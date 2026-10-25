@@ -131,8 +131,30 @@ internal static class SelfTest
             await Settle();
         }
 
-        model.SelectedTool = model.Tools[4];
+        model.SelectedTool = model.Tools.First(t => t.Title == "Hromadné spracovanie");
         await Screenshot(window, "main-placeholder.png");
+
+        // rules page: undetermined languages chosen by the user, result written next to the kept original
+        var work = Path.Combine(_outputDirectory, "rules");
+        Directory.CreateDirectory(work);
+        var copy = Path.Combine(work, "en-und-cz-forced.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Rules);
+        await model.Rules.LoadAsync(copy);
+        Check(model.Rules.Plan?.Target.IsBlocked == true, "rules: undetermined languages block the file");
+        Check(!model.Rules.ApplyCommand.CanExecute(null), "rules: apply disabled while blocked");
+        await Screenshot(window, "rules-undetermined.png");
+        model.Rules.ChooseLanguage(2, "cs");
+        model.Rules.ChooseLanguage(3, "cs");
+        model.Rules.KeepOriginal = true;
+        model.Rules.TargetDirectory = null;
+        Check(model.Rules.ApplyCommand.CanExecute(null), "rules: apply enabled after choosing languages");
+        await Screenshot(window, "rules-preview.png");
+        await model.Rules.ApplyCommand.ExecuteAsync(null);
+        Check(model.Rules.Result.StartsWith("Hotovo", StringComparison.Ordinal), "rules: written – " + model.Rules.Result);
+        var result = Path.Combine(work, "en-und-cz-forced [UNIVERSUM].mkv");
+        Check(File.Exists(result) && File.Exists(copy), "rules: result next to the kept original");
+        await Screenshot(window, "rules-done.png");
         window.Close();
 
         var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };

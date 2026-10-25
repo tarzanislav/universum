@@ -29,6 +29,21 @@ tool output directly. MKVToolNix is the first backend (`Universum.Core.MkvToolNi
 A future ffmpeg backend (ffprobe inspection, audio/subtitle conversion, audio samples for language detection) plugs
 in next to it without changing the rules, planning or UI.
 
+## Rules, planning and writing
+
+- `Rules/UniversumRules` – the track rules of the specification (section 6) as a pure function of the file,
+  a `RuleProfile` (preferred languages, keywords for forced / SDH / commentary) and languages chosen for `und`
+  tracks. Result: `TargetState` (tracks in final order, flags, names, languages, issues). Blocking issues
+  (undetermined language, several video tracks, no audio) stop automatic processing.
+- `Planning/EditPlan` – write method (`None`, `HeaderEdit` with mkvpropedit, `Remux` with mkvmerge when the order
+  changes) and the list of changes for previews; `TargetVerifier` compares a written file with its target.
+- `MkvToolNix/MkvToolNixArguments` – mkvpropedit / mkvmerge arguments (tracks selected by Matroska track number,
+  language set as IETF tag so both language elements are written, statistics tags disabled when tags are removed).
+- `Execution/FileProcessor` – writes a plan safely: new files under a temporary name next to their destination,
+  read back and verified before the original is touched; a replaced original goes to the Recycle Bin (refused where
+  there is none, e.g. network shares); in-place header edits first save an `UndoRecord` (header values and tags)
+  and are reverted automatically when verification fails.
+
 ## Processes
 
 `ProcessRunner` starts tools without a shell, passes arguments one by one, reads output as UTF-8, kills the whole

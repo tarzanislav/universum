@@ -1,12 +1,14 @@
 <Application x:Class="Universum.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Universum.App"
              ThemeMode="System"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
             <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+            <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
 
             <Style x:Key="Icon" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource IconFont}" />

@@ -397,7 +397,7 @@ public sealed class BatchTests
 
     private sealed class NoRecycleBin : IRecycleBin
     {
-        public bool CanRecycle(string path) => false;
+        public string? CannotRecycle(string path) => "no recycle bin in tests";
 
         public void MoveToRecycleBin(string path) => throw new IOException("no recycle bin in tests");
     }

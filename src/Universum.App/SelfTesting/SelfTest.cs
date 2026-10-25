@@ -80,6 +80,16 @@ internal static class SelfTest
         File.WriteAllBytes(unsigned, [0x4D, 0x5A, 0, 0]);
         Check(!AuthenticodeVerifier.Verify(unsigned).IsValid, "unsigned file is rejected");
 
+        // Recycle Bin: only where Windows really keeps files (never a silent permanent delete)
+        var bin = new WindowsRecycleBin();
+        var probe = Path.Combine(_outputDirectory, "recycle-probe.txt");
+        File.WriteAllText(probe, "x");
+        var reason = bin.CannotRecycle(probe);
+        Write($"Recycle Bin on the work drive: {reason ?? "available"}");
+        Check(reason is null || reason.Contains("Recycle Bin", StringComparison.Ordinal), "Recycle Bin check gives a reason when it refuses");
+        Check(bin.CannotRecycle(@"\\server\share\film.mkv") is not null, "network share refused");
+        File.Delete(probe);
+
         var registry = new RegistryMkvToolNixLocations().CandidateDirectories().ToList();
         Write($"registry candidates: {(registry.Count == 0 ? "none" : string.Join("; ", registry))}");
         return installation;

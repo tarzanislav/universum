@@ -161,7 +161,8 @@ if (options.Command == "analyze" || options.DryRun)
     return items.Any(i => i.Status == BatchStatus.NeedsReview) ? 1 : 0;
 }
 
-var processor = new FileProcessor(installation, runner, RecycleBin(), Path.Combine(Path.GetDirectoryName(cacheFile)!, "journal"));
+var processor = new FileProcessor(installation, runner, RecycleBin(), Path.Combine(Path.GetDirectoryName(cacheFile)!, "journal"),
+    new LibraryIndex(Path.Combine(Path.GetDirectoryName(cacheFile)!, "library-index.json")));
 layout.EnsureCreated();
 using var cancel = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -241,7 +242,7 @@ static void TrySave(Universum.Core.Media.CachingInspector inspector)
 /// <summary>Without a Recycle Bin (Linux) deleting originals is refused.</summary>
 internal sealed class NoRecycleBin : IRecycleBin
 {
-    public bool CanRecycle(string path) => false;
+    public string? CannotRecycle(string path) => "no Recycle Bin on this system";
 
     public void MoveToRecycleBin(string path) => throw new IOException("No Recycle Bin on this system.");
 }

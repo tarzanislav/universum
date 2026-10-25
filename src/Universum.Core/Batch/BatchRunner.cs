@@ -49,7 +49,17 @@ public static class BatchRunner
                     }
 
                     var fileProgress = progress is null ? null : new InlineProgress(f => progress.Report(new BatchProgress(item, f, null, Volatile.Read(ref finished), work.Count)));
-                    var result = await processor.ProcessAsync(item.Plan, item.Placement!, output, fileProgress, cancellationToken).ConfigureAwait(false);
+                    ProcessingResult result;
+                    try
+                    {
+                        result = await processor.ProcessAsync(item.Plan, item.Placement!, output, fileProgress, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // one file never stops the batch
+                        result = new ProcessingResult(item.File.Path, ProcessingStatus.Failed, item.Plan.Method, null, null, [ex.Message]);
+                    }
+
                     lock (results)
                     {
                         results.Add(result);

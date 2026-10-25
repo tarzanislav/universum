@@ -38,7 +38,7 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         var rest = fileName[VersionStart.Length..^Extension.Length];
         foreach (var label in SizeClasses.AllLabels)
         {
-            if (rest.StartsWith(label, StringComparison.Ordinal))
+            if (rest.StartsWith(label, StringComparison.OrdinalIgnoreCase))
             {
                 var number = rest[label.Length..];
                 return number.Length == 0 || (number.All(char.IsAsciiDigit) && number[0] != '0' && number != "1");
@@ -61,7 +61,7 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         }
 
         var label = name[VersionStart.Length..^Extension.Length].TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
-        return string.Equals(label, Sizes.Label(size), StringComparison.Ordinal);
+        return string.Equals(label, Sizes.Label(size), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Length of the full path of a result of the given size, with room for a version number.</summary>
@@ -115,9 +115,18 @@ public sealed record LibraryLayout(string Root)
         return Path.GetFullPath(path).StartsWith(root, Paths.Comparison);
     }
 
-    /// <summary>Unfinished results (temporary files) left in the library after an interruption.</summary>
-    public IReadOnlyList<string> FindLeftovers() =>
+    /// <summary>Unfinished results (temporary copies) left in the library after an interruption; safe to remove.</summary>
+    public IReadOnlyList<string> FindLeftovers() => Find(Execution.FileProcessor.IsTemporaryFile);
+
+    /// <summary>
+    /// Originals or replaced library files left half-way by an interruption (".universum-moving", ".universum-old"):
+    /// possibly the only copy, never removed automatically.
+    /// </summary>
+    public IReadOnlyList<string> FindInterrupted() => Find(Execution.FileProcessor.IsInterruptedFile);
+
+    private List<string> Find(Func<string, bool> predicate) =>
         System.IO.Directory.Exists(Root)
-            ? System.IO.Directory.EnumerateFiles(Root, "*" + Execution.FileProcessor.TemporaryExtension, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }).ToList()
+            ? System.IO.Directory.EnumerateFiles(Root, "*.universum-*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+                .Where(predicate).ToList()
             : [];
 }

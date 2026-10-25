@@ -27,6 +27,8 @@ public sealed class BatchPageViewModel : ObservableObject
     private BatchAnalysis? _analysis;
     private LibraryJob? _library;
     private IReadOnlyList<string> _leftovers = [];
+    private IReadOnlyList<string> _interrupted = [];
+    private bool _ranSinceAnalysis;
     private IReadOnlyList<BatchItem> _items = [];
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
@@ -52,7 +54,7 @@ public sealed class BatchPageViewModel : ObservableObject
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
         SaveTemplateCommand = new RelayCommand(SaveTemplate, () => !Busy && Template.Slots.Count > 0);
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
-        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
+        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
         StopCommand = new RelayCommand(Stop, () => _running);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
@@ -300,6 +302,8 @@ public sealed class BatchPageViewModel : ObservableObject
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
             IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
+            _interrupted = _services.Library?.FindInterrupted() ?? Array.Empty<string>();
+            _ranSinceAnalysis = false;
             TrySave(inspector);
             Groups.Clear();
             foreach (var group in _analysis.Groups)
@@ -309,7 +313,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
             Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
                       (_analysis.Failed.Count > 0 ? $", {_analysis.Failed.Count} sa nedalo prečítať ({string.Join(", ", _analysis.Failed.Select(f => Path.GetFileName(f.Path)))})" : "") +
-                      (_leftovers.Count > 0 ? $", {_leftovers.Count} zvyšok po prerušenom spracovaní" : "") + "." +
+                      (_leftovers.Count > 0 ? $", {_leftovers.Count} zvyšok po prerušenom spracovaní" : "") +
+                      (_interrupted.Count > 0 ? $", POZOR: {_interrupted.Count} nedokončený presun v knižnici – skontrolujte súbory *.universum-moving / *.universum-old ({string.Join(", ", _interrupted.Select(Path.GetFileName))})" : "") + "." +
                       (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "");
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
@@ -462,7 +467,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            var processor = new FileProcessor(installation, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
+            var processor = _services.Processor(installation);
             _library.Layout.EnsureCreated();
             _results = await BatchRunner.RunAsync(
                 _items, processor, new OutputOptions(handling),
@@ -487,8 +492,9 @@ public sealed class BatchPageViewModel : ObservableObject
             var failed = _results.Count(r => r.Status == ProcessingStatus.Failed);
             var present = _results.Count(r => r.Status == ProcessingStatus.AlreadyInLibrary);
             RunState = $"Hotovo: {done} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
-                       (failed > 0 ? $", {failed} s chybou (originály nezmenené)" : "") +
-                       (_control.StopAfterCurrent ? " – zastavené na požiadanie." : ".");
+                       (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
+                       (_control.StopAfterCurrent ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
+            _ranSinceAnalysis = true;
         }
         finally
         {

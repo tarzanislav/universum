@@ -47,6 +47,15 @@ public sealed class AppServices
         LibraryChanged?.Invoke();
     }
 
+    private LibraryIndex? _libraryIndex;
+
+    /// <summary>Which original each library file was made from (recognises the same stream processed again).</summary>
+    public LibraryIndex LibraryIndex => _libraryIndex ??= new LibraryIndex(AppSettings.LibraryIndexFile);
+
+    /// <summary>Writes into the library with the Windows Recycle Bin and the undo journal.</summary>
+    public FileProcessor Processor(MkvToolNixInstallation installation) =>
+        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex);
+
     /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
     public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
 
@@ -110,6 +119,9 @@ public sealed class AppSettings
 
     /// <summary>Saved batch templates (*.json).</summary>
     public static string TemplateDirectory => Path.Combine(Directory, "templates");
+
+    /// <summary>Index of library files and the originals they were made from.</summary>
+    public static string LibraryIndexFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "library-index.json");
 
     /// <summary>Cache of identification results (path, size, time → structure).</summary>
     public static string IdentificationCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "identification-cache.json");

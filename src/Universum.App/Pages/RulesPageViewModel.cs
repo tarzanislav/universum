@@ -303,7 +303,7 @@ public sealed class RulesPageViewModel : ObservableObject
         Progress = 0;
         try
         {
-            var processor = new FileProcessor(_services.CurrentMkvToolNix, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
+            var processor = _services.Processor(_services.CurrentMkvToolNix);
             var result = await processor.ProcessAsync(_plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
             _undoRecord = result.UndoRecordPath;
             var cache = _services.Inspector(_services.CurrentMkvToolNix);
@@ -342,7 +342,7 @@ public sealed class RulesPageViewModel : ObservableObject
         Busy = true;
         try
         {
-            var processor = new FileProcessor(_services.CurrentMkvToolNix, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
+            var processor = _services.Processor(_services.CurrentMkvToolNix);
             var problems = await processor.UndoAsync(_undoRecord);
             Result = problems.Count == 0 ? "Pôvodná hlavička je obnovená a súbor je na pôvodnom mieste." : "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
             if (problems.Count == 0)

@@ -17,6 +17,11 @@ internal static class Output
             Console.WriteLine("  zvyšok (možno vymazať): " + leftover);
         }
 
+        foreach (var interrupted in library.Layout.FindInterrupted())
+        {
+            Console.WriteLine("  POZOR – nedokončený presun, možno jediná kópia (skontrolujte, nemažte): " + interrupted);
+        }
+
         Console.WriteLine($"Knižnica: {library.Layout.Root}");
         if (library.Kind == MediaKind.Series)
         {

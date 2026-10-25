@@ -40,14 +40,21 @@ in next to it without changing the rules, planning or UI.
   changes) and the list of changes for previews; `TargetVerifier` compares a written file with its target.
 - `MkvToolNix/MkvToolNixArguments` – mkvpropedit / mkvmerge arguments (tracks selected by Matroska track number,
   language set as IETF tag so both language elements are written, statistics tags disabled when tags are removed).
-- `Execution/FileProcessor` – writes a plan into the library safely. A header-only change of an original that is to
-  be removed and lies on the same drive moves the original into the library (a rename) and edits it there; every
-  header edit first saves an `UndoRecord` (header values, tags, where the file came from) and is reverted – edit and
-  move – when verification fails. Otherwise the result is written as `*.universum-tmp` in the target folder (not a
-  video extension, so media servers ignore it), read back, verified, renamed to its final name, and only then is the
-  original sent to the Recycle Bin (refused where there is none, e.g. network shares). A file already in its library
-  folder is edited there or replaced (the old one to the Recycle Bin). The same stream already in the library
-  (duration, tracks, size) is not written again (`AlreadyInLibrary`).
+- `Execution/FileProcessor` – writes a plan into the library; an original is never lost:
+  - the file is read again first; if it changed since the analysis, nothing is written;
+  - header-only change of an original that is to be removed, on the same drive: an `UndoRecord` (header values,
+    tags, time, track UIDs, where the file came from) is written first, then the original is moved into the library as
+    `*.universum-moving` (ignored by media servers), edited without interruption, verified and renamed; any failure,
+    also an exception, restores the header and moves it back;
+  - otherwise the result is written as `*.universum-tmp`, flushed, read back, verified and renamed, and only then is
+    the original sent to the Recycle Bin;
+  - a file already in its library folder is edited with undo, or replaced: the old one is renamed to
+    `*.universum-old`, the new one takes its place, then the old one goes to the Recycle Bin;
+  - `Library/LibraryIndex` remembers which original (fingerprint of its content) each library file came from, so
+    the same original processed again is not written twice; unknown files are never skipped, at worst they become a
+    new version.
+- `Platform.Windows/WindowsRecycleBin` – only fixed drives whose Recycle Bin is on and large enough for the file
+  (per-volume settings in the registry); Windows must ask before any permanent delete (`FOF_WANTNUKEWARNING`).
 
 ## Library (specification, section 13)
 

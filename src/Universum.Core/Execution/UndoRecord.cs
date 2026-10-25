@@ -18,11 +18,21 @@ public sealed record UndoRecord
     /// <summary>Tags of the file before the edit (mkvextract XML); null when the file had none.</summary>
     public string? TagsXmlPath { get; init; }
 
+    /// <summary>Last-modified time of the file before the edit; restored by undo.</summary>
+    public DateTime? ModifiedUtc { get; init; }
+
     public static UndoRecord Load(string path) =>
         JsonSerializer.Deserialize<UndoRecord>(File.ReadAllText(path)) ?? throw new InvalidDataException("Empty undo record.");
 
-    public void Save(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+    /// <summary>Writes the record atomically (a new file renamed over the old one).</summary>
+    public void Save(string path)
+    {
+        var temporary = path + ".new";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        File.Move(temporary, path, overwrite: true);
+    }
 }
 
 /// <param name="Number">Matroska track number (stable for in-place edits).</param>
-public sealed record UndoTrack(int Number, string? Name, string Language, string? LanguageIetf, bool Default, bool Enabled, bool Forced);
+/// <param name="Uid">Track UID: undo checks that the file is still the one that was edited.</param>
+public sealed record UndoTrack(int Number, string? Name, string Language, string? LanguageIetf, bool Default, bool Enabled, bool Forced, ulong? Uid = null);

@@ -159,6 +159,72 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task FailedEditPutsTheOriginalBack()
+    {
+        using var work = new WorkFolder();
+        var runner = new FailingRunner(new ProcessRunner());
+        var (processor, inspector) = await CreateAsync(work, runner: runner);
+        var file = work.Copy("cz-only.mkv");
+        var installation = await TestData.RequireMkvToolNixAsync();
+        await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvPropEdit), [file, "--edit", "track:a1", "--set", "name=Dabing CZ"]));
+        var time = new DateTime(2021, 3, 4, 5, 6, 8, DateTimeKind.Utc);
+        System.IO.File.SetLastWriteTimeUtc(file, time);
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file)));
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method);
+
+        runner.FailNextEdit = true;
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Delete);
+
+        Assert.Equal(ProcessingStatus.Failed, result.Status);
+        Assert.True(result.Messages.Contains("the original was restored"), string.Join("; ", result.Messages));
+        Assert.True(System.IO.File.Exists(file), "original back in its place");
+        Assert.Equal("Dabing CZ", (await inspector.InspectAsync(file)).TracksOf(TrackType.Audio).Single().Name, "header as before");
+        Assert.Equal(time, System.IO.File.GetLastWriteTimeUtc(file), "modification time as before");
+        Assert.True(!Directory.EnumerateFiles(work.Layout.Root, "*", SearchOption.AllDirectories).Any(), "nothing left in the library");
+    }
+
+    [Test]
+    public async Task ChangedFileIsNotWritten()
+    {
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var file = work.Copy("sk-cz-mixed.mkv");
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file)));
+        var installation = await TestData.RequireMkvToolNixAsync();
+        await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvPropEdit), [file, "--edit", "track:a1", "--set", "name=changed"]));
+
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Delete);
+        Assert.Equal(ProcessingStatus.Failed, result.Status);
+        Assert.True(result.Messages.Single().Contains("changed since the analysis", StringComparison.Ordinal), result.Messages.Single());
+        Assert.True(!Directory.Exists(work.Layout.Root), "nothing written");
+    }
+
+    [Test]
+    public async Task ReplacingALibraryFileSendsTheOldOneToTheRecycleBin()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var original = work.Copy("sk-cz-mixed.mkv");
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original)));
+        var first = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, first.Status, string.Join("; ", first.Messages));
+
+        // the library file again, with English first: a new file replaces it in the same folder
+        var englishFirst = RuleProfile.Default with { OrderLanguages = ["en", "cs", "sk"] };
+        var again = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(first.OutputPath!), englishFirst));
+        Assert.Equal(WriteMethod.Remux, again.Method);
+        var placement = work.Layout.Place(again.Target, new TitleInfo(MediaKind.Movie, "Vymyslený film", 2026), null, englishFirst);
+        var second = await processor.ProcessAsync(again, placement, Keep);
+
+        Assert.Equal(ProcessingStatus.Done, second.Status, string.Join("; ", second.Messages));
+        Assert.Equal("Vymyslený film (2026) - EN CZ SK SD H264 SMALL.mkv", Path.GetFileName(second.OutputPath));
+        Assert.True(!System.IO.File.Exists(first.OutputPath!), "old library file replaced");
+        Assert.True(bin.Recycled.Single().EndsWith(FileProcessor.ReplacedExtension, StringComparison.Ordinal), "old file in the Recycle Bin");
+        Assert.True(System.IO.File.Exists(original), "the original outside the library untouched");
+    }
+
+    [Test]
     public async Task MissingVideoIndexIsRepaired()
     {
         using var work = new WorkFolder();
@@ -204,12 +270,13 @@ public sealed class ProcessorTests
         Assert.Equal(ProcessingStatus.NeedsReview, result.Status);
     }
 
-    private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null)
+    private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();
-        var runner = new ProcessRunner();
-        return (new FileProcessor(installation, runner, bin ?? new FolderRecycleBin(Path.Combine(work.Path, "bin")), Path.Combine(work.Path, "journal")),
-            new MkvMergeInspector(installation, runner));
+        runner ??= new ProcessRunner();
+        var index = new LibraryIndex(Path.Combine(work.Path, "library-index.json"));
+        return (new FileProcessor(installation, runner, bin ?? new FolderRecycleBin(Path.Combine(work.Path, "bin")), Path.Combine(work.Path, "journal"), index),
+            new MkvMergeInspector(installation, new ProcessRunner()));
     }
 
     private sealed class WorkFolder : IDisposable
@@ -242,13 +309,30 @@ public sealed class ProcessorTests
 
         public List<string> Recycled { get; } = [];
 
-        public bool CanRecycle(string path) => Available;
+        public string? CannotRecycle(string path) => Available ? null : "no recycle bin";
 
         public void MoveToRecycleBin(string path)
         {
             Directory.CreateDirectory(folder);
             System.IO.File.Move(path, System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path)));
             Recycled.Add(path);
+        }
+    }
+
+    /// <summary>Runs the tools, but lets the next mkvpropedit edit (not an undo) fail once.</summary>
+    private sealed class FailingRunner(IProcessRunner inner) : IProcessRunner
+    {
+        public bool FailNextEdit { get; set; }
+
+        public Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
+        {
+            if (FailNextEdit && Path.GetFileNameWithoutExtension(request.FileName).Equals("mkvpropedit", StringComparison.OrdinalIgnoreCase))
+            {
+                FailNextEdit = false;
+                return Task.FromResult(new ProcessResult(2, "", "Error: simulated failure", TimeSpan.Zero));
+            }
+
+            return inner.RunAsync(request, cancellationToken);
         }
     }
 

@@ -1,0 +1,98 @@
+using System.Globalization;
+using Universum.Core.Media;
+using Universum.Core.Rules;
+
+namespace Universum.Core.MkvToolNix;
+
+/// <summary>Builds mkvpropedit and mkvmerge arguments for a target state.</summary>
+public static class MkvToolNixArguments
+{
+    /// <summary>mkvpropedit arguments that change the header in place (track order must not change).</summary>
+    public static IReadOnlyList<string> HeaderEdit(TargetState target, string filePath)
+    {
+        if (target.OrderChanged)
+        {
+            throw new InvalidOperationException("mkvpropedit cannot change the track order.");
+        }
+
+        var arguments = new List<string> { filePath };
+        if (target.TagsChanged)
+        {
+            arguments.AddRange(["--tags", "all:"]);
+        }
+
+        for (var position = 0; position < target.Tracks.Count; position++)
+        {
+            var track = target.Tracks[position];
+            if (!track.HasChanges)
+            {
+                continue;
+            }
+
+            arguments.AddRange(["--edit", Selector(track.Source, position)]);
+            if (track.NameChanged)
+            {
+                arguments.AddRange(track.Name is null ? ["--delete", "name"] : ["--set", "name=" + track.Name]);
+            }
+
+            if (track.LanguageChanged)
+            {
+                arguments.AddRange(["--set", "language=" + Code(track.Language)]);
+            }
+
+            AddFlag(arguments, "flag-default", track.Source.Flags.Default, track.Flags.Default);
+            AddFlag(arguments, "flag-enabled", track.Source.Flags.Enabled, track.Flags.Enabled);
+            AddFlag(arguments, "flag-forced", track.Source.Flags.Forced, track.Flags.Forced);
+        }
+
+        return arguments;
+    }
+
+    /// <summary>mkvmerge arguments that write the target state to a new file (track order may change).</summary>
+    public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath)
+    {
+        var arguments = new List<string> { "--gui-mode", "--output", outputPath };
+        if (target.RemoveTags)
+        {
+            arguments.AddRange(["--no-global-tags", "--no-track-tags", "--disable-track-statistics-tags"]);
+        }
+
+        foreach (var track in target.Tracks)
+        {
+            var id = track.TrackId.ToString(CultureInfo.InvariantCulture);
+            arguments.AddRange(["--track-name", $"{id}:{track.Name}"]);
+            if (track.LanguageChanged)
+            {
+                arguments.AddRange(["--language", $"{id}:{Code(track.Language)}"]);
+            }
+
+            arguments.AddRange(["--default-track-flag", $"{id}:{Bit(track.Flags.Default)}"]);
+            arguments.AddRange(["--track-enabled-flag", $"{id}:{Bit(track.Flags.Enabled)}"]);
+            arguments.AddRange(["--forced-display-flag", $"{id}:{Bit(track.Flags.Forced)}"]);
+        }
+
+        arguments.Add(sourcePath);
+        arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => "0:" + t.TrackId.ToString(CultureInfo.InvariantCulture)))]);
+        return arguments;
+    }
+
+    /// <summary>Selects a track by its Matroska track number ("track:@3"), or by position when it is unknown.</summary>
+    public static string Selector(MediaTrack track, int position) =>
+        track.Number is { } number
+            ? "track:@" + number.ToString(CultureInfo.InvariantCulture)
+            : "track:" + (position + 1).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Language value for MKVToolNix: the IETF tag when known (sets both elements), else the legacy code.</summary>
+    public static string Code(LanguageTag language) =>
+        !string.IsNullOrWhiteSpace(language.Ietf) && !language.IsUndetermined ? language.Ietf : language.Legacy;
+
+    private static void AddFlag(List<string> arguments, string name, bool before, bool after)
+    {
+        if (before != after)
+        {
+            arguments.AddRange(["--set", $"{name}={Bit(after)}"]);
+        }
+    }
+
+    private static string Bit(bool value) => value ? "1" : "0";
+}

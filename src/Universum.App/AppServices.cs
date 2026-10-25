@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Universum.Core.Execution;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Platform.Windows;
@@ -50,6 +51,18 @@ public sealed class AppSettings
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UNIVERSUM");
 
     public string? MkvToolNixDirectory { get; set; }
+
+    /// <summary>Keep or delete (to the Recycle Bin) the original; null until the user chooses the first time.</summary>
+    public OriginalHandling? OriginalHandling { get; set; }
+
+    /// <summary>Folder for results; null = next to the original.</summary>
+    public string? TargetDirectory { get; set; }
+
+    /// <summary>Folder with undo records of in-place edits.</summary>
+    public static string JournalDirectory =>
+        Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
+            ? Path.Combine(custom, "journal")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "journal");
 
     public static AppSettings Load()
     {

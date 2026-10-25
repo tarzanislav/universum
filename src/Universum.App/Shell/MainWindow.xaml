@@ -46,6 +46,95 @@
                 </DataGrid>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:RulesPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Otvoriť súbor…" Command="{Binding OpenCommand}" Padding="16,6" />
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Pravidlá UNIVERSUM" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Grid.Row="1" Margin="0,8,0,12">
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
+                    <TextBlock Text="{Binding Issues}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                </StackPanel>
+                <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Position}" />
+                        <DataGridTextColumn Header="Typ" Binding="{Binding Type}" />
+                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding Codec}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Jazyk (pred → po)" Width="175">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <StackPanel Visibility="{Binding NeedsLanguage, Converter={StaticResource InverseBoolToVisibility}}">
+                                            <TextBlock Text="{Binding LanguageBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding LanguageAfter}" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <ComboBox Visibility="{Binding NeedsLanguage, Converter={StaticResource BoolToVisibility}}"
+                                                  ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                  DisplayMemberPath="SlovakName" MinWidth="160" ToolTip="Neurčený jazyk – vyberte, v akom jazyku stopa je" />
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Názov (pred → po)" Width="*" MinWidth="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding NameAfter}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Default" Binding="{Binding DefaultAfter}" />
+                        <DataGridTextColumn Header="Enabled" Binding="{Binding EnabledAfter}" />
+                        <DataGridTextColumn Header="Forced" Binding="{Binding ForcedAfter}" />
+                        <DataGridTextColumn Header="Rola" Binding="{Binding Role}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <WrapPanel>
+                            <TextBlock Text="Originál:" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
+                            <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
+                            <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original" />
+                            <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
+                                <Run Text="Výsledok:" /> <Run Text="{Binding TargetDescription, Mode=OneWay}" />
+                            </TextBlock>
+                            <Button Content="Priečinok…" Command="{Binding ChooseTargetDirectoryCommand}" Margin="0,0,8,0" Padding="10,4" />
+                            <Button Content="Vedľa originálu" Command="{Binding ClearTargetDirectoryCommand}" Padding="10,4" />
+                        </WrapPanel>
+                        <DockPanel Margin="0,12,0,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
+                                <Button Content="Použiť pravidlá" Command="{Binding ApplyCommand}" Padding="16,6" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,16,0">
+                                <ProgressBar Height="4" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>

@@ -24,6 +24,12 @@ public partial class MainWindow : Window
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files && File.Exists(files[0]))
         {
+            if (Model.SelectedTool.Page == Model.Rules)
+            {
+                await Model.Rules.LoadAsync(files[0]);
+                return;
+            }
+
             Model.SelectedTool = Model.Tools.First(t => t.Page == Model.Info);
             await Model.Info.LoadAsync(files[0]);
         }

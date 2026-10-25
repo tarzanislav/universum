@@ -3,6 +3,7 @@ using System.Text.Json;
 using Universum.Core.Execution;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
+using Universum.Core.Rules;
 using Universum.Core.Processes;
 using Universum.Platform.Windows;
 
@@ -28,6 +29,9 @@ public sealed class AppServices
 
         return _inspector;
     }
+
+    /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
+    public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
 
     /// <summary>MKVToolNix found by the last search; null when none is usable.</summary>
     public MkvToolNixInstallation? CurrentMkvToolNix { get; private set; }
@@ -72,6 +76,9 @@ public sealed class AppSettings
 
     /// <summary>Folder for results; null = next to the original.</summary>
     public string? TargetDirectory { get; set; }
+
+    /// <summary>Own rules profile; null = the profile of the specification.</summary>
+    public RuleProfile? Profile { get; set; }
 
     /// <summary>Last folder of the batch page.</summary>
     public string? BatchFolder { get; set; }

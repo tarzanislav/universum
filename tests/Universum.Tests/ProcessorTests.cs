@@ -97,6 +97,29 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task MissingVideoIndexIsRepaired()
+    {
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var file = System.IO.Path.Combine(work.Path, "no-index.mkv");
+        await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge),
+            ["-o", file, "--cues", "0:none", TestData.Media("cz-only.mkv")]));
+        var source = await inspector.InspectAsync(file);
+        Assert.Equal(0, source.TracksOf(TrackType.Video).Single().IndexEntries, "test file without index");
+
+        var plan = EditPlan.For(UniversumRules.Apply(source));
+        Assert.True(plan.Target.Issues.Any(i => i.Kind == RuleIssueKind.MissingIndex), "health issue reported");
+        Assert.Equal(WriteMethod.Remux, plan.Method, "index needs a new file");
+        var result = await processor.ProcessAsync(plan, new OutputOptions(OriginalHandling.Keep));
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.True((await inspector.InspectAsync(result.OutputPath!)).TracksOf(TrackType.Video).Single().IndexEntries > 0, "index created");
+
+        var withoutRepair = EditPlan.For(UniversumRules.Apply(source, RuleProfile.Default with { RepairIndex = false }));
+        Assert.Equal(WriteMethod.None, withoutRepair.Method, "repair can be switched off");
+    }
+
+    [Test]
     public async Task NoRecycleBinMeansNothingIsWritten()
     {
         using var work = new WorkFolder();

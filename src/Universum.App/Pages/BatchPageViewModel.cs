@@ -253,8 +253,8 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        BatchPlanner.Suggest(_analysis);
-        _items = BatchPlanner.Plan(_analysis, Template);
+        BatchPlanner.Suggest(_analysis, _services.Profile);
+        _items = BatchPlanner.Plan(_analysis, Template, _services.Profile);
         foreach (var row in Groups)
         {
             var items = _items.Where(i => i.Group == row.Group).ToList();

@@ -38,6 +38,9 @@ public sealed record RuleProfile
     /// <summary>Remove all tags (global, track and statistics tags).</summary>
     public bool RemoveTags { get; init; } = true;
 
+    /// <summary>Rewrite files whose video track has no index (cues), so seeking works again.</summary>
+    public bool RepairIndex { get; init; } = true;
+
     /// <summary>Position of a language in the track order (lower first); int.MaxValue for languages not listed.</summary>
     public int Priority(string primaryLanguage) => IndexOf(OrderLanguages.Count > 0 ? OrderLanguages : PreferredLanguages, primaryLanguage);
 

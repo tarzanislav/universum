@@ -13,6 +13,12 @@ public enum RuleIssueKind
 
     /// <summary>No audio in a preferred language and no subtitles in one either: nothing is shown by default.</summary>
     NoPreferredSubtitles,
+
+    /// <summary>The video track has no index (cues): seeking is slow or broken; a rewrite repairs it.</summary>
+    MissingIndex,
+
+    /// <summary>mkvmerge reported warnings when reading the file (damaged or unusual file).</summary>
+    ContainerWarnings,
 }
 
 /// <param name="TrackId">The track concerned, null for the whole file.</param>

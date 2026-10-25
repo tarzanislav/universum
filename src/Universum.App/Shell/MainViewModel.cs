@@ -20,6 +20,7 @@ public sealed class MainViewModel : ObservableObject
         Info = new InfoPageViewModel(services);
         Rules = new RulesPageViewModel(services);
         Batch = new BatchPageViewModel(services);
+        Settings = new SettingsPageViewModel(services);
         Tools =
         [
             new("Zlučovanie", "\uE71D", new PlaceholderPageViewModel("Zlučovanie", "Zdrojové súbory, stopy a ich vlastnosti, výstup a prílohy – ako Multiplexer v MKVToolNix GUI.", "etapa E4")),
@@ -30,6 +31,7 @@ public sealed class MainViewModel : ObservableObject
             new("Hromadné spracovanie", "\uE8B7", Batch),
             new("Fronta úloh", "\uE823", new PlaceholderPageViewModel("Fronta úloh", "Úlohy čakajúce na spracovanie.", "etapa E4")),
             new("Výstup úloh", "\uE7C3", new PlaceholderPageViewModel("Výstup úloh", "Priebeh, upozornenia a chyby spracovania.", "etapa E4")),
+            new("Nastavenia", "\uE713", Settings),
         ];
         _selectedTool = Tools[1];
         SetupCommand = new AsyncRelayCommand(SetupAsync);
@@ -44,6 +46,8 @@ public sealed class MainViewModel : ObservableObject
     public RulesPageViewModel Rules { get; }
 
     public BatchPageViewModel Batch { get; }
+
+    public SettingsPageViewModel Settings { get; }
 
     public ToolItem SelectedTool { get => _selectedTool; set => SetProperty(ref _selectedTool, value); }
 

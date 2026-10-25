@@ -5,7 +5,11 @@ namespace Universum.Core.Execution;
 /// <summary>Original header values of a file edited in place, so the edit can be reverted.</summary>
 public sealed record UndoRecord
 {
+    /// <summary>The edited file (after a move, its place in the library).</summary>
     public required string FilePath { get; init; }
+
+    /// <summary>Where the file was before it was moved into the library; undo moves it back.</summary>
+    public string? MovedFrom { get; init; }
 
     public DateTime CreatedUtc { get; init; } = DateTime.UtcNow;
 

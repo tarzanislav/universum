@@ -50,6 +50,7 @@ public static class Texts
     public static string Status(BatchStatus status) => status switch
     {
         BatchStatus.Unchanged => "bez zmeny",
+        BatchStatus.Place => "do knižnice",
         BatchStatus.HeaderEdit => "len hlavička",
         BatchStatus.Remux => "nový súbor",
         _ => "na kontrolu",
@@ -62,6 +63,9 @@ public static class Texts
             $"chýba povinná stopa: {Type(missing.Type)} {Language(LanguageTag.FromCode(missing.Language))}, {Role(missing.Role)}",
         ReviewReasonKind.MultipleVideoTracks => "viac video stôp",
         ReviewReasonKind.NoAudio => "bez zvuku",
+        ReviewReasonKind.MissingTitle => "chýba názov titulu",
+        ReviewReasonKind.MissingEpisode => "chýba číslo epizódy",
+        ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind.ToString(),
     };
 }

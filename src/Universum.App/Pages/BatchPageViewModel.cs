@@ -7,6 +7,7 @@ using Microsoft.Win32;
 using Universum.App.Templates;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
@@ -17,13 +18,15 @@ using Universum.Platform.Windows;
 namespace Universum.App.Pages;
 
 /// <summary>
-/// Batch processing of a folder (specification, section 7): analysis, structure groups, decisions per group,
-/// tolerant template, simulation, run with pause and stop, report.
+/// Batch processing of a folder (specification, sections 7 and 13): analysis, structure groups, decisions per group,
+/// tolerant template, titles and episodes for the library, simulation, run with pause and stop, report.
 /// </summary>
 public sealed class BatchPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private BatchAnalysis? _analysis;
+    private LibraryJob? _library;
+    private IReadOnlyList<string> _leftovers = [];
     private IReadOnlyList<BatchItem> _items = [];
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
@@ -52,15 +55,25 @@ public sealed class BatchPageViewModel : ObservableObject
         RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
         StopCommand = new RelayCommand(Stop, () => _running);
-        CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _analysis?.LeftoverTemporaryFiles.Count > 0);
+        CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
-        ChooseTargetDirectoryCommand = new RelayCommand(ChooseTargetDirectory, () => !Busy);
-        ClearTargetDirectoryCommand = new RelayCommand(() => SetTargetDirectory(null), () => !Busy);
+        ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
+        ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null && _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode)));
+        services.LibraryChanged += () =>
+        {
+            OnPropertyChanged(nameof(OutputDescription));
+            if (_analysis is not null && _services.Library is { } layout)
+            {
+                _library = LibraryJob.Guess(layout, _analysis);
+                OnLibraryChanged();
+            }
+        };
     }
 
-    public RelayCommand ChooseTargetDirectoryCommand { get; }
+    public RelayCommand ChooseOutputDirectoryCommand { get; }
 
-    public RelayCommand ClearTargetDirectoryCommand { get; }
+    /// <summary>Accepts titles and episode numbers guessed from the names.</summary>
+    public RelayCommand ConfirmTitlesCommand { get; }
 
     public RelayCommand ChooseFolderCommand { get; }
 
@@ -174,9 +187,71 @@ public sealed class BatchPageViewModel : ObservableObject
         set => SetHandling(value, OriginalHandling.Delete);
     }
 
-    public string? TargetDirectory => _services.Settings.TargetDirectory;
+    public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
 
-    public string TargetDescription => TargetDirectory is null ? "vedľa originálov" : TargetDirectory + " (so štruktúrou podpriečinkov)";
+    /// <summary>Naming decisions for the analysed folder; null without an output folder.</summary>
+    public LibraryJob? Library => _library;
+
+    public bool IsMovies
+    {
+        get => _library?.Kind != MediaKind.Series;
+        set => SetKind(value, MediaKind.Movie);
+    }
+
+    public bool IsSeries
+    {
+        get => _library?.Kind == MediaKind.Series;
+        set => SetKind(value, MediaKind.Series);
+    }
+
+    /// <summary>Title of the series as in the library ("Nine Puzzles (2025) [tmdbid-227191]"); for films each file has its own.</summary>
+    public string SeriesTitle
+    {
+        get => _library?.Series?.FolderName ?? "";
+        set
+        {
+            if (_library is null)
+            {
+                return;
+            }
+
+            _library.Series = TitleGuess.Typed(MediaKind.Series, value);
+            Replan();
+        }
+    }
+
+    public string SeriesSuggestion => _library is { Series: null, SeriesSuggestion: { } suggestion } ? "návrh: " + suggestion.FolderName : "";
+
+    /// <summary>Sets the naming of one file: a film title ("Creep (2004)") or an episode ("S01E04"); also used by the self-test.</summary>
+    public void SetNaming(string path, string text)
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        if (_library.Kind == MediaKind.Series)
+        {
+            if (EpisodeNumber.TryParse(text) is { } number)
+            {
+                _library.Episodes[path] = number;
+            }
+            else
+            {
+                _library.Episodes.Remove(path);
+            }
+        }
+        else if (TitleGuess.Typed(MediaKind.Movie, text) is { } title)
+        {
+            _library.Movies[path] = title;
+        }
+        else
+        {
+            _library.Movies.Remove(path);
+        }
+
+        Replan();
+    }
 
     public string Summary { get => _summary; private set => SetProperty(ref _summary, value); }
 
@@ -221,7 +296,10 @@ public sealed class BatchPageViewModel : ObservableObject
             var inspector = _services.Inspector(installation);
             _analysis = await BatchAnalyzer.AnalyzeAsync(Folder, Recursive, inspector,
                 new Progress<(int Done, int Total)>(p => Summary = $"Analyzujem {p.Done} / {p.Total}…"),
-                excludeDirectory: TargetDirectory);
+                excludeDirectory: _services.Library?.Root);
+            _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
+            IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
+            _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
             TrySave(inspector);
             Groups.Clear();
             foreach (var group in _analysis.Groups)
@@ -231,8 +309,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
             Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
                       (_analysis.Failed.Count > 0 ? $", {_analysis.Failed.Count} sa nedalo prečítať ({string.Join(", ", _analysis.Failed.Select(f => Path.GetFileName(f.Path)))})" : "") +
-                      (_analysis.LeftoverTemporaryFiles.Count > 0 ? $", {_analysis.LeftoverTemporaryFiles.Count} zvyšok po prerušenom spracovaní" : "") + ".";
-            Replan();
+                      (_leftovers.Count > 0 ? $", {_leftovers.Count} zvyšok po prerušenom spracovaní" : "") + "." +
+                      (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "");
+            OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -254,7 +333,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         BatchPlanner.Suggest(_analysis, _services.Profile);
-        _items = BatchPlanner.Plan(_analysis, Template, _services.Profile);
+        _items = BatchPlanner.Plan(_analysis, Template, _services.Profile, _library);
         foreach (var row in Groups)
         {
             var items = _items.Where(i => i.Group == row.Group).ToList();
@@ -275,8 +354,11 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var remux = _items.Count(i => i.Status == BatchStatus.Remux);
         var header = _items.Count(i => i.Status == BatchStatus.HeaderEdit);
-        Simulation = $"Spracuje sa {remux + header} súborov ({remux} nový súbor, {header} len hlavička) · " +
-                     $"bez zmeny {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
+        var place = _items.Count(i => i.Status == BatchStatus.Place);
+        Simulation = (_library is null ? "Bez výstupného priečinka – len simulácia pravidiel · " : $"Do knižnice {remux + header + place} súborov ({remux} nový súbor, {header} len hlavička, {place} bez zmeny obsahu) · ") +
+                     $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
+        OnPropertyChanged(nameof(SeriesTitle));
+        OnPropertyChanged(nameof(SeriesSuggestion));
         RefreshCommands();
     }
 
@@ -296,10 +378,34 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var item in _items.Where(i => i.Group == group))
         {
-            FileRows.Add(new FileRow(item, _ => Replan()));
+            FileRows.Add(new FileRow(item, _ => Replan(), this));
         }
 
         RefreshCommands();
+    }
+
+    private void OnLibraryChanged()
+    {
+        OnPropertyChanged(nameof(IsMovies));
+        OnPropertyChanged(nameof(IsSeries));
+        Replan();
+    }
+
+    private void SetKind(bool selected, MediaKind kind)
+    {
+        if (!selected || _library is null || _library.Kind == kind)
+        {
+            return;
+        }
+
+        _library.Kind = kind;
+        OnLibraryChanged();
+    }
+
+    private void ConfirmTitles()
+    {
+        _library?.ConfirmSuggestions();
+        Replan();
     }
 
     private void ConfirmSuggestions()
@@ -344,7 +450,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private async Task RunAsync()
     {
-        if (_services.CurrentMkvToolNix is not { } installation || _services.Settings.OriginalHandling is not { } handling || _analysis is null)
+        if (_services.CurrentMkvToolNix is not { } installation || _services.Settings.OriginalHandling is not { } handling || _analysis is null || _library is null)
         {
             return;
         }
@@ -357,10 +463,9 @@ public sealed class BatchPageViewModel : ObservableObject
         try
         {
             var processor = new FileProcessor(installation, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
-            var options = new OutputOptions(handling, TargetDirectory);
-            var root = _analysis.Folder;
+            _library.Layout.EnsureCreated();
             _results = await BatchRunner.RunAsync(
-                _items, processor, item => BatchRunner.OutputFor(options, root, item.File.Path),
+                _items, processor, new OutputOptions(handling),
                 new Progress<BatchProgress>(p =>
                 {
                     Progress = p.Total == 0 ? 0 : (p.Finished + (p.Result is null ? p.FileFraction : 0)) / p.Total;
@@ -380,7 +485,9 @@ public sealed class BatchPageViewModel : ObservableObject
             TrySave(cache);
             var done = _results.Count(r => r.Status == ProcessingStatus.Done);
             var failed = _results.Count(r => r.Status == ProcessingStatus.Failed);
-            RunState = $"Hotovo: {done} súborov" + (failed > 0 ? $", {failed} s chybou (originály nezmenené)" : "") +
+            var present = _results.Count(r => r.Status == ProcessingStatus.AlreadyInLibrary);
+            RunState = $"Hotovo: {done} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
+                       (failed > 0 ? $", {failed} s chybou (originály nezmenené)" : "") +
                        (_control.StopAfterCurrent ? " – zastavené na požiadanie." : ".");
         }
         finally
@@ -429,7 +536,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var bin = new WindowsRecycleBin();
-        foreach (var file in _analysis.LeftoverTemporaryFiles.Where(File.Exists))
+        foreach (var file in _leftovers.Where(File.Exists))
         {
             try
             {
@@ -459,22 +566,13 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    private void ChooseTargetDirectory()
+    private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok pre upravené súbory" };
+        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
         if (dialog.ShowDialog() == true)
         {
-            SetTargetDirectory(dialog.FolderName);
+            _services.SetOutputDirectory(dialog.FolderName);
         }
-    }
-
-    /// <summary>Sets the folder for results (null = next to the originals); also used by the self-test.</summary>
-    public void SetTargetDirectory(string? folder)
-    {
-        _services.Settings.TargetDirectory = folder;
-        _services.Settings.Save();
-        OnPropertyChanged(nameof(TargetDirectory));
-        OnPropertyChanged(nameof(TargetDescription));
     }
 
     private void ChooseFolder()
@@ -568,7 +666,7 @@ public sealed class BatchPageViewModel : ObservableObject
                  {
                      ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
-                     StopCommand, CleanupCommand, SaveReportCommand, ChooseTargetDirectoryCommand, ClearTargetDirectoryCommand,
+                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

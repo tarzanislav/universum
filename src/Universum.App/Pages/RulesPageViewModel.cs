@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Planning;
@@ -13,7 +14,7 @@ using Universum.Platform.Windows;
 
 namespace Universum.App.Pages;
 
-/// <summary>Applying the UNIVERSUM rules to one file: preview, languages for undetermined tracks, writing, undo.</summary>
+/// <summary>Applying the UNIVERSUM rules to one file: preview, languages for undetermined tracks, title and place in the library, writing, undo.</summary>
 public sealed class RulesPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
@@ -28,15 +29,24 @@ public sealed class RulesPageViewModel : ObservableObject
     private double _progress;
     private bool _busy;
     private string? _undoRecord;
+    private MediaKind _kind = MediaKind.Movie;
+    private string _titleText = "";
+    private string _episodeText = "";
+    private Placement? _placement;
+    private string _target = "";
 
     public RulesPageViewModel(AppServices services)
     {
         _services = services;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
-        ApplyCommand = new AsyncRelayCommand(ApplyAsync, () => !Busy && _plan is { Method: not WriteMethod.None } && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null);
+        ApplyCommand = new AsyncRelayCommand(ApplyAsync, CanApply);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
-        ChooseTargetDirectoryCommand = new RelayCommand(ChooseTargetDirectory);
-        ClearTargetDirectoryCommand = new RelayCommand(() => TargetDirectory = null);
+        ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
+        services.LibraryChanged += () =>
+        {
+            OnPropertyChanged(nameof(OutputDescription));
+            UpdateTarget();
+        };
     }
 
     public AsyncRelayCommand OpenCommand { get; }
@@ -45,9 +55,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
     public AsyncRelayCommand UndoCommand { get; }
 
-    public RelayCommand ChooseTargetDirectoryCommand { get; }
-
-    public RelayCommand ClearTargetDirectoryCommand { get; }
+    public RelayCommand ChooseOutputDirectoryCommand { get; }
 
     public ObservableCollection<RuleRow> Rows { get; } = [];
 
@@ -87,19 +95,48 @@ public sealed class RulesPageViewModel : ObservableObject
         set => SetHandling(value ? OriginalHandling.Delete : null);
     }
 
-    public string? TargetDirectory
+    public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
+
+    public bool IsMovie
     {
-        get => _services.Settings.TargetDirectory;
+        get => _kind == MediaKind.Movie;
+        set => SetKind(value, MediaKind.Movie);
+    }
+
+    public bool IsSeries
+    {
+        get => _kind == MediaKind.Series;
+        set => SetKind(value, MediaKind.Series);
+    }
+
+    /// <summary>Title as in the library: "Creep (2004)" or "Nine Puzzles (2025) [tmdbid-227191]".</summary>
+    public string TitleText
+    {
+        get => _titleText;
         set
         {
-            _services.Settings.TargetDirectory = value;
-            _services.Settings.Save();
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(TargetDescription));
+            if (SetProperty(ref _titleText, value))
+            {
+                UpdateTarget();
+            }
         }
     }
 
-    public string TargetDescription => TargetDirectory is null ? "vedľa originálu" : TargetDirectory;
+    /// <summary>Episode of a series file: "S01E04".</summary>
+    public string EpisodeText
+    {
+        get => _episodeText;
+        set
+        {
+            if (SetProperty(ref _episodeText, value))
+            {
+                UpdateTarget();
+            }
+        }
+    }
+
+    /// <summary>Where the result goes (or why it cannot go anywhere yet).</summary>
+    public string Target { get => _target; private set => SetProperty(ref _target, value); }
 
     public async Task LoadAsync(string path)
     {
@@ -111,6 +148,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _plan = null;
         Rows.Clear();
         FileName = Path.GetFileName(path);
+        GuessTitle(path);
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
@@ -169,17 +207,93 @@ public sealed class RulesPageViewModel : ObservableObject
 
         Summary = _plan.Method switch
         {
-            WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – nie je čo meniť.",
+            WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice.",
             WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({_plan.Changes.Count} zmien) – trvá to pár sekúnd.",
             _ => $"Mení sa poradie stôp – vznikne nový súbor ({_plan.Changes.Count} zmien).",
         } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
+        UpdateTarget();
+    }
+
+    /// <summary>Kind, title and episode guessed from the file and folder names; the user can correct them.</summary>
+    private void GuessTitle(string path)
+    {
+        var episode = EpisodeParser.FromPath(path);
+        _kind = episode is null ? MediaKind.Movie : MediaKind.Series;
+        var folder = Path.GetFileName(Path.GetDirectoryName(path));
+        if (_kind == MediaKind.Series && EpisodeParser.SeasonOfFolder(folder) is not null)
+        {
+            folder = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path)));
+        }
+
+        var fromFolder = TitleGuess.FromName(folder);
+        var fromFile = TitleGuess.FromName(Path.GetFileNameWithoutExtension(path));
+        var guess = fromFolder is { Year: not null } or { TmdbId: not null } ? fromFolder : fromFile ?? fromFolder;
+        _titleText = guess is null ? "" : new TitleInfo(_kind, guess.Name, guess.Year, guess.TmdbId, guess.TmdbId is not null).FolderName;
+        _episodeText = episode?.Number.Tag ?? "";
+        OnPropertyChanged(nameof(IsMovie));
+        OnPropertyChanged(nameof(IsSeries));
+        OnPropertyChanged(nameof(TitleText));
+        OnPropertyChanged(nameof(EpisodeText));
+    }
+
+    /// <summary>Computes the place in the library from the title, episode and the planned result.</summary>
+    private void UpdateTarget()
+    {
+        _placement = null;
+        var layout = _services.Library;
+        var title = TitleGuess.Typed(_kind, TitleText);
+        var episode = EpisodeNumber.TryParse(EpisodeText);
+        if (_plan is null)
+        {
+            Target = "";
+        }
+        else if (layout is null)
+        {
+            Target = "Najprv nastavte výstupný priečinok (knižnicu).";
+        }
+        else if (title is null || title.Problem is not null)
+        {
+            Target = "Zadajte názov titulu, napr. Creep (2004).";
+        }
+        else if (_kind == MediaKind.Series && episode is null)
+        {
+            Target = "Zadajte epizódu, napr. S01E04.";
+        }
+        else
+        {
+            _placement = layout.Place(_plan.Target, title, episode, _services.Profile);
+            var size = new FileInfo(_plan.Target.Source.Path).Length;
+            Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
+                ? "Súbor už je v knižnici na svojom mieste."
+                : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
+                  (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "");
+        }
+
         RefreshCommands();
+    }
+
+    private bool CanApply() =>
+        !Busy && _plan is not null && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null && _placement is not null &&
+        !(_plan.Method == WriteMethod.None && _placement.Holds(_plan.Target.Source.Path, new FileInfo(_plan.Target.Source.Path).Length)) &&
+        _placement.EstimatedPathLength(new FileInfo(_plan.Target.Source.Path).Length) <= LibraryNames.MaxPathLength;
+
+    private void SetKind(bool selected, MediaKind kind)
+    {
+        if (!selected || _kind == kind)
+        {
+            return;
+        }
+
+        _kind = kind;
+        OnPropertyChanged(nameof(IsMovie));
+        OnPropertyChanged(nameof(IsSeries));
+        UpdateTarget();
     }
 
     private async Task ApplyAsync()
     {
-        if (_plan is null || _services.CurrentMkvToolNix is null || _services.Settings.OriginalHandling is not { } handling)
+        if (_plan is null || _placement is null || _services.CurrentMkvToolNix is null || _services.Settings.OriginalHandling is not { } handling)
         {
             return;
         }
@@ -190,7 +304,7 @@ public sealed class RulesPageViewModel : ObservableObject
         try
         {
             var processor = new FileProcessor(_services.CurrentMkvToolNix, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
-            var result = await processor.ProcessAsync(_plan, new OutputOptions(handling, TargetDirectory), new Progress<double>(p => Progress = p));
+            var result = await processor.ProcessAsync(_plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
             _undoRecord = result.UndoRecordPath;
             var cache = _services.Inspector(_services.CurrentMkvToolNix);
             cache.Invalidate(result.SourcePath);
@@ -200,8 +314,9 @@ public sealed class RulesPageViewModel : ObservableObject
             }
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Hotovo: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu hlavičky je možné vrátiť späť."),
-                ProcessingStatus.Unchanged => "Súbor už spĺňa pravidlá.",
+                ProcessingStatus.Done => $"Hotovo: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu je možné vrátiť späť."),
+                ProcessingStatus.Unchanged => "Súbor už spĺňa pravidlá a je v knižnici.",
+                ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal.",
                 ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať (pozri upozornenia).",
                 ProcessingStatus.Cancelled => "Zrušené.",
                 _ => "Nepodarilo sa – originál ostal nezmenený.\n" + string.Join("\n", result.Messages),
@@ -229,7 +344,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             var processor = new FileProcessor(_services.CurrentMkvToolNix, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
             var problems = await processor.UndoAsync(_undoRecord);
-            Result = problems.Count == 0 ? "Pôvodná hlavička je obnovená." : "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
+            Result = problems.Count == 0 ? "Pôvodná hlavička je obnovená a súbor je na pôvodnom mieste." : "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
             if (problems.Count == 0)
             {
                 _undoRecord = null;
@@ -250,12 +365,12 @@ public sealed class RulesPageViewModel : ObservableObject
         }
     }
 
-    private void ChooseTargetDirectory()
+    private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok pre upravené súbory" };
+        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
         if (dialog.ShowDialog() == true)
         {
-            TargetDirectory = dialog.FolderName;
+            _services.SetOutputDirectory(dialog.FolderName);
         }
     }
 
@@ -278,6 +393,7 @@ public sealed class RulesPageViewModel : ObservableObject
         OpenCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
+        ChooseOutputDirectoryCommand.NotifyCanExecuteChanged();
     }
 
     private string Describe(RuleIssue issue) => issue.Kind switch

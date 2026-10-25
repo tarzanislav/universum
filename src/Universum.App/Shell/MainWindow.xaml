@@ -114,13 +114,27 @@
                         <WrapPanel>
                             <TextBlock Text="Originál:" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
                             <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
-                            <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original" />
+                            <RadioButton Content="vymazať" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
+                                         ToolTip="Pri zmene len hlavičky na tom istom disku sa originál presunie do knižnice, inak ide do Koša" />
                             <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
-                                <Run Text="Výsledok:" /> <Run Text="{Binding TargetDescription, Mode=OneWay}" />
+                                <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
-                            <Button Content="Priečinok…" Command="{Binding ChooseTargetDirectoryCommand}" Margin="0,0,8,0" Padding="10,4" />
-                            <Button Content="Vedľa originálu" Command="{Binding ClearTargetDirectoryCommand}" Padding="10,4" />
+                            <Button Content="Priečinok…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,4" />
                         </WrapPanel>
+                        <WrapPanel Margin="0,8,0,0">
+                            <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                            <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                            <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="320" Margin="0,0,16,0"
+                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]" />
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                            </StackPanel>
+                        </WrapPanel>
+                        <TextBlock Margin="0,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Target}">
+                            <Run Text="Cieľ:" FontWeight="SemiBold" /> <Run Text="{Binding Target, Mode=OneWay}" />
+                        </TextBlock>
                         <DockPanel Margin="0,12,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
@@ -240,7 +254,26 @@
                         <DataGrid Grid.Row="3" ItemsSource="{Binding FileRows}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" />
+                                <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" MinWidth="110" />
+                                <DataGridTemplateColumn Header="Film / epizóda" Width="170">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
+                                                         ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
+                                                <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="1.6*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Target}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Header="Výsledok" Binding="{Binding Status}" />
                                 <DataGridTextColumn Header="Prečo na kontrolu" Binding="{Binding Reasons}" Width="*" />
                                 <DataGridTemplateColumn Header="Aj tak">
@@ -280,12 +313,25 @@
                         <WrapPanel>
                             <TextBlock Text="Originál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" GroupName="batchOriginal" Margin="0,0,12,0" />
-                            <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" GroupName="batchOriginal" Margin="0,0,20,0" />
+                            <RadioButton Content="vymazať" IsChecked="{Binding DeleteOriginal}" GroupName="batchOriginal" Margin="0,0,20,0"
+                                         ToolTip="Pri zmene len hlavičky na tom istom disku sa originál presunie do knižnice, inak ide do Koša" />
                             <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0">
-                                <Run Text="Výsledok:" /> <Run Text="{Binding TargetDescription, Mode=OneWay}" />
+                                <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
-                            <Button Content="Priečinok…" Command="{Binding ChooseTargetDirectoryCommand}" Margin="0,0,6,0" Padding="10,3" />
-                            <Button Content="Vedľa originálov" Command="{Binding ClearTargetDirectoryCommand}" Padding="10,3" />
+                            <Button Content="Priečinok…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" />
+                        </WrapPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <TextBlock Text="Obsah:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton Content="filmy" IsChecked="{Binding IsMovies}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Seriál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding SeriesTitle, UpdateSourceTrigger=LostFocus}" Width="300" Margin="0,0,8,0"
+                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]" />
+                                <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            </StackPanel>
+                            <Button Content="Prijať návrhy názvov" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
+                                    ToolTip="Názvy a čísla epizód odhadnuté z mien súborov a priečinkov" />
                         </WrapPanel>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -309,7 +355,20 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="32,24" MaxWidth="760" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource PageTitle}" Text="Nastavenia" />
-                    <TextBlock Style="{StaticResource Hint}" Text="Profil pravidiel UNIVERSUM. Predvolený profil zodpovedá špecifikácii (čeština a slovenčina)." Margin="0,0,0,16" />
+                    <TextBlock Style="{StaticResource Hint}" Text="Knižnica a profil pravidiel UNIVERSUM. Predvolený profil zodpovedá špecifikácii (čeština a slovenčina)." Margin="0,0,0,16" />
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Priečinok…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="12,5" VerticalAlignment="Top" />
+                                <StackPanel>
+                                    <TextBlock Text="Výstupný priečinok (knižnica)" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding OutputDescription}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"
+                                       Text="Filmy idú do MOVIES\Názov (rok), seriály do TVSHOWS\Názov (rok)\Season 01 – podľa pravidiel Jellyfin. Priečinky MOVIES a TVSHOWS UNIVERSUM nikdy nemaže." />
+                        </StackPanel>
+                    </Border>
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Preferované jazyky (v poradí priority, kódy oddelené čiarkou)" FontWeight="SemiBold" />
@@ -328,6 +387,13 @@
                             </WrapPanel>
                             <CheckBox Content="Odstraňovať tagy (globálne, stôp aj štatistické)" IsChecked="{Binding RemoveTags}" Margin="0,12,0,0" />
                             <CheckBox Content="Opraviť chýbajúci index videa (súbor sa zapíše nanovo)" IsChecked="{Binding RepairIndex}" Margin="0,6,0,0" />
+                            <TextBlock Text="Veľkosť v názve: hranice SMALL; BIG; BluRay v GB (nad poslednou BluRay BIG)" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <WrapPanel Margin="0,4,0,0">
+                                <TextBlock Text="filmy:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding MovieSizes, UpdateSourceTrigger=PropertyChanged}" Width="120" Margin="0,0,20,0" />
+                                <TextBlock Text="seriály:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding SeriesSizes, UpdateSourceTrigger=PropertyChanged}" Width="120" />
+                            </WrapPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                                 <Button Content="Uložiť" Command="{Binding SaveCommand}" Margin="0,0,8,0" Padding="16,6" />
                                 <Button Content="Predvolený profil" Command="{Binding ResetCommand}" Padding="16,6" />

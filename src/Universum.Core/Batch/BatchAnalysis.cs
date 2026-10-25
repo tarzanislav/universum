@@ -20,7 +20,7 @@ public sealed record BatchAnalysis(
 
 public static class BatchAnalyzer
 {
-    private static readonly string[] Extensions = [".mkv"];
+    private static readonly string[] Extensions = [".mkv", FileProcessor.TemporaryExtension];
 
     /// <summary>Matroska files of the folder in natural order (Episode 2 before Episode 10).</summary>
     /// <param name="excludeDirectory">A folder to skip, e.g. the target folder of results inside the analysed folder.</param>

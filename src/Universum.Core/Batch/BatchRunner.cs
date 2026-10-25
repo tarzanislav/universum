@@ -1,4 +1,5 @@
 using Universum.Core.Execution;
+using Universum.Core.IO;
 
 namespace Universum.Core.Batch;
 
@@ -8,15 +9,16 @@ namespace Universum.Core.Batch;
 public sealed record BatchProgress(BatchItem Item, double FileFraction, ProcessingResult? Result, int Finished, int Total);
 
 /// <summary>
-/// Processes the files of a simulation that need work. Files on the same drive are written one after another,
-/// different drives in parallel (specification, section 12): one disk is never overloaded by parallel writes.
+/// Processes the files of a simulation that need work, into the library. Files whose source or target drives meet are
+/// written one after another, others in parallel (specification, section 12): one disk is never overloaded by
+/// parallel writes. With one output drive this means one file at a time.
 /// </summary>
 public static class BatchRunner
 {
     public static async Task<IReadOnlyList<ProcessingResult>> RunAsync(
         IReadOnlyList<BatchItem> items,
         FileProcessor processor,
-        Func<BatchItem, OutputOptions> output,
+        OutputOptions output,
         IProgress<BatchProgress>? progress = null,
         BatchControl? control = null,
         CancellationToken cancellationToken = default)
@@ -25,7 +27,7 @@ public static class BatchRunner
         var work = items.Where(i => i.NeedsWork).ToList();
         var results = new List<ProcessingResult>();
         var finished = 0;
-        var lanes = work.GroupBy(i => DriveOf(i.File.Path), StringComparer.OrdinalIgnoreCase);
+        var lanes = Lanes(work);
 
         await Task.WhenAll(lanes.Select(lane => Task.Run(
             async () =>
@@ -47,7 +49,7 @@ public static class BatchRunner
                     }
 
                     var fileProgress = progress is null ? null : new InlineProgress(f => progress.Report(new BatchProgress(item, f, null, Volatile.Read(ref finished), work.Count)));
-                    var result = await processor.ProcessAsync(item.Plan, output(item), fileProgress, cancellationToken).ConfigureAwait(false);
+                    var result = await processor.ProcessAsync(item.Plan, item.Placement!, output, fileProgress, cancellationToken).ConfigureAwait(false);
                     lock (results)
                     {
                         results.Add(result);
@@ -65,21 +67,33 @@ public static class BatchRunner
         return results;
     }
 
-    /// <summary>Output options for one file: a target folder keeps the folder's subfolder structure.</summary>
-    public static OutputOptions OutputFor(OutputOptions options, string rootFolder, string filePath)
+    /// <summary>Groups the items so that no two groups share a drive (source or target); order is kept inside a group.</summary>
+    internal static IReadOnlyList<List<BatchItem>> Lanes(IReadOnlyList<BatchItem> items)
     {
-        if (options.TargetDirectory is null)
+        var parent = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string Find(string drive)
         {
-            return options;
+            parent.TryAdd(drive, drive);
+            while (!string.Equals(parent[drive], drive, StringComparison.OrdinalIgnoreCase))
+            {
+                drive = parent[drive];
+            }
+
+            return drive;
         }
 
-        var relative = Path.GetRelativePath(rootFolder, Path.GetDirectoryName(filePath)!);
-        return relative is "." || relative.StartsWith("..", StringComparison.Ordinal)
-            ? options
-            : options with { TargetDirectory = Path.Combine(options.TargetDirectory, relative) };
-    }
+        foreach (var item in items)
+        {
+            var a = Find(Paths.Volume(item.File.Path));
+            var b = Find(Paths.Volume(item.Placement!.Directory));
+            if (!string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
+            {
+                parent[a] = b;
+            }
+        }
 
-    private static string DriveOf(string path) => Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+        return items.GroupBy(i => Find(Paths.Volume(i.File.Path)), StringComparer.OrdinalIgnoreCase).Select(g => g.ToList()).ToList();
+    }
 
     /// <summary>Reports directly on the calling thread (no posting), for progress inside a lane.</summary>
     private sealed class InlineProgress(Action<double> report) : IProgress<double>

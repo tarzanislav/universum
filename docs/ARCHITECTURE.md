@@ -40,28 +40,48 @@ in next to it without changing the rules, planning or UI.
   changes) and the list of changes for previews; `TargetVerifier` compares a written file with its target.
 - `MkvToolNix/MkvToolNixArguments` – mkvpropedit / mkvmerge arguments (tracks selected by Matroska track number,
   language set as IETF tag so both language elements are written, statistics tags disabled when tags are removed).
-- `Execution/FileProcessor` – writes a plan safely: new files under a temporary name next to their destination,
-  read back and verified before the original is touched; a replaced original goes to the Recycle Bin (refused where
-  there is none, e.g. network shares); in-place header edits first save an `UndoRecord` (header values and tags)
-  and are reverted automatically when verification fails.
+- `Execution/FileProcessor` – writes a plan into the library safely. A header-only change of an original that is to
+  be removed and lies on the same drive moves the original into the library (a rename) and edits it there; every
+  header edit first saves an `UndoRecord` (header values, tags, where the file came from) and is reverted – edit and
+  move – when verification fails. Otherwise the result is written as `*.universum-tmp` in the target folder (not a
+  video extension, so media servers ignore it), read back, verified, renamed to its final name, and only then is the
+  original sent to the Recycle Bin (refused where there is none, e.g. network shares). A file already in its library
+  folder is edited there or replaced (the old one to the Recycle Bin). The same stream already in the library
+  (duration, tracks, size) is not written again (`AlreadyInLibrary`).
+
+## Library (specification, section 13)
+
+- `Library/LibraryLayout` – the output folder with `MOVIES` and `TVSHOWS` (created, never deleted).
+  Films: `MOVIES\Title (Year)\Title (Year) - {stream}.mkv`; series:
+  `TVSHOWS\Title (Year)\Season 01\Title S01E04 - {stream}.mkv` (Jellyfin naming; a film file starts with its
+  folder name so versions are grouped).
+- `Library/TitleInfo` – the name used: the original title when it is written in Latin script, otherwise the English
+  title plus `[tmdbid-ID]`; `LibraryNames` removes characters Windows forbids and detects the script.
+- `Library/StreamLabel` – `{languages} {quality} {codec} {size}`, e.g. `CZ EN FHD H264 SMALL`: audio languages
+  without commentaries (or `CZ titulky` / `SK titulky` when no audio is in a preferred language), SD/HD/FHD/4K by
+  resolution with tolerance for cropped formats, H264/HEVC/AV1/…, SMALL/BIG/BluRay/BluRay BIG by the final size
+  (thresholds in the profile). `Placement` chooses the final name after writing: another stream with the same name
+  gets a number (`BIG2`, `BIG3`).
+- `Library/EpisodeParser`, `TitleGuess`, `LibraryJob` – episode numbers and titles from file and folder names (only
+  suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
 
 ## Batch processing
 
 - `Batch/BatchAnalyzer` – finds the Matroska files of a folder (natural order, optionally with subfolders), reads
   them in parallel through `Media/CachingInspector` (results remembered by path, size and modification time) and
   groups them by `StructureSignature` (audio and subtitle languages, forced flags, chapters, tags); the largest group
-  comes first. Left-over `*.universum-tmp.*` files from an interrupted run are reported, never analysed.
+  comes first. Left-over `*.universum-tmp` files from an interrupted run are reported, never analysed.
 - `Templates/BatchTemplate` – tolerant template: ordered `TemplateSlot`s (type, language, role, required). The slot
   order becomes the language order of the rules; files with fewer tracks still match unless a required slot is
   missing; tracks outside the template are kept (default) or removed. Flags always come from the rules.
 - `Batch/BatchPlanner` – per file: language evidence (file → group decision → track name → suggestion), rules,
-  template match and review reasons. `Suggest` adds suggestions that are never used unconfirmed: the language of
+  template match, title, episode and place in the library, and review reasons. `Suggest` adds suggestions that are never used unconfirmed: the language of
   a similar track elsewhere in the folder (codec, channels, sampling rate, name) and forced subtitles detected from
   subtitle counts (statistics tags). `Text/TextLanguageDetector` + `MkvToolNix/SubtitleText` recognise the
   language of text subtitles on request.
-- `Batch/BatchRunner` – processes the files that need work: one after another per drive, drives in parallel;
-  pause, resume, stop after the current file; a target folder keeps the subfolder structure. `BatchReport` writes
-  CSV and HTML reports.
+- `Batch/BatchRunner` – processes the files that need work: files whose source or target drives meet one after
+  another, others in parallel (with one output drive: one at a time); pause, resume, stop after the current file.
+  `BatchReport` writes CSV and HTML reports with the target paths.
 
 ## Processes
 

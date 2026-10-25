@@ -1,3 +1,4 @@
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Planning;
 using Universum.Core.Rules;
@@ -15,13 +16,14 @@ public static class BatchPlanner
     /// <summary>Share of subtitles below which a track is suggested as forced (compared with a full track).</summary>
     public const double ForcedShare = 0.15;
 
-    public static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null)
+    /// <param name="library">Titles and episodes for the library; without it the items have no place (rules only).</param>
+    public static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null, LibraryJob? library = null)
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
-        return analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective))).ToList();
+        return analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
     }
 
-    public static BatchItem PlanFile(MediaFile file, BatchGroup group, BatchTemplate template, RuleProfile profile)
+    public static BatchItem PlanFile(MediaFile file, BatchGroup group, BatchTemplate template, RuleProfile profile, LibraryJob? library = null)
     {
         var evidence = new Dictionary<SlotKey, LanguageEvidence>();
         var languages = new Dictionary<int, LanguageTag>();
@@ -70,7 +72,41 @@ public static class BatchPlanner
             reasons.AddRange(match.MissingRequired.Select(s => new ReviewReason(ReviewReasonKind.MissingRequiredSlot, TemplateSlot: s)));
         }
 
-        return new BatchItem(file, group, decisions, target, EditPlan.For(target), match, evidence, reasons);
+        var item = new BatchItem(file, group, decisions, target, EditPlan.For(target), match, evidence, reasons);
+        return library is null ? item : Place(item, library, profile, reasons);
+    }
+
+    /// <summary>Title, episode and place in the library (specification 13.5); missing decisions become review reasons.</summary>
+    private static BatchItem Place(BatchItem item, LibraryJob library, RuleProfile profile, List<ReviewReason> reasons)
+    {
+        var path = item.File.Path;
+        var title = library.TitleFor(path);
+        if (title is null || title.Problem is not null)
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.MissingTitle));
+            return item;
+        }
+
+        EpisodeNumber? episode = null;
+        if (title.Kind == MediaKind.Series)
+        {
+            var (number, suggested) = library.EpisodeFor(path);
+            if (number is null || suggested)
+            {
+                reasons.Add(new ReviewReason(ReviewReasonKind.MissingEpisode));
+                return item with { Title = title, Episode = number };
+            }
+
+            episode = number;
+        }
+
+        var placement = library.Layout.Place(item.Target, title, episode, profile);
+        if (placement.EstimatedPathLength(new FileInfo(path).Length) > LibraryNames.MaxPathLength)
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.PathTooLong));
+        }
+
+        return item with { Title = title, Episode = episode, Placement = placement };
     }
 
     /// <summary>

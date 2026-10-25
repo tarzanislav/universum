@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.Core.Batch;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 
@@ -138,11 +139,53 @@ public sealed class SlotRow : ObservableObject
 }
 
 /// <summary>One file of the selected group with its simulated result.</summary>
-public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged) : ObservableObject
+public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged, BatchPageViewModel page) : ObservableObject
 {
     public BatchItem Item { get; private set; } = item;
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
+
+    /// <summary>Film title ("Creep (2004)") or episode ("S01E04"), editable; empty while undecided.</summary>
+    public string Naming
+    {
+        get
+        {
+            if (page.Library is not { } library)
+            {
+                return "";
+            }
+
+            if (library.Kind == MediaKind.Series)
+            {
+                return library.EpisodeFor(Item.File.Path) is ({ } number, false) ? number.Tag : "";
+            }
+
+            return library.TitleFor(Item.File.Path)?.FolderName ?? "";
+        }
+        set => page.SetNaming(Item.File.Path, value);
+    }
+
+    /// <summary>A suggestion waiting for confirmation, shown under the editable value.</summary>
+    public string NamingSuggestion
+    {
+        get
+        {
+            if (page.Library is not { } library)
+            {
+                return "";
+            }
+
+            if (library.Kind == MediaKind.Series)
+            {
+                return library.EpisodeFor(Item.File.Path) is ({ } number, true) ? "návrh: " + number.Tag : "";
+            }
+
+            return library.SuggestedTitleFor(Item.File.Path) is { } title ? "návrh: " + title.FolderName : "";
+        }
+    }
+
+    /// <summary>Planned place in the library, relative to the output folder.</summary>
+    public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
 
     public string Status => Texts.Status(Item.Status);
 

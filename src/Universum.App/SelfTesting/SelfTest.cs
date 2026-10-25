@@ -136,7 +136,8 @@ internal static class SelfTest
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
 
-        // rules page: undetermined languages chosen by the user, result written next to the kept original
+        // rules page: undetermined languages chosen by the user, result written into the library, original kept
+        var library = Path.Combine(_outputDirectory, "library");
         var work = Path.Combine(_outputDirectory, "rules");
         Directory.CreateDirectory(work);
         var copy = Path.Combine(work, "en-und-cz-forced.mkv");
@@ -145,18 +146,27 @@ internal static class SelfTest
         await model.Rules.LoadAsync(copy);
         Check(model.Rules.Plan?.Target.IsBlocked == true, "rules: undetermined languages block the file");
         Check(!model.Rules.ApplyCommand.CanExecute(null), "rules: apply disabled while blocked");
+        Check(services.Library is not null || model.Rules.Target.Contains("výstupný priečinok", StringComparison.Ordinal),
+            "rules: asks for the output folder – " + model.Rules.Target);
         await Screenshot(window, "rules-undetermined.png");
         model.Rules.ChooseLanguage(2, "cs");
         model.Rules.ChooseLanguage(3, "cs");
         model.Rules.KeepOriginal = true;
-        model.Rules.TargetDirectory = null;
-        Check(model.Rules.ApplyCommand.CanExecute(null), "rules: apply enabled after choosing languages");
+        services.SetOutputDirectory(library);
+        Check(Directory.Exists(Path.Combine(library, "MOVIES")) && Directory.Exists(Path.Combine(library, "TVSHOWS")), "library: MOVIES and TVSHOWS created");
+        model.Rules.IsMovie = true;
+        model.Rules.TitleText = "Vymyslený film: Návrat (2026)";
+        Check(model.Rules.Target == Path.Combine("MOVIES", "Vymyslený film Návrat (2026)", "Vymyslený film Návrat (2026) - CZ EN SD H264 SMALL.mkv"),
+            "rules: target in the library – " + model.Rules.Target);
+        Check(model.Rules.ApplyCommand.CanExecute(null), "rules: apply enabled after choosing languages and title");
         await Screenshot(window, "rules-preview.png");
         await model.Rules.ApplyCommand.ExecuteAsync(null);
         Check(model.Rules.Result.StartsWith("Hotovo", StringComparison.Ordinal), "rules: written – " + model.Rules.Result);
-        var result = Path.Combine(work, "en-und-cz-forced [UNIVERSUM].mkv");
-        Check(File.Exists(result) && File.Exists(copy), "rules: result next to the kept original");
+        var result = Path.Combine(library, "MOVIES", "Vymyslený film Návrat (2026)", "Vymyslený film Návrat (2026) - CZ EN SD H264 SMALL.mkv");
+        Check(File.Exists(result) && File.Exists(copy), "rules: result in the library, original kept");
         await Screenshot(window, "rules-done.png");
+        await model.Rules.ApplyCommand.ExecuteAsync(null);
+        Check(model.Rules.Result.StartsWith("Rovnaký stream", StringComparison.Ordinal), "rules: the same stream is not written twice – " + model.Rules.Result);
 
         await TestBatchPageAsync(model, window);
         window.Close();
@@ -168,7 +178,7 @@ internal static class SelfTest
         setup.Close();
     }
 
-    /// <summary>Batch page: three episodes of one structure, a clean file; group decision, run into a target folder.</summary>
+    /// <summary>Batch page: three episodes of one structure, a clean file; group decision, series title, run into the library.</summary>
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)
     {
         var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media");
@@ -187,25 +197,28 @@ internal static class SelfTest
         batch.Recursive = true;
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 2 && batch.Groups[0].Count == 3, $"batch: 2 groups, the series first ({batch.Summary})");
-        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 3, "batch: episodes wait for the subtitle language");
+        Check(batch.IsSeries, "batch: series recognised from the episode numbers");
+        Check(batch.SeriesSuggestion.Contains("Seriál", StringComparison.Ordinal), "batch: series title suggested – " + batch.SeriesSuggestion);
+        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 4, "batch: everything waits for the title and the subtitle language");
         await Screenshot(window, "batch-analysed.png");
 
         var forcedSlot = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0));
         forcedSlot.ChosenLanguage = Languages.Czech;
+        batch.ConfirmTitlesCommand.Execute(null);
+        batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");
-        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Unchanged) == 1, "batch: clean file unchanged");
+        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Place) == 1, "batch: clean file only goes into the library (suggested episode 1)");
 
         batch.KeepOriginal = true;
-        var output = Path.Combine(_outputDirectory, "batch-output");
-        batch.SetTargetDirectory(output);
         Check(batch.RunCommand.CanExecute(null), "batch: run enabled");
         await Screenshot(window, "batch-ready.png");
         await batch.RunCommand.ExecuteAsync(null);
-        Check(batch.Results.Count == 3 && batch.Results.All(r => r.Status == Core.Execution.ProcessingStatus.Done),
-            "batch: three files written – " + string.Join("; ", batch.Results.SelectMany(r => r.Messages)));
-        Check(File.Exists(Path.Combine(output, "Sezóna 1", "Seriál E10.mkv")), "batch: target folder keeps subfolders");
+        Check(batch.Results.Count == 4 && batch.Results.All(r => r.Status == Core.Execution.ProcessingStatus.Done),
+            "batch: four files in the library – " + string.Join("; ", batch.Results.SelectMany(r => r.Messages)));
+        var shows = Path.Combine(model.Batch.Library!.Layout.Shows, "Seriál (2026)", "Season 01");
+        Check(File.Exists(Path.Combine(shows, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")), "batch: episode 10 in Season 01");
+        Check(File.Exists(Path.Combine(shows, "Seriál S01E01 - CZ SD H264 SMALL.mkv")), "batch: the loose file as episode 1");
         await Screenshot(window, "batch-done.png");
-        batch.SetTargetDirectory(null);
 
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(
             Core.Templates.BatchTemplate.FromTarget("Podľa skupiny A", batch.Items.First().Target))) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };

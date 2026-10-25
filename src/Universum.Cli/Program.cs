@@ -3,6 +3,7 @@ using System.Text;
 using Universum.Cli;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Core.Templates;
@@ -42,6 +43,15 @@ if (!Directory.Exists(options.Path))
     return 2;
 }
 
+var outputDirectory = options.OutputDirectory ?? SettingsProfile.OutputDirectory();
+if (string.IsNullOrWhiteSpace(outputDirectory))
+{
+    Console.Error.WriteLine("Výstupný priečinok nie je nastavený: zadajte --output <priečinok> alebo ho nastavte v programe UNIVERSUM.");
+    return 2;
+}
+
+var layout = new LibraryLayout(Path.GetFullPath(outputDirectory));
+
 var template = BatchTemplate.RulesOnly;
 if (options.TemplateFile is not null)
 {
@@ -59,7 +69,7 @@ if (options.TemplateFile is not null)
 Console.WriteLine($"MKVToolNix {installation.Version} · {template.Name}");
 var cacheFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "identification-cache.json");
 var inspector = new Universum.Core.Media.CachingInspector(new MkvMergeInspector(installation, runner), cacheFile);
-var analysis = await BatchAnalyzer.AnalyzeAsync(options.Path, options.Recursive, inspector, excludeDirectory: options.TargetDirectory);
+var analysis = await BatchAnalyzer.AnalyzeAsync(options.Path, options.Recursive, inspector, excludeDirectory: layout.Root);
 TrySave(inspector);
 
 foreach (var (label, slot, language) in options.Languages)
@@ -96,8 +106,55 @@ if (options.ConfirmSuggestions)
     }
 }
 
-var items = BatchPlanner.Plan(analysis, template, profile);
-Output.Print(analysis, items);
+var library = LibraryJob.Guess(layout, analysis);
+if (options.Kind is { } kind)
+{
+    library.Kind = kind;
+}
+
+if (options.Title is { } name)
+{
+    var title = new TitleInfo(library.Kind, name, options.Year, options.Tmdb?.Id, options.Tmdb is not null);
+    if (title.Problem is { } problem)
+    {
+        Console.Error.WriteLine($"Názov {name}: {problem}.");
+        return 2;
+    }
+
+    if (library.Kind == MediaKind.Series)
+    {
+        library.Series = title;
+    }
+    else
+    {
+        foreach (var file in analysis.Groups.SelectMany(g => g.Files))
+        {
+            library.Movies[file.Path] = title;
+        }
+    }
+}
+
+foreach (var (fileName, number) in options.Episodes)
+{
+    var matches = analysis.Groups.SelectMany(g => g.Files).Where(f =>
+        Path.GetFileName(f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase) ||
+        Path.GetRelativePath(analysis.Folder, f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (matches.Count != 1)
+    {
+        Console.Error.WriteLine($"Súbor {fileName} pre --epizoda {(matches.Count == 0 ? "sa nenašiel" : "nie je jednoznačný")} – voľba sa preskočí.");
+        continue;
+    }
+
+    library.Episodes[matches[0].Path] = number;
+}
+
+if (options.ConfirmSuggestions)
+{
+    library.ConfirmSuggestions();
+}
+
+var items = BatchPlanner.Plan(analysis, template, profile, library);
+Output.Print(analysis, items, library);
 if (options.Command == "analyze" || options.DryRun)
 {
     SaveReport(options.ReportFile, items, []);
@@ -105,19 +162,20 @@ if (options.Command == "analyze" || options.DryRun)
 }
 
 var processor = new FileProcessor(installation, runner, RecycleBin(), Path.Combine(Path.GetDirectoryName(cacheFile)!, "journal"));
-var baseOptions = new OutputOptions(options.Original!.Value, options.TargetDirectory);
+layout.EnsureCreated();
 using var cancel = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
     cancel.Cancel();
 };
-var results = await BatchRunner.RunAsync(items, processor, i => BatchRunner.OutputFor(baseOptions, analysis.Folder, i.File.Path),
+var results = await BatchRunner.RunAsync(items, processor, new OutputOptions(options.Original!.Value),
     new Progress<BatchProgress>(p =>
     {
         if (p.Result is { } result)
         {
-            Console.WriteLine($"[{p.Finished}/{p.Total}] {BatchReport.Describe(p.Item, result)}: {Path.GetFileName(p.Item.File.Path)}");
+            Console.WriteLine($"[{p.Finished}/{p.Total}] {BatchReport.Describe(p.Item, result)}: {Path.GetFileName(p.Item.File.Path)}" +
+                              (result.OutputPath is { } target ? " → " + Path.GetRelativePath(layout.Root, target) : ""));
             foreach (var message in result.Messages)
             {
                 Console.WriteLine("        " + message);
@@ -132,7 +190,7 @@ foreach (var result in results.Where(r => r.Status == ProcessingStatus.Done))
 
 TrySave(inspector);
 SaveReport(options.ReportFile, items, results);
-var failed = results.Count(r => r.Status != ProcessingStatus.Done);
+var failed = results.Count(r => r.Status is not (ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary));
 Console.WriteLine($"Hotovo: {results.Count - failed}, s chybou alebo zrušené: {failed}, na kontrolu: {items.Count(i => i.Status == BatchStatus.NeedsReview)}");
 return failed > 0 || items.Any(i => i.Status == BatchStatus.NeedsReview) ? 1 : 0;
 

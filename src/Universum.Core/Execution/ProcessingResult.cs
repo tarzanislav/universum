@@ -15,10 +15,13 @@ public enum ProcessingStatus
     Failed,
 
     Cancelled,
+
+    /// <summary>The same stream is already in the library (same duration, tracks and size); nothing was written.</summary>
+    AlreadyInLibrary,
 }
 
-/// <param name="OutputPath">Path of the result (equals the original path when it was replaced).</param>
-/// <param name="UndoRecordPath">Record for reverting an in-place edit, when one was made.</param>
+/// <param name="OutputPath">Path of the result in the library (for <see cref="ProcessingStatus.AlreadyInLibrary"/> the file found there).</param>
+/// <param name="UndoRecordPath">Record for reverting a header edit, when one was made.</param>
 /// <param name="Messages">Errors, verification problems and tool warnings (technical, English).</param>
 public sealed record ProcessingResult(
     string SourcePath,

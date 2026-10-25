@@ -9,7 +9,7 @@
             <StackPanel Margin="32">
                 <TextBlock Style="{StaticResource PageTitle}" Text="{Binding Title}" />
                 <TextBlock Style="{StaticResource Hint}" Text="{Binding Description}" MaxWidth="640" HorizontalAlignment="Left" />
-                <TextBlock Style="{StaticResource Hint}" Margin="0,12,0,0" Text="{Binding Stage, StringFormat=Pripravuje sa – {0}.}" />
+                <TextBlock Style="{StaticResource Hint}" Margin="0,12,0,0" Text="{Binding Stage, StringFormat='Pripravuje sa – {0}.'}" />
             </StackPanel>
         </DataTemplate>
 

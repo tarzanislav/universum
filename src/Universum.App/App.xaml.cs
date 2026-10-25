@@ -18,6 +18,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnUnhandledException;
+        Universum.Platform.Windows.WindowsVolumes.Register();
         var services = new AppServices();
 
         if (e.Args.Contains(SelfTestSwitch, StringComparer.OrdinalIgnoreCase))

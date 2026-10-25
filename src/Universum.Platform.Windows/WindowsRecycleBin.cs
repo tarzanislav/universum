@@ -1,10 +1,15 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Microsoft.Win32;
 using Universum.Core.Execution;
 
 namespace Universum.Platform.Windows;
 
-/// <summary>Moves files to the Windows Recycle Bin (SHFileOperation with undo).</summary>
+/// <summary>
+/// Moves files to the Windows Recycle Bin. A file is moved only where Windows really keeps it: on a fixed drive whose
+/// Recycle Bin is switched on and large enough for the file. Should Windows still want to delete a file permanently,
+/// it has to ask first (FOF_WANTNUKEWARNING); a refusal leaves the file in place.
+/// </summary>
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowsRecycleBin : IRecycleBin
 {
@@ -13,28 +18,77 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
     private const ushort FofNoConfirmation = 0x0010;
     private const ushort FofAllowUndo = 0x0040;
     private const ushort FofNoErrorUi = 0x0400;
+    private const ushort FofWantNukeWarning = 0x4000;
 
-    /// <summary>Local fixed and removable drives have a Recycle Bin; network shares do not (deleting there is permanent).</summary>
-    public bool CanRecycle(string path)
+    private const string BitBucketKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket";
+
+    private const uint DriveFixed = 3;
+
+    public string? CannotRecycle(string path)
     {
         var full = Path.GetFullPath(path);
         if (full.StartsWith(@"\\", StringComparison.Ordinal))
         {
-            return false;
+            return "network location without a Recycle Bin";
         }
 
         try
         {
-            return new DriveInfo(Path.GetPathRoot(full)!).DriveType is DriveType.Fixed or DriveType.Removable;
+            // the real volume: a folder may be a mount point of a USB drive
+            if (WindowsVolumes.MountPoint(full) is not { } mountPoint)
+            {
+                return "the drive of the file cannot be determined";
+            }
+
+            if (WindowsVolumes.DriveType(mountPoint) != DriveFixed)
+            {
+                return $"{mountPoint} is not a fixed disk and has no Recycle Bin";
+            }
+
+            var guid = VolumeGuid(mountPoint);
+            if (guid is null)
+            {
+                return $"the Recycle Bin of {mountPoint} cannot be determined";
+            }
+
+            var (nukeOnDelete, maxCapacityMb) = BinSettings(guid);
+            if (nukeOnDelete)
+            {
+                return $"the Recycle Bin of {mountPoint} deletes files immediately";
+            }
+
+            // without a stored size, assume the smallest default (5 % of the drive): an underestimate is safe
+            var capacity = maxCapacityMb is { } mb ? mb << 20 : (WindowsVolumes.TotalSize(mountPoint) ?? 0) / 20;
+            var size = File.Exists(full) ? new FileInfo(full).Length : 0;
+            if (size > capacity)
+            {
+                return $"the file ({size >> 20} MB) is larger than the Recycle Bin of {mountPoint} ({capacity >> 20} MB)";
+            }
+
+            // a full Recycle Bin makes room by deleting its oldest items for good – also originals recycled a moment ago
+            var info = new ShQueryRbInfo { Size = Marshal.SizeOf<ShQueryRbInfo>() };
+            if (SHQueryRecycleBin(mountPoint, ref info) != 0)
+            {
+                return $"the content of the Recycle Bin of {mountPoint} cannot be determined";
+            }
+
+            return info.TotalBytes + size > capacity
+                ? $"the Recycle Bin of {mountPoint} is too full ({info.TotalBytes >> 20} of {capacity >> 20} MB): it would delete older items for good – empty it first"
+                : null;
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
         {
-            return false;
+            return "the Recycle Bin cannot be checked: " + ex.Message;
         }
     }
 
     public void MoveToRecycleBin(string path)
     {
+        if (CannotRecycle(path) is { } reason)
+        {
+            throw new IOException($"'{path}' cannot go to the Recycle Bin: {reason}.");
+        }
+
         var from = Marshal.StringToHGlobalUni(Path.GetFullPath(path) + "\0"); // the list ends with a second null
         try
         {
@@ -42,7 +96,7 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
             {
                 Func = FoDelete,
                 From = from,
-                Flags = FofAllowUndo | FofNoConfirmation | FofSilent | FofNoErrorUi,
+                Flags = FofAllowUndo | FofNoConfirmation | FofWantNukeWarning | FofSilent | FofNoErrorUi,
             };
             var result = SHFileOperation(ref operation);
             if (result != 0 || operation.AnyOperationsAborted != 0 || File.Exists(path))
@@ -56,8 +110,52 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
         }
     }
 
+    /// <summary>Recycle Bin settings of a volume from the registry (per volume, or the old global values).</summary>
+    private static (bool NukeOnDelete, long? MaxCapacityMb) BinSettings(string volumeGuid)
+    {
+        try
+        {
+            using var bitBucket = Registry.CurrentUser.OpenSubKey(BitBucketKey);
+            using var volume = bitBucket?.OpenSubKey(@"Volume\" + volumeGuid);
+            var nuke = volume?.GetValue("NukeOnDelete") ?? bitBucket?.GetValue("NukeOnDelete");
+            var capacity = volume?.GetValue("MaxCapacity");
+            return (nuke is int n && n != 0, capacity is int c && c > 0 ? c : null);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return (false, null);
+        }
+    }
+
+    /// <summary>"{xxxxxxxx-…}" of the volume mounted at a mount point such as "C:\".</summary>
+    private static string? VolumeGuid(string mountPoint)
+    {
+        var buffer = new char[64];
+        if (!WindowsVolumes.GetVolumeNameForVolumeMountPoint(mountPoint, buffer, buffer.Length))
+        {
+            return null;
+        }
+
+        var name = new string(buffer).TrimEnd('\0');
+        var start = name.IndexOf('{', StringComparison.Ordinal);
+        var end = name.IndexOf('}', StringComparison.Ordinal);
+        return start >= 0 && end > start ? name[start..(end + 1)] : null;
+    }
+
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static partial int SHFileOperation(ref ShFileOpStruct operation);
+
+    [LibraryImport("shell32.dll", EntryPoint = "SHQueryRecycleBinW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int SHQueryRecycleBin(string rootPath, ref ShQueryRbInfo info);
+
+    // 64-bit Windows: natural alignment, 24 bytes
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ShQueryRbInfo
+    {
+        public int Size;
+        public long TotalBytes;
+        public long Items;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ShFileOpStruct

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
@@ -29,6 +30,31 @@ public sealed class AppServices
 
         return _inspector;
     }
+
+    /// <summary>The library in the output folder; null until the user chooses the folder.</summary>
+    public LibraryLayout? Library => Settings.OutputDirectory is { Length: > 0 } folder ? new LibraryLayout(folder) : null;
+
+    /// <summary>Raised when the output folder changes, so the pages can update.</summary>
+    public event Action? LibraryChanged;
+
+    /// <summary>Sets the output folder and creates MOVIES and TVSHOWS in it (they are never deleted by UNIVERSUM).</summary>
+    public void SetOutputDirectory(string folder)
+    {
+        var layout = new LibraryLayout(Path.GetFullPath(folder));
+        layout.EnsureCreated();
+        Settings.OutputDirectory = layout.Root;
+        Settings.Save();
+        LibraryChanged?.Invoke();
+    }
+
+    private LibraryIndex? _libraryIndex;
+
+    /// <summary>Which original each library file was made from (recognises the same stream processed again).</summary>
+    public LibraryIndex LibraryIndex => _libraryIndex ??= new LibraryIndex(AppSettings.LibraryIndexFile);
+
+    /// <summary>Writes into the library with the Windows Recycle Bin and the undo journal.</summary>
+    public FileProcessor Processor(MkvToolNixInstallation installation) =>
+        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex);
 
     /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
     public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
@@ -74,8 +100,8 @@ public sealed class AppSettings
     /// <summary>Keep or delete (to the Recycle Bin) the original; null until the user chooses the first time.</summary>
     public OriginalHandling? OriginalHandling { get; set; }
 
-    /// <summary>Folder for results; null = next to the original.</summary>
-    public string? TargetDirectory { get; set; }
+    /// <summary>Output folder with MOVIES and TVSHOWS (specification, section 13); must be set before processing.</summary>
+    public string? OutputDirectory { get; set; }
 
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }
@@ -93,6 +119,9 @@ public sealed class AppSettings
 
     /// <summary>Saved batch templates (*.json).</summary>
     public static string TemplateDirectory => Path.Combine(Directory, "templates");
+
+    /// <summary>Index of library files and the originals they were made from.</summary>
+    public static string LibraryIndexFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "library-index.json");
 
     /// <summary>Cache of identification results (path, size, time → structure).</summary>
     public static string IdentificationCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "identification-cache.json");

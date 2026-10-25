@@ -1,3 +1,5 @@
+using Universum.Core.Library;
+
 namespace Universum.Core.Rules;
 
 /// <summary>
@@ -40,6 +42,9 @@ public sealed record RuleProfile
 
     /// <summary>Rewrite files whose video track has no index (cues), so seeking works again.</summary>
     public bool RepairIndex { get; init; } = true;
+
+    /// <summary>Naming of results in the library (size classes, subtitles word).</summary>
+    public LibraryProfile Library { get; init; } = new();
 
     /// <summary>Position of a language in the track order (lower first); int.MaxValue for languages not listed.</summary>
     public int Priority(string primaryLanguage) => IndexOf(OrderLanguages.Count > 0 ? OrderLanguages : PreferredLanguages, primaryLanguage);

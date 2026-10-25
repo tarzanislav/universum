@@ -1,5 +1,6 @@
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 
 namespace Universum.Cli;
@@ -17,7 +18,20 @@ public sealed class Options
 
     public OriginalHandling? Original { get; private set; }
 
-    public string? TargetDirectory { get; private set; }
+    /// <summary>Output folder with MOVIES and TVSHOWS; null = the folder set in the UNIVERSUM settings.</summary>
+    public string? OutputDirectory { get; private set; }
+
+    /// <summary>Films or a series; null = guessed from the names.</summary>
+    public MediaKind? Kind { get; private set; }
+
+    public string? Title { get; private set; }
+
+    public int? Year { get; private set; }
+
+    public TmdbReference? Tmdb { get; private set; }
+
+    /// <summary>Episode numbers by file name: "Seriál E2.mkv=S01E02".</summary>
+    public List<(string File, EpisodeNumber Number)> Episodes { get; } = [];
 
     public bool DryRun { get; private set; }
 
@@ -58,8 +72,28 @@ public sealed class Options
                 case "--delete":
                     options.Original = OriginalHandling.Delete;
                     break;
-                case "--target":
-                    options.TargetDirectory = value();
+                case "--output" or "-o" or "--vystup":
+                    options.OutputDirectory = value();
+                    break;
+                case "--film" or "--movie":
+                    options.Kind = MediaKind.Movie;
+                    break;
+                case "--serial" or "--series":
+                    options.Kind = MediaKind.Series;
+                    break;
+                case "--nazov" or "--title":
+                    options.Title = value();
+                    break;
+                case "--rok" or "--year":
+                    var year = value();
+                    options.Year = int.TryParse(year, out var y) && y is >= 1870 and <= 2200 ? y : throw new UsageException($"Rok {year} nie je platný.");
+                    break;
+                case "--tmdb":
+                    var reference = value();
+                    options.Tmdb = TitleGuess.ParseTmdb(reference) ?? throw new UsageException($"TMDB zadajte ako číslo alebo adresu themoviedb.org (je {reference}).");
+                    break;
+                case "--epizoda" or "--episode":
+                    options.Episodes.Add(ParseEpisode(value()));
                     break;
                 case "--dry-run":
                     options.DryRun = true;
@@ -83,6 +117,11 @@ public sealed class Options
                 default:
                     throw new UsageException($"Neznáma voľba {args[i]}.");
             }
+        }
+
+        if ((options.Year is not null || options.Tmdb is not null) && options.Title is null)
+        {
+            throw new UsageException("Rok a TMDB patria k názvu: zadajte aj --nazov.");
         }
 
         if (options.Command == "apply" && !options.DryRun && options.Original is null)
@@ -109,6 +148,18 @@ public sealed class Options
         }
 
         return (group, slot, LanguageTag.FromCode(code));
+    }
+
+    private static (string, EpisodeNumber) ParseEpisode(string text)
+    {
+        var equals = text.LastIndexOf('=');
+        var number = equals < 0 ? null : EpisodeNumber.TryParse(text[(equals + 1)..]);
+        if (number is null)
+        {
+            throw new UsageException($"Epizódu zadajte ako súbor=S01E04, napr. \"Seriál E2.mkv=S01E02\" (je {text}).");
+        }
+
+        return (text[..equals].Trim(), number);
     }
 
     private static (string, SlotKey) ParseSlot(string text)

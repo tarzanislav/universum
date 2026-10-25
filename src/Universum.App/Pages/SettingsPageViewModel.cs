@@ -1,12 +1,14 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 
 namespace Universum.App.Pages;
 
-/// <summary>Settings: the rules profile (languages and keywords) and maintenance.</summary>
+/// <summary>Settings: the output folder (library), the rules profile (languages, keywords, size classes) and maintenance.</summary>
 public sealed class SettingsPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
@@ -17,6 +19,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private bool _removeTags;
     private bool _repairIndex;
     private int _videoNameLength;
+    private string _movieSizes = "";
+    private string _seriesSizes = "";
     private string _message = "";
 
     public SettingsPageViewModel(AppServices services)
@@ -25,8 +29,21 @@ public sealed class SettingsPageViewModel : ObservableObject
         SaveCommand = new RelayCommand(Save);
         ResetCommand = new RelayCommand(() => Load(RuleProfile.Default));
         ClearCacheCommand = new RelayCommand(ClearCache);
+        ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
+        services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
+
+    public RelayCommand ChooseOutputDirectoryCommand { get; }
+
+    public string OutputDescription => _services.Library is { } library
+        ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
+        : "Nie je nastavený. Bez neho UNIVERSUM nič nespracuje.";
+
+    /// <summary>Upper limits of SMALL, BIG and BluRay for films in GB, e.g. "2; 14; 30".</summary>
+    public string MovieSizes { get => _movieSizes; set => SetProperty(ref _movieSizes, value); }
+
+    public string SeriesSizes { get => _seriesSizes; set => SetProperty(ref _seriesSizes, value); }
 
     public RelayCommand SaveCommand { get; }
 
@@ -61,7 +78,29 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveTags = profile.RemoveTags;
         RepairIndex = profile.RepairIndex;
         VideoNameLength = profile.VideoNameLength;
+        MovieSizes = Sizes(profile.Library.Movies);
+        SeriesSizes = Sizes(profile.Library.Series);
         Message = "";
+    }
+
+    private static string Sizes(SizeClasses sizes) =>
+        string.Join("; ", new[] { sizes.SmallMaxGb, sizes.BigMaxGb, sizes.BluRayMaxGb }.Select(v => v.ToString(System.Globalization.CultureInfo.CurrentCulture)));
+
+    private static SizeClasses? ParseSizes(string text)
+    {
+        var values = ListOfNumbers(text).Select(v => double.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out var d) ? d : -1).ToList();
+        return values.Count == 3 && values[0] > 0 && values[0] < values[1] && values[1] < values[2]
+            ? new SizeClasses { SmallMaxGb = values[0], BigMaxGb = values[1], BluRayMaxGb = values[2] }
+            : null;
+    }
+
+    private void ChooseOutputDirectory()
+    {
+        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
+        if (dialog.ShowDialog() == true)
+        {
+            _services.SetOutputDirectory(dialog.FolderName);
+        }
     }
 
     private void Save()
@@ -79,8 +118,15 @@ public sealed class SettingsPageViewModel : ObservableObject
             return;
         }
 
+        if (ParseSizes(MovieSizes) is not { } movieSizes || ParseSizes(SeriesSizes) is not { } seriesSizes)
+        {
+            Message = "Hranice veľkosti zadajte ako tri rastúce čísla v GB oddelené bodkočiarkou, napr. 2; 14; 30.";
+            return;
+        }
+
         var profile = RuleProfile.Default with
         {
+            Library = RuleProfile.Default.Library with { Movies = movieSizes, Series = seriesSizes },
             Name = "Vlastný profil",
             PreferredLanguages = languages,
             ForcedKeywords = List(ForcedKeywords),
@@ -114,9 +160,13 @@ public sealed class SettingsPageViewModel : ObservableObject
         var d = RuleProfile.Default;
         return profile.PreferredLanguages.SequenceEqual(d.PreferredLanguages) && profile.ForcedKeywords.SequenceEqual(d.ForcedKeywords) &&
                profile.HearingImpairedKeywords.SequenceEqual(d.HearingImpairedKeywords) && profile.CommentaryKeywords.SequenceEqual(d.CommentaryKeywords) &&
-               profile.RemoveTags == d.RemoveTags && profile.RepairIndex == d.RepairIndex && profile.VideoNameLength == d.VideoNameLength;
+               profile.RemoveTags == d.RemoveTags && profile.RepairIndex == d.RepairIndex && profile.VideoNameLength == d.VideoNameLength &&
+               profile.Library.Movies == d.Library.Movies && profile.Library.Series == d.Library.Series;
     }
 
     private static List<string> List(string text) =>
         text.Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static List<string> ListOfNumbers(string text) =>
+        text.Split([';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 }

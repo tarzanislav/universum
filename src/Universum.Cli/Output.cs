@@ -1,15 +1,40 @@
 using Universum.Core.Batch;
+using Universum.Core.Library;
 using Universum.Core.Media;
 
 namespace Universum.Cli;
 
 internal static class Output
 {
-    public static void Print(BatchAnalysis analysis, IReadOnlyList<BatchItem> items)
+    public static void Print(BatchAnalysis analysis, IReadOnlyList<BatchItem> items, LibraryJob library, string journalDirectory)
     {
+        var leftovers = analysis.LeftoverTemporaryFiles.Concat(library.Layout.FindLeftovers()).ToList();
         Console.WriteLine($"{analysis.FileCount} súborov v {analysis.Groups.Count} skupinách" +
                           (analysis.Failed.Count > 0 ? $", nečitateľné: {analysis.Failed.Count}" : "") +
-                          (analysis.LeftoverTemporaryFiles.Count > 0 ? $", zvyšky po prerušení: {analysis.LeftoverTemporaryFiles.Count}" : ""));
+                          (leftovers.Count > 0 ? $", zvyšky po prerušení: {leftovers.Count}" : ""));
+        foreach (var leftover in leftovers)
+        {
+            Console.WriteLine("  zvyšok (možno vymazať): " + leftover);
+        }
+
+        foreach (var interrupted in library.Layout.FindInterrupted())
+        {
+            var home = Universum.Core.Execution.FileProcessor.OriginalPlaceOf(journalDirectory, interrupted);
+            Console.WriteLine("  POZOR – nedokončený presun, možno jediná kópia (nemažte): " + interrupted +
+                              (home is null ? "" : " – patrí do: " + home));
+        }
+
+        Console.WriteLine($"Knižnica: {library.Layout.Root}");
+        if (library.Kind == MediaKind.Series)
+        {
+            Console.WriteLine(library.Series is { } series
+                ? $"Seriál: {series.FolderName}"
+                : $"Seriál: NEURČENÝ{(library.SeriesSuggestion is { } s ? $" – návrh „{s.FolderName}“ (--confirm-suggestions)" : "")} – zadajte --nazov a --rok");
+        }
+        else
+        {
+            Console.WriteLine("Filmy: názov každého súboru je uvedený pri ňom; jeden film zadajte --nazov a --rok");
+        }
         foreach (var group in analysis.Groups)
         {
             Console.WriteLine();
@@ -33,17 +58,31 @@ internal static class Output
 
             foreach (var item in items.Where(i => i.Group == group))
             {
-                var reasons = item.Reasons.Count == 0 ? "" : " – " + string.Join("; ", item.Reasons.Select(r => r.Kind + (r.Slot is { } s ? " " + s : "")));
-                Console.WriteLine($"    {Status(item.Status),-13} {Path.GetRelativePath(analysis.Folder, item.File.Path)}{reasons}");
+                var reasons = item.Reasons.Count == 0 ? "" : " – " + string.Join("; ", item.Reasons.Select(r => Reason(r, item, library)));
+                var target = item.PlannedPath is { } planned ? " → " + Path.GetRelativePath(library.Layout.Root, planned) : "";
+                Console.WriteLine($"    {Status(item.Status),-13} {Path.GetRelativePath(analysis.Folder, item.File.Path)}{target}{reasons}");
             }
         }
 
         Console.WriteLine();
     }
 
+    private static string Reason(ReviewReason reason, BatchItem item, LibraryJob library) => reason.Kind switch
+    {
+        ReviewReasonKind.MissingTitle => library.SuggestedTitleFor(item.File.Path) is { } suggested
+            ? $"názov: návrh „{suggested.FolderName}“ (--confirm-suggestions)"
+            : "chýba názov (--nazov, --rok)",
+        ReviewReasonKind.MissingEpisode => item.Episode is { } episode
+            ? $"epizóda: návrh {episode.Tag} (--confirm-suggestions)"
+            : "chýba číslo epizódy (--epizoda)",
+        ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
+        _ => reason.Kind + (reason.Slot is { } s ? " " + s : ""),
+    };
+
     private static string Status(BatchStatus status) => status switch
     {
         BatchStatus.Unchanged => "bez zmeny",
+        BatchStatus.Place => "do knižnice",
         BatchStatus.HeaderEdit => "len hlavička",
         BatchStatus.Remux => "nový súbor",
         _ => "NA KONTROLU",

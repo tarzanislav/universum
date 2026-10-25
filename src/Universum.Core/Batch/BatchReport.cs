@@ -41,7 +41,15 @@ public static class BatchReport
 
     public static string Describe(BatchItem item, ProcessingResult? result) => result?.Status switch
     {
-        ProcessingStatus.Done => result.Method == Planning.WriteMethod.Remux ? "hotovo – nový súbor" : "hotovo – upravená hlavička",
+        ProcessingStatus.Done => result.Method switch
+        {
+            Planning.WriteMethod.Remux => "hotovo – nový súbor",
+            Planning.WriteMethod.HeaderEdit => "hotovo – upravená hlavička",
+            _ => "hotovo – v knižnici",
+        },
+        ProcessingStatus.AlreadyInLibrary => "už je v knižnici",
+        ProcessingStatus.Failed when FileProcessor.NeedsAttention(result) => "CHYBA – niečo sa nepodarilo úplne vrátiť, pozri poznámky",
+        ProcessingStatus.Failed when result.Messages.Contains(FileProcessor.RestoredMessage) => "chyba – originál vrátený do pôvodného stavu",
         ProcessingStatus.Failed => "chyba – originál nezmenený",
         ProcessingStatus.Cancelled => "zrušené",
         ProcessingStatus.NeedsReview => "na kontrolu",
@@ -50,6 +58,7 @@ public static class BatchReport
         {
             BatchStatus.Unchanged => "bez zmeny",
             BatchStatus.NeedsReview => "na kontrolu",
+            BatchStatus.Place => "do knižnice",
             _ => "nespracované",
         },
     };
@@ -63,7 +72,7 @@ public static class BatchReport
             var notes = result?.Messages.Count > 0
                 ? string.Join(" | ", result.Messages)
                 : string.Join(" | ", item.Reasons.Select(r => r.Kind + (r.Slot is { } s ? " " + s : "")));
-            yield return [item.File.Path, item.Group.Label, Describe(item, result), result?.OutputPath ?? "", notes];
+            yield return [item.File.Path, item.Group.Label, Describe(item, result), result?.OutputPath ?? item.PlannedPath ?? "", notes];
         }
     }
 

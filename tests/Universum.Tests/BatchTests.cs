@@ -1,5 +1,6 @@
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
@@ -35,7 +36,7 @@ public sealed class BatchTests
         Assert.Equal("A", series.Label);
         Assert.Sequence(["Seriál E2.mkv", "Seriál E3.mkv", "Seriál E10.mkv"], series.Files.Select(f => Path.GetFileName(f.Path)), "natural order");
         Assert.True(series.Signature.Contains("A: en, und", StringComparison.Ordinal), series.Signature);
-        Assert.Sequence(["Seriál E5.universum-tmp.mkv"], analysis.LeftoverTemporaryFiles.Select(Path.GetFileName)!, "left-over temporary file found, not analysed");
+        Assert.Sequence(["Seriál E5.universum-tmp.mkv", "Seriál E6.0a1b2c3d.universum-tmp"], analysis.LeftoverTemporaryFiles.Select(Path.GetFileName)!, "left-over temporary files found, not analysed");
     }
 
     [Test]
@@ -63,16 +64,17 @@ public sealed class BatchTests
         using var work = await SeriesFolderAsync();
         var analysis = await AnalyzeAsync(work.Path);
         analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
-        var items = BatchPlanner.Plan(analysis, FilmCzEn);
+        var library = Library(work.Path, analysis);
+        var items = BatchPlanner.Plan(analysis, FilmCzEn, library: library);
 
         var czOnly = items.Single(i => i.File.Path.EndsWith("cz-only.mkv", StringComparison.Ordinal));
         Assert.True(czOnly.Match.IsAcceptable && czOnly.Match.MissingOptional.Count == 2, "no EN audio, no forced: still matches");
-        Assert.Equal(BatchStatus.Unchanged, czOnly.Status);
+        Assert.Equal(BatchStatus.Place, czOnly.Status, "nothing to change, only into the library");
 
         var english = items.Single(i => i.File.Path.EndsWith("en-only.mkv", StringComparison.Ordinal));
         Assert.Equal(ReviewReasonKind.MissingRequiredSlot, english.Reasons.Single().Kind, "required Czech audio missing");
         english.Group.Decisions.ProcessAnyway.Add(english.File.Path);
-        Assert.True(BatchPlanner.Plan(analysis, FilmCzEn).Single(i => i.File.Path == english.File.Path).NeedsWork, "processed anyway on request");
+        Assert.True(BatchPlanner.Plan(analysis, FilmCzEn, library: library).Single(i => i.File.Path == english.File.Path).NeedsWork, "processed anyway on request");
     }
 
     [Test]
@@ -87,7 +89,7 @@ public sealed class BatchTests
             Slots = [new(TrackType.Audio, "en", TrackRole.Main, false), new(TrackType.Audio, "cs", TrackRole.Main, true), new(TrackType.Subtitles, "cs", TrackRole.Main, false)],
             Unlisted = UnlistedTracks.Remove,
         };
-        var item = BatchPlanner.Plan(analysis, template).Single();
+        var item = BatchPlanner.Plan(analysis, template, library: Library(work.Path, analysis)).Single();
         Assert.Sequence(
             ["video", "audio en", "audio cs", "subtitles cs"],
             item.Target.Tracks.Select(t => t.Type == TrackType.Video ? "video" : $"{t.Type.ToString().ToLowerInvariant()} {t.Language.Primary}"),
@@ -95,31 +97,81 @@ public sealed class BatchTests
         Assert.Equal(2, item.Target.Removed.Count, "removed tracks");
         Assert.True(item.Target.For(item.Target.Tracks[1].TrackId).Flags.Default, "first audio by template is default");
 
-        var results = await RunAsync(work.Path, [item], new OutputOptions(OriginalHandling.Keep));
+        var results = await RunAsync(work.Path, [item]);
         Assert.Equal(ProcessingStatus.Done, results.Single().Status, string.Join("; ", results.Single().Messages));
         var written = await (await InspectorAsync()).InspectAsync(results.Single().OutputPath!);
         Assert.Equal(4, written.Tracks.Count, "written tracks");
     }
 
     [Test]
-    public async Task RunWritesTargetFolderWithSubfolders()
+    public async Task SeriesIsGuessedFromTheNames()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+
+        Assert.Equal(MediaKind.Series, job.Kind, "most files carry an episode number");
+        Assert.Equal<TitleInfo?>(null, job.Series, "title only suggested");
+        Assert.Equal("Seriál", job.SeriesSuggestion?.Name, "series title from the file names");
+        var czOnly = analysis.Groups.SelectMany(g => g.Files).Single(f => f.Path.EndsWith("cz-only.mkv", StringComparison.Ordinal)).Path;
+        Assert.Equal((new EpisodeNumber(1, 1), true), job.EpisodeFor(czOnly), "free number suggested in folder order");
+        var episode = analysis.Groups[0].Files[0].Path;
+        Assert.Equal((new EpisodeNumber(1, 2), false), job.EpisodeFor(episode), "number from the name");
+
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.True(items.All(i => i.Reasons.Any(r => r.Kind == ReviewReasonKind.MissingTitle)), "nothing without a confirmed title");
+
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.True(items.All(i => i.Reasons.Count == 0), string.Join("; ", items.SelectMany(i => i.Reasons).Select(r => r.Kind)));
+    }
+
+    [Test]
+    public void FilmTitlesFromNames()
+    {
+        var analysis = Synthetic("/filmy",
+            "/filmy/Creep.2004.1080p.BluRay.x264-GRP.mkv",
+            "/filmy/Kantara A Legend Chapter 1 (2025) [tmdbid-1083637]/kantara-uhd.mkv",
+            "/filmy/Pelíšky (1999)/pelisky.mkv");
+        var job = LibraryJob.Guess(new LibraryLayout("/out"), analysis);
+
+        Assert.Equal(MediaKind.Movie, job.Kind);
+        Assert.Equal(new TitleInfo(MediaKind.Movie, "Creep", 2004), job.MovieSuggestions[Path.GetFullPath("/filmy/Creep.2004.1080p.BluRay.x264-GRP.mkv")]);
+        Assert.Equal(new TitleInfo(MediaKind.Movie, "Pelíšky", 1999), job.MovieSuggestions[Path.GetFullPath("/filmy/Pelíšky (1999)/pelisky.mkv")], "named by its folder");
+        Assert.Equal(
+            "Kantara A Legend Chapter 1 (2025) [tmdbid-1083637]",
+            job.Movies[Path.GetFullPath("/filmy/Kantara A Legend Chapter 1 (2025) [tmdbid-1083637]/kantara-uhd.mkv")].FolderName,
+            "library name with an ID: confirmed");
+    }
+
+    [Test]
+    public async Task RunWritesSeriesIntoTheLibrary()
     {
         using var work = await SeriesFolderAsync();
         var analysis = await AnalyzeAsync(work.Path);
         analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
-        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
-        var output = Path.Combine(work.Path, "_výsledok");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library);
         var progress = new List<BatchProgress>();
 
-        var results = await RunAsync(work.Path, items, new OutputOptions(OriginalHandling.Keep, output), progress);
+        var results = await RunAsync(work.Path, items, progress);
 
-        Assert.Equal(4, results.Count, "files needing work (cz-only is clean)");
+        Assert.Equal(5, results.Count, "every file goes into the library");
         Assert.True(results.All(r => r.Status == ProcessingStatus.Done), string.Join("; ", results.SelectMany(r => r.Messages)));
-        Assert.True(File.Exists(Path.Combine(output, "Sezóna 1", "Seriál E2.mkv")), "subfolder structure kept");
-        Assert.Equal(4, progress.Count(p => p.Result is not null), "a result per file");
+        var season = Path.Combine(library.Layout.Shows, "Seriál (2026)", "Season 01");
+        Assert.True(File.Exists(Path.Combine(season, "Seriál S01E02 - CZ EN SD H264 SMALL.mkv")), string.Join(", ", Directory.EnumerateFiles(season).Select(Path.GetFileName)));
+        Assert.True(File.Exists(Path.Combine(season, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")), "episode 10");
+        Assert.True(File.Exists(Path.Combine(season, "Seriál S01E01 - CZ SD H264 SMALL.mkv")), "confirmed suggestion for the loose file");
+        Assert.Equal(5, progress.Count(p => p.Result is not null), "a result per file");
 
-        var again = BatchPlanner.Plan(await AnalyzeAsync(output), BatchTemplate.RulesOnly);
-        Assert.True(again.All(i => i.Status == BatchStatus.Unchanged), "second run: nothing to do");
+        var inLibrary = await AnalyzeAsync(Path.Combine(library.Layout.Shows, "Seriál (2026)"));
+        var again = LibraryJob.Guess(library.Layout, inLibrary);
+        again.Series = library.Series;
+        var plan = BatchPlanner.Plan(inLibrary, BatchTemplate.RulesOnly, library: again);
+        Assert.True(plan.All(i => i.Status == BatchStatus.Unchanged), string.Join("; ", plan.Select(i => i.Status + " " + Path.GetFileName(i.File.Path))));
     }
 
     [Test]
@@ -128,8 +180,10 @@ public sealed class BatchTests
         using var work = await SeriesFolderAsync();
         var analysis = await AnalyzeAsync(work.Path);
         analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
         var control = new BatchControl();
-        var results = await RunAsync(work.Path, BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly), new OutputOptions(OriginalHandling.Keep),
+        var results = await RunAsync(work.Path, BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library),
             new SyncProgress<BatchProgress>(p => { if (p.Result is not null) { control.StopAfterCurrent = true; } }), control);
         Assert.Equal(1, results.Count, "stopped after the first file");
     }
@@ -289,6 +343,7 @@ public sealed class BatchTests
         }
 
         File.Copy(TestData.Media("en-und-cz-forced.mkv"), Path.Combine(season, "Seriál E5.universum-tmp.mkv"));
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), Path.Combine(season, "Seriál E6.0a1b2c3d.universum-tmp"));
         File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(work.Path, "cz-only.mkv"));
         var english = Path.Combine(work.Path, "en-only.mkv");
         await MergeAsync(english, "--audio-tracks", "1", "--subtitle-tracks", "5", TestData.Media("en-und-cz-forced.mkv"));
@@ -300,21 +355,29 @@ public sealed class BatchTests
 
     private static async Task<IMediaInspector> InspectorAsync() => new MkvMergeInspector(await TestData.RequireMkvToolNixAsync(), new ProcessRunner());
 
-    private static async Task<IReadOnlyList<ProcessingResult>> RunAsync(
-        string root, IReadOnlyList<BatchItem> items, OutputOptions options, ICollection<BatchProgress>? progress = null, BatchControl? control = null)
+    /// <summary>Films: every file confirmed under its own (guessed) title.</summary>
+    private static LibraryJob Library(string root, BatchAnalysis analysis)
     {
-        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"));
-        return await BatchRunner.RunAsync(items, processor, i => BatchRunner.OutputFor(options, root, i.File.Path),
-            progress is null ? null : new SyncProgress<BatchProgress>(progress.Add), control);
+        var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(root, "OUTPUT")), analysis);
+        job.Kind = MediaKind.Movie;
+        job.ConfirmSuggestions();
+        return job;
     }
 
-    private static Task<IReadOnlyList<ProcessingResult>> RunAsync(string root, IReadOnlyList<BatchItem> items, OutputOptions options, IProgress<BatchProgress> progress, BatchControl control) =>
-        RunWithProgressAsync(root, items, options, progress, control);
+    private static BatchAnalysis Synthetic(string folder, params string[] paths)
+    {
+        var group = new BatchGroup("x", 0);
+        group.Files.AddRange(paths.Select(p => new MediaFile { Path = Path.GetFullPath(p) }));
+        return new BatchAnalysis(Path.GetFullPath(folder), true, [group], [], []);
+    }
 
-    private static async Task<IReadOnlyList<ProcessingResult>> RunWithProgressAsync(string root, IReadOnlyList<BatchItem> items, OutputOptions options, IProgress<BatchProgress> progress, BatchControl control)
+    private static Task<IReadOnlyList<ProcessingResult>> RunAsync(string root, IReadOnlyList<BatchItem> items, ICollection<BatchProgress>? progress = null) =>
+        RunAsync(root, items, progress is null ? null : new SyncProgress<BatchProgress>(progress.Add), null);
+
+    private static async Task<IReadOnlyList<ProcessingResult>> RunAsync(string root, IReadOnlyList<BatchItem> items, IProgress<BatchProgress>? progress, BatchControl? control)
     {
         var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"));
-        return await BatchRunner.RunAsync(items, processor, i => BatchRunner.OutputFor(options, root, i.File.Path), progress, control);
+        return await BatchRunner.RunAsync(items, processor, new OutputOptions(OriginalHandling.Keep), progress, control);
     }
 
     private static async Task PropEditAsync(string file, params string[] arguments) =>
@@ -334,7 +397,7 @@ public sealed class BatchTests
 
     private sealed class NoRecycleBin : IRecycleBin
     {
-        public bool CanRecycle(string path) => false;
+        public string? CannotRecycle(string path) => "no recycle bin in tests";
 
         public void MoveToRecycleBin(string path) => throw new IOException("no recycle bin in tests");
     }

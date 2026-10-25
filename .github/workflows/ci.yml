@@ -27,9 +27,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
-        with:
-          dotnet-version: '10.0.1xx'
+      # the runner image's .NET 10 SDK, else the Ubuntu package (the Microsoft download CDN answered 409)
+      - name: .NET 10 SDK
+        run: |
+          if ! dotnet --list-sdks 2>/dev/null | grep -q '^10\.'; then sudo apt-get update -q && sudo apt-get install -y -q dotnet-sdk-10.0; fi
+          dotnet --list-sdks
       - name: Install MKVToolNix (Ubuntu package)
         run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mkvtoolnix && mkvmerge --version
       - name: Build core
@@ -44,9 +46,16 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
-        with:
-          dotnet-version: '10.0.1xx'
+      # the runner image's .NET 10 SDK, else the official install script from builds.dotnet.microsoft.com
+      - name: .NET 10 SDK
+        shell: pwsh
+        run: |
+          $sdks = & dotnet --list-sdks 2>$null
+          if (-not ($sdks -match '^10\.')) {
+            Invoke-WebRequest https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
+            & "$env:RUNNER_TEMP\dotnet-install.ps1" -Channel 10.0 -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir "$env:ProgramFiles\dotnet"
+          }
+          dotnet --list-sdks
 
       - name: Version
         id: version

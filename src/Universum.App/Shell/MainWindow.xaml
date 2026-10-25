@@ -70,8 +70,15 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="#" Binding="{Binding Position}" />
                         <DataGridTextColumn Header="Typ" Binding="{Binding Type}" />
-                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" />
-                        <DataGridTemplateColumn Header="Jazyk (pred → po)" Width="230">
+                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding Codec}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Jazyk (pred → po)" Width="175">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid>
@@ -81,12 +88,12 @@
                                         </StackPanel>
                                         <ComboBox Visibility="{Binding NeedsLanguage, Converter={StaticResource BoolToVisibility}}"
                                                   ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
-                                                  DisplayMemberPath="SlovakName" MinWidth="180" ToolTip="Neurčený jazyk – vyberte, v akom jazyku stopa je" />
+                                                  DisplayMemberPath="SlovakName" MinWidth="160" ToolTip="Neurčený jazyk – vyberte, v akom jazyku stopa je" />
                                     </Grid>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Názov (pred → po)" Width="*">
+                        <DataGridTemplateColumn Header="Názov (pred → po)" Width="*" MinWidth="150">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel>

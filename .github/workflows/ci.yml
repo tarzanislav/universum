@@ -148,6 +148,7 @@ jobs:
           if ($p.ExitCode -ne 0) { Write-Host "::error::Self-test exit code $($p.ExitCode)"; exit 1 }
           & publish\universum-cli.exe analyze testdata\media
           if ($LASTEXITCODE -ne 1) { Write-Host "::error::universum-cli.exe analyze returned $LASTEXITCODE"; exit 1 }
+          exit 0
           Write-Host "::notice::Self-test OK"
 
       - name: Self-test output (log and screenshots)

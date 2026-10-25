@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Windows-only services: MKVToolNix in the registry, Authenticode signatures, Recycle Bin. -->
+  <PropertyGroup>
+    <!-- plain net10.0 with [SupportedOSPlatform("windows")] so the project also builds on Linux -->
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Universum.Platform.Windows</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Universum.Core\Universum.Core.csproj" />
+  </ItemGroup>
+</Project>

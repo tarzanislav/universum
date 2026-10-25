@@ -1,0 +1,198 @@
+using System.IO;
+using System.Text;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using Universum.App.Setup;
+using Universum.App.Shell;
+using Universum.Core.Media;
+using Universum.Core.MkvToolNix;
+using Universum.Platform.Windows;
+
+namespace Universum.App.SelfTesting;
+
+/// <summary>
+/// Self-test run by CI ("Universum.exe --samotest") on a real Windows machine with a real MKVToolNix.
+/// Environment: UNIVERSUM_MKVTOOLNIX_DIR (tools), UNIVERSUM_TESTDATA (testdata folder),
+/// UNIVERSUM_SELFTEST_DIR (log and screenshots). Exit code 0 = passed.
+/// </summary>
+internal static class SelfTest
+{
+    private static readonly StringBuilder Log = new();
+    private static string _outputDirectory = "";
+    private static int _failures;
+
+    public static async Task<int> RunAsync(AppServices services)
+    {
+        _outputDirectory = Environment.GetEnvironmentVariable("UNIVERSUM_SELFTEST_DIR") is { Length: > 0 } dir
+            ? dir
+            : Path.Combine(Path.GetTempPath(), "UNIVERSUM-selftest");
+        Directory.CreateDirectory(_outputDirectory);
+        Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
+
+        MkvToolNixInstallation? installation = null;
+        await Step("MKVToolNix", async () => installation = await TestMkvToolNixAsync(services));
+        await Step("inspection", () => TestInspectionAsync(services));
+        await Step("release feed and download", () => TestReleaseFeedAndDownloadAsync(installation));
+        await Step("windows", () => TestWindowsAsync(services));
+
+        Write(_failures == 0 ? "SELFTEST OK" : $"SELFTEST FAILED ({_failures})");
+        File.WriteAllText(Path.Combine(_outputDirectory, "selftest.log"), Log.ToString(), new UTF8Encoding(false));
+        return _failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>Runs one part of the self-test; an exception fails it but the other parts still run.</summary>
+    private static async Task Step(string name, Func<Task> test)
+    {
+        Write($"--- {name}");
+        try
+        {
+            await test();
+        }
+        catch (Exception ex)
+        {
+            Fail($"{name}: unexpected exception: {ex}");
+        }
+    }
+
+    private static async Task<MkvToolNixInstallation?> TestMkvToolNixAsync(AppServices services)
+    {
+        var installation = await services.FindMkvToolNixAsync();
+        Check(installation is not null, "MKVToolNix found");
+        if (installation is null)
+        {
+            return null;
+        }
+
+        Write($"using {installation}");
+        Check(installation.IsSupportedVersion, $"version {installation.Version} >= {MkvToolNixVersion.Minimum}");
+        foreach (var tool in Enum.GetValues<MkvToolNixTool>())
+        {
+            Check(installation.HasTool(tool), $"tool present: {MkvToolNixToolNames.FileName(tool)}");
+        }
+
+        var signature = AuthenticodeVerifier.Verify(installation.ToolPath(MkvToolNixTool.MkvMerge));
+        Write($"mkvmerge.exe signature: valid={signature.IsValid}, signer={signature.SignerName}, status=0x{signature.Status:X8}, revocation checked={signature.RevocationChecked}");
+        Check(signature.IsSignedBy(MkvToolNixDownloads.WindowsSignerName), "mkvmerge.exe signed by " + MkvToolNixDownloads.WindowsSignerName);
+
+        var unsigned = Path.Combine(_outputDirectory, "unsigned.exe");
+        File.WriteAllBytes(unsigned, [0x4D, 0x5A, 0, 0]);
+        Check(!AuthenticodeVerifier.Verify(unsigned).IsValid, "unsigned file is rejected");
+
+        var registry = new RegistryMkvToolNixLocations().CandidateDirectories().ToList();
+        Write($"registry candidates: {(registry.Count == 0 ? "none" : string.Join("; ", registry))}");
+        return installation;
+    }
+
+    private static async Task TestInspectionAsync(AppServices services)
+    {
+        var testData = Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA");
+        if (string.IsNullOrEmpty(testData) || services.CurrentMkvToolNix is null)
+        {
+            Fail("UNIVERSUM_TESTDATA or MKVToolNix missing");
+            return;
+        }
+
+        var inspector = new MkvMergeInspector(services.CurrentMkvToolNix, services.Runner);
+        var file = await inspector.InspectAsync(Path.Combine(testData, "media", "en-und-cz-forced.mkv"));
+        Check(file.Tracks.Count == 6, $"en-und-cz-forced: 6 tracks ({file.Tracks.Count})");
+        Check(file.TracksOf(TrackType.Audio).Count(t => t.Language.IsUndetermined) == 1, "en-und-cz-forced: one undetermined audio track");
+        Check(file.HasTags && file.HasChapters, "en-und-cz-forced: tags and chapters");
+        Write($"identification format version {file.IdentificationFormatVersion}");
+    }
+
+    private static async Task TestReleaseFeedAndDownloadAsync(MkvToolNixInstallation? installation)
+    {
+        var latest = await MkvToolNixInstaller.GetLatestVersionAsync();
+        Write($"latest MKVToolNix release: {latest}");
+        Check(installation is null || latest >= installation.Version, "release feed is not older than the tested version");
+
+        // full download and verification path, without running the installer
+        var installer = await MkvToolNixInstaller.DownloadAsync(latest, null);
+        Check(File.Exists(installer), "installer downloaded and verified (SHA-256 + signature)");
+        File.Delete(installer);
+    }
+
+    private static async Task TestWindowsAsync(AppServices services)
+    {
+        var model = new MainViewModel(services);
+        var window = new MainWindow(model) { Width = 1180, Height = 740, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        window.Show();
+        await model.RefreshStatusAsync();
+        await model.Info.LoadAsync(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"));
+        Check(model.Info.Tracks.Count == 6, $"information page shows 6 tracks ({model.Info.Tracks.Count})");
+        Check(model.Info.Error.Length == 0, "information page shows no error: " + model.Info.Error);
+        await Screenshot(window, "main-info.png");
+
+        foreach (var tool in model.Tools)
+        {
+            model.SelectedTool = tool;
+            await Settle();
+        }
+
+        model.SelectedTool = model.Tools[4];
+        await Screenshot(window, "main-placeholder.png");
+        window.Close();
+
+        var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        setup.Show();
+        await Task.Delay(3000);
+        await Screenshot(setup, "setup.png");
+        setup.Close();
+    }
+
+    private static async Task Screenshot(Window window, string fileName)
+    {
+        await Settle();
+        if (window.Content is not FrameworkElement content || content.ActualWidth < 1)
+        {
+            Fail($"screenshot {fileName}: nothing rendered");
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(content);
+        var bitmap = new RenderTargetBitmap(
+            (int)(content.ActualWidth * dpi.DpiScaleX), (int)(content.ActualHeight * dpi.DpiScaleY),
+            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        var background = new DrawingVisual();
+        using (var context = background.RenderOpen())
+        {
+            context.DrawRectangle(window.Background ?? Brushes.White, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
+        }
+
+        bitmap.Render(background);
+        bitmap.Render(content);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        await using var stream = File.Create(Path.Combine(_outputDirectory, fileName));
+        encoder.Save(stream);
+        Write("screenshot " + fileName);
+    }
+
+    private static async Task Settle()
+    {
+        await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        await Task.Delay(300);
+    }
+
+    private static void Check(bool condition, string what)
+    {
+        if (condition)
+        {
+            Write("ok    " + what);
+        }
+        else
+        {
+            Fail(what);
+        }
+    }
+
+    private static void Fail(string what)
+    {
+        _failures++;
+        Write("ERROR " + what);
+    }
+
+    private static void Write(string line) => Log.AppendLine($"{DateTime.Now:HH:mm:ss.fff} {line}");
+}

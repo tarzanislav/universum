@@ -48,7 +48,7 @@ public static class BatchReport
             _ => "hotovo – v knižnici",
         },
         ProcessingStatus.AlreadyInLibrary => "už je v knižnici",
-        ProcessingStatus.Failed when result.UndoRecordPath is not null => "CHYBA – originál sa nepodarilo úplne vrátiť, pozri poznámky",
+        ProcessingStatus.Failed when FileProcessor.NeedsAttention(result) => "CHYBA – niečo sa nepodarilo úplne vrátiť, pozri poznámky",
         ProcessingStatus.Failed when result.Messages.Contains(FileProcessor.RestoredMessage) => "chyba – originál vrátený do pôvodného stavu",
         ProcessingStatus.Failed => "chyba – originál nezmenený",
         ProcessingStatus.Cancelled => "zrušené",

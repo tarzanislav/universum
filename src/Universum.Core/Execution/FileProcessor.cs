@@ -91,7 +91,7 @@ public sealed class FileProcessor(
             var fingerprint = index is null || inLibrary ? null : await LibraryIndex.FingerprintAsync(source, cancellationToken);
             var signature = LibraryIndex.TargetSignature(plan.Target);
             string? previous = null;
-            if (fingerprint is not null && index!.FindPrevious(placement, fingerprint) is { } found)
+            if (fingerprint is not null && index!.FindPrevious(placement, fingerprint, signature) is { } found)
             {
                 if (found.Target == signature)
                 {
@@ -230,12 +230,14 @@ public sealed class FileProcessor(
             problems.Add("the modification time could not be restored: " + ex.Message);
         }
 
+        var finalPath = path;
         if (back is not null)
         {
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(back)!);
-                File.Move(path, back);
+                Paths.Rename(path, back);
+                finalPath = back;
             }
             catch (Exception ex) when (IsFileError(ex))
             {
@@ -248,6 +250,18 @@ public sealed class FileProcessor(
             TryDelete(undoRecordPath);
             TryDelete(record.TagsXmlPath);
         }
+        else
+        {
+            // the record follows the file, so undo can be tried again
+            try
+            {
+                (record with { FilePath = finalPath, MovedFrom = finalPath == back ? null : back }).Save(undoRecordPath);
+            }
+            catch (Exception ex) when (IsFileError(ex))
+            {
+                problems.Add("the undo record could not be updated: " + ex.Message);
+            }
+        }
 
         return problems;
     }
@@ -255,9 +269,19 @@ public sealed class FileProcessor(
     /// <summary>Where the original of an interrupted move belongs, from the undo journal; null when unknown.</summary>
     public static string? OriginalPlaceOf(string journalDirectory, string interruptedPath)
     {
+        IEnumerable<string> records;
         try
         {
-            foreach (var file in Directory.Exists(journalDirectory) ? Directory.EnumerateFiles(journalDirectory, "*.undo.json") : [])
+            records = Directory.Exists(journalDirectory) ? Directory.EnumerateFiles(journalDirectory, "*.undo.json").ToList() : [];
+        }
+        catch (Exception ex) when (IsFileError(ex))
+        {
+            return null;
+        }
+
+        foreach (var file in records)
+        {
+            try
             {
                 var record = UndoRecord.Load(file);
                 if (Paths.Same(record.FilePath, interruptedPath))
@@ -265,10 +289,10 @@ public sealed class FileProcessor(
                     return record.MovedFrom;
                 }
             }
-        }
-        catch (Exception ex) when (IsFileError(ex))
-        {
-            // unknown
+            catch (Exception ex) when (IsFileError(ex))
+            {
+                // one unreadable record does not hide the others
+            }
         }
 
         return null;
@@ -323,7 +347,7 @@ public sealed class FileProcessor(
 
                 // the old file steps aside (a name media servers ignore), the new one takes its place, then the old one is recycled
                 var aside = UniquePath(placement.Directory, source, ReplacedExtension);
-                File.Move(source, aside);
+                Paths.Rename(source, aside);
                 string final;
                 try
                 {
@@ -331,7 +355,15 @@ public sealed class FileProcessor(
                 }
                 catch (Exception ex) when (IsFileError(ex))
                 {
-                    File.Move(aside, source);
+                    try
+                    {
+                        Paths.Rename(aside, source);
+                    }
+                    catch (Exception back) when (IsFileError(back))
+                    {
+                        throw new IOException($"{RestoreFailedPrefix}the old library file stays as {aside} ({back.Message}); {ex.Message}", ex);
+                    }
+
                     throw;
                 }
 
@@ -362,7 +394,7 @@ public sealed class FileProcessor(
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(source, moving);
+            Paths.Rename(source, moving);
         }
         catch (Exception ex) when (IsFileError(ex) || ex is OperationCanceledException)
         {
@@ -400,13 +432,21 @@ public sealed class FileProcessor(
         {
             var problems = await UndoAsync(undoPath, current, Paths.Same(current, home) ? null : home, trusted: true, CancellationToken.None);
             messages.AddRange(ex is EditFailedException failed ? failed.Messages : [ex.Message]);
-            messages.AddRange(problems.Count == 0 ? [RestoredMessage] : problems.Select(p => "RESTORE FAILED: " + p));
+            messages.AddRange(problems.Count == 0 ? [RestoredMessage] : problems.Select(p => RestoreFailedPrefix + p));
             return Result(plan, ProcessingStatus.Failed, null, problems.Count == 0 ? null : undoPath, messages);
         }
     }
 
     /// <summary>Message of a failed edit after which the original state was restored.</summary>
     public const string RestoredMessage = "the original was restored";
+
+    /// <summary>Start of messages saying that something could not be put back (the user has to look).</summary>
+    public const string RestoreFailedPrefix = "RESTORE FAILED: ";
+
+    /// <summary>True when a failed result left something not fully restored.</summary>
+    public static bool NeedsAttention(ProcessingResult result) =>
+        result.Status == ProcessingStatus.Failed &&
+        (result.UndoRecordPath is not null || result.Messages.Any(m => m.Contains(RestoreFailedPrefix, StringComparison.Ordinal)));
 
     /// <summary>A new file (copy or remux) under a temporary name, verified, renamed; then the original to the Recycle Bin.</summary>
     private async Task<ProcessingResult> WriteIntoLibraryAsync(

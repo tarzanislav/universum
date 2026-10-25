@@ -11,8 +11,25 @@ namespace Universum.Platform.Windows;
 [SupportedOSPlatform("windows")]
 public static partial class WindowsVolumes
 {
-    /// <summary>Uses the real volumes for <see cref="Paths.SameVolume"/> (call once at start-up).</summary>
-    public static void Register() => Paths.VolumeResolver = VolumeOf;
+    /// <summary>
+    /// Uses the real volumes for <see cref="Paths.SameVolume"/> and renames without the copy fallback of File.Move
+    /// (call once at start-up).
+    /// </summary>
+    public static void Register()
+    {
+        Paths.VolumeResolver = VolumeOf;
+        Paths.Rename = Rename;
+    }
+
+    /// <summary>Renames (moves within one volume) and never copies: across volumes it fails instead.</summary>
+    public static void Rename(string source, string target)
+    {
+        if (!MoveFileEx(Path.GetFullPath(source), Path.GetFullPath(target), 0))
+        {
+            var error = Marshal.GetLastPInvokeError();
+            throw new IOException($"'{source}' could not be moved to '{target}' (error {error}).", error);
+        }
+    }
 
     /// <summary>Volume identifier ("\\?\Volume{…}\") of the path, or its mount point when that is unknown.</summary>
     public static string VolumeOf(string path)
@@ -61,6 +78,10 @@ public static partial class WindowsVolumes
     [LibraryImport("kernel32.dll", EntryPoint = "GetVolumeNameForVolumeMountPointW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetVolumeNameForVolumeMountPoint(string mountPoint, [Out] char[] volumeName, int length);
+
+    [LibraryImport("kernel32.dll", EntryPoint = "MoveFileExW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool MoveFileEx(string existing, string target, uint flags);
 
     [LibraryImport("kernel32.dll", EntryPoint = "GetDriveTypeW", StringMarshalling = StringMarshalling.Utf16)]
     private static partial uint GetDriveType(string rootPathName);

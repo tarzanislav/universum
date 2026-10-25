@@ -323,7 +323,7 @@ public sealed class RulesPageViewModel : ObservableObject
                 ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal.",
                 ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať (pozri upozornenia).",
                 ProcessingStatus.Cancelled => "Zrušené.",
-                _ when result.UndoRecordPath is not null =>
+                _ when FileProcessor.NeedsAttention(result) =>
                     "POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri podrobnosti; záznam na vrátenie: " + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
                 _ when result.Messages.Contains(FileProcessor.RestoredMessage) => "Nepodarilo sa – originál je vrátený do pôvodného stavu.\n" + string.Join("\n", result.Messages),
                 _ => "Nepodarilo sa – originál ostal nezmenený.\n" + string.Join("\n", result.Messages),

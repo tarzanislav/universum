@@ -86,7 +86,7 @@ internal static class SelfTest
         File.WriteAllText(probe, "x");
         var reason = bin.CannotRecycle(probe);
         Write($"Recycle Bin on the work drive: {reason ?? "available"}");
-        Check(reason is null || reason.Contains("Recycle Bin", StringComparison.Ordinal), "Recycle Bin check gives a reason when it refuses");
+        Check(reason is null, "Recycle Bin usable on the work drive (volume, settings and content read): " + (reason ?? "ok"));
         Check(bin.CannotRecycle(@"\\server\share\film.mkv") is not null, "network share refused");
         File.Delete(probe);
 

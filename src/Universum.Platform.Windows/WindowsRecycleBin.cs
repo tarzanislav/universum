@@ -60,7 +60,21 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
             // without a stored size, assume the smallest default (5 % of the drive): an underestimate is safe
             var capacity = maxCapacityMb is { } mb ? mb << 20 : (WindowsVolumes.TotalSize(mountPoint) ?? 0) / 20;
             var size = File.Exists(full) ? new FileInfo(full).Length : 0;
-            return size > capacity ? $"the file ({size >> 20} MB) is larger than the Recycle Bin of {mountPoint} ({capacity >> 20} MB)" : null;
+            if (size > capacity)
+            {
+                return $"the file ({size >> 20} MB) is larger than the Recycle Bin of {mountPoint} ({capacity >> 20} MB)";
+            }
+
+            // a full Recycle Bin makes room by deleting its oldest items for good – also originals recycled a moment ago
+            var info = new ShQueryRbInfo { Size = Marshal.SizeOf<ShQueryRbInfo>() };
+            if (SHQueryRecycleBin(mountPoint, ref info) != 0)
+            {
+                return $"the content of the Recycle Bin of {mountPoint} cannot be determined";
+            }
+
+            return info.TotalBytes + size > capacity
+                ? $"the Recycle Bin of {mountPoint} is too full ({info.TotalBytes >> 20} of {capacity >> 20} MB): it would delete older items for good – empty it first"
+                : null;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
         {
@@ -130,6 +144,18 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
 
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static partial int SHFileOperation(ref ShFileOpStruct operation);
+
+    [LibraryImport("shell32.dll", EntryPoint = "SHQueryRecycleBinW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int SHQueryRecycleBin(string rootPath, ref ShQueryRbInfo info);
+
+    // 64-bit Windows: natural alignment, 24 bytes
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ShQueryRbInfo
+    {
+        public int Size;
+        public long TotalBytes;
+        public long Items;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ShFileOpStruct

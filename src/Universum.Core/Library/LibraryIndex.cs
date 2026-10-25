@@ -62,7 +62,7 @@ public sealed class LibraryIndex
         var text = new StringBuilder();
         foreach (var track in target.Tracks)
         {
-            text.Append(CultureInfo.InvariantCulture, $"{track.TrackId}|{track.Type}|{track.Language.Primary}|{track.Flags.Default}{track.Flags.Enabled}{track.Flags.Forced}|{track.Role}|")
+            text.Append(CultureInfo.InvariantCulture, $"{track.TrackId}|{track.Type}|{track.Language.Ietf ?? track.Language.Legacy}|{track.Flags.Default}{track.Flags.Enabled}{track.Flags.Forced}|{track.Role}|")
                 .Append(track.Type == TrackType.Video ? "" : track.Name ?? "").Append('\n');
         }
 
@@ -70,29 +70,39 @@ public sealed class LibraryIndex
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())))[..24];
     }
 
-    /// <summary>A version of the placement made from the same original and unchanged since; null when there is none.</summary>
-    public (string Path, string Target)? FindPrevious(Placement placement, string sourceFingerprint)
+    /// <summary>
+    /// A version of the placement made from the same original and unchanged since (preferring one made into the same
+    /// target); null when there is none. Entries without a target signature are not trusted.
+    /// </summary>
+    public (string Path, string Target)? FindPrevious(Placement placement, string sourceFingerprint, string targetSignature)
     {
         if (!Directory.Exists(placement.Directory))
         {
             return null;
         }
 
+        (string Path, string Target)? first = null;
         lock (_entries)
         {
             foreach (var file in Directory.EnumerateFiles(placement.Directory, "*" + placement.Extension))
             {
                 if (placement.IsVersionName(Path.GetFileName(file)) &&
                     _entries.TryGetValue(Path.GetFullPath(file), out var entry) &&
+                    entry.Target.Length > 0 &&
                     entry.Source == sourceFingerprint &&
                     entry.Size == new FileInfo(file).Length)
                 {
-                    return (file, entry.Target);
+                    if (entry.Target == targetSignature)
+                    {
+                        return (file, entry.Target);
+                    }
+
+                    first ??= (file, entry.Target);
                 }
             }
         }
 
-        return null;
+        return first;
     }
 
     /// <summary>Records that <paramref name="resultPath"/> was made from an original with this fingerprint into this target.</summary>

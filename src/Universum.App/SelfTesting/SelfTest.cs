@@ -31,21 +31,29 @@ internal static class SelfTest
         Directory.CreateDirectory(_outputDirectory);
         Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
 
-        try
-        {
-            var installation = await TestMkvToolNixAsync(services);
-            await TestInspectionAsync(services);
-            await TestReleaseFeedAndDownloadAsync(installation);
-            await TestWindowsAsync(services);
-        }
-        catch (Exception ex)
-        {
-            Fail("unexpected exception: " + ex);
-        }
+        MkvToolNixInstallation? installation = null;
+        await Step("MKVToolNix", async () => installation = await TestMkvToolNixAsync(services));
+        await Step("inspection", () => TestInspectionAsync(services));
+        await Step("release feed and download", () => TestReleaseFeedAndDownloadAsync(installation));
+        await Step("windows", () => TestWindowsAsync(services));
 
         Write(_failures == 0 ? "SELFTEST OK" : $"SELFTEST FAILED ({_failures})");
         File.WriteAllText(Path.Combine(_outputDirectory, "selftest.log"), Log.ToString(), new UTF8Encoding(false));
         return _failures == 0 ? 0 : 1;
+    }
+
+    /// <summary>Runs one part of the self-test; an exception fails it but the other parts still run.</summary>
+    private static async Task Step(string name, Func<Task> test)
+    {
+        Write($"--- {name}");
+        try
+        {
+            await test();
+        }
+        catch (Exception ex)
+        {
+            Fail($"{name}: unexpected exception: {ex}");
+        }
     }
 
     private static async Task<MkvToolNixInstallation?> TestMkvToolNixAsync(AppServices services)

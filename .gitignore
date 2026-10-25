@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+TestResults/
+
+# Installer output
+installer/Output/
+
+# Local scratch
+*.tmp
+.universum-scratch/

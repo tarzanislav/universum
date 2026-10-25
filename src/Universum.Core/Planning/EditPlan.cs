@@ -7,7 +7,7 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
 {
     public static EditPlan For(TargetState target)
     {
-        var method = !target.HasChanges ? WriteMethod.None : target.OrderChanged ? WriteMethod.Remux : WriteMethod.HeaderEdit;
+        var method = !target.HasChanges ? WriteMethod.None : target.NeedsRewrite ? WriteMethod.Remux : WriteMethod.HeaderEdit;
         return new EditPlan(target, method, ListChanges(target));
     }
 
@@ -42,6 +42,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
         foreach (var removed in target.Removed)
         {
             changes.Add(new PlannedChange(removed.Id, ChangeKind.Removed, (sourcePositions[removed.Id] + 1).ToString(), null));
+        }
+
+        if (target.RepairIndex)
+        {
+            changes.Add(new PlannedChange(null, ChangeKind.Index, "0", null));
         }
 
         if (target.TagsChanged)

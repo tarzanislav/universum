@@ -131,8 +131,10 @@ internal static class SelfTest
             await Settle();
         }
 
-        model.SelectedTool = model.Tools.First(t => t.Title == "Hromadné spracovanie");
+        model.SelectedTool = model.Tools.First(t => t.Title == "Kapitoly");
         await Screenshot(window, "main-placeholder.png");
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
+        await Screenshot(window, "settings.png");
 
         // rules page: undetermined languages chosen by the user, result written next to the kept original
         var work = Path.Combine(_outputDirectory, "rules");

@@ -95,6 +95,7 @@ public static class MkvMergeIdentificationParser
             IsTextSubtitles = Bool(properties, "text_subtitles") ?? false,
             StatisticsFrames = Long(properties, "tag_number_of_frames"),
             StatisticsBitsPerSecond = Long(properties, "tag_bps"),
+            IndexEntries = Int(properties, "num_index_entries"),
             TagEntries = trackTags.GetValueOrDefault(id),
         };
     }

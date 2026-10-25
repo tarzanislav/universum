@@ -145,7 +145,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var target = UniversumRules.Apply(_file, RuleProfile.Default, new TrackDecisions { Languages = _languages, VideoNames = _videoNames });
+        var target = UniversumRules.Apply(_file, _services.Profile, new TrackDecisions { Languages = _languages, VideoNames = _videoNames });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -172,7 +172,7 @@ public sealed class RulesPageViewModel : ObservableObject
             WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – nie je čo meniť.",
             WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({_plan.Changes.Count} zmien) – trvá to pár sekúnd.",
             _ => $"Mení sa poradie stôp – vznikne nový súbor ({_plan.Changes.Count} zmien).",
-        } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
+        } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
         RefreshCommands();
     }
@@ -285,7 +285,9 @@ public sealed class RulesPageViewModel : ObservableObject
         RuleIssueKind.UndeterminedLanguage => $"Stopa {Rows.FirstOrDefault(r => r.TrackId == issue.TrackId)?.Position}: neurčený jazyk – vyberte ho v stĺpci Jazyk.",
         RuleIssueKind.MultipleVideoTracks => "Súbor má viac video stôp – treba ho skontrolovať ručne.",
         RuleIssueKind.NoAudio => "Súbor nemá zvukovú stopu – treba ho skontrolovať ručne.",
-        RuleIssueKind.NoPreferredSubtitles => "Zvuk nie je v češtine ani slovenčine a chýbajú české aj slovenské titulky – žiadne titulky sa nezobrazia automaticky.",
+        RuleIssueKind.NoPreferredSubtitles => "Zvuk nie je v preferovanom jazyku a chýbajú titulky v preferovanom jazyku – žiadne titulky sa nezobrazia automaticky.",
+        RuleIssueKind.MissingIndex => "Video nemá index (pretáčanie môže byť pomalé alebo nefunkčné) – nový zápis ho vytvorí.",
+        RuleIssueKind.ContainerWarnings => "mkvmerge pri čítaní hlási upozornenia: " + string.Join(" ", _file?.Warnings ?? []),
         _ => issue.Kind.ToString(),
     };
 }

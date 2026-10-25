@@ -11,6 +11,7 @@ documents; this file describes the code.
 | `src/Universum.Core` | `net10.0` | Tool-independent core: media model, language handling, rules, planning, MKVToolNix backend. Only the .NET base library — builds and is tested on Windows and Linux. |
 | `src/Universum.Platform.Windows` | `net10.0` (Windows APIs marked with `[SupportedOSPlatform("windows")]`) | Registry lookup of MKVToolNix, Authenticode verification, later Recycle Bin. |
 | `src/Universum.App` | `net10.0-windows`, WPF | User interface only: windows, pages, view models. No business logic. |
+| `src/Universum.Cli` | `net10.0` | `universum-cli` – `analyze` / `apply` a folder without the window (scripts, Task Scheduler); same core, same settings profile. |
 | `tests/Universum.Tests` | `net10.0` | Own small test runner (no third-party framework). Runs against a real `mkvmerge` and the files in `testdata/`. |
 
 Third-party packages: only `CommunityToolkit.Mvvm` (MIT) in the WPF project.

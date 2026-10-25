@@ -35,6 +35,7 @@ public static class TargetVerifier
             Check(problems, actual.Flags.Forced == expected.Flags.Forced, $"{where}: forced {actual.Flags.Forced}, expected {expected.Flags.Forced}");
         }
 
+        Check(problems, !target.RepairIndex || result.TracksOf(TrackType.Video).All(v => v.IndexEntries is null or > 0), "video index still missing");
         Check(problems, result.ChapterEntries == source.ChapterEntries, $"chapters {result.ChapterEntries}, expected {source.ChapterEntries}");
         Check(problems, result.AttachmentCount == source.AttachmentCount, $"attachments {result.AttachmentCount}, expected {source.AttachmentCount}");
         Check(problems, !target.RemoveTags || !result.HasTags, "tags are still present");

@@ -54,9 +54,21 @@ public static class UniversumRules
         targets.AddRange(file.Tracks.Where(t => t.Type == TrackType.Other)
             .Select(t => new TrackTarget(t, t.Name, t.Language, t.Flags, TrackRole.Main)));
 
+        var missingIndex = videos.Any(v => v.IndexEntries == 0);
+        if (missingIndex)
+        {
+            issues.Add(new RuleIssue(RuleIssueKind.MissingIndex));
+        }
+
+        if (file.Warnings.Count > 0)
+        {
+            issues.Add(new RuleIssue(RuleIssueKind.ContainerWarnings));
+        }
+
         return new TargetState(file, targets, profile.RemoveTags, issues)
         {
             Removed = file.Tracks.Where(t => !kept(t)).ToList(),
+            RepairIndex = missingIndex && profile.RepairIndex,
         };
     }
 

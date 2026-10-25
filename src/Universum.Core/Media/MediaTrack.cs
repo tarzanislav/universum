@@ -41,6 +41,9 @@ public sealed record MediaTrack
     /// <summary>Bits per second from the track statistics tags, when present.</summary>
     public long? StatisticsBitsPerSecond { get; init; }
 
+    /// <summary>Number of index (cue) entries; 0 for a video track means seeking will be slow or broken.</summary>
+    public int? IndexEntries { get; init; }
+
     /// <summary>Number of tag entries attached to this track.</summary>
     public int TagEntries { get; init; }
 }

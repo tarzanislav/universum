@@ -305,6 +305,46 @@
                 </Border>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:SettingsPageViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="32,24" MaxWidth="760" HorizontalAlignment="Left">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="Nastavenia" />
+                    <TextBlock Style="{StaticResource Hint}" Text="Profil pravidiel UNIVERSUM. Predvolený profil zodpovedá špecifikácii (čeština a slovenčina)." Margin="0,0,0,16" />
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Preferované jazyky (v poradí priority, kódy oddelené čiarkou)" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding PreferredLanguages, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,4" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" Text="Stopy v týchto jazykoch idú prvé; zvuk v nich znamená, že sa úplné titulky nezapínajú; forced platí len pre ne." />
+                            <TextBlock Text="Slová pre forced titulky" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBox Text="{Binding ForcedKeywords, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                            <TextBlock Text="Slová pre titulky pre nepočujúcich" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBox Text="{Binding HearingImpairedKeywords, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                            <TextBlock Text="Slová pre komentáre" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBox Text="{Binding CommentaryKeywords, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,4,0,0" Text="Slová sa hľadajú v pôvodnom názve stopy ako celé slová, bez ohľadu na veľké písmená a diakritiku." />
+                            <WrapPanel Margin="0,14,0,0">
+                                <TextBlock Text="Dĺžka náhodného názvu videa:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding VideoNameLength, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                            </WrapPanel>
+                            <CheckBox Content="Odstraňovať tagy (globálne, stôp aj štatistické)" IsChecked="{Binding RemoveTags}" Margin="0,12,0,0" />
+                            <CheckBox Content="Opraviť chýbajúci index videa (súbor sa zapíše nanovo)" IsChecked="{Binding RepairIndex}" Margin="0,6,0,0" />
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <Button Content="Uložiť" Command="{Binding SaveCommand}" Margin="0,0,8,0" Padding="16,6" />
+                                <Button Content="Predvolený profil" Command="{Binding ResetCommand}" Padding="16,6" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Údržba" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" Text="{Binding Folders}" Margin="0,4,0,8" />
+                            <Button Content="Vymazať vyrovnávaciu pamäť analýzy" Command="{Binding ClearCacheCommand}" HorizontalAlignment="Left" Padding="12,5" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>

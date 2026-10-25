@@ -10,9 +10,9 @@ public static class MkvToolNixArguments
     /// <summary>mkvpropedit arguments that change the header in place (track order must not change).</summary>
     public static IReadOnlyList<string> HeaderEdit(TargetState target, string filePath)
     {
-        if (target.OrderChanged)
+        if (target.NeedsRewrite)
         {
-            throw new InvalidOperationException("mkvpropedit cannot change the track order.");
+            throw new InvalidOperationException("mkvpropedit cannot change the track order or create an index.");
         }
 
         var arguments = new List<string> { filePath };

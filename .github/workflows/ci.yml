@@ -41,6 +41,13 @@ jobs:
           dotnet build src/Universum.Platform.Windows/Universum.Platform.Windows.csproj -c Release
       - name: Tests
         run: dotnet run --project tests/Universum.Tests -c Release
+      - name: Command line smoke test
+        run: |
+          set +e
+          dotnet run --project src/Universum.Cli -c Release -- analyze testdata/media
+          code=$?
+          # 1 = some files need review (the test data contains undetermined languages); 2 would be an error
+          if [ "$code" -ne 1 ]; then echo "::error::universum-cli analyze returned $code"; exit 1; fi
 
   windows:
     name: Build, self-test and installer (Windows)
@@ -110,7 +117,9 @@ jobs:
         shell: pwsh
         run: |
           # compiler errors become annotations (job logs are not always available)
-          $output = & dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true `
+          $output = & dotnet publish src/Universum.Cli/Universum.Cli.csproj -c Release -r win-x64 --self-contained true `
+            "-p:Version=${{ steps.version.outputs.number }}" -o publish 2>&1
+          $output += & dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true `
             "-p:Version=${{ steps.version.outputs.number }}" -o publish 2>&1
           $code = $LASTEXITCODE
           $output | ForEach-Object { Write-Host $_ }
@@ -137,6 +146,9 @@ jobs:
             Write-Host "::error::Self-test wrote no log (exit code $($p.ExitCode))"
           }
           if ($p.ExitCode -ne 0) { Write-Host "::error::Self-test exit code $($p.ExitCode)"; exit 1 }
+          & publish\universum-cli.exe analyze testdata\media
+          if ($LASTEXITCODE -ne 1) { Write-Host "::error::universum-cli.exe analyze returned $LASTEXITCODE"; exit 1 }
+          exit 0
           Write-Host "::notice::Self-test OK"
 
       - name: Self-test output (log and screenshots)

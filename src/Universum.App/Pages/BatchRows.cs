@@ -191,6 +191,9 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
 
     public string Reasons => string.Join("; ", Item.Reasons.Select(Texts.Reason));
 
+    /// <summary>Status and, for files waiting for review, why.</summary>
+    public string Outcome => Item.Reasons.Count == 0 ? Status : Status + ": " + Reasons;
+
     /// <summary>Required template tracks are missing: the user may still allow processing.</summary>
     public bool CanProcessAnyway =>
         Item.Group.Decisions.ProcessAnyway.Contains(Item.File.Path) || Item.Reasons.Any(r => r.Kind == ReviewReasonKind.MissingRequiredSlot);

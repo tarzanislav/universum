@@ -8,6 +8,7 @@ using Universum.App.Templates;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
 using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
@@ -61,6 +62,13 @@ public sealed class BatchPageViewModel : ObservableObject
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null && _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode)));
+        Tmdb = new TmdbPicker(services, () => MediaKind.Series, () => SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? "", ChooseTmdbSeries);
+        FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } && _services.Tmdb is not null);
+        services.TmdbChanged += () =>
+        {
+            Tmdb.Refresh();
+            FindMoviesCommand.NotifyCanExecuteChanged();
+        };
         services.LibraryChanged += () =>
         {
             OnPropertyChanged(nameof(OutputDescription));
@@ -76,6 +84,12 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>Accepts titles and episode numbers guessed from the names.</summary>
     public RelayCommand ConfirmTitlesCommand { get; }
+
+    /// <summary>Looking up the series title on TMDB.</summary>
+    public TmdbPicker Tmdb { get; }
+
+    /// <summary>Refines the suggested film titles on TMDB (exact name and year only).</summary>
+    public AsyncRelayCommand FindMoviesCommand { get; }
 
     public RelayCommand ChooseFolderCommand { get; }
 
@@ -410,6 +424,62 @@ public sealed class BatchPageViewModel : ObservableObject
         OnLibraryChanged();
     }
 
+    private void ChooseTmdbSeries(TmdbTitle title)
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        var (text, note) = TmdbPicker.TitleText(title);
+        _library.Kind = MediaKind.Series;
+        _library.Series = TitleGuess.Typed(MediaKind.Series, text);
+        RunState = note;
+        OnLibraryChanged();
+    }
+
+    private async Task FindMoviesAsync()
+    {
+        if (_library is null || _analysis is null || _services.Tmdb is not { } tmdb)
+        {
+            return;
+        }
+
+        Busy = true;
+        int asked = 0, found = 0;
+        try
+        {
+            foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
+            {
+                if (_library.Movies.ContainsKey(file.Path) || _library.MovieSuggestions.GetValueOrDefault(file.Path) is not { } guess)
+                {
+                    continue;
+                }
+
+                asked++;
+                RunState = $"TMDB: {asked}…";
+                var results = await tmdb.SearchAsync(MediaKind.Movie, guess.Name, guess.Year);
+                if (TmdbClient.ExactMatch(results, guess.Name, guess.Year) is { } match && match.ToTitleInfo() is { } info)
+                {
+                    _library.MovieSuggestions[file.Path] = info;
+                    found++;
+                }
+            }
+
+            TmdbPicker.TrySaveCache(tmdb);
+            RunState = $"TMDB spresnilo {found} z {asked} navrhnutých názvov – skontrolujte ich a dajte Prijať návrhy názvov.";
+        }
+        catch (TmdbException ex)
+        {
+            RunState = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+            Replan();
+        }
+    }
+
     private void ConfirmTitles()
     {
         _library?.ConfirmSuggestions();
@@ -675,7 +745,7 @@ public sealed class BatchPageViewModel : ObservableObject
                  {
                      ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
-                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand,
+                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

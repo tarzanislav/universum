@@ -4,6 +4,7 @@ using Universum.Cli;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
 using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Core.Templates;
@@ -117,7 +118,52 @@ if (options.Kind is { } kind)
     library.Kind = kind;
 }
 
-if (options.Title is { } name)
+var tmdbKey = options.TmdbKey ?? Environment.GetEnvironmentVariable("UNIVERSUM_TMDB_KEY") ??
+              (OperatingSystem.IsWindows() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
+using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+var titleFromTmdb = false;
+var tmdb = string.IsNullOrWhiteSpace(tmdbKey) ? null : new TmdbClient(http, tmdbKey, Path.Combine(Path.GetDirectoryName(cacheFile)!, "tmdb-cache.json"));
+try
+{
+    if (options.Tmdb is { } reference && tmdb is not null)
+    {
+        var tmdbKind = reference.Kind ?? library.Kind;
+        if (await tmdb.GetAsync(tmdbKind, reference.Id) is not { } found)
+        {
+            Console.Error.WriteLine($"TMDB nepozná titul {reference.Id}.");
+            return 2;
+        }
+
+        library.Kind = tmdbKind;
+        var fromTmdb = found.ToTitleInfo() ?? (options.Title is { } english ? new TitleInfo(tmdbKind, english, found.Year, found.Id, true) : null);
+        if (fromTmdb is null)
+        {
+            Console.Error.WriteLine($"TMDB nemá anglický názov titulu {found.Display}: zadajte ho voľbou --nazov.");
+            return 2;
+        }
+
+        Console.WriteLine($"TMDB: {found.Display} → {fromTmdb.FolderName}");
+        SetTitle(library, analysis, fromTmdb);
+        titleFromTmdb = true;
+    }
+    else if (options.Tmdb is not null && options.Title is null)
+    {
+        Console.Error.WriteLine("Pre --tmdb bez --nazov treba kľúč TMDB (--tmdb-key alebo uložený v programe UNIVERSUM).");
+        return 2;
+    }
+    else if (tmdb is not null && options.Title is null)
+    {
+        Console.WriteLine($"TMDB: spresnené návrhy názvov: {await RefineSuggestionsAsync(tmdb, library)}");
+    }
+
+    tmdb?.SaveCache();
+}
+catch (TmdbException ex)
+{
+    Console.Error.WriteLine("TMDB: " + ex.Message);
+}
+
+if (options.Title is { } name && !titleFromTmdb)
 {
     var title = new TitleInfo(library.Kind, name, options.Year, options.Tmdb?.Id, options.Tmdb is not null);
     if (title.Problem is { } problem)
@@ -126,17 +172,7 @@ if (options.Title is { } name)
         return 2;
     }
 
-    if (library.Kind == MediaKind.Series)
-    {
-        library.Series = title;
-    }
-    else
-    {
-        foreach (var file in analysis.Groups.SelectMany(g => g.Files))
-        {
-            library.Movies[file.Path] = title;
-        }
-    }
+    SetTitle(library, analysis, title);
 }
 
 foreach (var (fileName, number) in options.Episodes)
@@ -202,6 +238,54 @@ return failed > 0 || items.Any(i => i.Status == BatchStatus.NeedsReview) ? 1 : 0
 
 [SupportedOSPlatform("windows")]
 static void RegisterVolumes() => WindowsVolumes.Register();
+
+static void SetTitle(LibraryJob library, BatchAnalysis analysis, TitleInfo title)
+{
+    if (library.Kind == MediaKind.Series)
+    {
+        library.Series = title;
+        return;
+    }
+
+    foreach (var file in analysis.Groups.SelectMany(g => g.Files))
+    {
+        library.Movies[file.Path] = title;
+    }
+}
+
+// suggestions from the names replaced by TMDB titles where the name and year match exactly
+static async Task<string> RefineSuggestionsAsync(TmdbClient tmdb, LibraryJob library)
+{
+    if (library.Kind == MediaKind.Series)
+    {
+        if (library.Series is null && library.SeriesSuggestion is { } guess &&
+            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year)?.ToTitleInfo() is { } series)
+        {
+            library.SeriesSuggestion = series;
+            return "seriál " + series.FolderName;
+        }
+
+        return "žiadne";
+    }
+
+    var found = 0;
+    foreach (var (path, guess) in library.MovieSuggestions.ToList())
+    {
+        if (!library.Movies.ContainsKey(path) &&
+            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Movie, guess.Name, guess.Year), guess.Name, guess.Year)?.ToTitleInfo() is { } movie)
+        {
+            library.MovieSuggestions[path] = movie;
+            found++;
+        }
+    }
+
+    return $"{found} z {library.MovieSuggestions.Count}";
+}
+
+static string? Unprotect(string stored) => OperatingSystem.IsWindows() ? WindowsUnprotect(stored) : null;
+
+[SupportedOSPlatform("windows")]
+static string? WindowsUnprotect(string stored) => UserSecret.Unprotect(stored);
 
 static BatchGroup? Group(BatchAnalysis analysis, string label)
 {

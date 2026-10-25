@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 
@@ -22,6 +23,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private string _movieSizes = "";
     private string _seriesSizes = "";
     private string _message = "";
+    private string _tmdbKeyInput = "";
+    private string _tmdbStatus = "";
 
     public SettingsPageViewModel(AppServices services)
     {
@@ -30,11 +33,36 @@ public sealed class SettingsPageViewModel : ObservableObject
         ResetCommand = new RelayCommand(() => Load(RuleProfile.Default));
         ClearCacheCommand = new RelayCommand(ClearCache);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
+        SaveTmdbKeyCommand = new AsyncRelayCommand(SaveTmdbKeyAsync, () => TmdbKeyInput.Trim().Length > 0);
+        RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
+
+    public AsyncRelayCommand SaveTmdbKeyCommand { get; }
+
+    public RelayCommand RemoveTmdbKeyCommand { get; }
+
+    /// <summary>A new TMDB key typed by the user (the stored key is never shown).</summary>
+    public string TmdbKeyInput
+    {
+        get => _tmdbKeyInput;
+        set
+        {
+            if (SetProperty(ref _tmdbKeyInput, value))
+            {
+                SaveTmdbKeyCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string TmdbStatus => _tmdbStatus.Length > 0
+        ? _tmdbStatus
+        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne." : "Kľúč je uložený (chránený pre vaše konto Windows).";
+
+    public string TmdbAttribution => TmdbClient.Attribution;
 
     public string OutputDescription => _services.Library is { } library
         ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
@@ -92,6 +120,35 @@ public sealed class SettingsPageViewModel : ObservableObject
         return values.Count == 3 && values[0] > 0 && values[0] < values[1] && values[1] < values[2]
             ? new SizeClasses { SmallMaxGb = values[0], BigMaxGb = values[1], BluRayMaxGb = values[2] }
             : null;
+    }
+
+    /// <summary>Checks the key with one request (a well-known film) before storing it.</summary>
+    private async Task SaveTmdbKeyAsync()
+    {
+        var key = TmdbKeyInput.Trim();
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            var title = await new TmdbClient(http, key).GetAsync(MediaKind.Movie, 8555);
+            _services.SetTmdbKey(key);
+            TmdbKeyInput = "";
+            _tmdbStatus = title is null ? "Kľúč je uložený." : $"Kľúč funguje a je uložený (skúška: {title.Display}).";
+        }
+        catch (TmdbException ex)
+        {
+            _tmdbStatus = "Kľúč sa neuložil: " + ex.Message;
+        }
+
+        OnPropertyChanged(nameof(TmdbStatus));
+        RemoveTmdbKeyCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RemoveTmdbKey()
+    {
+        _services.SetTmdbKey(null);
+        _tmdbStatus = "";
+        OnPropertyChanged(nameof(TmdbStatus));
+        RemoveTmdbKeyCommand.NotifyCanExecuteChanged();
     }
 
     private void ChooseOutputDirectory()

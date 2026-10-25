@@ -14,7 +14,9 @@ internal static class Help
           -o, --output <priečinok>     výstupný priečinok (inak ten z nastavení UNIVERSUM)
           --film | --serial            filmy alebo seriál (inak podľa názvov súborov)
           --nazov "Creep" --rok 2004   názov titulu: seriálu, pri filmoch pre všetky súbory (jeden film, aj viac verzií)
-          --tmdb <ID alebo adresa>     TMDB ID k názvu; pridá sa do priečinka [tmdbid-ID] (pri inom písme ako latinka)
+          --tmdb <ID alebo adresa>     titul z TMDB (s kľúčom); bez kľúča len ID k --nazov, pridá sa ako [tmdbid-ID]
+          --tmdb-key <kľúč>            kľúč TMDB (inak UNIVERSUM_TMDB_KEY alebo kľúč uložený v programe UNIVERSUM);
+                                       s kľúčom sa návrhy názvov z mien súborov spresnia podľa TMDB
           --epizoda "súbor.mkv=S01E04" číslo epizódy súboru
           -r, --recursive              aj podpriečinky
           -t, --template <súbor.json>  šablóna (uložená v programe UNIVERSUM)

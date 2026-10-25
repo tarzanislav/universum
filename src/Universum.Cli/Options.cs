@@ -30,6 +30,9 @@ public sealed class Options
 
     public TmdbReference? Tmdb { get; private set; }
 
+    /// <summary>TMDB key for this run (otherwise UNIVERSUM_TMDB_KEY or the key saved in the application).</summary>
+    public string? TmdbKey { get; private set; }
+
     /// <summary>Episode numbers by file name: "Seriál E2.mkv=S01E02".</summary>
     public List<(string File, EpisodeNumber Number)> Episodes { get; } = [];
 
@@ -92,6 +95,9 @@ public sealed class Options
                     var reference = value();
                     options.Tmdb = TitleGuess.ParseTmdb(reference) ?? throw new UsageException($"TMDB zadajte ako číslo alebo adresu themoviedb.org (je {reference}).");
                     break;
+                case "--tmdb-key":
+                    options.TmdbKey = value();
+                    break;
                 case "--epizoda" or "--episode":
                     options.Episodes.Add(ParseEpisode(value()));
                     break;
@@ -119,9 +125,9 @@ public sealed class Options
             }
         }
 
-        if ((options.Year is not null || options.Tmdb is not null) && options.Title is null)
+        if (options.Year is not null && options.Title is null)
         {
-            throw new UsageException("Rok a TMDB patria k názvu: zadajte aj --nazov.");
+            throw new UsageException("Rok patrí k názvu: zadajte aj --nazov.");
         }
 
         if (options.Command == "apply" && !options.DryRun && options.Original is null)

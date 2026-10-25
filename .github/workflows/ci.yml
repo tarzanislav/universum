@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  # MKVToolNix used by the Windows tests; the archive is checked against the official checksum list
+  # and mkvmerge.exe against the official signer (LINET Services GmbH)
+  MKVTOOLNIX_VERSION: '103.0'
+
+jobs:
+  core-linux:
+    name: Core tests (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install MKVToolNix (Ubuntu package)
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mkvtoolnix && mkvmerge --version
+      - name: Build core
+        run: |
+          dotnet build src/Universum.Core/Universum.Core.csproj -c Release
+          dotnet build src/Universum.Platform.Windows/Universum.Platform.Windows.csproj -c Release
+      - name: Tests
+        run: dotnet run --project tests/Universum.Tests -c Release
+
+  windows:
+    name: Build, self-test and installer (Windows)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "0.1.${{ github.run_number }}"
+          "number=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $v"
+
+      - name: MKVToolNix portable (checksum and signature verified)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = $env:MKVTOOLNIX_VERSION
+          $base = "https://mkvtoolnix.download/windows/releases/$v"
+          $name = "mkvtoolnix-64-bit-$v.7z"
+          $work = Join-Path $env:RUNNER_TEMP "mkvtoolnix-download"
+          New-Item -ItemType Directory -Force $work | Out-Null
+          Invoke-WebRequest "$base/$name" -OutFile (Join-Path $work $name)
+          Invoke-WebRequest "$base/sha256sums.txt" -OutFile (Join-Path $work "sha256sums.txt")
+          $expected = (Get-Content (Join-Path $work "sha256sums.txt") | Where-Object { $_ -match [regex]::Escape($name) + '$' } | ForEach-Object { ($_ -split '\s+')[0] }) | Select-Object -First 1
+          $actual = (Get-FileHash (Join-Path $work $name) -Algorithm SHA256).Hash
+          if (-not $expected -or $expected.ToUpperInvariant() -ne $actual) { throw "SHA-256 mismatch for $name (expected $expected, actual $actual)" }
+          Write-Host "::notice title=MKVToolNix $v::$name SHA-256 $actual"
+          $target = Join-Path $env:RUNNER_TEMP "mkvtoolnix"
+          7z x -y "-o$target" (Join-Path $work $name) | Out-Null
+          $mkvmerge = Get-ChildItem $target -Recurse -Filter mkvmerge.exe | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $mkvmerge.FullName
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=LINET Services GmbH') {
+            throw "mkvmerge.exe signature: $($signature.Status) $($signature.SignerCertificate.Subject)"
+          }
+          & $mkvmerge.FullName --version
+          "UNIVERSUM_MKVTOOLNIX_DIR=$($mkvmerge.DirectoryName)" >> $env:GITHUB_ENV
+
+      - name: MKVToolNix release feed (format check)
+        shell: pwsh
+        run: |
+          $feed = Join-Path $env:RUNNER_TEMP "latest-release.xml.gz"
+          Invoke-WebRequest "https://mkvtoolnix.download/latest-release.xml.gz" -OutFile $feed
+          $stream = [IO.Compression.GZipStream]::new([IO.File]::OpenRead($feed), [IO.Compression.CompressionMode]::Decompress)
+          $xml = [IO.StreamReader]::new($stream).ReadToEnd()
+          $flat = ($xml -replace '\s+', ' ')
+          Write-Host "::notice title=latest-release.xml::$($flat.Substring(0, [Math]::Min(900, $flat.Length)))"
+          "UNIVERSUM_LATEST_RELEASE_XML=$feed" >> $env:GITHUB_ENV
+
+      - name: Core tests
+        run: dotnet run --project tests/Universum.Tests -c Release
+
+      - name: Publish program
+        run: >
+          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true
+          -p:Version=${{ steps.version.outputs.number }} -o publish
+
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "selftest"
+          $env:UNIVERSUM_SELFTEST_DIR = $out
+          $env:UNIVERSUM_TESTDATA = Join-Path $PWD "testdata"
+          $p = Start-Process -FilePath "publish\Universum.exe" -ArgumentList "--samotest" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(600000)) { $p.Kill(); Write-Host "::error::Self-test did not finish within 10 minutes"; exit 1 }
+          $log = Join-Path $out "selftest.log"
+          if (Test-Path $log) {
+            Get-Content $log
+            Get-Content $log | Where-Object { $_ -match ' ERROR ' } | Select-Object -First 10 | ForEach-Object { Write-Host "::error title=Self-test::$($_ -replace '%', '%25')" }
+          } else {
+            Write-Host "::error::Self-test wrote no log (exit code $($p.ExitCode))"
+          }
+          if ($p.ExitCode -ne 0) { Write-Host "::error::Self-test exit code $($p.ExitCode)"; exit 1 }
+          Write-Host "::notice::Self-test OK"
+
+      - name: Self-test output (log and screenshots)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: selftest-${{ steps.version.outputs.number }}
+          path: ${{ runner.temp }}/selftest
+          retention-days: 14
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.number }}" "/DSourceDir=$PWD\publish" installer\universum.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $file = "installer\Output\UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash
+          Write-Host "::notice title=Installer::UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe SHA-256 $hash"
+
+      - name: Installer download (14 days)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: UNIVERSUM_Setup_${{ steps.version.outputs.number }}
+          path: installer/Output/UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe
+          retention-days: 14

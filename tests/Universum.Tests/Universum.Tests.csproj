@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Own test runner, no third-party test framework. Run: dotnet run (project tests/Universum.Tests) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Universum.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Universum.Core\Universum.Core.csproj" />
+    <ProjectReference Include="..\..\src\Universum.Platform.Windows\Universum.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

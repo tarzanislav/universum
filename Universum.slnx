@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Universum.App/Universum.App.csproj" />
+    <Project Path="src/Universum.Core/Universum.Core.csproj" />
+    <Project Path="src/Universum.Platform.Windows/Universum.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Universum.Tests/Universum.Tests.csproj" />
+  </Folder>
+</Solution>

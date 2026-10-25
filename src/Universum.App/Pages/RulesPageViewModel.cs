@@ -145,7 +145,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var target = UniversumRules.Apply(_file, RuleProfile.Default, _languages, _videoNames);
+        var target = UniversumRules.Apply(_file, RuleProfile.Default, new TrackDecisions { Languages = _languages, VideoNames = _videoNames });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;

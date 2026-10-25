@@ -1,0 +1,315 @@
+using Universum.Core.Batch;
+using Universum.Core.Execution;
+using Universum.Core.Media;
+using Universum.Core.MkvToolNix;
+using Universum.Core.Processes;
+using Universum.Core.Rules;
+using Universum.Core.Templates;
+using Universum.Core.Text;
+
+namespace Universum.Tests;
+
+public sealed class BatchTests
+{
+    private static readonly BatchTemplate FilmCzEn = new()
+    {
+        Name = "Film CZ + EN",
+        Slots =
+        [
+            new TemplateSlot(TrackType.Audio, "cs", TrackRole.Main, Required: true),
+            new TemplateSlot(TrackType.Audio, "en", TrackRole.Main, Required: false),
+            new TemplateSlot(TrackType.Subtitles, "cs", TrackRole.Forced, Required: false),
+            new TemplateSlot(TrackType.Subtitles, "cs", TrackRole.Main, Required: false),
+        ],
+    };
+
+    [Test]
+    public async Task AnalysisGroupsFilesByStructure()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+
+        Assert.Equal(5, analysis.FileCount, "files");
+        Assert.Equal(3, analysis.Groups.Count, "groups: three episodes, cz-only, en-only");
+        var series = analysis.Groups[0];
+        Assert.Equal("A", series.Label);
+        Assert.Sequence(["Seriál E2.mkv", "Seriál E3.mkv", "Seriál E10.mkv"], series.Files.Select(f => Path.GetFileName(f.Path)), "natural order");
+        Assert.True(series.Signature.Contains("A: en, und", StringComparison.Ordinal), series.Signature);
+        Assert.Sequence(["Seriál E5.universum-tmp.mkv"], analysis.LeftoverTemporaryFiles.Select(Path.GetFileName)!, "left-over temporary file found, not analysed");
+    }
+
+    [Test]
+    public async Task GroupDecisionResolvesUndeterminedTracks()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        var series = analysis.Groups[0];
+
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        var episode = items.First(i => i.Group == series);
+        Assert.Equal(BatchStatus.NeedsReview, episode.Status, "forced subtitles without a language");
+        Assert.Equal(EvidenceSource.TrackName, episode.Evidence[new SlotKey(TrackType.Audio, 1)].Source, "'CZ Dabing' resolved from the name");
+        Assert.Equal(new SlotKey(TrackType.Subtitles, 0), episode.Reasons.Single().Slot, "only the forced subtitles are open");
+
+        series.Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        Assert.True(items.Where(i => i.Group == series).All(i => i.Status == BatchStatus.Remux), "all three episodes ready");
+        Assert.True(items.Single(i => i.File.Path.EndsWith("cz-only.mkv", StringComparison.Ordinal)).Status == BatchStatus.Unchanged, "clean file unchanged");
+    }
+
+    [Test]
+    public async Task TemplateToleratesMissingOptionalTracks()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var items = BatchPlanner.Plan(analysis, FilmCzEn);
+
+        var czOnly = items.Single(i => i.File.Path.EndsWith("cz-only.mkv", StringComparison.Ordinal));
+        Assert.True(czOnly.Match.IsAcceptable && czOnly.Match.MissingOptional.Count == 2, "no EN audio, no forced: still matches");
+        Assert.Equal(BatchStatus.Unchanged, czOnly.Status);
+
+        var english = items.Single(i => i.File.Path.EndsWith("en-only.mkv", StringComparison.Ordinal));
+        Assert.Equal(ReviewReasonKind.MissingRequiredSlot, english.Reasons.Single().Kind, "required Czech audio missing");
+        english.Group.Decisions.ProcessAnyway.Add(english.File.Path);
+        Assert.True(BatchPlanner.Plan(analysis, FilmCzEn).Single(i => i.File.Path == english.File.Path).NeedsWork, "processed anyway on request");
+    }
+
+    [Test]
+    public async Task TemplateOrderAndRemovalOfUnlistedTracks()
+    {
+        using var work = new Work();
+        File.Copy(TestData.Media("sk-cz-mixed.mkv"), Path.Combine(work.Path, "mix.mkv"));
+        var analysis = await AnalyzeAsync(work.Path);
+        var template = new BatchTemplate
+        {
+            Name = "CZ + EN",
+            Slots = [new(TrackType.Audio, "en", TrackRole.Main, false), new(TrackType.Audio, "cs", TrackRole.Main, true), new(TrackType.Subtitles, "cs", TrackRole.Main, false)],
+            Unlisted = UnlistedTracks.Remove,
+        };
+        var item = BatchPlanner.Plan(analysis, template).Single();
+        Assert.Sequence(
+            ["video", "audio en", "audio cs", "subtitles cs"],
+            item.Target.Tracks.Select(t => t.Type == TrackType.Video ? "video" : $"{t.Type.ToString().ToLowerInvariant()} {t.Language.Primary}"),
+            "template order, Slovak tracks removed");
+        Assert.Equal(2, item.Target.Removed.Count, "removed tracks");
+        Assert.True(item.Target.For(item.Target.Tracks[1].TrackId).Flags.Default, "first audio by template is default");
+
+        var results = await RunAsync(work.Path, [item], new OutputOptions(OriginalHandling.Keep));
+        Assert.Equal(ProcessingStatus.Done, results.Single().Status, string.Join("; ", results.Single().Messages));
+        var written = await (await InspectorAsync()).InspectAsync(results.Single().OutputPath!);
+        Assert.Equal(4, written.Tracks.Count, "written tracks");
+    }
+
+    [Test]
+    public async Task RunWritesTargetFolderWithSubfolders()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        var output = Path.Combine(work.Path, "_výsledok");
+        var progress = new List<BatchProgress>();
+
+        var results = await RunAsync(work.Path, items, new OutputOptions(OriginalHandling.Keep, output), progress);
+
+        Assert.Equal(4, results.Count, "files needing work (cz-only is clean)");
+        Assert.True(results.All(r => r.Status == ProcessingStatus.Done), string.Join("; ", results.SelectMany(r => r.Messages)));
+        Assert.True(File.Exists(Path.Combine(output, "Sezóna 1", "Seriál E2.mkv")), "subfolder structure kept");
+        Assert.Equal(4, progress.Count(p => p.Result is not null), "a result per file");
+
+        var again = BatchPlanner.Plan(await AnalyzeAsync(output), BatchTemplate.RulesOnly);
+        Assert.True(again.All(i => i.Status == BatchStatus.Unchanged), "second run: nothing to do");
+    }
+
+    [Test]
+    public async Task StopAfterCurrentFile()
+    {
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var control = new BatchControl();
+        var results = await RunAsync(work.Path, BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly), new OutputOptions(OriginalHandling.Keep),
+            new SyncProgress<BatchProgress>(p => { if (p.Result is not null) { control.StopAfterCurrent = true; } }), control);
+        Assert.Equal(1, results.Count, "stopped after the first file");
+    }
+
+    [Test]
+    public async Task SimilarTrackSuggestsLanguage()
+    {
+        using var work = new Work();
+        // episode 1: Czech dub tagged; episode 2: same dub without language and name
+        var tagged = Path.Combine(work.Path, "E1.mkv");
+        var untagged = Path.Combine(work.Path, "E2.mkv");
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), tagged);
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), untagged);
+        await PropEditAsync(tagged, "--edit", "track:a2", "--set", "language=cs", "--delete", "name");
+        await PropEditAsync(untagged, "--edit", "track:a2", "--delete", "name");
+        var analysis = await AnalyzeAsync(work.Path);
+        Assert.Equal(2, analysis.Groups.Count, "different structure");
+
+        BatchPlanner.Suggest(analysis);
+        var group = analysis.GroupOf(Path.GetFullPath(untagged))!;
+        var suggestion = group.Suggestions[new SlotKey(TrackType.Audio, 1)];
+        Assert.Equal(("cs", Confidence.Medium, EvidenceSource.Similarity), (suggestion.Language.Primary, suggestion.Confidence, suggestion.Source));
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single(i => i.Group == group);
+        Assert.Equal(BatchStatus.NeedsReview, item.Status, "a suggestion is not used before confirmation");
+    }
+
+    [Test]
+    public void ForcedSuggestedFromSubtitleCounts()
+    {
+        var file = new MediaFile
+        {
+            Path = "x.mkv",
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Video },
+                new MediaTrack { Id = 1, Type = TrackType.Audio, Language = new LanguageTag("eng", "en") },
+                new MediaTrack { Id = 2, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs"), StatisticsFrames = 1200 },
+                new MediaTrack { Id = 3, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs"), StatisticsFrames = 37 },
+            ],
+        };
+        var group = new BatchGroup(StructureSignature.Of(file), 0);
+        group.Files.Add(file);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+
+        BatchPlanner.Suggest(analysis);
+        Assert.Sequence([new SlotKey(TrackType.Subtitles, 1)], group.ForcedSuggestions, "37 of 1200 subtitles: forced");
+
+        group.Decisions.Forced[new SlotKey(TrackType.Subtitles, 1)] = true;
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.True(item.Target.For(3).Flags.Forced && item.Target.For(2).Flags.Default, "confirmed forced; full Czech default");
+    }
+
+    [Test]
+    public void TemplateJsonRoundTrip()
+    {
+        var copy = BatchTemplate.FromJson(FilmCzEn.ToJson());
+        Assert.Equal(FilmCzEn.Name, copy.Name);
+        Assert.Sequence(FilmCzEn.Slots, copy.Slots, "slots");
+        Assert.True(FilmCzEn.ToJson().Contains("\"Forced\"", StringComparison.Ordinal), "enums as text");
+    }
+
+    [Test]
+    public async Task CacheAnswersUnchangedFiles()
+    {
+        using var work = new Work();
+        var file = Path.Combine(work.Path, "a.mkv");
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), file);
+        var cacheFile = Path.Combine(work.Path, "cache.json");
+        var first = new CachingInspector(await InspectorAsync(), cacheFile);
+        var original = await first.InspectAsync(file);
+        first.Save();
+
+        var second = new CachingInspector(await InspectorAsync(), cacheFile);
+        var cached = await second.InspectAsync(file);
+        Assert.Equal(1, second.Hits, "answered from the cache");
+        Assert.Sequence(original.Tracks.Select(t => (t.Id, t.Language, t.Flags, t.Name)), cached.Tracks.Select(t => (t.Id, t.Language, t.Flags, t.Name)), "same tracks");
+
+        await PropEditAsync(file, "--edit", "track:a1", "--set", "name=changed");
+        Assert.Equal("changed", (await second.InspectAsync(file)).TracksOf(TrackType.Audio).First().Name, "changed file read again");
+    }
+
+    [Test]
+    public async Task SubtitleTextIsExtracted()
+    {
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var file = await (await InspectorAsync()).InspectAsync(TestData.Media("en-und-cz-forced.mkv"));
+        var czech = file.TracksOf(TrackType.Subtitles).Single(t => t.Name == "Czech full");
+        var text = await SubtitleText.ExtractAsync(installation, new ProcessRunner(), file, czech);
+        Assert.Equal("Dobrý den, jak se máte?\nDěkuji, mám se dobře.", text);
+    }
+
+    [Test]
+    public void TextLanguages()
+    {
+        const string czech = "Ahoj, jak se máš? Já jsem v pořádku, děkuji. Nevím, co mám dělat, ale musím to udělat ještě dnes. " +
+                             "Proč jsi mi to neřekl dřív? Když to nevím, tak se nemůžu rozhodnout. Tohle je opravdu těžké, jo.";
+        const string slovak = "Ahoj, ako sa máš? Ja som v poriadku, ďakujem. Neviem, čo mám robiť, ale musím to urobiť ešte dnes. " +
+                              "Prečo si mi to nepovedal skôr? Keď to neviem, tak sa nemôžem rozhodnúť. Toto je naozaj ťažké, hej.";
+        const string english = "Hello, how are you? I am fine, thank you. I don't know what to do, but I have to do it today. " +
+                               "Why didn't you tell me before? If I do not know it, I can't decide. This is really hard, you know.";
+        Assert.Equal("cs", TextLanguageDetector.Detect(czech));
+        Assert.Equal("sk", TextLanguageDetector.Detect(slovak));
+        Assert.Equal("en", TextLanguageDetector.Detect(english));
+        Assert.Equal<string?>(null, TextLanguageDetector.Detect("Ahoj, ako sa máš?"), "too short");
+        Assert.Equal("ru", TextLanguageDetector.Detect(string.Concat(Enumerable.Repeat("Привет, как дела? Я не знаю, что делать. ", 6))));
+    }
+
+    [Test]
+    public void SubtitleCleaning() =>
+        Assert.Equal(
+            "Ahoj\nAko sa máš?",
+            SubtitleText.Clean("[Script Info]\nTitle: x\nFormat: Layer, Start, End, Text\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\i1}Ahoj{\\i0}\n\n1\n00:00:03,000 --> 00:00:04,000\n<i>Ako sa máš?</i>\n"));
+
+    [Test]
+    public void NaturalSort() =>
+        Assert.Sequence(["E1.mkv", "E2.mkv", "e3.mkv", "E10.mkv", "E10a.mkv"], new[] { "E10.mkv", "e3.mkv", "E2.mkv", "E10a.mkv", "E1.mkv" }.Order(NaturalComparer.Instance), "order");
+
+    /// <summary>Season folder with three episodes of one structure, a clean Czech file, a foreign-only file and a left-over temporary file.</summary>
+    private static async Task<Work> SeriesFolderAsync()
+    {
+        var work = new Work();
+        var season = Directory.CreateDirectory(Path.Combine(work.Path, "Sezóna 1")).FullName;
+        foreach (var name in new[] { "Seriál E2.mkv", "Seriál E10.mkv", "Seriál E3.mkv" })
+        {
+            File.Copy(TestData.Media("en-und-cz-forced.mkv"), Path.Combine(season, name));
+        }
+
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), Path.Combine(season, "Seriál E5.universum-tmp.mkv"));
+        File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(work.Path, "cz-only.mkv"));
+        var english = Path.Combine(work.Path, "en-only.mkv");
+        await MergeAsync(english, "--audio-tracks", "1", "--subtitle-tracks", "5", TestData.Media("en-und-cz-forced.mkv"));
+        return work;
+    }
+
+    private static async Task<BatchAnalysis> AnalyzeAsync(string folder) =>
+        await BatchAnalyzer.AnalyzeAsync(folder, recursive: true, await InspectorAsync());
+
+    private static async Task<IMediaInspector> InspectorAsync() => new MkvMergeInspector(await TestData.RequireMkvToolNixAsync(), new ProcessRunner());
+
+    private static async Task<IReadOnlyList<ProcessingResult>> RunAsync(
+        string root, IReadOnlyList<BatchItem> items, OutputOptions options, ICollection<BatchProgress>? progress = null, BatchControl? control = null)
+    {
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"));
+        return await BatchRunner.RunAsync(items, processor, i => BatchRunner.OutputFor(options, root, i.File.Path),
+            progress is null ? null : new SyncProgress<BatchProgress>(progress.Add), control);
+    }
+
+    private static Task<IReadOnlyList<ProcessingResult>> RunAsync(string root, IReadOnlyList<BatchItem> items, OutputOptions options, IProgress<BatchProgress> progress, BatchControl control) =>
+        RunWithProgressAsync(root, items, options, progress, control);
+
+    private static async Task<IReadOnlyList<ProcessingResult>> RunWithProgressAsync(string root, IReadOnlyList<BatchItem> items, OutputOptions options, IProgress<BatchProgress> progress, BatchControl control)
+    {
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"));
+        return await BatchRunner.RunAsync(items, processor, i => BatchRunner.OutputFor(options, root, i.File.Path), progress, control);
+    }
+
+    private static async Task PropEditAsync(string file, params string[] arguments) =>
+        await new ProcessRunner().RunAsync(new ProcessRequest((await TestData.RequireMkvToolNixAsync()).ToolPath(MkvToolNixTool.MkvPropEdit), [file, .. arguments]));
+
+    private static async Task MergeAsync(string output, params string[] arguments) =>
+        await new ProcessRunner().RunAsync(new ProcessRequest((await TestData.RequireMkvToolNixAsync()).ToolPath(MkvToolNixTool.MkvMerge), ["-o", output, .. arguments]));
+
+    private sealed class Work : IDisposable
+    {
+        private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("universum-batch-");
+
+        public string Path => _directory.FullName;
+
+        public void Dispose() => _directory.Delete(recursive: true);
+    }
+
+    private sealed class NoRecycleBin : IRecycleBin
+    {
+        public bool CanRecycle(string path) => false;
+
+        public void MoveToRecycleBin(string path) => throw new IOException("no recycle bin in tests");
+    }
+
+    private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
+    }
+}

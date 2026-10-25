@@ -16,6 +16,12 @@ public sealed record RuleProfile
     /// </summary>
     public IReadOnlyList<string> PreferredLanguages { get; init; } = ["cs", "sk"];
 
+    /// <summary>
+    /// Track order by language (primary subtags), e.g. ["cs", "en", "sk"] from a batch template. Empty means the
+    /// order of <see cref="PreferredLanguages"/>. Languages not listed follow in their original order.
+    /// </summary>
+    public IReadOnlyList<string> OrderLanguages { get; init; } = [];
+
     /// <summary>Words in the original track name that mark forced subtitles (matched without case and diacritics).</summary>
     public IReadOnlyList<string> ForcedKeywords { get; init; } = ["forced", "vynucene", "vynutene", "nucene", "nutene"];
 
@@ -32,12 +38,19 @@ public sealed record RuleProfile
     /// <summary>Remove all tags (global, track and statistics tags).</summary>
     public bool RemoveTags { get; init; } = true;
 
-    /// <summary>Priority of a language: its index in <see cref="PreferredLanguages"/>, or int.MaxValue for others.</summary>
-    public int Priority(string primaryLanguage)
+    /// <summary>Position of a language in the track order (lower first); int.MaxValue for languages not listed.</summary>
+    public int Priority(string primaryLanguage) => IndexOf(OrderLanguages.Count > 0 ? OrderLanguages : PreferredLanguages, primaryLanguage);
+
+    /// <summary>Preference among <see cref="PreferredLanguages"/> (lower is better); int.MaxValue for other languages.</summary>
+    public int Preference(string primaryLanguage) => IndexOf(PreferredLanguages, primaryLanguage);
+
+    public bool IsPreferred(string primaryLanguage) => Preference(primaryLanguage) != int.MaxValue;
+
+    private static int IndexOf(IReadOnlyList<string> languages, string primaryLanguage)
     {
-        for (var i = 0; i < PreferredLanguages.Count; i++)
+        for (var i = 0; i < languages.Count; i++)
         {
-            if (string.Equals(PreferredLanguages[i], primaryLanguage, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(languages[i], primaryLanguage, StringComparison.OrdinalIgnoreCase))
             {
                 return i;
             }
@@ -45,6 +58,4 @@ public sealed record RuleProfile
 
         return int.MaxValue;
     }
-
-    public bool IsPreferred(string primaryLanguage) => Priority(primaryLanguage) != int.MaxValue;
 }

@@ -12,17 +12,13 @@ public static class UniversumRules
 {
     private const string NameAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-    /// <param name="languages">Languages chosen for tracks (by track ID); they override the language in the file.</param>
-    /// <param name="videoNames">Video names to reuse (by track ID), so a preview does not change on every recalculation.</param>
-    public static TargetState Apply(
-        MediaFile file,
-        RuleProfile? profile = null,
-        IReadOnlyDictionary<int, LanguageTag>? languages = null,
-        IReadOnlyDictionary<int, string>? videoNames = null)
+    public static TargetState Apply(MediaFile file, RuleProfile? profile = null, TrackDecisions? decisions = null)
     {
         profile ??= RuleProfile.Default;
+        decisions ??= TrackDecisions.None;
         var issues = new List<RuleIssue>();
-        var language = (MediaTrack t) => languages is not null && languages.TryGetValue(t.Id, out var chosen) ? chosen : t.Language;
+        var language = (MediaTrack t) => decisions.Languages.TryGetValue(t.Id, out var chosen) ? chosen : t.Language;
+        var kept = (MediaTrack t) => t.Type is TrackType.Video or TrackType.Other || !decisions.Removed.Contains(t.Id);
 
         var videos = file.TracksOf(TrackType.Video).ToList();
         if (videos.Count > 1)
@@ -30,8 +26,8 @@ public static class UniversumRules
             issues.Add(new RuleIssue(RuleIssueKind.MultipleVideoTracks));
         }
 
-        var audio = Order(file.TracksOf(TrackType.Audio), t => AudioRole(t, profile), language, profile);
-        var subtitles = Order(file.TracksOf(TrackType.Subtitles), t => SubtitleRole(t, language(t), profile), language, profile);
+        var audio = Order(file.TracksOf(TrackType.Audio).Where(kept), t => AudioRole(t, profile), language, profile);
+        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(kept), t => SubtitleRole(t, language(t), profile, decisions), language, profile);
         if (audio.Count == 0)
         {
             issues.Add(new RuleIssue(RuleIssueKind.NoAudio));
@@ -43,7 +39,7 @@ public static class UniversumRules
         }
 
         var targets = new List<TrackTarget>();
-        targets.AddRange(videos.Select(v => new TrackTarget(v, videoNames is not null && videoNames.TryGetValue(v.Id, out var name) ? name : VideoName(v, profile), v.Language, v.Flags with { Default = true, Enabled = true, Forced = false }, TrackRole.Main)));
+        targets.AddRange(videos.Select(v => new TrackTarget(v, decisions.VideoNames.TryGetValue(v.Id, out var name) ? name : VideoName(v, profile), v.Language, v.Flags with { Default = true, Enabled = true, Forced = false }, TrackRole.Main)));
 
         // audio: exactly one default – the first regular track after ordering
         var defaultAudio = audio.FirstOrDefault(a => a.Role != TrackRole.Commentary) ?? audio.FirstOrDefault();
@@ -58,7 +54,10 @@ public static class UniversumRules
         targets.AddRange(file.Tracks.Where(t => t.Type == TrackType.Other)
             .Select(t => new TrackTarget(t, t.Name, t.Language, t.Flags, TrackRole.Main)));
 
-        return new TargetState(file, targets, profile.RemoveTags, issues);
+        return new TargetState(file, targets, profile.RemoveTags, issues)
+        {
+            Removed = file.Tracks.Where(t => !kept(t)).ToList(),
+        };
     }
 
     private static IEnumerable<TrackTarget> SubtitleTargets(
@@ -85,7 +84,7 @@ public static class UniversumRules
             // foreign audio: full subtitles in the best preferred language; forced ones stay forced but not default
             defaultSubtitle = subtitles
                 .Where(s => s.Role == TrackRole.Main && profile.IsPreferred(s.Language.Primary))
-                .OrderBy(s => profile.Priority(s.Language.Primary))
+                .OrderBy(s => profile.Preference(s.Language.Primary))
                 .FirstOrDefault();
             if (defaultSubtitle is null && subtitles.Count > 0)
             {
@@ -118,7 +117,7 @@ public static class UniversumRules
     private static TrackRole AudioRole(MediaTrack track, RuleProfile profile) =>
         track.Flags.Commentary || Words.ContainsAny(track.Name, profile.CommentaryKeywords) ? TrackRole.Commentary : TrackRole.Main;
 
-    private static TrackRole SubtitleRole(MediaTrack track, LanguageTag language, RuleProfile profile)
+    private static TrackRole SubtitleRole(MediaTrack track, LanguageTag language, RuleProfile profile, TrackDecisions decisions)
     {
         if (track.Flags.Commentary || Words.ContainsAny(track.Name, profile.CommentaryKeywords))
         {
@@ -126,7 +125,10 @@ public static class UniversumRules
         }
 
         // forced subtitles are honoured only in the preferred languages (specification: Czech and Slovak)
-        if (profile.IsPreferred(language.Primary) && (track.Flags.Forced || Words.ContainsAny(track.Name, profile.ForcedKeywords)))
+        var forced = decisions.Forced.TryGetValue(track.Id, out var confirmed)
+            ? confirmed
+            : track.Flags.Forced || Words.ContainsAny(track.Name, profile.ForcedKeywords);
+        if (profile.IsPreferred(language.Primary) && forced)
         {
             return TrackRole.Forced;
         }

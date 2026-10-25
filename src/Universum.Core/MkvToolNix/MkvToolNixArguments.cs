@@ -57,6 +57,12 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--no-global-tags", "--no-track-tags", "--disable-track-statistics-tags"]);
         }
 
+        if (target.Removed.Count > 0)
+        {
+            AddSelection(arguments, target, TrackType.Audio, "--audio-tracks", "--no-audio");
+            AddSelection(arguments, target, TrackType.Subtitles, "--subtitle-tracks", "--no-subtitles");
+        }
+
         foreach (var track in target.Tracks)
         {
             var id = track.TrackId.ToString(CultureInfo.InvariantCulture);
@@ -85,6 +91,20 @@ public static class MkvToolNixArguments
     /// <summary>Language value for MKVToolNix: the IETF tag when known (sets both elements), else the legacy code.</summary>
     public static string Code(LanguageTag language) =>
         !string.IsNullOrWhiteSpace(language.Ietf) && !language.IsUndetermined ? language.Ietf : language.Legacy;
+
+    /// <summary>Keeps only the target's tracks of one type ("--audio-tracks 1,3" or "--no-audio").</summary>
+    private static void AddSelection(List<string> arguments, TargetState target, TrackType type, string keepOption, string noneOption)
+    {
+        var kept = target.Tracks.Where(t => t.Type == type).Select(t => t.TrackId.ToString(CultureInfo.InvariantCulture)).ToList();
+        if (kept.Count == 0)
+        {
+            arguments.Add(noneOption);
+        }
+        else if (target.Removed.Any(t => t.Type == type))
+        {
+            arguments.AddRange([keepOption, string.Join(",", kept)]);
+        }
+    }
 
     private static void AddFlag(List<string> arguments, string name, bool before, bool after)
     {

@@ -44,6 +44,24 @@ in next to it without changing the rules, planning or UI.
   there is none, e.g. network shares); in-place header edits first save an `UndoRecord` (header values and tags)
   and are reverted automatically when verification fails.
 
+## Batch processing
+
+- `Batch/BatchAnalyzer` – finds the Matroska files of a folder (natural order, optionally with subfolders), reads
+  them in parallel through `Media/CachingInspector` (results remembered by path, size and modification time) and
+  groups them by `StructureSignature` (audio and subtitle languages, forced flags, chapters, tags); the largest group
+  comes first. Left-over `*.universum-tmp.*` files from an interrupted run are reported, never analysed.
+- `Templates/BatchTemplate` – tolerant template: ordered `TemplateSlot`s (type, language, role, required). The slot
+  order becomes the language order of the rules; files with fewer tracks still match unless a required slot is
+  missing; tracks outside the template are kept (default) or removed. Flags always come from the rules.
+- `Batch/BatchPlanner` – per file: language evidence (file → group decision → track name → suggestion), rules,
+  template match and review reasons. `Suggest` adds suggestions that are never used unconfirmed: the language of
+  a similar track elsewhere in the folder (codec, channels, sampling rate, name) and forced subtitles detected from
+  subtitle counts (statistics tags). `Text/TextLanguageDetector` + `MkvToolNix/SubtitleText` recognise the
+  language of text subtitles on request.
+- `Batch/BatchRunner` – processes the files that need work: one after another per drive, drives in parallel;
+  pause, resume, stop after the current file; a target folder keeps the subfolder structure. `BatchReport` writes
+  CSV and HTML reports.
+
 ## Processes
 
 `ProcessRunner` starts tools without a shell, passes arguments one by one, reads output as UTF-8, kills the whole

@@ -1,0 +1,67 @@
+using Universum.Core.Batch;
+using Universum.Core.Media;
+using Universum.Core.Rules;
+
+namespace Universum.App.Pages;
+
+/// <summary>Slovak texts for values of the core.</summary>
+public static class Texts
+{
+    public static IReadOnlyList<Choice<TrackType>> TrackTypes { get; } =
+        [new(TrackType.Audio, "Zvuk"), new(TrackType.Subtitles, "Titulky")];
+
+    public static IReadOnlyList<Choice<TrackRole>> Roles { get; } =
+        [new(TrackRole.Main, "bežná"), new(TrackRole.Forced, "forced"), new(TrackRole.HearingImpaired, "pre nepočujúcich"), new(TrackRole.Commentary, "komentár")];
+
+    public static string Type(TrackType type) => type switch
+    {
+        TrackType.Video => "Video",
+        TrackType.Audio => "Zvuk",
+        TrackType.Subtitles => "Titulky",
+        _ => "Iné",
+    };
+
+    public static string Role(TrackRole role) => Roles.First(r => r.Value == role).Text;
+
+    public static string Slot(SlotKey key) => $"{Type(key.Type)} {key.Ordinal + 1}";
+
+    public static string Language(LanguageTag tag)
+    {
+        if (tag.IsUndetermined)
+        {
+            return "neurčený (und)";
+        }
+
+        var language = Languages.Find(tag.Primary);
+        return language is null ? tag.ToString() : $"{language.SlovakName} ({tag.Primary})";
+    }
+
+    public static string Evidence(LanguageEvidence? evidence) => evidence?.Source switch
+    {
+        null => "neznámy – vyberte jazyk",
+        EvidenceSource.File => "zo súboru",
+        EvidenceSource.TrackName => "z názvu stopy",
+        EvidenceSource.GroupDecision => "vaša voľba",
+        EvidenceSource.Similarity => "NÁVRH podľa podobnej stopy – potvrďte",
+        EvidenceSource.SubtitleText => "NÁVRH podľa textu titulkov – potvrďte",
+        _ => "",
+    };
+
+    public static string Status(BatchStatus status) => status switch
+    {
+        BatchStatus.Unchanged => "bez zmeny",
+        BatchStatus.HeaderEdit => "len hlavička",
+        BatchStatus.Remux => "nový súbor",
+        _ => "na kontrolu",
+    };
+
+    public static string Reason(ReviewReason reason) => reason.Kind switch
+    {
+        ReviewReasonKind.UndeterminedLanguage => $"neurčený jazyk: {(reason.Slot is { } slot ? Slot(slot) : "stopa")}",
+        ReviewReasonKind.MissingRequiredSlot when reason.TemplateSlot is { } missing =>
+            $"chýba povinná stopa: {Type(missing.Type)} {Language(LanguageTag.FromCode(missing.Language))}, {Role(missing.Role)}",
+        ReviewReasonKind.MultipleVideoTracks => "viac video stôp",
+        ReviewReasonKind.NoAudio => "bez zvuku",
+        _ => reason.Kind.ToString(),
+    };
+}

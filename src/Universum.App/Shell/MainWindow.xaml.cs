@@ -22,6 +22,14 @@ public partial class MainWindow : Window
 
     private async void OnDrop(object sender, DragEventArgs e)
     {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } dropped && Directory.Exists(dropped[0]))
+        {
+            Model.SelectedTool = Model.Tools.First(t => t.Page == Model.Batch);
+            Model.Batch.Folder = dropped[0];
+            await Model.Batch.AnalyzeAsync();
+            return;
+        }
+
         if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files && File.Exists(files[0]))
         {
             if (Model.SelectedTool.Page == Model.Rules)

@@ -39,6 +39,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             AddFlag(changes, track, ChangeKind.Forced, source.Flags.Forced, track.Flags.Forced);
         }
 
+        foreach (var removed in target.Removed)
+        {
+            changes.Add(new PlannedChange(removed.Id, ChangeKind.Removed, (sourcePositions[removed.Id] + 1).ToString(), null));
+        }
+
         if (target.TagsChanged)
         {
             var count = target.Source.GlobalTagEntries + target.Source.Tracks.Sum(t => t.TagEntries);

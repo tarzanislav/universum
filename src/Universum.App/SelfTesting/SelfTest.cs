@@ -155,6 +155,8 @@ internal static class SelfTest
         var result = Path.Combine(work, "en-und-cz-forced [UNIVERSUM].mkv");
         Check(File.Exists(result) && File.Exists(copy), "rules: result next to the kept original");
         await Screenshot(window, "rules-done.png");
+
+        await TestBatchPageAsync(model, window);
         window.Close();
 
         var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
@@ -162,6 +164,52 @@ internal static class SelfTest
         await Task.Delay(3000);
         await Screenshot(setup, "setup.png");
         setup.Close();
+    }
+
+    /// <summary>Batch page: three episodes of one structure, a clean file; group decision, run into a target folder.</summary>
+    private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)
+    {
+        var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media");
+        var folder = Path.Combine(_outputDirectory, "batch");
+        var season = Path.Combine(folder, "Sezóna 1");
+        Directory.CreateDirectory(season);
+        foreach (var name in new[] { "Seriál E2.mkv", "Seriál E3.mkv", "Seriál E10.mkv" })
+        {
+            File.Copy(Path.Combine(media, "en-und-cz-forced.mkv"), Path.Combine(season, name), overwrite: true);
+        }
+
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(folder, "cz-only.mkv"), overwrite: true);
+        var batch = model.Batch;
+        model.SelectedTool = model.Tools.First(t => t.Page == batch);
+        batch.Folder = folder;
+        batch.Recursive = true;
+        await batch.AnalyzeAsync();
+        Check(batch.Groups.Count == 2 && batch.Groups[0].Count == 3, $"batch: 2 groups, the series first ({batch.Summary})");
+        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 3, "batch: episodes wait for the subtitle language");
+        await Screenshot(window, "batch-analysed.png");
+
+        var forcedSlot = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0));
+        forcedSlot.ChosenLanguage = Languages.Czech;
+        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");
+        Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Unchanged) == 1, "batch: clean file unchanged");
+
+        batch.KeepOriginal = true;
+        var output = Path.Combine(_outputDirectory, "batch-output");
+        batch.SetTargetDirectory(output);
+        Check(batch.RunCommand.CanExecute(null), "batch: run enabled");
+        await Screenshot(window, "batch-ready.png");
+        await batch.RunCommand.ExecuteAsync(null);
+        Check(batch.Results.Count == 3 && batch.Results.All(r => r.Status == Core.Execution.ProcessingStatus.Done),
+            "batch: three files written – " + string.Join("; ", batch.Results.SelectMany(r => r.Messages)));
+        Check(File.Exists(Path.Combine(output, "Sezóna 1", "Seriál E10.mkv")), "batch: target folder keeps subfolders");
+        await Screenshot(window, "batch-done.png");
+        batch.SetTargetDirectory(null);
+
+        var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(
+            Core.Templates.BatchTemplate.FromTarget("Podľa skupiny A", batch.Items.First().Target))) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        editor.Show();
+        await Screenshot(editor, "template-editor.png");
+        editor.Close();
     }
 
     private static async Task Screenshot(Window window, string fileName)

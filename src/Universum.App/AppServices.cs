@@ -58,11 +58,22 @@ public sealed class AppSettings
     /// <summary>Folder for results; null = next to the original.</summary>
     public string? TargetDirectory { get; set; }
 
+    /// <summary>Last folder of the batch page.</summary>
+    public string? BatchFolder { get; set; }
+
+    public bool BatchRecursive { get; set; } = true;
+
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>
         Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
             ? Path.Combine(custom, "journal")
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "journal");
+
+    /// <summary>Saved batch templates (*.json).</summary>
+    public static string TemplateDirectory => Path.Combine(Directory, "templates");
+
+    /// <summary>Cache of identification results (path, size, time → structure).</summary>
+    public static string IdentificationCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "identification-cache.json");
 
     public static AppSettings Load()
     {

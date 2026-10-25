@@ -107,9 +107,18 @@ jobs:
         run: dotnet run --project tests/Universum.Tests -c Release
 
       - name: Publish program
-        run: >
-          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true
-          -p:Version=${{ steps.version.outputs.number }} -o publish
+        shell: pwsh
+        run: |
+          # compiler errors become annotations (job logs are not always available)
+          $output = & dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true `
+            "-p:Version=${{ steps.version.outputs.number }}" -o publish 2>&1
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          $output | Where-Object { $_ -match ': (error|warning) [A-Z]+\d+' } | Select-Object -Unique -First 30 | ForEach-Object {
+            $line = "$_" -replace '%', '%25'
+            if ($line -match ': error ') { Write-Host "::error::$line" } else { Write-Host "::warning::$line" }
+          }
+          exit $code
 
       - name: Self-test
         shell: pwsh

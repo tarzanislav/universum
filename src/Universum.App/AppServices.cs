@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Universum.Core.Execution;
+using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Platform.Windows;
@@ -13,6 +14,20 @@ public sealed class AppServices
     public IProcessRunner Runner { get; } = new ProcessRunner();
 
     public AppSettings Settings { get; } = AppSettings.Load();
+
+    private CachingInspector? _inspector;
+
+    /// <summary>Inspector with the persistent identification cache for the current MKVToolNix.</summary>
+    public CachingInspector Inspector(MkvToolNixInstallation installation)
+    {
+        var inner = new MkvMergeInspector(installation, Runner);
+        if (_inspector is null || _inspector.Name != inner.Name)
+        {
+            _inspector = new CachingInspector(inner, AppSettings.IdentificationCacheFile);
+        }
+
+        return _inspector;
+    }
 
     /// <summary>MKVToolNix found by the last search; null when none is usable.</summary>
     public MkvToolNixInstallation? CurrentMkvToolNix { get; private set; }

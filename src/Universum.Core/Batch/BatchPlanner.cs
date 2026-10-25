@@ -98,7 +98,8 @@ public static class BatchPlanner
     }
 
     /// <summary>
-    /// Fills <see cref="BatchGroup.Suggestions"/> and <see cref="BatchGroup.ForcedSuggestions"/> (specification 7.3, 7.4):
+    /// Fills <see cref="BatchGroup.Suggestions"/> and <see cref="BatchGroup.ForcedSuggestions"/> (specification 7.3, 7.4); call
+    /// again after decisions change, so a decision in one group can suggest languages for another:
     /// undetermined tracks resembling a track with a known language elsewhere in the folder, and subtitles with very
     /// few entries compared with a full track of the same language. Suggestions are never used without confirmation.
     /// </summary>
@@ -122,7 +123,12 @@ public static class BatchPlanner
 
         foreach (var group in analysis.Groups)
         {
-            group.Suggestions.Clear();
+            // similarity suggestions are recalculated; suggestions from reading subtitle text are kept (expensive)
+            foreach (var key in group.Suggestions.Where(s => s.Value.Source == EvidenceSource.Similarity).Select(s => s.Key).ToList())
+            {
+                group.Suggestions.Remove(key);
+            }
+
             group.ForcedSuggestions.Clear();
             var representative = group.Representative;
             foreach (var (key, track) in SlotKey.Of(representative))

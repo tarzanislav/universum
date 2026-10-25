@@ -61,7 +61,7 @@ public sealed class ProcessorTests
         Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
         Assert.Equal(original, result.OutputPath, "result replaces the original");
         Assert.Equal(1, bin.Recycled.Count, "original in the Recycle Bin");
-        Assert.Equal(time, System.IO.File.GetLastWriteTimeUtc(original), "modification time preserved");
+        Assert.Equal(time.AddSeconds(2), System.IO.File.GetLastWriteTimeUtc(original), "modification time kept (+2 s so changes are noticed)");
         var audio = (await inspector.InspectAsync(original)).TracksOf(TrackType.Audio).Select(t => t.Language.Primary);
         Assert.Sequence(["cs", "sk", "en"], audio, "audio order");
     }

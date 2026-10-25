@@ -65,7 +65,9 @@ public sealed class FileProcessor(
                 : await WriteNewFileAsync(plan, output, resultPath, temporary, progress, cancellationToken);
             if (result.Status == ProcessingStatus.Done && output.PreserveModifiedTime && result.OutputPath is not null)
             {
-                File.SetLastWriteTimeUtc(result.OutputPath, originalTime);
+                // two seconds later than the original: the library order stays, but media servers, backups and caches
+                // still see that the file has changed (2 s is the coarsest file system time resolution, FAT)
+                File.SetLastWriteTimeUtc(result.OutputPath, originalTime.AddSeconds(2));
             }
 
             return result;

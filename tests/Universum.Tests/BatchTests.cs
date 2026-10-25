@@ -157,6 +157,37 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task TargetFolderInsideIsNotAnalysed()
+    {
+        using var work = await SeriesFolderAsync();
+        var output = Directory.CreateDirectory(Path.Combine(work.Path, "_výsledok", "Sezóna 1")).FullName;
+        File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(output, "x.mkv"));
+        var analysis = await BatchAnalyzer.AnalyzeAsync(work.Path, recursive: true, await InspectorAsync(), excludeDirectory: Path.Combine(work.Path, "_výsledok"));
+        Assert.Equal(5, analysis.FileCount, "results in the target folder are skipped");
+    }
+
+    [Test]
+    public async Task DecisionInOneGroupSuggestsAnother()
+    {
+        using var work = new Work();
+        var full = Path.Combine(work.Path, "E1.mkv");
+        var shorter = Path.Combine(work.Path, "E2.mkv");
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), full);
+        await MergeAsync(shorter, "--audio-tracks", "2", TestData.Media("en-und-cz-forced.mkv"));
+        await PropEditAsync(full, "--edit", "track:a2", "--delete", "name");
+        await PropEditAsync(shorter, "--edit", "track:a1", "--delete", "name");
+        var analysis = await AnalyzeAsync(work.Path);
+        var first = analysis.GroupOf(Path.GetFullPath(full))!;
+        var second = analysis.GroupOf(Path.GetFullPath(shorter))!;
+        BatchPlanner.Suggest(analysis);
+        Assert.True(!second.Suggestions.ContainsKey(new SlotKey(TrackType.Audio, 0)), "nothing known yet");
+
+        first.Decisions.Languages[new SlotKey(TrackType.Audio, 1)] = LanguageTag.FromCode("cs");
+        BatchPlanner.Suggest(analysis);
+        Assert.Equal("cs", second.Suggestions[new SlotKey(TrackType.Audio, 0)].Language.Primary, "the same dub in the shorter file");
+    }
+
+    [Test]
     public void ForcedSuggestedFromSubtitleCounts()
     {
         var file = new MediaFile

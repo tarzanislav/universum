@@ -52,6 +52,15 @@ public sealed class CachingInspector : IMediaInspector
         return file;
     }
 
+    /// <summary>Forgets a file, e.g. after UNIVERSUM itself has written it.</summary>
+    public void Invalidate(string path)
+    {
+        lock (_lock)
+        {
+            _dirty |= _entries.Remove(Path.GetFullPath(path));
+        }
+    }
+
     /// <summary>Writes the cache (atomically) when something changed.</summary>
     public void Save()
     {

@@ -23,8 +23,10 @@ public static class BatchAnalyzer
     private static readonly string[] Extensions = [".mkv"];
 
     /// <summary>Matroska files of the folder in natural order (Episode 2 before Episode 10).</summary>
-    public static (IReadOnlyList<string> Files, IReadOnlyList<string> Leftovers) FindFiles(string folder, bool recursive)
+    /// <param name="excludeDirectory">A folder to skip, e.g. the target folder of results inside the analysed folder.</param>
+    public static (IReadOnlyList<string> Files, IReadOnlyList<string> Leftovers) FindFiles(string folder, bool recursive, string? excludeDirectory = null)
     {
+        var excluded = excludeDirectory is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(excludeDirectory)) + Path.DirectorySeparatorChar;
         var all = Directory.EnumerateFiles(folder, "*", new EnumerationOptions
             {
                 RecurseSubdirectories = recursive,
@@ -32,6 +34,7 @@ public static class BatchAnalyzer
                 AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
             })
             .Where(f => Extensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+            .Where(f => excluded is null || !Path.GetFullPath(f).StartsWith(excluded, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             .Order(NaturalComparer.Instance)
             .ToList();
         return (all.Where(f => !FileProcessor.IsTemporaryFile(f)).ToList(), all.Where(FileProcessor.IsTemporaryFile).ToList());
@@ -44,10 +47,11 @@ public static class BatchAnalyzer
         IMediaInspector inspector,
         IProgress<(int Done, int Total)>? progress = null,
         int parallelism = 4,
+        string? excludeDirectory = null,
         CancellationToken cancellationToken = default)
     {
         folder = Path.GetFullPath(folder);
-        var (files, leftovers) = FindFiles(folder, recursive);
+        var (files, leftovers) = FindFiles(folder, recursive, excludeDirectory);
         var results = new (MediaFile? File, string? Error)[files.Count];
         var done = 0;
         await Parallel.ForEachAsync(

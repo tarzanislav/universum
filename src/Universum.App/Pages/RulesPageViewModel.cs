@@ -192,6 +192,12 @@ public sealed class RulesPageViewModel : ObservableObject
             var processor = new FileProcessor(_services.CurrentMkvToolNix, _services.Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory);
             var result = await processor.ProcessAsync(_plan, new OutputOptions(handling, TargetDirectory), new Progress<double>(p => Progress = p));
             _undoRecord = result.UndoRecordPath;
+            var cache = _services.Inspector(_services.CurrentMkvToolNix);
+            cache.Invalidate(result.SourcePath);
+            if (result.OutputPath is not null)
+            {
+                cache.Invalidate(result.OutputPath);
+            }
             Result = result.Status switch
             {
                 ProcessingStatus.Done => $"Hotovo: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu hlavičky je možné vrátiť späť."),

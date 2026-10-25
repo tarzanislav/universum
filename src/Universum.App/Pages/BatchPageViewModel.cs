@@ -218,11 +218,11 @@ public sealed class BatchPageViewModel : ObservableObject
         _results = [];
         try
         {
-            var inspector = new CachingInspector(new MkvMergeInspector(installation, _services.Runner), AppSettings.IdentificationCacheFile);
+            var inspector = _services.Inspector(installation);
             _analysis = await BatchAnalyzer.AnalyzeAsync(Folder, Recursive, inspector,
-                new Progress<(int Done, int Total)>(p => Summary = $"Analyzujem {p.Done} / {p.Total}…"));
+                new Progress<(int Done, int Total)>(p => Summary = $"Analyzujem {p.Done} / {p.Total}…"),
+                excludeDirectory: TargetDirectory);
             TrySave(inspector);
-            BatchPlanner.Suggest(_analysis);
             Groups.Clear();
             foreach (var group in _analysis.Groups)
             {
@@ -253,6 +253,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        BatchPlanner.Suggest(_analysis);
         _items = BatchPlanner.Plan(_analysis, Template);
         foreach (var row in Groups)
         {
@@ -366,6 +367,17 @@ public sealed class BatchPageViewModel : ObservableObject
                     RunState = $"{p.Finished} / {p.Total} · {Path.GetFileName(p.Item.File.Path)}";
                 }),
                 _control, _cancellation.Token);
+            var cache = _services.Inspector(installation);
+            foreach (var result in _results.Where(r => r.Status == ProcessingStatus.Done))
+            {
+                cache.Invalidate(result.SourcePath);
+                if (result.OutputPath is not null)
+                {
+                    cache.Invalidate(result.OutputPath);
+                }
+            }
+
+            TrySave(cache);
             var done = _results.Count(r => r.Status == ProcessingStatus.Done);
             var failed = _results.Count(r => r.Status == ProcessingStatus.Failed);
             RunState = $"Hotovo: {done} súborov" + (failed > 0 ? $", {failed} s chybou (originály nezmenené)" : "") +

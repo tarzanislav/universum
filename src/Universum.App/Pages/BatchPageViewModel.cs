@@ -314,7 +314,10 @@ public sealed class BatchPageViewModel : ObservableObject
             Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
                       (_analysis.Failed.Count > 0 ? $", {_analysis.Failed.Count} sa nedalo prečítať ({string.Join(", ", _analysis.Failed.Select(f => Path.GetFileName(f.Path)))})" : "") +
                       (_leftovers.Count > 0 ? $", {_leftovers.Count} zvyšok po prerušenom spracovaní" : "") +
-                      (_interrupted.Count > 0 ? $", POZOR: {_interrupted.Count} nedokončený presun v knižnici – skontrolujte súbory *.universum-moving / *.universum-old ({string.Join(", ", _interrupted.Select(Path.GetFileName))})" : "") + "." +
+                      (_interrupted.Count > 0
+                          ? $", POZOR: {_interrupted.Count} nedokončený presun v knižnici (možno jediná kópia, nemažte): " +
+                            string.Join("; ", _interrupted.Select(f => f + (FileProcessor.OriginalPlaceOf(AppSettings.JournalDirectory, f) is { } home ? " → patrí do " + home : "")))
+                          : "") + "." +
                       (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "");
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();

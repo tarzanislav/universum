@@ -225,6 +225,51 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task CorrectedRunReplacesTheEarlierResult()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var original = work.Copy("sk-cz-mixed.mkv");
+        var file = await inspector.InspectAsync(original);
+        var first = await processor.ProcessAsync(EditPlan.For(UniversumRules.Apply(file)), work.Movie(EditPlan.For(UniversumRules.Apply(file))), Keep);
+        Assert.Equal(ProcessingStatus.Done, first.Status, string.Join("; ", first.Messages));
+
+        // the user corrects a decision (Slovak subtitles are forced): same name, different result
+        var corrected = EditPlan.For(UniversumRules.Apply(file, decisions: new TrackDecisions { Forced = new Dictionary<int, bool> { [4] = true } }));
+        var second = await processor.ProcessAsync(corrected, work.Movie(corrected), Keep);
+        Assert.Equal(ProcessingStatus.Done, second.Status, "not skipped: " + string.Join("; ", second.Messages));
+        Assert.Equal(first.OutputPath, second.OutputPath, "takes the place of the earlier result");
+        Assert.Equal(1, bin.Recycled.Count, "earlier result in the Recycle Bin");
+        Assert.True((await inspector.InspectAsync(second.OutputPath!)).TracksOf(TrackType.Subtitles).Any(t => t.Flags.Forced), "corrected flags written");
+
+        var third = await processor.ProcessAsync(corrected, work.Movie(corrected), Keep);
+        Assert.Equal(ProcessingStatus.AlreadyInLibrary, third.Status, "the same decisions again: nothing to do");
+    }
+
+    [Test]
+    public async Task CleanOriginalIsMovedAndUndoMovesItBack()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var original = work.Copy("cz-only.mkv");
+        var before = await System.IO.File.ReadAllBytesAsync(original);
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original)));
+        Assert.Equal(WriteMethod.None, plan.Method);
+
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Delete);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.True(!System.IO.File.Exists(original) && bin.Recycled.Count == 0, "moved, not recycled");
+        var moved = await System.IO.File.ReadAllBytesAsync(result.OutputPath!);
+        Assert.True(before.SequenceEqual(moved), "content unchanged");
+
+        Assert.Equal(0, (await processor.UndoAsync(result.UndoRecordPath!)).Count, "undo");
+        var restored = await System.IO.File.ReadAllBytesAsync(original);
+        Assert.True(before.SequenceEqual(restored), "back in its place, unchanged");
+    }
+
+    [Test]
     public async Task MissingVideoIndexIsRepaired()
     {
         using var work = new WorkFolder();

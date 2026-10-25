@@ -263,7 +263,7 @@ public sealed class RulesPageViewModel : ObservableObject
         else
         {
             _placement = layout.Place(_plan.Target, title, episode, _services.Profile);
-            var size = new FileInfo(_plan.Target.Source.Path).Length;
+            var size = SourceSize();
             Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
                 ? "Súbor už je v knižnici na svojom mieste."
                 : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
@@ -275,8 +275,12 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private bool CanApply() =>
         !Busy && _plan is not null && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null && _placement is not null &&
-        !(_plan.Method == WriteMethod.None && _placement.Holds(_plan.Target.Source.Path, new FileInfo(_plan.Target.Source.Path).Length)) &&
-        _placement.EstimatedPathLength(new FileInfo(_plan.Target.Source.Path).Length) <= LibraryNames.MaxPathLength;
+        File.Exists(_plan.Target.Source.Path) &&
+        !(_plan.Method == WriteMethod.None && _placement.Holds(_plan.Target.Source.Path, SourceSize())) &&
+        _placement.EstimatedPathLength(SourceSize()) <= LibraryNames.MaxPathLength;
+
+    /// <summary>Size of the opened file; 0 when it is no longer there (moved into the library).</summary>
+    private long SourceSize() => _plan is not null && File.Exists(_plan.Target.Source.Path) ? new FileInfo(_plan.Target.Source.Path).Length : 0;
 
     private void SetKind(bool selected, MediaKind kind)
     {
@@ -319,6 +323,9 @@ public sealed class RulesPageViewModel : ObservableObject
                 ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal.",
                 ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať (pozri upozornenia).",
                 ProcessingStatus.Cancelled => "Zrušené.",
+                _ when result.UndoRecordPath is not null =>
+                    "POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri podrobnosti; záznam na vrátenie: " + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
+                _ when result.Messages.Contains(FileProcessor.RestoredMessage) => "Nepodarilo sa – originál je vrátený do pôvodného stavu.\n" + string.Join("\n", result.Messages),
                 _ => "Nepodarilo sa – originál ostal nezmenený.\n" + string.Join("\n", result.Messages),
             };
             if (result.Status == ProcessingStatus.Done && result.Messages.Count > 0)

@@ -28,6 +28,11 @@ catch (UsageException ex)
     return 2;
 }
 
+if (OperatingSystem.IsWindows())
+{
+    RegisterVolumes();
+}
+
 var runner = new ProcessRunner();
 IEnumerable<IMkvToolNixLocationSource> sources = OperatingSystem.IsWindows() ? [Registry()] : [];
 var installation = await new MkvToolNixLocator(runner, sources).FindAsync(options.MkvToolNixDirectory);
@@ -154,7 +159,7 @@ if (options.ConfirmSuggestions)
 }
 
 var items = BatchPlanner.Plan(analysis, template, profile, library);
-Output.Print(analysis, items, library);
+Output.Print(analysis, items, library, Path.Combine(Path.GetDirectoryName(cacheFile)!, "journal"));
 if (options.Command == "analyze" || options.DryRun)
 {
     SaveReport(options.ReportFile, items, []);
@@ -194,6 +199,9 @@ SaveReport(options.ReportFile, items, results);
 var failed = results.Count(r => r.Status is not (ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary));
 Console.WriteLine($"Hotovo: {results.Count - failed}, s chybou alebo zrušené: {failed}, na kontrolu: {items.Count(i => i.Status == BatchStatus.NeedsReview)}");
 return failed > 0 || items.Any(i => i.Status == BatchStatus.NeedsReview) ? 1 : 0;
+
+[SupportedOSPlatform("windows")]
+static void RegisterVolumes() => WindowsVolumes.Register();
 
 static BatchGroup? Group(BatchAnalysis analysis, string label)
 {

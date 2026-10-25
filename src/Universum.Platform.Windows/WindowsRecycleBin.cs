@@ -22,6 +22,8 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
 
     private const string BitBucketKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\BitBucket";
 
+    private const uint DriveFixed = 3;
+
     public string? CannotRecycle(string path)
     {
         var full = Path.GetFullPath(path);
@@ -30,30 +32,40 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
             return "network location without a Recycle Bin";
         }
 
-        DriveInfo drive;
         try
         {
-            drive = new DriveInfo(Path.GetPathRoot(full)!);
-            if (drive.DriveType != DriveType.Fixed)
+            // the real volume: a folder may be a mount point of a USB drive
+            if (WindowsVolumes.MountPoint(full) is not { } mountPoint)
             {
-                return $"drive {drive.Name} ({drive.DriveType}) has no Recycle Bin";
+                return "the drive of the file cannot be determined";
             }
-        }
-        catch (Exception ex) when (ex is ArgumentException or IOException)
-        {
-            return "unknown drive";
-        }
 
-        var (nukeOnDelete, maxCapacityMb) = BinSettings(drive);
-        if (nukeOnDelete)
-        {
-            return $"the Recycle Bin of {drive.Name} deletes files immediately";
-        }
+            if (WindowsVolumes.DriveType(mountPoint) != DriveFixed)
+            {
+                return $"{mountPoint} is not a fixed disk and has no Recycle Bin";
+            }
 
-        // without a stored size, assume the smallest default (5 % of the drive): an underestimate is safe
-        var capacity = maxCapacityMb is { } mb ? mb << 20 : drive.TotalSize / 20;
-        var size = File.Exists(full) ? new FileInfo(full).Length : 0;
-        return size > capacity ? $"the file ({size >> 20} MB) is larger than the Recycle Bin of {drive.Name} ({capacity >> 20} MB)" : null;
+            var guid = VolumeGuid(mountPoint);
+            if (guid is null)
+            {
+                return $"the Recycle Bin of {mountPoint} cannot be determined";
+            }
+
+            var (nukeOnDelete, maxCapacityMb) = BinSettings(guid);
+            if (nukeOnDelete)
+            {
+                return $"the Recycle Bin of {mountPoint} deletes files immediately";
+            }
+
+            // without a stored size, assume the smallest default (5 % of the drive): an underestimate is safe
+            var capacity = maxCapacityMb is { } mb ? mb << 20 : (WindowsVolumes.TotalSize(mountPoint) ?? 0) / 20;
+            var size = File.Exists(full) ? new FileInfo(full).Length : 0;
+            return size > capacity ? $"the file ({size >> 20} MB) is larger than the Recycle Bin of {mountPoint} ({capacity >> 20} MB)" : null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return "the Recycle Bin cannot be checked: " + ex.Message;
+        }
     }
 
     public void MoveToRecycleBin(string path)
@@ -84,14 +96,13 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
         }
     }
 
-    /// <summary>Recycle Bin settings of a drive from the registry (per volume, or the old global values).</summary>
-    private static (bool NukeOnDelete, long? MaxCapacityMb) BinSettings(DriveInfo drive)
+    /// <summary>Recycle Bin settings of a volume from the registry (per volume, or the old global values).</summary>
+    private static (bool NukeOnDelete, long? MaxCapacityMb) BinSettings(string volumeGuid)
     {
         try
         {
             using var bitBucket = Registry.CurrentUser.OpenSubKey(BitBucketKey);
-            var guid = VolumeGuid(drive.RootDirectory.FullName);
-            using var volume = guid is null ? null : bitBucket?.OpenSubKey(@"Volume\" + guid);
+            using var volume = bitBucket?.OpenSubKey(@"Volume\" + volumeGuid);
             var nuke = volume?.GetValue("NukeOnDelete") ?? bitBucket?.GetValue("NukeOnDelete");
             var capacity = volume?.GetValue("MaxCapacity");
             return (nuke is int n && n != 0, capacity is int c && c > 0 ? c : null);
@@ -102,11 +113,11 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
         }
     }
 
-    /// <summary>"{xxxxxxxx-…}" of the volume mounted at a root such as "C:\".</summary>
-    private static string? VolumeGuid(string root)
+    /// <summary>"{xxxxxxxx-…}" of the volume mounted at a mount point such as "C:\".</summary>
+    private static string? VolumeGuid(string mountPoint)
     {
         var buffer = new char[64];
-        if (!GetVolumeNameForVolumeMountPoint(root, buffer, buffer.Length))
+        if (!WindowsVolumes.GetVolumeNameForVolumeMountPoint(mountPoint, buffer, buffer.Length))
         {
             return null;
         }
@@ -119,10 +130,6 @@ public sealed partial class WindowsRecycleBin : IRecycleBin
 
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static partial int SHFileOperation(ref ShFileOpStruct operation);
-
-    [LibraryImport("kernel32.dll", EntryPoint = "GetVolumeNameForVolumeMountPointW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetVolumeNameForVolumeMountPoint(string mountPoint, [Out] char[] volumeName, int length);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ShFileOpStruct

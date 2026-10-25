@@ -13,8 +13,14 @@ public static class Paths
     /// <summary>True when the file lies directly in the folder.</summary>
     public static bool IsIn(string filePath, string directory) => Same(Path.GetDirectoryName(Path.GetFullPath(filePath))!, directory);
 
-    /// <summary>Drive (or share) of a path: "D:\", "\\server\share", "/".</summary>
-    public static string Volume(string path) => Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+    /// <summary>
+    /// Finds the volume of a path. The default uses the path root ("D:\"); on Windows the platform replaces it with the
+    /// real volume, so folders mounted from another drive are told apart.
+    /// </summary>
+    public static Func<string, string> VolumeResolver { get; set; } = path => Path.GetPathRoot(Path.GetFullPath(path)) ?? "";
+
+    /// <summary>Volume of a path: "D:\", "\\server\share", "/" or a volume identifier.</summary>
+    public static string Volume(string path) => VolumeResolver(path);
 
     /// <summary>True when a file can be moved between the two paths by renaming (no copying).</summary>
     public static bool SameVolume(string a, string b) => string.Equals(Volume(a), Volume(b), StringComparison.OrdinalIgnoreCase);

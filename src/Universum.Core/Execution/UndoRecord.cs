@@ -18,6 +18,9 @@ public sealed record UndoRecord
     /// <summary>Tags of the file before the edit (mkvextract XML); null when the file had none.</summary>
     public string? TagsXmlPath { get; init; }
 
+    /// <summary>False when the file was only moved (its header was not edited).</summary>
+    public bool HeaderChanged { get; init; } = true;
+
     /// <summary>Last-modified time of the file before the edit; restored by undo.</summary>
     public DateTime? ModifiedUtc { get; init; }
 

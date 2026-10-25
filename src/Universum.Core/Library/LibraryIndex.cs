@@ -1,14 +1,19 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Globalization;
+using System.Text;
 using Universum.Core.IO;
+using Universum.Core.Media;
+using Universum.Core.Rules;
 
 namespace Universum.Core.Library;
 
 /// <summary>
-/// Remembers from which original each library file was made (a fingerprint of the original's content), so processing
-/// the same original again is recognised (specification 13, K8). It never guesses: a library file counts as the same
-/// stream only when it was made from an original with the same fingerprint and has not changed since. A file it does
-/// not know is never skipped, at worst it becomes another version.
+/// Remembers from which original each library file was made (a fingerprint of the original) and with which result
+/// (a signature of the target state), so processing the same original again is recognised (specification 13, K8).
+/// It never guesses: a library file counts as the same stream only when it was made from an original with the same
+/// fingerprint into the same target and has not changed since. A file it does not know is never skipped, at worst it
+/// becomes another version.
 /// </summary>
 public sealed class LibraryIndex
 {
@@ -23,7 +28,7 @@ public sealed class LibraryIndex
         _entries = Load(file);
     }
 
-    /// <summary>Size and SHA-256 of the start, middle and end of a file (1 MiB each).</summary>
+    /// <summary>Size, modification time and SHA-256 of the start, middle and end of a file (1 MiB each).</summary>
     public static async Task<string> FingerprintAsync(string path, CancellationToken cancellationToken = default)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, SampleSize, useAsync: true);
@@ -43,11 +48,30 @@ public sealed class LibraryIndex
             hash.AppendData(buffer, 0, read);
         }
 
-        return length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + Convert.ToHexString(hash.GetHashAndReset());
+        return length.ToString(CultureInfo.InvariantCulture) + ":" +
+               File.GetLastWriteTimeUtc(path).Ticks.ToString(CultureInfo.InvariantCulture) + ":" +
+               Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    /// <summary>
+    /// What the result will be: track order, languages, flags, roles, names (except the random video name), removed
+    /// tracks, tags and index repair.
+    /// </summary>
+    public static string TargetSignature(TargetState target)
+    {
+        var text = new StringBuilder();
+        foreach (var track in target.Tracks)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"{track.TrackId}|{track.Type}|{track.Language.Primary}|{track.Flags.Default}{track.Flags.Enabled}{track.Flags.Forced}|{track.Role}|")
+                .Append(track.Type == TrackType.Video ? "" : track.Name ?? "").Append('\n');
+        }
+
+        text.Append("removed:").AppendJoin(',', target.Removed.Select(t => t.Id)).Append(";tags:").Append(target.RemoveTags).Append(";index:").Append(target.RepairIndex);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())))[..24];
     }
 
     /// <summary>A version of the placement made from the same original and unchanged since; null when there is none.</summary>
-    public string? FindSameStream(Placement placement, string sourceFingerprint)
+    public (string Path, string Target)? FindPrevious(Placement placement, string sourceFingerprint)
     {
         if (!Directory.Exists(placement.Directory))
         {
@@ -63,7 +87,7 @@ public sealed class LibraryIndex
                     entry.Source == sourceFingerprint &&
                     entry.Size == new FileInfo(file).Length)
                 {
-                    return file;
+                    return (file, entry.Target);
                 }
             }
         }
@@ -71,17 +95,34 @@ public sealed class LibraryIndex
         return null;
     }
 
-    /// <summary>Records that <paramref name="resultPath"/> was made from an original with this fingerprint.</summary>
-    public void Record(string resultPath, string sourceFingerprint)
+    /// <summary>Records that <paramref name="resultPath"/> was made from an original with this fingerprint into this target.</summary>
+    public void Record(string resultPath, string sourceFingerprint, string targetSignature)
     {
         lock (_entries)
         {
-            _entries[Path.GetFullPath(resultPath)] = new Entry(sourceFingerprint, new FileInfo(resultPath).Length, DateTime.UtcNow);
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_file))!);
-            var temporary = _file + ".new";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(_entries));
-            File.Move(temporary, _file, overwrite: true);
+            _entries[Path.GetFullPath(resultPath)] = new Entry(sourceFingerprint, new FileInfo(resultPath).Length, DateTime.UtcNow, targetSignature);
+            Save();
         }
+    }
+
+    /// <summary>Forgets a library file (it went to the Recycle Bin or was renamed).</summary>
+    public void Forget(string resultPath)
+    {
+        lock (_entries)
+        {
+            if (_entries.Remove(Path.GetFullPath(resultPath)))
+            {
+                Save();
+            }
+        }
+    }
+
+    private void Save()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_file))!);
+        var temporary = _file + ".new";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(_entries));
+        File.Move(temporary, _file, overwrite: true);
     }
 
     private static Dictionary<string, Entry> Load(string file)
@@ -101,5 +142,5 @@ public sealed class LibraryIndex
         return new Dictionary<string, Entry>(Paths.Comparer);
     }
 
-    public sealed record Entry(string Source, long Size, DateTime RecordedUtc);
+    public sealed record Entry(string Source, long Size, DateTime RecordedUtc, string Target = "");
 }

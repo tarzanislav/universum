@@ -6,7 +6,7 @@ namespace Universum.Cli;
 
 internal static class Output
 {
-    public static void Print(BatchAnalysis analysis, IReadOnlyList<BatchItem> items, LibraryJob library)
+    public static void Print(BatchAnalysis analysis, IReadOnlyList<BatchItem> items, LibraryJob library, string journalDirectory)
     {
         var leftovers = analysis.LeftoverTemporaryFiles.Concat(library.Layout.FindLeftovers()).ToList();
         Console.WriteLine($"{analysis.FileCount} súborov v {analysis.Groups.Count} skupinách" +
@@ -19,7 +19,9 @@ internal static class Output
 
         foreach (var interrupted in library.Layout.FindInterrupted())
         {
-            Console.WriteLine("  POZOR – nedokončený presun, možno jediná kópia (skontrolujte, nemažte): " + interrupted);
+            var home = Universum.Core.Execution.FileProcessor.OriginalPlaceOf(journalDirectory, interrupted);
+            Console.WriteLine("  POZOR – nedokončený presun, možno jediná kópia (nemažte): " + interrupted +
+                              (home is null ? "" : " – patrí do: " + home));
         }
 
         Console.WriteLine($"Knižnica: {library.Layout.Root}");

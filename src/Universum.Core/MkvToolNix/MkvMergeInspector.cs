@@ -20,7 +20,7 @@ public sealed class MkvMergeInspector(MkvToolNixInstallation installation, IProc
         }
 
         using var options = MkvToolNixOptionsFile.Create(
-            ["--ui-language", "en_US", "--identification-format", "json", "--identify", fullPath]);
+            ["--identification-format", "json", "--identify", fullPath]);
         var result = await runner.RunAsync(
             new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge), [options.Argument]) { Timeout = Timeout },
             cancellationToken).ConfigureAwait(false);

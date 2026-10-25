@@ -163,7 +163,7 @@
 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="290" />
+                        <ColumnDefinition Width="250" />
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
@@ -184,7 +184,7 @@
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
+                            <RowDefinition Height="1.5*" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
@@ -194,15 +194,15 @@
                                         ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
                                 <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Padding="10,3" />
                             </StackPanel>
-                            <TextBlock Text="Stopy skupiny – rozhodnutie platí pre všetky jej súbory" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
                         </DockPanel>
                         <DataGrid Grid.Row="1" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Stopa" Binding="{Binding Slot}" />
-                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="90" />
-                                <DataGridTextColumn Header="Názov v súbore" Binding="{Binding Name}" Width="*" />
-                                <DataGridTemplateColumn Header="Jazyk" Width="170">
+                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="70" />
+                                <DataGridTextColumn Header="Názov v súbore" Binding="{Binding Name}" Width="*" MinWidth="80" />
+                                <DataGridTemplateColumn Header="Jazyk" Width="150">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Grid>
@@ -213,7 +213,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Pôvod" Width="170">
+                                <DataGridTemplateColumn Header="Pôvod" Width="1.2*" MinWidth="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel VerticalAlignment="Center">
@@ -223,7 +223,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Forced" Width="150">
+                                <DataGridTemplateColumn Header="Forced" Width="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Visibility="{Binding IsSubtitles, Converter={StaticResource BoolToVisibility}}">

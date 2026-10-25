@@ -19,6 +19,7 @@ public sealed class MainViewModel : ObservableObject
         _services = services;
         Info = new InfoPageViewModel(services);
         Rules = new RulesPageViewModel(services);
+        Batch = new BatchPageViewModel(services);
         Tools =
         [
             new("Zlučovanie", "\uE71D", new PlaceholderPageViewModel("Zlučovanie", "Zdrojové súbory, stopy a ich vlastnosti, výstup a prílohy – ako Multiplexer v MKVToolNix GUI.", "etapa E4")),
@@ -26,7 +27,7 @@ public sealed class MainViewModel : ObservableObject
             new("Pravidlá UNIVERSUM", "\uE90F", Rules),
             new("Úprava hlavičky", "\uE70F", new PlaceholderPageViewModel("Úprava hlavičky", "Zmena názvov, jazykov a príznakov stôp priamo v súbore – ako Header editor v MKVToolNix GUI. Pravidlá UNIVERSUM sú už v nástroji Pravidlá UNIVERSUM.", "etapa E4")),
             new("Kapitoly", "\uE8FD", new PlaceholderPageViewModel("Kapitoly", "Editor kapitol.", "etapa E4")),
-            new("Hromadné spracovanie", "\uE8B7", new PlaceholderPageViewModel("Hromadné spracovanie", "Analýza priečinka, skupiny súborov podľa štruktúry a tolerantné šablóny.", "etapa E2")),
+            new("Hromadné spracovanie", "\uE8B7", Batch),
             new("Fronta úloh", "\uE823", new PlaceholderPageViewModel("Fronta úloh", "Úlohy čakajúce na spracovanie.", "etapa E4")),
             new("Výstup úloh", "\uE7C3", new PlaceholderPageViewModel("Výstup úloh", "Priebeh, upozornenia a chyby spracovania.", "etapa E4")),
         ];
@@ -41,6 +42,8 @@ public sealed class MainViewModel : ObservableObject
     public InfoPageViewModel Info { get; }
 
     public RulesPageViewModel Rules { get; }
+
+    public BatchPageViewModel Batch { get; }
 
     public ToolItem SelectedTool { get => _selectedTool; set => SetProperty(ref _selectedTool, value); }
 

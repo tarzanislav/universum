@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Universum.Core.Execution;
+using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Platform.Windows;
@@ -13,6 +14,20 @@ public sealed class AppServices
     public IProcessRunner Runner { get; } = new ProcessRunner();
 
     public AppSettings Settings { get; } = AppSettings.Load();
+
+    private CachingInspector? _inspector;
+
+    /// <summary>Inspector with the persistent identification cache for the current MKVToolNix.</summary>
+    public CachingInspector Inspector(MkvToolNixInstallation installation)
+    {
+        var inner = new MkvMergeInspector(installation, Runner);
+        if (_inspector is null || _inspector.Name != inner.Name)
+        {
+            _inspector = new CachingInspector(inner, AppSettings.IdentificationCacheFile);
+        }
+
+        return _inspector;
+    }
 
     /// <summary>MKVToolNix found by the last search; null when none is usable.</summary>
     public MkvToolNixInstallation? CurrentMkvToolNix { get; private set; }
@@ -58,11 +73,22 @@ public sealed class AppSettings
     /// <summary>Folder for results; null = next to the original.</summary>
     public string? TargetDirectory { get; set; }
 
+    /// <summary>Last folder of the batch page.</summary>
+    public string? BatchFolder { get; set; }
+
+    public bool BatchRecursive { get; set; } = true;
+
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>
         Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
             ? Path.Combine(custom, "journal")
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "journal");
+
+    /// <summary>Saved batch templates (*.json).</summary>
+    public static string TemplateDirectory => Path.Combine(Directory, "templates");
+
+    /// <summary>Cache of identification results (path, size, time → structure).</summary>
+    public static string IdentificationCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "identification-cache.json");
 
     public static AppSettings Load()
     {

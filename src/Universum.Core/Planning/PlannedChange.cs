@@ -8,6 +8,7 @@ public enum ChangeKind
     Enabled,
     Forced,
     Position,
+    Removed,
     Tags,
 }
 

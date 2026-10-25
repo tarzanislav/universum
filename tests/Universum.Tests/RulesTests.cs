@@ -17,7 +17,10 @@ public sealed class RulesTests
             Subs(4, "cze", "Czech full"),
             Subs(5, "eng", null)) with { GlobalTagEntries = 1 };
 
-        var target = UniversumRules.Apply(file, languages: new Dictionary<int, LanguageTag> { [2] = LanguageTag.FromCode("cs"), [3] = LanguageTag.FromCode("cs") });
+        var target = UniversumRules.Apply(file, decisions: new TrackDecisions
+        {
+            Languages = new Dictionary<int, LanguageTag> { [2] = LanguageTag.FromCode("cs"), [3] = LanguageTag.FromCode("cs") },
+        });
 
         Assert.True(!target.IsBlocked, "not blocked");
         Assert.Sequence([0, 2, 1, 3, 4, 5], target.Tracks.Select(t => t.TrackId), "order: video, CZ audio, EN audio, CZ forced, CZ, EN");

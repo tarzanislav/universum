@@ -12,7 +12,10 @@ public enum OriginalHandling
 
 /// <param name="TargetDirectory">Folder for kept results; null = next to the original.</param>
 /// <param name="KeepSuffix">Added to the file name when the result is written next to a kept original.</param>
-/// <param name="PreserveModifiedTime">The result keeps the original's last-modified time.</param>
+/// <param name="PreserveModifiedTime">
+/// The result gets the original's last-modified time plus two seconds, so libraries keep their order while
+/// media servers and caches still notice the change.
+/// </param>
 public sealed record OutputOptions(
     OriginalHandling Original,
     string? TargetDirectory = null,

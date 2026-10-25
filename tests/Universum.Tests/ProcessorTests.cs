@@ -10,7 +10,10 @@ namespace Universum.Tests;
 /// <summary>End-to-end: rules → plan → real mkvmerge/mkvpropedit → verification, on copies of the test files.</summary>
 public sealed class ProcessorTests
 {
-    private static readonly Dictionary<int, LanguageTag> CzechDub = new() { [2] = LanguageTag.FromCode("cs"), [3] = LanguageTag.FromCode("cs") };
+    private static readonly TrackDecisions CzechDub = new()
+    {
+        Languages = new Dictionary<int, LanguageTag> { [2] = LanguageTag.FromCode("cs"), [3] = LanguageTag.FromCode("cs") },
+    };
 
     [Test]
     public async Task RemuxKeepingTheOriginal()
@@ -20,7 +23,7 @@ public sealed class ProcessorTests
         var original = work.Copy("en-und-cz-forced.mkv");
         var before = await System.IO.File.ReadAllBytesAsync(original);
 
-        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original), languages: CzechDub));
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original), decisions: CzechDub));
         Assert.Equal(WriteMethod.Remux, plan.Method);
         var progress = new List<double>();
         var result = await processor.ProcessAsync(plan, new OutputOptions(OriginalHandling.Keep), new SyncProgress(progress.Add));
@@ -58,7 +61,7 @@ public sealed class ProcessorTests
         Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
         Assert.Equal(original, result.OutputPath, "result replaces the original");
         Assert.Equal(1, bin.Recycled.Count, "original in the Recycle Bin");
-        Assert.Equal(time, System.IO.File.GetLastWriteTimeUtc(original), "modification time preserved");
+        Assert.Equal(time.AddSeconds(2), System.IO.File.GetLastWriteTimeUtc(original), "modification time kept (+2 s so changes are noticed)");
         var audio = (await inspector.InspectAsync(original)).TracksOf(TrackType.Audio).Select(t => t.Language.Primary);
         Assert.Sequence(["cs", "sk", "en"], audio, "audio order");
     }

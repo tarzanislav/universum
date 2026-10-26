@@ -373,7 +373,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         Tracks.Clear();
         Inputs.Clear();
         Attachments.Clear();
-        _outputPath = "";
+        Library.TitleText = "";
         _title = "";
         _chaptersFile = "";
         OnPropertyChanged(nameof(Title));

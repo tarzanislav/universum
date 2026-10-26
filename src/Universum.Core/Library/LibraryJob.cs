@@ -135,7 +135,8 @@ public sealed class LibraryJob(LibraryLayout layout)
             .Select(g => g.First())
             .FirstOrDefault();
 
-    // season of a season folder between the analysed folder and the file ("Séria 2\a.mkv"), or null
+    // season of a season folder between the analysed folder and the file ("Séria 2\a.mkv"), or of the analysed folder
+    // itself when it only names a season ("Season 2" analysed on its own); null otherwise
     private static int? SeasonFolderBelow(string root, string file)
     {
         var folder = Path.GetDirectoryName(file);
@@ -149,7 +150,8 @@ public sealed class LibraryJob(LibraryLayout layout)
             folder = Path.GetDirectoryName(folder);
         }
 
-        return null;
+        var rootName = Path.GetFileName(Path.TrimEndingDirectorySeparator(root));
+        return EpisodeParser.IsSeasonOnlyFolder(rootName) ? EpisodeParser.SeasonOfFolder(rootName) : null;
     }
 
     /// <summary>The title a file is stored under; null while it is not decided.</summary>

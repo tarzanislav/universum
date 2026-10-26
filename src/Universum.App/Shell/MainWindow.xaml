@@ -401,7 +401,12 @@
                             <CheckBox Content="Pripájať sa k TMDB" IsChecked="{Binding TmdbEnabled}" Margin="0,8,0,0"
                                       ToolTip="Vypnutím sa na TMDB nič neposiela; uložený kľúč ostáva." />
                             <TextBlock Text="{Binding TmdbStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
-                            <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
+                            <DockPanel Margin="0,8,0,0">
+                                <!-- the TMDB logo, smaller than the UNIVERSUM name (TMDB attribution rules) -->
+                                <Image DockPanel.Dock="Left" Source="/Assets/tmdb-logo.png" Height="11" Margin="0,0,10,0" VerticalAlignment="Center"
+                                       RenderOptions.BitmapScalingMode="HighQuality" ToolTip="The Movie Database (TMDB) – www.themoviedb.org" />
+                                <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            </DockPanel>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">

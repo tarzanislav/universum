@@ -155,12 +155,35 @@ public sealed class LibraryTests
         // are always Season 00, never Season 01
         Assert.Sequence(["Season 00", "Season 01", "Season 02", "Season 09", "Season 10", "Season 100"],
             new[] { 0, 1, 2, 9, 10, 100 }.Select(LibraryNames.SeasonFolder), "two digits");
-        foreach (var specials in new[] { "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Season 0" })
+        // a special never goes into Season 01 by itself; Season 00 or Season 01 is a question for the user
+        foreach (var specials in new[] { "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Season 0", "Nine Puzzles Specials", "Špeciálne epizódy", "Speciální díly" })
         {
             Assert.Equal(0, EpisodeParser.SeasonOfFolder(specials), specials);
-            Assert.Equal("S00E01", EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv"))?.Number.Tag, specials + ": the folder wins over S01 in the name");
-            Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv")) is { NeedsConfirmation: false }, specials + ": decided");
+            Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv")) is { Number.Tag: "S00E01", NameSeason: 1, IsSeasonQuestion: true },
+                specials + ": suggested Season 00, asked");
+            Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S00E01.mkv")) is { Number.Tag: "S00E01", NeedsConfirmation: false }, specials + ": a special");
+            Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál E02.mkv")) is { Number.Tag: "S00E02", NeedsConfirmation: false }, specials + ": no season in the name");
         }
+
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Specials", "Season 1", "Seriál S01E09.mkv")) is { Number.Tag: "S00E09", IsSeasonQuestion: true }, "Specials above Season 1");
+        var disk = Path.GetFullPath(Path.Combine("Seriál (2025)", "Specials", "Disk 1", "Seriál S01E01.mkv"));
+        Assert.True(EpisodeParser.FromPath(disk, Path.GetDirectoryName(disk)) is { Number.Tag: "S00E01", IsSeasonQuestion: true }, "Specials above the analysed folder");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 1", "Seriál S00E03.mkv")) is { Number.Tag: "S00E03", IsSeasonQuestion: true }, "S00 in Season 1");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 1", "Seriál S01E00.mkv")) is { IsSeasonQuestion: true }, "episode 00");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 2", "Seriál S01E03.mkv")) is { NeedsConfirmation: true, IsSeasonQuestion: false }, "S01 in Season 2: to confirm, no 00/01 question");
+        Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder("Special Forces (2019)"), "a title");
+        foreach (var pack in new[] { "Nine.Puzzles.Season.1-3.1080p", "Nine.Puzzles.S01-03.1080p", "Nine Puzzles Séria 1 až 3", "Nine Puzzles S01-S03" })
+        {
+            Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder(pack), pack);
+        }
+
+        Assert.Equal(2, EpisodeParser.SeasonOfFolder("Sezóna 2 - 2019"), "season 2 of 2019");
+        foreach (var range in new[] { "Show S01E07-05", "Show 1x09-07", "Show 1x10-2x01" })
+        {
+            Assert.True(EpisodeParser.FromText(range) is { RangeRejected: true }, range);
+        }
+
+        Assert.Equal("S01E01-E15", EpisodeParser.FromText("Show S01E01-15")?.Number.Tag, "a bare range");
 
         Assert.Equal(1, EpisodeParser.SeasonOfFolder("Season 1"), "an input folder may be Season 1; the library writes Season 01");
 

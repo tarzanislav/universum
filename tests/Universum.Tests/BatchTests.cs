@@ -197,6 +197,20 @@ public sealed class BatchTests
             Path.Combine(output, "TVSHOWS", "Vymyslený seriál (2024)", "Season 00", "Vymyslený seriál S00E01 - SMALL.mkv"),
             items.Single(i => Paths.Same(i.File.Path, P("Specials", "Vymysleny Serial E01.mkv"))).PlannedPath, "Season 00 (no tracks: no languages, quality or codec)");
 
+        // a file in Specials named S01: Season 00 or Season 01 is asked; accepting all suggestions does not answer it
+        var question = P("Specials", "Vymysleny.Serial.S01E02.mkv");
+        analysis.Groups[0].Files.Add(new MediaFile { Path = question });
+        job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        job.Kind = MediaKind.Series;
+        job.Series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2024);
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([ReviewReasonKind.SeasonQuestion], Kinds(question), "asked, not accepted");
+        Assert.True(items.Single(i => Paths.Same(i.File.Path, question)).Reasons.Single(r => r.Kind == ReviewReasonKind.SeasonQuestion).Detail?.Contains("Season 00", StringComparison.Ordinal) == true, "the question names both seasons");
+        Assert.Equal(1, job.AnswerSpecials(), "answer: specials");
+        Assert.Equal((new EpisodeNumber(0, 2), false), job.EpisodeFor(question));
+        analysis.Groups[0].Files.RemoveAll(f => Paths.Same(f.Path, question));
+
         // TMDB knows four episodes of season 1 and the specials without a count
         job.ConfirmSuggestions();
         job.SeriesOnTmdb = (job.Series, [new TmdbSeason(0, 0), new TmdbSeason(1, 4), new TmdbSeason(2, 1)]);
@@ -223,6 +237,12 @@ public sealed class BatchTests
             File.WriteAllBytes(path, []);
             return path;
         }
+
+        // "Name - Díl N (Year)" with the same year: episodes too
+        var parts = Synthetic(Path.Combine(work.Path, "c"), F("c", "Kriminálka Anděl - Díl 1 (2008).mkv"), F("c", "Kriminálka Anděl - Díl 2 (2008).mkv"), F("c", "Kriminálka Anděl - Díl 3 (2008).mkv"));
+        Assert.Equal(MediaKind.Series, LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), parts).Kind, "numbered parts of one year");
+        var saga = Synthetic(Path.Combine(work.Path, "d"), F("d", "Sága - Časť 1 (2010).mkv"), F("d", "Sága - Časť 2 (2011).mkv"));
+        Assert.Equal(MediaKind.Movie, LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), saga).Kind, "parts of different years: films");
 
         // "Name (Year) Díl N" is a series
         var series = Synthetic(Path.Combine(work.Path, "a"), F("a", "Kriminálka Anděl (2008) Díl 1.mkv"), F("a", "Kriminálka Anděl (2008) Díl 2.mkv"));

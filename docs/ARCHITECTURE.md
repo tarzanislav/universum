@@ -106,7 +106,11 @@ in next to it without changing the rules, planning or UI.
     (2011)", "Rally 4x10 (2015)"), after it is an episode ("Kriminálka Anděl (2008) Díl 1"); episodes among films and
     different films under one title go for review; a TMDB address tells the kind (`/tv/` series, `/movie/` film);
   - fixed by the owner (26 Oct 2026): season folders have two digits (`Season 01`, never `Season 1`) and specials
-    ("Specials", "Špeciály", "Season 00") are always `Season 00`, even when a name says S01;
+    ("Specials", "Špeciály", "Season 00", "… Specials", "Špeciálne epizódy") are `Season 00`; whenever Season 00 or a
+    regular season is in doubt – a specials folder (anywhere up to four levels above) with S01 in the name, S00 in a
+    "Season 1" folder, episode 00 – UNIVERSUM asks (`EpisodeMatch.IsSeasonQuestion`, review `SeasonQuestion`): never
+    answered by "accept all suggestions", only per file or by "Špeciály do Season 00" (`LibraryJob.AnswerSpecials`,
+    CLI `--specialy`); folders naming several seasons ("Season 1-3", "S01-03", "Séria 1 až 3") name none;
   - seasons are looked for only below the analysed folder; extras (Extras, Trailers, Featurettes, Samples … folders,
     "- trailer" names) are no films or episodes and go for review; ranges S01E18-S01E19, S01E20E21E22, 1x15-16;
   - `TitleInfo.Problem`: the year is required ("Name (Year)") and the name must be in Latin script; titles in library

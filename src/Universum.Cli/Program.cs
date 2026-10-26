@@ -118,6 +118,18 @@ if (options.Kind is { } kind)
     library.Kind = kind;
 }
 
+// a TMDB address tells the kind: themoviedb.org/tv/… is a series, themoviedb.org/movie/… a film
+if (options.Tmdb is { Kind: { } addressKind })
+{
+    if (options.Kind is { } chosen && chosen != addressKind)
+    {
+        Console.Error.WriteLine($"Adresa TMDB je {(addressKind == MediaKind.Series ? "seriál (/tv/)" : "film (/movie/)")}, ale zadané je {(chosen == MediaKind.Series ? "--serial" : "--film")}.");
+        return 2;
+    }
+
+    library.Kind = addressKind;
+}
+
 var tmdbKey = options.TmdbKey ?? Environment.GetEnvironmentVariable("UNIVERSUM_TMDB_KEY") ??
               (OperatingSystem.IsWindows() && SettingsProfile.TmdbEnabled() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
@@ -263,6 +275,11 @@ foreach (var fileName in options.ProcessAnyway)
     }
 
     matches[0].Group.Decisions.ProcessAnyway.Add(matches[0].Path);
+}
+
+if (options.SpecialsIntoSeason00)
+{
+    Console.WriteLine($"Špeciály do Season 00: {library.AnswerSpecials()} súborov");
 }
 
 if (options.ConfirmSuggestions)

@@ -42,10 +42,21 @@ public enum EpisodeForm
 /// The name carries a range that cannot be written ("S01E40-S02E01" over two seasons, "S01E05-E03" backwards): only the
 /// first episode is taken, to be confirmed.
 /// </param>
-public sealed record EpisodeMatch(EpisodeNumber Number, bool SeasonAssumed, int? FolderSeason = null, EpisodeForm Form = EpisodeForm.SeasonEpisode, bool RangeRejected = false)
+/// <param name="NameSeason">The season the name says when a specials folder put the file into Season 00.</param>
+public sealed record EpisodeMatch(
+    EpisodeNumber Number, bool SeasonAssumed, int? FolderSeason = null, EpisodeForm Form = EpisodeForm.SeasonEpisode, bool RangeRejected = false,
+    int? NameSeason = null)
 {
     /// <summary>The number is a guess the user has to confirm: the season was assumed, the folder disagrees or a range was cut.</summary>
-    public bool NeedsConfirmation => SeasonAssumed || FolderSeason is not null || RangeRejected;
+    public bool NeedsConfirmation => SeasonAssumed || FolderSeason is not null || RangeRejected || IsSeasonQuestion;
+
+    /// <summary>
+    /// Season 00 or a regular season – a question only the user can answer, never accepted with all suggestions (owner's
+    /// decision of 26 October 2026): a specials folder with "S01" in the name, "S00" in a "Season 1" folder, or episode 00
+    /// of a regular season.
+    /// </summary>
+    public bool IsSeasonQuestion =>
+        NameSeason is not null || (FolderSeason is not null && (FolderSeason == 0 || Number.Season == 0)) || (Number.Episode == 0 && Number.Season > 0);
 }
 
 /// <summary>Finds season and episode numbers in file and folder names (specification, section 13.5).</summary>
@@ -65,11 +76,26 @@ public static partial class EpisodeParser
         }
 
         var folderSeason = SeasonOfPath(path, root);
-        // a specials folder ("Specials", "Špeciály", "Season 00") always means Season 00, whatever the name says: a special
-        // must never go into Season 01 (owner's decision of 26 October 2026)
-        if (match.SeasonAssumed || folderSeason == 0)
+        if (match.SeasonAssumed)
         {
-            return folderSeason is { } season ? match with { Number = match.Number with { Season = season }, SeasonAssumed = false } : match;
+            var assumed = folderSeason is { } season ? match with { Number = match.Number with { Season = season }, SeasonAssumed = false } : match;
+            // "E09" below a specials folder that is not the nearest season folder: Season 00 or the season? A question
+            return assumed.Number.Season != 0 && UnderSpecials(path)
+                ? assumed with { Number = assumed.Number with { Season = 0 }, NameSeason = assumed.Number.Season, SeasonAssumed = false }
+                : assumed;
+        }
+
+        // a specials folder ("Specials", "Špeciály", "Season 00") means Season 00: a special never goes into Season 01 by
+        // itself; when the name says another season, the user is asked (owner's decisions of 26 October 2026)
+        if (folderSeason == 0 && match.Number.Season != 0)
+        {
+            return match with { Number = match.Number with { Season = 0 }, NameSeason = match.Number.Season };
+        }
+
+        // a specials folder further up ("Specials\Season 1\…", or above the analysed folder): ask as well
+        if (match.Number.Season != 0 && UnderSpecials(path))
+        {
+            return match with { Number = match.Number with { Season = 0 }, NameSeason = match.Number.Season, FolderSeason = null };
         }
 
         return folderSeason is { } other && other != match.Number.Season ? match with { FolderSeason = other } : match;
@@ -100,6 +126,38 @@ public static partial class EpisodeParser
         return null;
     }
 
+    /// <summary>
+    /// True when a specials folder ("Specials", "Špeciály", "Season 00", "Nine Puzzles Specials", "Špeciálne epizódy") lies
+    /// anywhere up to four levels above the file – also above the analysed folder.
+    /// </summary>
+    public static bool UnderSpecials(string path)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path));
+        for (var level = 0; level < 4 && !string.IsNullOrEmpty(folder); level++)
+        {
+            if (IsSpecialsFolder(Path.GetFileName(folder)))
+            {
+                return true;
+            }
+
+            folder = Path.GetDirectoryName(folder);
+        }
+
+        return false;
+    }
+
+    /// <summary>"Specials", "Special", "Špeciály", "Speciály", "Season 00", "Nine Puzzles Specials", "Špeciálne epizódy", "Speciální díly".</summary>
+    public static bool IsSpecialsFolder(string? folderName)
+    {
+        var words = Words.Normalize(folderName);
+        return SpecialsFolder().IsMatch(words) || SpecialsWord().IsMatch(words) || SeasonOfFolderExact(words) == 0;
+    }
+
+    private static int? SeasonOfFolderExact(string words) =>
+        SeasonFolder().Match(words) is { Success: true } exact ? Number(exact.Groups["s"])
+        : SeasonOnly().IsMatch(words) && SeasonWord().Match(words) is { Success: true } named ? Number(named.Groups["s"])
+        : null;
+
     public static EpisodeMatch? FromText(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -125,9 +183,17 @@ public static partial class EpisodeParser
                     rejected = true;
                 }
             }
-            else if (se.Groups["b"].Success && Number(se.Groups["b"]) is var bare && bare > episode && bare - episode <= 10)
+            else if (se.Groups["b"].Success)
             {
-                last = bare;
+                var bare = Number(se.Groups["b"]);
+                if (bare > episode && bare - episode <= 200)
+                {
+                    last = bare;
+                }
+                else
+                {
+                    rejected = true;
+                }
             }
 
             return new EpisodeMatch(new EpisodeNumber(season, episode, last), false, RangeRejected: rejected);
@@ -135,9 +201,24 @@ public static partial class EpisodeParser
 
         if (Crossed().Match(name) is { Success: true } x)
         {
+            var season = Number(x.Groups["s"]);
             var episode = Number(x.Groups["e"]);
-            int? last = x.Groups["l"].Success && Number(x.Groups["l"]) is var l && l > episode ? l : null;
-            return new EpisodeMatch(new EpisodeNumber(Number(x.Groups["s"]), episode, last), false, Form: EpisodeForm.Crossed);
+            int? last = null;
+            var rejected = false;
+            if (x.Groups["l"].Success)
+            {
+                var end = Number(x.Groups["l"]);
+                if ((!x.Groups["ls"].Success || Number(x.Groups["ls"]) == season) && end > episode)
+                {
+                    last = end;
+                }
+                else
+                {
+                    rejected = true;
+                }
+            }
+
+            return new EpisodeMatch(new EpisodeNumber(season, episode, last), false, Form: EpisodeForm.Crossed, RangeRejected: rejected);
         }
 
         var words = Words.Normalize(name);
@@ -165,12 +246,12 @@ public static partial class EpisodeParser
             return Number(exact.Groups["s"]);
         }
 
-        if (SpecialsFolder().IsMatch(words))
+        if (SpecialsFolder().IsMatch(words) || SpecialsWord().IsMatch(words))
         {
             return 0;
         }
 
-        if (SeasonRange().IsMatch(folderName ?? ""))
+        if (SeasonRange().IsMatch((folderName ?? "").Replace('.', ' ').Replace('_', ' ')))
         {
             return null;
         }
@@ -241,7 +322,7 @@ public static partial class EpisodeParser
     private static partial Regex SeasonEpisode();
 
     // 1x04, 1x15-16, 1x15-1x16 (not 1920x1080 nor "4x100": the season has at most two digits, the episode two)
-    [GeneratedRegex(@"(?<![a-z0-9])(?<s>\d{1,2})x(?<e>\d{2})(?:-(?:\d{1,2}x)?(?<l>\d{2}))?(?![a-z0-9])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?<![a-z0-9])(?<s>\d{1,2})x(?<e>\d{2})(?:-(?:(?<ls>\d{1,2})x)?(?<l>\d{2}))?(?![a-z0-9])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Crossed();
 
     // on normalised words (lower case, no diacritics): "epizoda 4", "dil 4", "diel 4", "cast 4", "episode 4", "ep 4", "e04"
@@ -275,7 +356,12 @@ public static partial class EpisodeParser
     [GeneratedRegex(@" (?:trailer|sample|featurette)$", RegexOptions.CultureInvariant)]
     private static partial Regex ExtraSuffix();
 
-    // "Season 1-3", "Séria 1 – 4": several seasons, none of them
-    [GeneratedRegex(@"(?:season|s[eé]ri[ae]|s[eé]rie|series|sez[oó]na|[řr]ada|staffel|sezon)\s*\d{1,3}\s*[-–]\s*\d{1,3}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // "Season 1-3", "Season.1-3", "Séria 1 – 4", "Séria 1 až 3", "S01-03", "S01-S03", "Season 1 & 2": several seasons, none of
+    // them ("Sezóna 2 - 2019" is season 2 of 2019)
+    [GeneratedRegex(@"(?<![a-z])(?:season|s[eé]ri[ae]|s[eé]rie|series|sez[oó]na|[řr]ada|staffel|sezon|s)\s*\d{1,3}\s*(?:[-–&,+]|až|az|to|and|a|und)\s*(?:s|season\s*)?\d{1,3}(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SeasonRange();
+
+    // a specials folder named with more words: "nine puzzles specials", "specialne epizody", "specialni dily"
+    [GeneratedRegex(@"\b(?:specials|specialy|specialne|specialni)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex SpecialsWord();
 }

@@ -102,7 +102,8 @@ public sealed class LibraryTargetPicker : ObservableObject
         var guess = TitleGuess.ForFile(path);
         _kind = guess.Kind;
         _titleText = guess.TitleText;
-        _episodeText = guess.Episode?.Number.Tag ?? "";
+        // Season 00 or a regular season: asked – the field stays empty until the user answers
+        _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
         _episodeNote = EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
@@ -140,7 +141,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         }
         else if (_kind == MediaKind.Series && episode is null)
         {
-            Description = "Zadajte epizódu, napr. S01E04.";
+            Description = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : "Zadajte epizódu, napr. S01E04.";
         }
         else
         {
@@ -163,10 +164,23 @@ public sealed class LibraryTargetPicker : ObservableObject
     /// <summary>Why a guessed episode number should be checked (Slovak), or "".</summary>
     public static string EpisodeNote(EpisodeMatch? episode) => episode switch
     {
+        { IsSeasonQuestion: true } question => SeasonQuestion(question),
         { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia – skontrolujte epizódu",
         { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
         _ => "",
     };
+
+    /// <summary>The question Season 00 or a regular season, with both answers to type (Slovak).</summary>
+    public static string SeasonQuestion(EpisodeMatch question)
+    {
+        var special = question.Number with { Season = 0 };
+        var regular = question.NameSeason is { } named ? question.Number with { Season = named }
+            : question.FolderSeason is { } folder ? question.Number with { Season = folder }
+            : question.Number;
+        return special.Episode == 0 || regular == special
+            ? $"OTÁZKA: epizóda {question.Number.Tag} – je to špeciál (Season 00) alebo časť sezóny? Zadajte epizódu."
+            : $"OTÁZKA: Season 00 alebo Season {regular.Season:00}? Zadajte {special.Tag} (špeciál) alebo {regular.Tag}.";
+    }
 
     private void SetKind(bool selected, MediaKind kind)
     {
@@ -197,16 +211,21 @@ public sealed class LibraryTargetPicker : ObservableObject
             OnPropertyChanged(nameof(IsSeries));
         }
 
+        // nothing is placed until a TMDB title is chosen
+        _placement = null;
         if (_services.Tmdb is not null)
         {
+            Description = "Hľadám titul na TMDB…";
             _ = Tmdb.SearchAsync();
         }
         else
         {
             TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
-            Update();
+            Description = "Zadajte názov titulu, napr. Creep (2004).";
         }
 
+        OnPropertyChanged(nameof(Placement));
+        Changed?.Invoke();
         return true;
     }
 

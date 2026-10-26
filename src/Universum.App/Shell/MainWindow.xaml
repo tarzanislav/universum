@@ -905,7 +905,10 @@
                                     Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Spresní navrhnuté názvy filmov podľa TMDB (len presná zhoda názvu a roku)" />
                             <Button Content="Prijať návrhy názvov" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
-                                    ToolTip="Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov" />
+                                    ToolTip="Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)" />
+                            <Button Content="Špeciály do Season 00" Command="{Binding AnswerSpecialsCommand}" Padding="10,3" Margin="6,0,0,0"
+                                    Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore." />
                         </WrapPanel>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">

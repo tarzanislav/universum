@@ -34,8 +34,10 @@ public static class BatchPlanner
         var flagged = new Dictionary<int, string>();
         foreach (var same in Enumerable.Range(0, items.Count).Where(i => items[i].Title is not null).GroupBy(i => items[i].Title!.FolderName, Paths.Comparer))
         {
-            var own = same.Select(i => (Index: i, Name: TitleGuess.FromName(Path.GetFileNameWithoutExtension(items[i].File.Path), MediaKind.Movie)?.Name))
-                .Where(x => x.Name is not null).ToList();
+            // only names that carry a title with a year ("Okno (2014)", "Ticho.2010.1080p"), not "okno-2160p"
+            var own = same.Select(i => (Index: i, Guess: TitleGuess.FromName(Path.GetFileNameWithoutExtension(items[i].File.Path), MediaKind.Movie)))
+                .Where(x => x.Guess is { Year: not null })
+                .Select(x => (x.Index, Name: x.Guess!.Name)).ToList();
             if (own.Select(x => Words.Normalize(x.Name)).Distinct(StringComparer.Ordinal).Count() < 2)
             {
                 continue;
@@ -197,7 +199,8 @@ public static class BatchPlanner
             var (number, suggested) = library.EpisodeFor(path);
             if (number is null || suggested)
             {
-                reasons.Add(new ReviewReason(ReviewReasonKind.MissingEpisode, Detail: library.EpisodeDoubt(path)));
+                reasons.Add(new ReviewReason(library.SeasonQuestions.Contains(path) ? ReviewReasonKind.SeasonQuestion : ReviewReasonKind.MissingEpisode,
+                    Detail: library.EpisodeDoubt(path)));
                 return item with { Title = title, Episode = number };
             }
 

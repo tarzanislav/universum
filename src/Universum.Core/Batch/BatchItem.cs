@@ -50,6 +50,9 @@ public enum ReviewReasonKind
     /// <summary>Among films, a file named like an episode (S01E04, "… (2008) Díl 1") or lying in a season folder.</summary>
     EpisodeAmongFilms,
 
+    /// <summary>Season 00 (specials) or a regular season: a question the user answers for the file (owner's decision).</summary>
+    SeasonQuestion,
+
     /// <summary>The path in the library would be too long for Windows.</summary>
     PathTooLong,
 }

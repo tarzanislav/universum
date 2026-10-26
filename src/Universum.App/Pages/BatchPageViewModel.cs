@@ -67,6 +67,7 @@ public sealed class BatchPageViewModel : ObservableObject
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
         ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
+        AnswerSpecialsCommand = new RelayCommand(AnswerSpecials, () => !Busy && HasSpecialsQuestions);
         Tmdb = new TmdbPicker(services, () => MediaKind.Series,
             () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? ""), ChooseTmdbSeries);
         FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } && _services.Tmdb is not null);
@@ -102,6 +103,13 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>Accepts the proposed kind (films or a series) as it is.</summary>
     public RelayCommand ConfirmKindCommand { get; }
+
+    /// <summary>The answer to the questions Season 00 or a regular season: these files are specials (Season 00).</summary>
+    public RelayCommand AnswerSpecialsCommand { get; }
+
+    /// <summary>Some files ask Season 00 or a regular season (shown with the button).</summary>
+    public bool HasSpecialsQuestions =>
+        _library is { Kind: MediaKind.Series } library && library.OpenSeasonQuestions.Any(p => library.EpisodeSuggestions.TryGetValue(p, out var n) && n.Season == 0);
 
     /// <summary>"návrh – potvrďte" while the kind is only guessed from the names (specification 13.5).</summary>
     public string KindNote => _library is { KindConfirmed: false } ? "(návrh podľa mien súborov – potvrďte)" : "";
@@ -425,6 +433,7 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(KindNote));
         OnPropertyChanged(nameof(KindNeedsConfirmation));
+        OnPropertyChanged(nameof(HasSpecialsQuestions));
         RefreshCommands();
     }
 
@@ -482,6 +491,15 @@ public sealed class BatchPageViewModel : ObservableObject
         catch (TmdbException ex)
         {
             RunState = "TMDB: epizódy sa nedajú overiť – " + ex.Message;
+        }
+    }
+
+    private void AnswerSpecials()
+    {
+        if (_library is not null)
+        {
+            RunState = $"Do Season 00: {_library.AnswerSpecials()} súborov.";
+            Replan();
         }
     }
 
@@ -937,6 +955,7 @@ public sealed class BatchPageViewModel : ObservableObject
                      ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
+                     AnswerSpecialsCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

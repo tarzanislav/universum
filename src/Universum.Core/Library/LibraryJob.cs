@@ -52,6 +52,12 @@ public sealed class LibraryJob(LibraryLayout layout)
     public Dictionary<string, EpisodeNumber> EpisodeSuggestions { get; } = new(Paths.Comparer);
 
     /// <summary>
+    /// Files whose season is a question – Season 00 (specials) or a regular season: only an answer for the file (its
+    /// number, or "specials into Season 00") decides it, never "accept all suggestions".
+    /// </summary>
+    public HashSet<string> SeasonQuestions { get; } = new(Paths.Comparer);
+
+    /// <summary>
     /// Seasons of a series as TMDB lists them (with episode counts), for the title they were read for; used only while
     /// that title is the series of this job (specification 13.5: TMDB checks that season and episode exist).
     /// </summary>
@@ -78,7 +84,8 @@ public sealed class LibraryJob(LibraryLayout layout)
         var root = analysis.Folder;
         var files = analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).Order(NaturalComparer.Instance).ToList();
         var content = files.Where(f => !EpisodeParser.IsExtra(f, root)).ToList();
-        var numbered = content.Count(f => LooksLikeEpisode(f, root) || SeasonFolderBelow(root, f) is not null);
+        var parts = NumberedParts(content);
+        var numbered = content.Count(f => LooksLikeEpisode(f, root) || SeasonFolderBelow(root, f) is not null || parts.Contains(f));
         job._kind = content.Count > 0 && numbered * 2 > content.Count ? MediaKind.Series : MediaKind.Movie;
 
         // series: the folder of the series (above a "Season 2" folder) or the start of the file names
@@ -138,12 +145,17 @@ public sealed class LibraryJob(LibraryLayout layout)
             used.Add((season, next));
         }
 
-        // numbers from the names whose season is only assumed or disagrees with the season folder: to be confirmed
+        // numbers from the names whose season is only assumed or disagrees with the season folder: to be confirmed; Season 00
+        // or a regular season: a question
         foreach (var file in content)
         {
             if (EpisodeParser.FromPath(file, root) is { NeedsConfirmation: true } doubtful)
             {
                 job.EpisodeSuggestions[file] = doubtful.Number;
+                if (doubtful.IsSeasonQuestion)
+                {
+                    job.SeasonQuestions.Add(file);
+                }
             }
         }
 
@@ -162,6 +174,18 @@ public sealed class LibraryJob(LibraryLayout layout)
             .OrderByDescending(g => g.Count())
             .Select(g => g.First())
             .FirstOrDefault();
+
+    /// <summary>
+    /// Files named alike except for a number before the same year ("Kriminálka Anděl - Díl 1 (2008)", "… Díl 2 (2008)"):
+    /// episodes of one series, not films ("Sága - Časť 1 (2010)" and "Časť 2 (2011)" have different years).
+    /// </summary>
+    private static HashSet<string> NumberedParts(IEnumerable<string> files) =>
+        files.Select(f => (File: f, Name: Path.GetFileNameWithoutExtension(f)))
+            .Where(x => TitleGuess.HasYearInParentheses(x.Name) && EpisodeParser.FromText(x.Name) is { Form: not EpisodeForm.SeasonEpisode })
+            .GroupBy(x => TitleGuess.FromName(x.Name, MediaKind.Series) is { } g ? Words.Normalize(g.Name) + "|" + g.Year : x.File, StringComparer.Ordinal)
+            .Where(g => g.Select(x => EpisodeParser.FromText(x.Name)!.Number.Episode).Distinct().Count() > 1)
+            .SelectMany(g => g.Select(x => x.File))
+            .ToHashSet(Paths.Comparer);
 
     /// <summary>
     /// An episode by its name: S01E04 always; 1x04, "Díl 4", "E04" unless the number stands in a film's title before its
@@ -213,6 +237,14 @@ public sealed class LibraryJob(LibraryLayout layout)
 
         return EpisodeParser.FromPath(path, Root) switch
         {
+            { NameSeason: { } named } found =>
+                $"OTÁZKA: súbor je v priečinku špeciálov (Season 00), ale meno uvádza sezónu {named:00} – patrí do Season 00 ({found.Number.Tag}) " +
+                $"alebo do Season {named:00} ({(found.Number with { Season = named }).Tag})? Zadajte číslo epizódy",
+            { FolderSeason: { } folder, Number.Season: 0 } found =>
+                $"OTÁZKA: meno uvádza špeciál ({found.Number.Tag}), ale súbor je v priečinku Season {folder:00} – patrí do Season 00 " +
+                $"alebo do Season {folder:00} ({(found.Number with { Season = folder }).Tag})? Zadajte číslo epizódy",
+            { Number: { Episode: 0, Season: > 0 } number } =>
+                $"OTÁZKA: epizóda 00 ({number.Tag}) – je to špeciál (Season 00) alebo časť sezóny {number.Season:00}? Zadajte číslo epizódy",
             { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia",
             { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
             { RangeRejected: true } => "rozsah epizód v mene sa nedá zapísať (iná sezóna alebo opačné poradie) – berie sa prvá epizóda",
@@ -221,7 +253,10 @@ public sealed class LibraryJob(LibraryLayout layout)
         };
     }
 
-    /// <summary>Accepts the proposed kind and all suggested titles and episode numbers.</summary>
+    /// <summary>
+    /// Accepts the proposed kind and all suggested titles and episode numbers – except the questions Season 00 or a
+    /// regular season, which the user answers for each file (or with <see cref="AnswerSpecials"/>).
+    /// </summary>
     public void ConfirmSuggestions()
     {
         KindConfirmed = true;
@@ -233,8 +268,33 @@ public sealed class LibraryJob(LibraryLayout layout)
 
         foreach (var (path, number) in EpisodeSuggestions)
         {
-            Episodes.TryAdd(path, number);
+            if (!SeasonQuestions.Contains(path))
+            {
+                Episodes.TryAdd(path, number);
+            }
         }
+    }
+
+    /// <summary>Unanswered questions Season 00 or a regular season.</summary>
+    public IEnumerable<string> OpenSeasonQuestions => SeasonQuestions.Where(p => !Episodes.ContainsKey(p));
+
+    /// <summary>
+    /// The user's answer "these are specials": every open question whose suggestion is in Season 00 (files in a specials
+    /// folder, names with S00) goes into Season 00; episode 00 of a regular season stays a question. Returns how many.
+    /// </summary>
+    public int AnswerSpecials()
+    {
+        var answered = 0;
+        foreach (var path in OpenSeasonQuestions.ToList())
+        {
+            if (EpisodeSuggestions.TryGetValue(path, out var number) && number.Season == 0)
+            {
+                Episodes[path] = number;
+                answered++;
+            }
+        }
+
+        return answered;
     }
 
     private static TitleInfo Title(MediaKind kind, NameGuess guess) => new(kind, guess.Name, guess.Year, guess.TmdbId, guess.TmdbId is not null);

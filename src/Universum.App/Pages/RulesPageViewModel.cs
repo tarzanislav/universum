@@ -248,7 +248,8 @@ public sealed class RulesPageViewModel : ObservableObject
         var guess = TitleGuess.ForFile(path);
         _kind = guess.Kind;
         _titleText = guess.TitleText;
-        _episodeText = guess.Episode?.Number.Tag ?? "";
+        // Season 00 or a regular season: asked – the field stays empty until the user answers
+        _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
         _episodeNote = LibraryTargetPicker.EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
@@ -284,7 +285,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
         else if (_kind == MediaKind.Series && episode is null)
         {
-            Target = "Zadajte epizódu, napr. S01E04.";
+            Target = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : "Zadajte epizódu, napr. S01E04.";
         }
         else
         {
@@ -317,16 +318,20 @@ public sealed class RulesPageViewModel : ObservableObject
             OnPropertyChanged(nameof(IsSeries));
         }
 
+        // nothing is placed until a TMDB title is chosen
+        _placement = null;
         if (_services.Tmdb is not null)
         {
+            Target = "Hľadám titul na TMDB…";
             _ = Tmdb.SearchAsync();
         }
         else
         {
             TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
-            UpdateTarget();
+            Target = "Zadajte názov titulu, napr. Creep (2004).";
         }
 
+        RefreshCommands();
         return true;
     }
 

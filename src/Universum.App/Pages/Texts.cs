@@ -77,6 +77,7 @@ public static class Texts
         ReviewReasonKind.OtherSeries => $"meno súboru patrí inému titulu ({reason.Detail}) – skontrolujte názov, alebo „spracovať aj tak“",
         ReviewReasonKind.KindNotConfirmed => $"druh ({reason.Detail}) je len návrh – potvrďte ho alebo zvoľte druhý",
         ReviewReasonKind.ExtraFile => "doplnok (trailer, ukážka, bonus) – nie je film ani epizóda",
+        ReviewReasonKind.SeasonQuestion => (reason.Detail ?? "OTÁZKA: Season 00 alebo bežná sezóna?") + " – alebo tlačidlo „Špeciály do Season 00“",
         ReviewReasonKind.EpisodeAmongFilms => "meno vyzerá ako epizóda seriálu – medzi filmami by bol verziou filmu; zvoľte seriál alebo „spracovať aj tak“",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind.ToString(),

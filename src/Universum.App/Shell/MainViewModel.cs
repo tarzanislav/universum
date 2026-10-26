@@ -25,6 +25,8 @@ public sealed class MainViewModel : ObservableObject
         Batch = new BatchPageViewModel(services);
         Settings = new SettingsPageViewModel(services);
         HeaderEditor = new HeaderEditorPageViewModel(services);
+        Queue = new Jobs.JobQueuePageViewModel(services);
+        Output = new Jobs.JobOutputPageViewModel(Queue);
         Tools =
         [
             new("Zlučovanie", "\uE71D", new PlaceholderPageViewModel("Zlučovanie", "Zdrojové súbory, stopy a ich vlastnosti, výstup a prílohy – ako Multiplexer v MKVToolNix GUI.", "etapa E4")),
@@ -33,8 +35,8 @@ public sealed class MainViewModel : ObservableObject
             new("Úprava hlavičky", "\uE70F", HeaderEditor),
             new("Kapitoly", "\uE8FD", new PlaceholderPageViewModel("Kapitoly", "Editor kapitol.", "etapa E4")),
             new("Hromadné spracovanie", "\uE8B7", Batch),
-            new("Fronta úloh", "\uE823", new PlaceholderPageViewModel("Fronta úloh", "Úlohy čakajúce na spracovanie.", "etapa E4")),
-            new("Výstup úloh", "\uE7C3", new PlaceholderPageViewModel("Výstup úloh", "Priebeh, upozornenia a chyby spracovania.", "etapa E4")),
+            new("Fronta úloh", "\uE823", Queue),
+            new("Výstup úloh", "\uE7C3", Output),
             new("Nastavenia", "\uE713", Settings),
         ];
         _selectedTool = Tools[1];
@@ -42,6 +44,11 @@ public sealed class MainViewModel : ObservableObject
         OpenMkvToolNixGuiCommand = new RelayCommand(OpenMkvToolNixGui, () => _services.CurrentMkvToolNix?.HasTool(MkvToolNixTool.Gui) == true);
         ShowUpdatesCommand = new AsyncRelayCommand(ShowUpdatesAsync);
         Settings.ShowUpdatesRequested += () => _ = ShowUpdatesAsync();
+        Queue.OutputRequested += row =>
+        {
+            Output.Show(row, follow: false);
+            SelectedTool = Tools.First(t => t.Page == Output);
+        };
         _services.Updates.Checked += UpdateBadgeText;
     }
 
@@ -82,6 +89,10 @@ public sealed class MainViewModel : ObservableObject
 
     public HeaderEditorPageViewModel HeaderEditor { get; }
 
+    public Jobs.JobQueuePageViewModel Queue { get; }
+
+    public Jobs.JobOutputPageViewModel Output { get; }
+
     public ToolItem SelectedTool { get => _selectedTool; set => SetProperty(ref _selectedTool, value); }
 
     public string MkvToolNixStatus { get => _mkvToolNixStatus; private set => SetProperty(ref _mkvToolNixStatus, value); }
@@ -100,6 +111,7 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Why updating is not possible now (a batch or a file is being processed); null when it is.</summary>
     public string? UpdateBlocker() =>
         Batch.IsRunning ? "Beží hromadné spracovanie – aktualizovať sa dá po jeho skončení."
+        : _services.Jobs.Running is not null ? "Beží fronta úloh – aktualizovať sa dá po jej dokončení (alebo ju zastavte)."
         : Rules.Busy ? "Spracúva sa súbor – aktualizovať sa dá po jeho dokončení."
         : null;
 

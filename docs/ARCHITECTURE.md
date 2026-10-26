@@ -93,6 +93,17 @@ in next to it without changing the rules, planning or UI.
   switched off, nothing is sent there and the stored key or token stays (the CLI honours the TMDB switch for the
   stored key). With both on, the two are to be synchronised (`SyncActive`; what exactly follows the HISTRA API).
 
+## Job queue (specification, section 5)
+
+- `Jobs/Job` – description, status (waiting, running, done, done with warnings, failed, cancelled), progress, output
+  (info / warning / error lines), outcome, times. An exception fails only that job.
+- `Jobs/JobQueue` – one job at a time in queue order while started; stop after the running job, cancel the running
+  one (the processor leaves the original unchanged) or take waiting ones out, move waiting jobs, retry, clear
+  finished. Events come on the thread that runs the queue; the app marshals progress from tool threads.
+- `Jobs/FileJob` – a plan written by the `FileProcessor` (same safe route, undo record, Recycle Bin); the tools'
+  warnings and errors become the job output. Header editor and rules page add jobs ("Do fronty"); the queue starts
+  at once unless switched off in the queue page.
+
 ## Batch processing
 
 - `Batch/BatchAnalyzer` – finds the Matroska files of a folder (natural order, optionally with subfolders), reads

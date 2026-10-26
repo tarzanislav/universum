@@ -3,7 +3,9 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Jobs;
 using Universum.Core.Execution;
+using Universum.Core.Jobs;
 using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -48,7 +50,11 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !Busy && Target() is { HasChanges: true });
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
+        QueueCommand = new RelayCommand(Enqueue, () => !Busy && Target() is { HasChanges: true });
     }
+
+    /// <summary>Adds the change to the job queue instead of saving now.</summary>
+    public RelayCommand QueueCommand { get; }
 
     public AsyncRelayCommand OpenCommand { get; }
 
@@ -395,6 +401,41 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         }
     }
 
+    private void Enqueue()
+    {
+        if (Target() is not { HasChanges: true } target || _services.CurrentMkvToolNix is not { } installation)
+        {
+            return;
+        }
+
+        var path = target.Source.Path;
+        var job = new FileJob($"Úprava hlavičky: {Path.GetFileName(path)}", _services.Processor(installation), EditPlan.For(target),
+            Placement.InPlace(path), new OutputOptions(OriginalHandling.Keep));
+        job.Finished += (finished, result) => JobRow.OnUi(() => _ = AfterJobAsync(finished, result, installation));
+        _services.Enqueue(job);
+        Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
+    }
+
+    /// <summary>A queued change finished: the editor shows the file as it is now (when it still shows that file).</summary>
+    private async Task AfterJobAsync(FileJob job, ProcessingResult result, MkvToolNixInstallation installation)
+    {
+        var path = job.Plan.Target.Source.Path;
+        _services.Inspector(installation).Invalidate(path);
+        if (_file is null || !Universum.Core.IO.Paths.Same(_file.Path, path) || Busy)
+        {
+            return;
+        }
+
+        if (result.Status == ProcessingStatus.Done)
+        {
+            _undoRecord = result.UndoRecordPath;
+            await ReadAsync(result.OutputPath ?? path);
+        }
+
+        Result = $"Úloha {job.Id}: {job.Outcome}";
+        RefreshCommands();
+    }
+
     private async Task UndoAsync()
     {
         if (_undoRecord is null || _services.CurrentMkvToolNix is not { } installation || _file is null)
@@ -443,5 +484,6 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         MoveDownCommand.NotifyCanExecuteChanged();
         SaveCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
+        QueueCommand?.NotifyCanExecuteChanged();
     }
 }

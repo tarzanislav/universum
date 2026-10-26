@@ -134,6 +134,12 @@ public sealed class AppServices
     /// <summary>Raised when the HISTRA token changes.</summary>
     public event Action? HistraChanged;
 
+    /// <summary>The job queue (one for the whole program; jobs run one after another).</summary>
+    public Universum.Core.Jobs.JobQueue Jobs { get; } = new();
+
+    /// <summary>Adds a job; starts the queue when the settings say so.</summary>
+    public void Enqueue(Universum.Core.Jobs.Job job) => Jobs.Add(job, Settings.AutoStartQueue);
+
     private Updates.UpdateService? _updates;
 
     /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
@@ -188,6 +194,9 @@ public sealed class AppSettings
 
     /// <summary>Check for updates at start and then once a day.</summary>
     public bool AutoCheckUpdates { get; set; } = true;
+
+    /// <summary>The job queue starts as soon as a job is added.</summary>
+    public bool AutoStartQueue { get; set; } = true;
 
     public DateTime? LastUpdateCheckUtc { get; set; }
 

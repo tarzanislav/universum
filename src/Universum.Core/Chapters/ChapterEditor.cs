@@ -38,8 +38,11 @@ public sealed class ChapterEditor(MkvToolNixInstallation installation, IProcessR
         }
     }
 
-    /// <summary>Replaces the file's chapters (an empty list removes them).</summary>
-    public async Task<ChapterSaveResult> SaveAsync(string path, IReadOnlyList<Chapter> chapters, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Replaces the file's chapters in place (an empty list removes them). Internal: the app writes chapters only into
+    /// new library files through the FileProcessor; originals are never edited.
+    /// </summary>
+    internal async Task<ChapterSaveResult> SaveAsync(string path, IReadOnlyList<Chapter> chapters, CancellationToken cancellationToken = default)
     {
         var current = await ReadAsync(path, cancellationToken);
         if (current.Complex)
@@ -75,7 +78,7 @@ public sealed class ChapterEditor(MkvToolNixInstallation installation, IProcessR
     }
 
     /// <summary>Puts the chapters saved before an edit back; returns problems (empty = done, the record is deleted).</summary>
-    public async Task<IReadOnlyList<string>> UndoAsync(string recordPath)
+    internal async Task<IReadOnlyList<string>> UndoAsync(string recordPath)
     {
         ChapterUndoRecord record;
         try

@@ -45,6 +45,13 @@ public sealed class FileProcessor(
 
     private readonly MkvMergeInspector _inspector = new(installation, runner);
 
+    /// <summary>
+    /// Whether <see cref="OriginalHandling.Delete"/> is honoured. Off by default: until the program is proven in practice
+    /// originals are always kept (the owner's decision of 26 October 2026); "delete" then means "keep". Only the tests of
+    /// the delete route switch it on.
+    /// </summary>
+    public bool DeleteOriginalsAllowed { get; init; }
+
     /// <summary>A new, unique temporary name in <paramref name="directory"/>; left-overs after a crash are recognised by it.</summary>
     public static string TemporaryPath(string directory, string sourcePath) => UniquePath(directory, sourcePath, TemporaryExtension);
 
@@ -61,6 +68,11 @@ public sealed class FileProcessor(
         EditPlan plan, Placement placement, OutputOptions output, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         var source = plan.Target.Source.Path;
+        if (output.Original == OriginalHandling.Delete && !DeleteOriginalsAllowed)
+        {
+            output = output with { Original = OriginalHandling.Keep };
+        }
+
         if (plan.Target.IsBlocked)
         {
             return Result(plan, ProcessingStatus.NeedsReview, null, null, plan.Target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind.ToString()));
@@ -81,9 +93,14 @@ public sealed class FileProcessor(
             }
 
             var sourceSize = new FileInfo(source).Length;
-            // a file in the placement's folder is reworked there – unless the placement names another file (a new one beside it)
+            // a file is reworked where it is only when it is a library result UNIVERSUM made: in the placement's folder,
+            // named by the library and recorded in the library index as a result, unchanged since. Any other file – also an
+            // original lying in the title folder, whatever its name ("Creep (2004) - 1080p BluRay.mkv") – is only read and
+            // the result is a new file. Without an index nothing is reworked.
             var inLibrary = Paths.IsIn(source, placement.Directory) &&
-                            (placement.FixedName is null || string.Equals(Path.GetFileName(source), placement.FixedName, Paths.Comparison));
+                            (placement.FixedName is not null
+                                ? placement.IsLibraryName(Path.GetFileName(source))
+                                : placement.IsLibraryName(Path.GetFileName(source)) && index?.IsResult(source) == true);
             if (inLibrary && plan.Method == WriteMethod.None && placement.Holds(source, sourceSize))
             {
                 return Result(plan, ProcessingStatus.Unchanged, source, null, []);
@@ -128,6 +145,19 @@ public sealed class FileProcessor(
             }
 
             result = Finish(result, fingerprint, signature, output.PreserveModifiedTime ? originalTime : null);
+            if (inLibrary)
+            {
+                // the reworked library result keeps its origin in the index under its (possibly new) name and size
+                try
+                {
+                    index?.Replace(source, result.OutputPath!, signature);
+                }
+                catch (Exception ex) when (IsFileError(ex))
+                {
+                    result = result with { Messages = [.. result.Messages, "done, but the library index was not updated: " + ex.Message] };
+                }
+            }
+
             return previous is null ? result : ReplacePrevious(result, previous, placement, fingerprint!, signature);
         }
         catch (OperationCanceledException)
@@ -180,6 +210,11 @@ public sealed class FileProcessor(
         if (back is not null && File.Exists(back))
         {
             return [$"cannot move the file back: {back} exists"];
+        }
+
+        if (!trusted && index is not null && index.Knows(path) && !index.IsResult(path))
+        {
+            return [$"{path} has changed since UNIVERSUM wrote it; nothing was restored"];
         }
 
         if (!trusted)
@@ -248,10 +283,20 @@ public sealed class FileProcessor(
             }
         }
 
+        try
+        {
+            index?.Undone(path, finalPath, sameAsBefore: trusted);
+        }
+        catch (Exception ex) when (IsFileError(ex))
+        {
+            problems.Add("the library index could not be updated: " + ex.Message);
+        }
+
         if (problems.Count == 0)
         {
             TryDelete(undoRecordPath);
             TryDelete(record.TagsXmlPath);
+            TryDelete(record.ChaptersXmlPath);
         }
         else
         {
@@ -304,6 +349,11 @@ public sealed class FileProcessor(
     private static List<string> UndoArguments(UndoRecord record, string path)
     {
         var arguments = new List<string> { path, "--tags", "all:" + (record.TagsXmlPath ?? "") };
+        if (record.ChaptersSaved)
+        {
+            arguments.AddRange(["--chapters", record.ChaptersXmlPath ?? ""]);
+        }
+
         if (record.TitleSaved)
         {
             arguments.AddRange(["--edit", "info"]);
@@ -399,7 +449,7 @@ public sealed class FileProcessor(
         var moving = UniquePath(placement.Directory, source, MovingExtension);
 
         // the record comes first: whatever happens after the move, it knows where the original belongs
-        var undoPath = await SaveUndoRecordAsync(plan.Target.Source, moving, source, plan.Method == WriteMethod.HeaderEdit, cancellationToken);
+        var undoPath = await SaveUndoRecordAsync(plan.Target.Source, moving, source, plan.Method == WriteMethod.HeaderEdit, plan.Target.ChaptersChanged, cancellationToken);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -421,7 +471,7 @@ public sealed class FileProcessor(
     /// <param name="movedFrom">Where the file was before it was moved into the library (move route), else null.</param>
     private async Task<ProcessingResult> EditWithUndoAsync(EditPlan plan, Placement placement, string path, string? movedFrom, string? undoPath = null)
     {
-        undoPath ??= await SaveUndoRecordAsync(plan.Target.Source with { Path = path }, path, movedFrom, plan.Method == WriteMethod.HeaderEdit, CancellationToken.None);
+        undoPath ??= await SaveUndoRecordAsync(plan.Target.Source with { Path = path }, path, movedFrom, plan.Method == WriteMethod.HeaderEdit, plan.Target.ChaptersChanged, CancellationToken.None);
         var home = movedFrom ?? path;
         var current = path;
         var messages = new List<string>();
@@ -448,6 +498,9 @@ public sealed class FileProcessor(
 
     /// <summary>Message of a failed edit after which the original state was restored.</summary>
     public const string RestoredMessage = "the original was restored";
+
+    /// <summary>A corrected run replaced the earlier result made from the same original (K8); the original is untouched.</summary>
+    public const string ReplacedPreviousPrefix = "the earlier result of this original went to the Recycle Bin: ";
 
     /// <summary>Start of messages saying that something could not be put back (the user has to look).</summary>
     public const string RestoreFailedPrefix = "RESTORE FAILED: ";
@@ -501,14 +554,16 @@ public sealed class FileProcessor(
         ProcessResult? result = null;
         if (plan.Method == WriteMethod.Remux)
         {
-            result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary), progress, cancellationToken);
+            using var chapters = ChaptersFile.For(plan.Target);
+            result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path), progress, cancellationToken);
         }
         else
         {
             await CopyAsync(source, temporary, progress, cancellationToken);
             if (plan.Method == WriteMethod.HeaderEdit)
             {
-                result = await RunAsync(MkvToolNixTool.MkvPropEdit, MkvToolNixArguments.HeaderEdit(plan.Target, temporary), null, cancellationToken);
+                using var chapters = ChaptersFile.For(plan.Target);
+                result = await RunAsync(MkvToolNixTool.MkvPropEdit, MkvToolNixArguments.HeaderEdit(plan.Target, temporary, chapters.Path), null, cancellationToken);
             }
         }
 
@@ -534,7 +589,12 @@ public sealed class FileProcessor(
     /// <summary>Edits a header in place (never interrupted) and verifies it; throws <see cref="EditFailedException"/>.</summary>
     private async Task<IReadOnlyList<string>> EditVerifiedAsync(EditPlan plan, string path)
     {
-        var result = await RunAsync(MkvToolNixTool.MkvPropEdit, MkvToolNixArguments.HeaderEdit(plan.Target, path), null, CancellationToken.None);
+        ProcessResult result;
+        using (var chapters = ChaptersFile.For(plan.Target))
+        {
+            result = await RunAsync(MkvToolNixTool.MkvPropEdit, MkvToolNixArguments.HeaderEdit(plan.Target, path, chapters.Path), null, CancellationToken.None);
+        }
+
         var messages = ToolMessages(result).ToList();
         if (result.ExitCode is not (0 or 1))
         {
@@ -610,7 +670,7 @@ public sealed class FileProcessor(
                 }
             }
 
-            messages.Add("the earlier result of this original went to the Recycle Bin: " + Path.GetFileName(previous));
+            messages.Add(ReplacedPreviousPrefix + Path.GetFileName(previous));
             return result with { OutputPath = lower, Messages = messages };
         }
         catch (Exception ex) when (IsFileError(ex))
@@ -713,7 +773,8 @@ public sealed class FileProcessor(
         (record with { FilePath = newPath, MovedFrom = movedFrom }).Save(undoPath);
     }
 
-    private async Task<string> SaveUndoRecordAsync(MediaFile file, string filePath, string? movedFrom, bool headerChanged, CancellationToken cancellationToken)
+    private async Task<string> SaveUndoRecordAsync(
+        MediaFile file, string filePath, string? movedFrom, bool headerChanged, bool chaptersChanged, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(journalDirectory);
         var id = $"{DateTime.UtcNow:yyyyMMdd-HHmmssfff}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4))}";
@@ -728,9 +789,23 @@ public sealed class FileProcessor(
             }
         }
 
+        string? chaptersPath = null;
+        if (file.HasChapters && headerChanged && chaptersChanged)
+        {
+            chaptersPath = Path.Combine(journalDirectory, id + ".chapters.xml");
+            var extract = await RunAsync(MkvToolNixTool.MkvExtract, [file.Path, "chapters", chaptersPath], null, cancellationToken);
+            if (extract.ExitCode is not (0 or 1) || !File.Exists(chaptersPath))
+            {
+                TryDelete(tagsPath);
+                throw new MkvToolNixException($"The chapters of '{file.Path}' could not be saved for undo: {Detail(extract)}");
+            }
+        }
+
         var record = new UndoRecord
         {
             FilePath = filePath,
+            ChaptersSaved = headerChanged && chaptersChanged,
+            ChaptersXmlPath = chaptersPath,
             MovedFrom = movedFrom,
             HeaderChanged = headerChanged,
             TagsXmlPath = tagsPath,
@@ -750,7 +825,9 @@ public sealed class FileProcessor(
     {
         try
         {
-            TryDelete(UndoRecord.Load(undoPath).TagsXmlPath);
+            var record = UndoRecord.Load(undoPath);
+            TryDelete(record.TagsXmlPath);
+            TryDelete(record.ChaptersXmlPath);
         }
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
@@ -878,5 +955,43 @@ public sealed class FileProcessor(
     private sealed class EditFailedException(IReadOnlyList<string> messages) : Exception(string.Join("; ", messages))
     {
         public IReadOnlyList<string> Messages { get; } = messages;
+    }
+}
+
+/// <summary>The target's new chapters as a temporary XML file for mkvpropedit / mkvmerge; deleted on dispose.</summary>
+internal sealed class ChaptersFile : IDisposable
+{
+    private ChaptersFile(string? path) => Path = path;
+
+    /// <summary>Null when the target keeps its chapters or removes all of them.</summary>
+    public string? Path { get; }
+
+    public static ChaptersFile For(TargetState target)
+    {
+        if (target.NewChapters is not { Count: > 0 } chapters)
+        {
+            return new ChaptersFile(null);
+        }
+
+        var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "UNIVERSUM");
+        Directory.CreateDirectory(directory);
+        var path = System.IO.Path.Combine(directory, $"chapters-{Guid.NewGuid():N}.xml");
+        File.WriteAllText(path, Universum.Core.Chapters.ChapterFormats.WriteXml(chapters), new System.Text.UTF8Encoding(false));
+        return new ChaptersFile(path);
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Path is not null)
+            {
+                File.Delete(Path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // a left-over temporary file is harmless
+        }
     }
 }

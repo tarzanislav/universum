@@ -18,12 +18,15 @@ public static class MuxRules
     }
 
     /// <summary>The Check panel's findings; track IDs are positions in <paramref name="tracks"/>.</summary>
-    public static IReadOnlyList<CheckFinding> Check(IReadOnlyList<MuxSource> sources, IReadOnlyList<MuxTrack> tracks, RuleProfile? profile = null)
+    public static IReadOnlyList<CheckFinding> Check(IReadOnlyList<MuxSource> sources, IReadOnlyList<MuxTrack> tracks, RuleProfile? profile = null) =>
+        TargetChecks.Review(Target(sources, tracks), profile);
+
+    /// <summary>The output as one target state (languages, quality, codec: the name in the library).</summary>
+    public static TargetState Target(IReadOnlyList<MuxSource> sources, IReadOnlyList<MuxTrack> tracks)
     {
         var (file, _) = Combined(sources, tracks);
         var keepsTags = sources.Any(s => s.KeepTags && s.File.HasTags);
-        var target = ManualTarget.Create(file, file.Tracks.Select(t => new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList(), removeTags: !keepsTags);
-        return TargetChecks.Review(target, profile);
+        return ManualTarget.Create(file, file.Tracks.Select(t => new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList(), removeTags: !keepsTags);
     }
 
     /// <summary>One file made of the chosen tracks: ID = position, values = the ones chosen so far.</summary>

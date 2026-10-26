@@ -251,11 +251,15 @@ public sealed class AppSettings
         try
         {
             var path = Path.Combine(Directory, "settings.json");
-            return File.Exists(path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new() : new();
+            var settings = File.Exists(path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new() : new();
+
+            // originals are always kept until the program is proven in practice (owner's decision, 26 October 2026)
+            settings.OriginalHandling = Universum.Core.Execution.OriginalHandling.Keep;
+            return settings;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
-            return new();
+            return new() { OriginalHandling = Universum.Core.Execution.OriginalHandling.Keep };
         }
     }
 

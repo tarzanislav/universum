@@ -32,6 +32,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private bool _ranSinceAnalysis;
     private CancellationTokenSource? _tmdbCancellation;
     private IReadOnlyList<BatchItem> _items = [];
+    private bool _needsAnalysis;
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
     private BatchTemplate _template = BatchTemplate.RulesOnly;
@@ -56,7 +57,7 @@ public sealed class BatchPageViewModel : ObservableObject
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
         SaveTemplateCommand = new RelayCommand(SaveTemplate, () => !Busy && Template.Slots.Count > 0);
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
-        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
+        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
         StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
@@ -75,6 +76,15 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged(nameof(OutputDescription));
             if (_analysis is not null && _services.Library is { } layout)
             {
+                // files of the analysis that now lie in the library must be left out: the folder is analysed again first
+                if (_analysis.Groups.SelectMany(g => g.Files).Any(f => layout.Contains(f.Path)))
+                {
+                    _needsAnalysis = true;
+                    Summary = "Výstupný priečinok obsahuje analyzované súbory – analyzujte priečinok znova (súbory v knižnici sa vynechajú).";
+                    RunCommand.NotifyCanExecuteChanged();
+                    return;
+                }
+
                 _library = LibraryJob.Guess(layout, _analysis);
                 OnLibraryChanged();
             }
@@ -322,6 +332,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
             _interrupted = _services.Library?.FindInterrupted() ?? Array.Empty<string>();
             _ranSinceAnalysis = false;
+            _needsAnalysis = false;
             TrySave(inspector);
             Groups.Clear();
             foreach (var group in _analysis.Groups)

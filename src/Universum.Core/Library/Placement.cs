@@ -20,8 +20,11 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     /// </summary>
     public string? FixedName { get; init; }
 
-    /// <summary>The file at <paramref name="path"/> is edited where it is and keeps its name.</summary>
-    public static Placement InPlace(string path)
+    /// <summary>
+    /// The file at <paramref name="path"/> is edited where it is and keeps its name. Internal: originals are never
+    /// edited (owner's decision); kept for tests and a possible later, explicitly agreed use.
+    /// </summary>
+    internal static Placement InPlace(string path)
     {
         var full = System.IO.Path.GetFullPath(path);
         return new Placement(System.IO.Path.GetDirectoryName(full)!, System.IO.Path.GetFileNameWithoutExtension(full), "", new SizeClasses(), System.IO.Path.GetExtension(full))
@@ -34,7 +37,7 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     /// A new file next to <paramref name="path"/> named "name (upravené).mkv" (then "name (upravené) (2).mkv" …): the
     /// original is not touched (header editor with "keep originals").
     /// </summary>
-    public static Placement Beside(string path, string suffix = " (upravené)")
+    internal static Placement Beside(string path, string suffix = " (upravené)")
     {
         var full = System.IO.Path.GetFullPath(path);
         var prefix = System.IO.Path.GetFileNameWithoutExtension(full) + suffix;
@@ -81,6 +84,31 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// True when <paramref name="fileName"/> is a name the library gives a result of this title (or episode), whatever
+    /// its stream description: "{Prefix} - … {size}{n}.mkv". Files with other names in the folder (an existing
+    /// collection, originals put there by hand) are never treated as library results.
+    /// </summary>
+    public bool IsLibraryName(string fileName)
+    {
+        if (FixedName is not null)
+        {
+            return string.Equals(fileName, FixedName, Paths.Comparison);
+        }
+
+        var start = Prefix + " - ";
+        if (fileName.Length < start.Length + Extension.Length ||
+            !fileName.StartsWith(start, StringComparison.OrdinalIgnoreCase) || !fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // the name ends with a size class and maybe a version number: "… BIG", "… BluRay BIG2"
+        var rest = fileName[start.Length..^Extension.Length].TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+        return SizeClasses.AllLabels.Any(label =>
+            rest.EndsWith(label, StringComparison.OrdinalIgnoreCase) && (rest.Length == label.Length || rest[^(label.Length + 1)] == ' '));
     }
 
     /// <summary>

@@ -12,6 +12,7 @@ public enum ChangeKind
     Index,
     Tags,
     Title,
+    Chapters,
 }
 
 /// <summary>One visible difference between the file and the target, for previews and reports.</summary>

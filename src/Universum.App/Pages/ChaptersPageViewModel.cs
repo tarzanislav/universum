@@ -4,6 +4,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Chapters;
+using Universum.Core.Execution;
+using Universum.Core.Planning;
+using Universum.Core.Rules;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
@@ -68,6 +71,8 @@ public sealed class ChaptersPageViewModel : ObservableObject
     public ChaptersPageViewModel(AppServices services)
     {
         _services = services;
+        Library = new LibraryTargetPicker(services, Target);
+        Library.Changed += RefreshCommands;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !_busy);
         AddCommand = new RelayCommand(Add, CanEdit);
         RemoveCommand = new RelayCommand(Remove, () => CanEdit() && _selected is not null);
@@ -77,7 +82,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         ShiftCommand = new RelayCommand(ShiftAll, () => CanEdit() && Rows.Count > 0);
         ImportCommand = new RelayCommand(Import, CanEdit);
         ResetCommand = new AsyncRelayCommand(() => ReadAsync(_file!.Path), () => !_busy && _file is not null);
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanEdit() && _dirty && Problems.Length == 0);
+        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanEdit() && _dirty && Problems.Length == 0 && Library.Placement is not null);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !_busy && _undoRecord is not null);
     }
 
@@ -123,11 +128,19 @@ public sealed class ChaptersPageViewModel : ObservableObject
 
     public string? FilePath => _file?.Path;
 
+    /// <summary>Where the result goes in the library (title, episode, name by the rules); the original is never changed.</summary>
+    public LibraryTargetPicker Library { get; }
+
+    /// <summary>The file with the chapters of the list (tracks unchanged); null without a file.</summary>
+    public TargetState? Target() =>
+        _file is null ? null : ManualTarget.Create(_file, ManualTarget.AsIs(_file)) with { NewChapters = Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList() };
+
     public async Task LoadAsync(string path)
     {
         _undoRecord = null;
         Result = "";
         await ReadAsync(path);
+        Library.Guess(path);
     }
 
     /// <summary>Chapters every <see cref="Interval"/> minutes over the whole file (replacing the list).</summary>
@@ -218,6 +231,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         var problems = Rows.Where(r => !r.IsValid).Select(r => $"Kapitola {r.Number}: čas „{r.Start}“ nie je v tvare HH:MM:SS.mmm.").ToList();
         problems.AddRange(ChapterChecks.Problems(Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList(), _file?.Duration));
         Problems = string.Join("\n", problems);
+        Library?.Update();
         RefreshCommands();
     }
 
@@ -306,9 +320,10 @@ public sealed class ChaptersPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>Writes a copy with the new chapters into the library (named by the rules); the original stays as it is.</summary>
     private async Task SaveAsync()
     {
-        if (_file is null || _services.CurrentMkvToolNix is not { } installation)
+        if (Target() is not { } target || _services.CurrentMkvToolNix is not { } installation || Library.Placement is not { } placement)
         {
             return;
         }
@@ -317,24 +332,26 @@ public sealed class ChaptersPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            var chapters = Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList();
-            var result = await Editor(installation).SaveAsync(_file.Path, chapters);
-            _services.Inspector(installation).Invalidate(_file.Path);
-            if (result.Saved)
+            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(target), placement, new OutputOptions(OriginalHandling.Keep));
+            _services.Inspector(installation).Invalidate(target.Source.Path);
+            var count = Count(target.NewChapters!.Count);
+            switch (result.Status)
             {
-                _undoRecord = result.UndoRecordPath;
-                await ReadAsync(_file.Path);
-                Result = chapters.Count == 0 ? "Kapitoly sú odstránené. Dá sa to vrátiť späť." : $"Uložené: {Count(chapters.Count)}. Dá sa to vrátiť späť.";
+                case ProcessingStatus.Done:
+                    _undoRecord = result.UndoRecordPath;
+                    await ReadAsync(result.OutputPath!);
+                    Result = $"Uložené do knižnice ({count}): {LibraryPath(result.OutputPath)}." +
+                             (_undoRecord is null ? " Originál ostal nezmenený." : " Zmenu súboru v knižnici je možné vrátiť späť.");
+                    break;
+                case ProcessingStatus.AlreadyInLibrary:
+                    Result = $"Rovnaký výsledok už v knižnici je: {LibraryPath(result.OutputPath)}. Nič sa nezapísalo.";
+                    break;
+                default:
+                    Result = (FileProcessor.NeedsAttention(result)
+                        ? "POZOR: nepodarilo sa a súbor v knižnici sa nepodarilo úplne vrátiť – záznam: " + result.UndoRecordPath
+                        : "Nepodarilo sa – nič sa nezmenilo.") + "\n" + string.Join("\n", result.Messages);
+                    break;
             }
-            else
-            {
-                Result = "Nepodarilo sa – " + (result.UndoRecordPath is null ? "kapitoly v súbore ostali pôvodné" : "POZOR: pôvodné kapitoly sa nepodarilo vrátiť, záznam: " + result.UndoRecordPath) +
-                         ".\n" + string.Join("\n", result.Messages);
-            }
-        }
-        catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException)
-        {
-            Result = "Nepodarilo sa: " + ex.Message;
         }
         finally
         {
@@ -343,6 +360,10 @@ public sealed class ChaptersPageViewModel : ObservableObject
         }
     }
 
+    private string LibraryPath(string? path) =>
+        path is null ? "" : _services.Library is { } layout && layout.Contains(path) ? Path.GetRelativePath(layout.Root, path) : path;
+
+    /// <summary>Puts back the chapters of a library file that was edited in place.</summary>
     private async Task UndoAsync()
     {
         if (_undoRecord is null || _services.CurrentMkvToolNix is not { } installation || _file is null)
@@ -351,7 +372,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         }
 
         var path = _file.Path;
-        var problems = await Editor(installation).UndoAsync(_undoRecord);
+        var problems = await _services.Processor(installation).UndoAsync(_undoRecord);
         _services.Inspector(installation).Invalidate(path);
         if (problems.Count == 0)
         {

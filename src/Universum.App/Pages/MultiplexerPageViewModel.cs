@@ -25,8 +25,6 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private MuxInputRow? _selectedInput;
     private MuxTrackRow? _selectedTrack;
     private string? _selectedAttachment;
-    private string _outputPath = "";
-    private bool _outputChosen;
     private string _title = "";
     private string _chaptersFile = "";
     private string _problems = "";
@@ -36,13 +34,14 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     public MultiplexerPageViewModel(AppServices services)
     {
         _services = services;
+        Library = new LibraryTargetPicker(services, LibraryTarget);
+        Library.Changed += RefreshCommands;
         AddFilesCommand = new AsyncRelayCommand(AddFilesAsync);
         RemoveInputCommand = new RelayCommand(RemoveInput, () => _selectedInput is not null);
         ClearCommand = new RelayCommand(Clear, () => Inputs.Count > 0);
         MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
         MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
         ApplyRulesCommand = new RelayCommand(ApplyRules, () => Tracks.Any(t => t.Include));
-        ChooseOutputCommand = new RelayCommand(ChooseOutput, () => Inputs.Count > 0);
         ChooseChaptersCommand = new RelayCommand(ChooseChapters);
         ClearChaptersCommand = new RelayCommand(() => ChaptersFile = "", () => ChaptersFile.Length > 0);
         AddAttachmentCommand = new RelayCommand(AddAttachments);
@@ -64,7 +63,8 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     public RelayCommand ApplyRulesCommand { get; }
 
-    public RelayCommand ChooseOutputCommand { get; }
+    /// <summary>Where the output goes in the library (title, episode, name by the rules).</summary>
+    public LibraryTargetPicker Library { get; }
 
     public RelayCommand ChooseChaptersCommand { get; }
 
@@ -97,19 +97,6 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     public string? SelectedAttachment { get => _selectedAttachment; set { if (SetProperty(ref _selectedAttachment, value)) { RefreshCommands(); } } }
 
-    public string OutputPath
-    {
-        get => _outputPath;
-        set
-        {
-            if (SetProperty(ref _outputPath, value))
-            {
-                _outputChosen = true;
-                Recalculate();
-            }
-        }
-    }
-
     public string Title { get => _title; set { if (SetProperty(ref _title, value)) { Recalculate(); } } }
 
     public string ChaptersFile { get => _chaptersFile; set { if (SetProperty(ref _chaptersFile, value)) { Recalculate(); } } }
@@ -128,8 +115,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     {
         var sources = Inputs.Select(i => i.ToSource()).ToList();
         var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
-        return new MuxSpec(sources, tracks, OutputPath)
+        return new MuxSpec(sources, tracks, "")
         {
+            Placement = Library.Placement,
             Title = Title.Length == 0 ? null : Title,
             ChaptersFile = ChaptersFile.Length == 0 ? null : ChaptersFile,
             Attachments = Attachments.Select(a => new MuxAttachment(a)).ToList(),
@@ -172,10 +160,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             }
         }
 
-        if (!_outputChosen && Inputs.Count > 0)
+        if (Library.TitleText.Length == 0 && Inputs.Count > 0)
         {
-            _outputPath = SuggestOutput(Inputs[0].File.Path);
-            OnPropertyChanged(nameof(OutputPath));
+            Library.Guess(Inputs[0].File.Path);
         }
 
         if (Title.Length == 0 && Inputs.FirstOrDefault()?.File.Title is { Length: > 0 } title)
@@ -231,19 +218,6 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             : "Pravidlá UNIVERSUM sú použité – skontrolujte a spustite.";
     }
 
-    private static string SuggestOutput(string firstInput)
-    {
-        var folder = Path.GetDirectoryName(Path.GetFullPath(firstInput))!;
-        var name = Path.GetFileNameWithoutExtension(firstInput);
-        var candidate = Path.Combine(folder, name + ".mkv");
-        for (var number = 1; File.Exists(candidate) || Universum.Core.IO.Paths.Same(candidate, firstInput); number++)
-        {
-            candidate = Path.Combine(folder, $"{name} (zlúčené{(number > 1 ? " " + number : "")}).mkv");
-        }
-
-        return candidate;
-    }
-
     private void Recalculate()
     {
         if (_loading)
@@ -257,6 +231,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             track.Position = track.Include ? position++ : 0;
         }
 
+        Library?.Update();
         Findings.Clear();
         var spec = Spec();
         if (spec.Tracks.Count > 0)
@@ -267,7 +242,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             }
         }
 
-        Problems = Inputs.Count == 0 ? "" : string.Join("\n", spec.Validate());
+        Problems = Inputs.Count == 0 ? "" : string.Join("\n", spec.Validate().Append(Library!.Placement is null ? Library.Description : "").Where(p => p.Length > 0));
         OnPropertyChanged(nameof(HasFindings));
         OnPropertyChanged(nameof(Summary));
         RefreshCommands();
@@ -320,7 +295,14 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         Recalculate();
     }
 
-    private bool CanWrite() => Inputs.Count > 0 && Spec().Validate().Count == 0;
+    private bool CanWrite() => Inputs.Count > 0 && Library.Placement is not null && Spec().Validate().Count == 0;
+
+    /// <summary>The output as one target state (its tracks give the name in the library); null with no track taken.</summary>
+    private TargetState? LibraryTarget()
+    {
+        var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
+        return tracks.Count == 0 ? null : MuxRules.Target(Inputs.Select(i => i.ToSource()).ToList(), tracks);
+    }
 
     private void Enqueue(bool start)
     {
@@ -330,7 +312,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             return;
         }
 
-        var job = new MuxJob($"Zlučovanie: {Path.GetFileName(spec.OutputPath)}", new Multiplexer(installation, _services.Runner), spec);
+        var job = new MuxJob($"Zlučovanie: {Path.GetFileName(spec.Placement?.Directory ?? "")} ({spec.Tracks.Count} stôp)", new Multiplexer(installation, _services.Runner), spec);
         job.Changed += changed =>
         {
             if (changed.IsFinished)
@@ -391,30 +373,13 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         Tracks.Clear();
         Inputs.Clear();
         Attachments.Clear();
-        _outputChosen = false;
-        _outputPath = "";
+        Library.TitleText = "";
         _title = "";
         _chaptersFile = "";
-        OnPropertyChanged(nameof(OutputPath));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(ChaptersFile));
         Result = "";
         Recalculate();
-    }
-
-    private void ChooseOutput()
-    {
-        var dialog = new SaveFileDialog
-        {
-            Filter = "Matroska (*.mkv)|*.mkv|Matroska zvuk (*.mka)|*.mka|WebM (*.webm)|*.webm",
-            FileName = Path.GetFileName(OutputPath),
-            InitialDirectory = Path.GetDirectoryName(OutputPath),
-            OverwritePrompt = false,
-        };
-        if (dialog.ShowDialog() == true)
-        {
-            OutputPath = dialog.FileName;
-        }
     }
 
     private void ChooseChapters()
@@ -445,7 +410,6 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         MoveUpCommand.NotifyCanExecuteChanged();
         MoveDownCommand.NotifyCanExecuteChanged();
         ApplyRulesCommand.NotifyCanExecuteChanged();
-        ChooseOutputCommand.NotifyCanExecuteChanged();
         ClearChaptersCommand?.NotifyCanExecuteChanged();
         RemoveAttachmentCommand?.NotifyCanExecuteChanged();
         StartCommand?.NotifyCanExecuteChanged();

@@ -8,7 +8,8 @@ namespace Universum.Core.MkvToolNix;
 public static class MkvToolNixArguments
 {
     /// <summary>mkvpropedit arguments that change the header in place (track order must not change).</summary>
-    public static IReadOnlyList<string> HeaderEdit(TargetState target, string filePath)
+    /// <param name="chaptersXml">Chapter file written from <see cref="TargetState.NewChapters"/> (null = none, chapters removed).</param>
+    public static IReadOnlyList<string> HeaderEdit(TargetState target, string filePath, string? chaptersXml = null)
     {
         if (target.NeedsRewrite)
         {
@@ -19,6 +20,11 @@ public static class MkvToolNixArguments
         if (target.TagsChanged)
         {
             arguments.AddRange(["--tags", "all:"]);
+        }
+
+        if (target.ChaptersChanged)
+        {
+            arguments.AddRange(["--chapters", chaptersXml ?? ""]);
         }
 
         if (target.TitleChanged)
@@ -55,7 +61,8 @@ public static class MkvToolNixArguments
     }
 
     /// <summary>mkvmerge arguments that write the target state to a new file (track order may change).</summary>
-    public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath)
+    /// <param name="chaptersXml">Chapter file written from <see cref="TargetState.NewChapters"/> (null = none).</param>
+    public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath, string? chaptersXml = null)
     {
         var arguments = new List<string> { "--gui-mode", "--output", outputPath };
         if (target.TitleChanged)
@@ -88,7 +95,18 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--forced-display-flag", $"{id}:{Bit(track.Flags.Forced)}"]);
         }
 
+        if (target.ChaptersChanged)
+        {
+            // the file's own chapters are left out; the new ones come from the chapter file
+            arguments.Add("--no-chapters");
+        }
+
         arguments.Add(sourcePath);
+        if (target.ChaptersChanged && chaptersXml is not null)
+        {
+            arguments.AddRange(["--chapters", chaptersXml]);
+        }
+
         arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => "0:" + t.TrackId.ToString(CultureInfo.InvariantCulture)))]);
         return arguments;
     }

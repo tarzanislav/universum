@@ -36,7 +36,7 @@ public static class TargetVerifier
         }
 
         Check(problems, !target.RepairIndex || result.TracksOf(TrackType.Video).All(v => v.IndexEntries is null or > 0), "video index still missing");
-        Check(problems, result.ChapterEntries == source.ChapterEntries, $"chapters {result.ChapterEntries}, expected {source.ChapterEntries}");
+        Check(problems, result.ChapterEntries == target.ResultChapterEntries, $"chapters {result.ChapterEntries}, expected {target.ResultChapterEntries}");
         Check(problems, result.AttachmentCount == source.AttachmentCount, $"attachments {result.AttachmentCount}, expected {source.AttachmentCount}");
         Check(problems, !target.RemoveTags || !result.HasTags, "tags are still present");
         Check(problems, !target.TitleChanged || (result.Title ?? "") == (target.ResultTitle ?? ""), $"title '{result.Title}', expected '{target.ResultTitle}'");

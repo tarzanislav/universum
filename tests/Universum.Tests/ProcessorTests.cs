@@ -1,4 +1,5 @@
 using Universum.Core.Execution;
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -370,6 +371,150 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task NewChaptersGoIntoTheLibraryCopyAndUndoInTheLibraryRestoresThem()
+    {
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var chaptersReader = new Universum.Core.Chapters.ChapterEditor(installation, new ProcessRunner(), Path.Combine(work.Path, "journal-ch"));
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var bytes = await System.IO.File.ReadAllBytesAsync(original);
+        var source = await inspector.InspectAsync(original);
+        var czech = LanguageTag.FromCode("cs");
+        var chapters = new List<Universum.Core.Chapters.Chapter> { new(TimeSpan.Zero, "Začiatok", czech), new(TimeSpan.FromMilliseconds(800), "Stred", czech), new(TimeSpan.FromSeconds(1.5), "Koniec", czech) };
+
+        // header only (tracks as they are) + new chapters: a copy in the library, the original untouched
+        var plan = EditPlan.For(ManualTarget.Create(source, ManualTarget.AsIs(source)) with { NewChapters = chapters });
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method, "chapters alone: header edit");
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var now = await System.IO.File.ReadAllBytesAsync(original);
+        Assert.True(bytes.SequenceEqual(now), "original untouched");
+        Assert.Sequence(["Začiatok", "Stred", "Koniec"], (await chaptersReader.ReadAsync(result.OutputPath!)).Chapters.Select(c => c.Name), "chapters in the library copy");
+
+        // the library file edited again in place: undo brings its chapters back
+        var inLibrary = await inspector.InspectAsync(result.OutputPath!);
+        var again = EditPlan.For(ManualTarget.Create(inLibrary, ManualTarget.AsIs(inLibrary)) with { NewChapters = [] });
+        var edited = await processor.ProcessAsync(again, work.Movie(again), Keep);
+        Assert.True(edited.Status == ProcessingStatus.Done && edited.UndoRecordPath is not null, string.Join("; ", edited.Messages));
+        Assert.Equal(0, (await inspector.InspectAsync(edited.OutputPath!)).ChapterEntries, "chapters removed");
+        Assert.Equal(0, (await processor.UndoAsync(edited.UndoRecordPath!)).Count, "undo");
+        Assert.Equal(3, (await chaptersReader.ReadAsync(edited.OutputPath!)).Chapters.Count, "chapters back");
+
+        // the library index follows the result through edit and undo: it is still a result and is edited where it is
+        Assert.True(new LibraryIndex(Path.Combine(work.Path, "library-index.json")).IsResult(edited.OutputPath!), "still recorded as a result");
+        var restored = await inspector.InspectAsync(edited.OutputPath!);
+        var third = await processor.ProcessAsync(EditPlan.For(ManualTarget.Create(restored, ManualTarget.AsIs(restored)) with { NewChapters = [] }), work.Movie(again), Keep);
+        Assert.True(third.Status == ProcessingStatus.Done && third.UndoRecordPath is not null && Paths.Same(third.OutputPath!, edited.OutputPath!), "edited in the library again: " + string.Join("; ", third.Messages));
+        Assert.Equal(0, (await processor.UndoAsync(third.UndoRecordPath!)).Count, "undo again");
+
+        // a new order and new chapters: mkvmerge takes the chapters from the file
+        var reorder = ManualTarget.AsIs(source).ToList();
+        (reorder[1], reorder[2]) = (reorder[2], reorder[1]);
+        var remux = EditPlan.For(ManualTarget.Create(source, reorder) with { NewChapters = chapters.Take(1).ToList() });
+        Assert.Equal(WriteMethod.Remux, remux.Method);
+        var written = await processor.ProcessAsync(remux, work.Movie(remux), Keep);
+        Assert.Equal(ProcessingStatus.Done, written.Status, string.Join("; ", written.Messages));
+        Assert.Sequence(["Začiatok"], (await chaptersReader.ReadAsync(written.OutputPath!)).Chapters.Select(c => c.Name), "only the new chapters");
+    }
+
+    [Test]
+    public async Task ResultChangedOutsideUniversumCountsAsAnOriginal()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var source = await inspector.InspectAsync(original);
+        var first = await processor.ProcessAsync(EditPlan.For(ManualTarget.Create(source, ManualTarget.AsIs(source), title: "Prvý")), work.Movie(EditPlan.For(ManualTarget.Create(source, ManualTarget.AsIs(source)))), Keep);
+        Assert.Equal(ProcessingStatus.Done, first.Status, string.Join("; ", first.Messages));
+        var result = first.OutputPath!;
+
+        // edited in the library with undo, then the file is touched by another program: undo refuses
+        var inLibrary = await inspector.InspectAsync(result);
+        var edit = EditPlan.For(ManualTarget.Create(inLibrary, ManualTarget.AsIs(inLibrary), title: "Druhý"));
+        var edited = await processor.ProcessAsync(edit, work.Movie(edit), Keep);
+        Assert.True(edited.Status == ProcessingStatus.Done && edited.UndoRecordPath is not null, "edited in place: " + string.Join("; ", edited.Messages));
+        System.IO.File.SetLastWriteTimeUtc(edited.OutputPath!, System.IO.File.GetLastWriteTimeUtc(edited.OutputPath!).AddHours(1));
+        var bytes = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True((await processor.UndoAsync(edited.UndoRecordPath!)).Any(p => p.Contains("has changed since", StringComparison.Ordinal)), "undo refused");
+        var afterUndo = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True(bytes.SequenceEqual(afterUndo), "nothing restored");
+
+        // and it is no longer reworked where it is: the next edit writes a new file, the changed one stays as it is
+        var changed = await inspector.InspectAsync(edited.OutputPath!);
+        var again = EditPlan.For(ManualTarget.Create(changed, ManualTarget.AsIs(changed), title: "Tretí"));
+        var third = await processor.ProcessAsync(again, work.Movie(again), Keep);
+        Assert.Equal(ProcessingStatus.Done, third.Status, string.Join("; ", third.Messages));
+        Assert.True(third.UndoRecordPath is null && !Paths.Same(third.OutputPath!, edited.OutputPath!), "a new file");
+        var afterThird = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True(bytes.SequenceEqual(afterThird), "the changed file untouched");
+        Assert.Equal(0, bin.Recycled.Count, "nothing in the Recycle Bin");
+    }
+
+    [Test]
+    public async Task OriginalLyingInItsTitleFolderIsOnlyRead()
+    {
+        // an existing collection: originals already sit in MOVIES\Vymyslený film (2026)\ under their own names
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var folder = work.InMovies("Vymyslený film (2026)");
+        Directory.CreateDirectory(folder);
+        // also names that look like library names (Jellyfin's own naming of versions)
+        // first an original lying exactly where its result would go
+        var cases = new (string File, Func<MediaFile, TargetState> Target, WriteMethod Method)[]
+        {
+            ("Vymyslený film (2026) - CZ SD H264 SMALL.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
+            ("Vymysleny.Film.2026.cz.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
+            ("Vymysleny.Film.2026.header.mkv", f => ManualTarget.Create(f, ManualTarget.AsIs(f), title: "Iný názov"), WriteMethod.HeaderEdit),
+            ("Vymysleny.Film.2026.remux.mkv", f => UniversumRules.Apply(f, decisions: CzechDub), WriteMethod.Remux),
+            ("Vymyslený film (2026) - 1080p BluRay.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
+            ("Vymyslený film (2026) - Bluray.mkv", f => ManualTarget.Create(f, ManualTarget.AsIs(f), title: "Iný názov 2"), WriteMethod.HeaderEdit),
+            ("Vymyslený film (2026) - Think Big.mkv", f => UniversumRules.Apply(f, decisions: CzechDub) with { NewTitle = "Iný 3" }, WriteMethod.Remux),
+        };
+        var sources = new[] { "cz-only.mkv", "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv", "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv" };
+        for (var i = 0; i < cases.Length; i++)
+        {
+            var original = Path.Combine(folder, cases[i].File);
+            System.IO.File.Copy(TestData.Media(sources[i]), original);
+            var bytes = await System.IO.File.ReadAllBytesAsync(original);
+            var plan = EditPlan.For(cases[i].Target(await inspector.InspectAsync(original)));
+            Assert.Equal(cases[i].Method, plan.Method, cases[i].File);
+            var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+            Assert.True(result.Status is ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary, $"{cases[i].File}: {result.Status} {string.Join("; ", result.Messages)}");
+            var now = await System.IO.File.ReadAllBytesAsync(original);
+            Assert.True(bytes.SequenceEqual(now), $"{cases[i].File}: the original is still there, unchanged");
+            Assert.True(result.UndoRecordPath is null && !Paths.Same(result.OutputPath!, original), $"{cases[i].File}: a new file, no in-place edit");
+        }
+
+        // results of the same original replace each other (K8); an original never goes to the Recycle Bin
+        Assert.True(bin.Recycled.All(r => !cases.Any(c => r.Contains(Path.GetFileNameWithoutExtension(c.File), StringComparison.Ordinal))), "no original in the Recycle Bin: " + string.Join(", ", bin.Recycled));
+    }
+
+    [Test]
+    public async Task OriginalsAreKeptUnlessDeletingIsAllowed()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var processor = new FileProcessor(installation, new ProcessRunner(), bin, Path.Combine(work.Path, "journal"));
+        var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+        foreach (var name in new[] { "sk-cz-mixed.mkv", "cz-only.mkv" })
+        {
+            var original = work.Copy(name);
+            var bytes = await System.IO.File.ReadAllBytesAsync(original);
+            var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original)));
+            var result = await processor.ProcessAsync(plan, work.Movie(plan), Delete);
+            Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+            var now = await System.IO.File.ReadAllBytesAsync(original);
+            Assert.True(bytes.SequenceEqual(now), $"{name}: original kept and unchanged although 'delete' was asked ({plan.Method})");
+        }
+
+        Assert.Equal(0, bin.Recycled.Count, "nothing in the Recycle Bin");
+    }
+
+    [Test]
     public async Task HeaderEditorKeepingOriginalsWritesANewFileBeside()
     {
         using var work = new WorkFolder();
@@ -398,7 +543,7 @@ public sealed class ProcessorTests
         var installation = await TestData.RequireMkvToolNixAsync();
         runner ??= new ProcessRunner();
         var index = new LibraryIndex(Path.Combine(work.Path, "library-index.json"));
-        return (new FileProcessor(installation, runner, bin ?? new FolderRecycleBin(Path.Combine(work.Path, "bin")), Path.Combine(work.Path, "journal"), index),
+        return (new FileProcessor(installation, runner, bin ?? new FolderRecycleBin(Path.Combine(work.Path, "bin")), Path.Combine(work.Path, "journal"), index) { DeleteOriginalsAllowed = true },
             new MkvMergeInspector(installation, new ProcessRunner()));
     }
 

@@ -244,16 +244,21 @@ internal static class SelfTest
     }
 
     /// <summary>Batch page: three episodes of one structure, a clean file; group decision, series title, run into the library.</summary>
-    /// <summary>Header editor: check panel, edit in place with title, undo, UNIVERSUM rules with one click, moving tracks.</summary>
+    /// <summary>
+    /// Header editor: check panel; the result is a new file in the library named by the rules and the original stays
+    /// byte for byte; a library file edited again can be undone; rules with one click; moving tracks; the queue.
+    /// </summary>
     private static async Task TestHeaderEditorAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
         var copy = Path.Combine(work, "header.mkv");
         File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
+        var originalBytes = File.ReadAllBytes(copy);
         var inspector = new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner);
-        var original = await inspector.InspectAsync(copy);
         var editor = model.HeaderEditor;
         model.SelectedTool = model.Tools.First(t => t.Page == editor);
         await editor.LoadAsync(copy);
+        editor.Library.IsMovie = true;
+        editor.Library.TitleText = "Hlavička test (2026)";
         Check(editor.Rows.Count == 6, $"header editor: 6 tracks ({editor.Rows.Count})");
         Check(editor.Findings.Any(f => f.Contains("neurčený", StringComparison.Ordinal)), "header editor: check panel shows the undetermined language");
         Check(!editor.SaveCommand.CanExecute(null), "header editor: nothing to save yet");
@@ -262,18 +267,27 @@ internal static class SelfTest
         editor.Rows[1].Name = "Originál";
         editor.Title = "Vymyslený film";
         editor.SelectedRow = editor.Rows[2];
-        Check(editor.Method.StartsWith("Zmení sa len hlavička", StringComparison.Ordinal), "header editor: header only – " + editor.Method);
+        Check(editor.Library.Placement is not null && editor.Library.Description.StartsWith(Path.Combine("MOVIES", "Hlavička test (2026)"), StringComparison.Ordinal),
+            "header editor: result goes into the library – " + editor.Library.Description);
         await Screenshot(window, "header-editor.png");
         await editor.SaveCommand.ExecuteAsync(null);
-        Check(editor.Result.StartsWith("Uložené", StringComparison.Ordinal), "header editor: saved – " + editor.Result);
-        var edited = await inspector.InspectAsync(copy);
-        Check(edited.Title == "Vymyslený film" && edited.Tracks[2].Language.Primary == "cs" && edited.Tracks[1].Name == "Originál", "header editor: file edited in place");
+        Check(editor.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal), "header editor: saved – " + editor.Result);
+        Check(File.ReadAllBytes(copy).AsSpan().SequenceEqual(originalBytes), "header editor: original unchanged, byte for byte");
+        var result = editor.FilePath!;
+        var edited = await inspector.InspectAsync(result);
+        Check(services.Library!.Contains(result) && Path.GetFileName(result).StartsWith("Hlavička test (2026) - ", StringComparison.Ordinal),
+            "header editor: new file named by the rules – " + Path.GetFileName(result));
+        Check(edited.Title == "Vymyslený film" && edited.Tracks[2].Language.Primary == "cs" && edited.Tracks[1].Name == "Originál", "header editor: the library file has the changes");
 
+        // the library file edited again: in place, with undo
+        editor.Rows[1].Name = "Druhá úprava";
+        await editor.SaveCommand.ExecuteAsync(null);
+        Check(editor.UndoCommand.CanExecute(null), "header editor: a library file edited again can be undone – " + editor.Result);
         await editor.UndoCommand.ExecuteAsync(null);
-        var restored = await inspector.InspectAsync(copy);
-        Check(restored.Title == original.Title && restored.Tracks[2].Language.IsUndetermined && restored.Tracks[1].Name == original.Tracks[1].Name,
-            "header editor: undo restored title, language and name – " + editor.Result);
+        Check((await inspector.InspectAsync(editor.FilePath!)).Tracks[1].Name == "Originál", "header editor: undo – " + editor.Result);
 
+        await editor.LoadAsync(copy);
+        editor.Library.TitleText = "Hlavička test (2026)";
         editor.Rows[2].Language = editor.Rows[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
         editor.Rows[3].Language = editor.Rows[3].LanguageChoices.First(c => c.Tag.Primary == "cs");
         editor.ApplyRules();
@@ -287,10 +301,10 @@ internal static class SelfTest
         Check(editor.Rows[1].TrackId == 1 && editor.Rows[2].TrackId == 2, "header editor: audio moved among audio");
         Check(editor.Findings.Any(f => f.StartsWith("Poradie zvuku", StringComparison.Ordinal)), "header editor: check panel notices the order");
 
-        // the same change through the job queue: a new file under the same name, output with the job's messages
+        // the same change through the job queue: a new file in the library, output with the job's messages
         editor.QueueCommand.Execute(null);
         Check(editor.Result.StartsWith("Pridané do fronty", StringComparison.Ordinal), "queue: header editor adds a job – " + editor.Result);
-        var job = services.Jobs.Jobs[^1];
+        var job = (Core.Jobs.FileJob)services.Jobs.Jobs[^1];
         for (var i = 0; i < 300 && !job.IsFinished; i++)
         {
             await Task.Delay(100);
@@ -303,8 +317,13 @@ internal static class SelfTest
 
         await Settle();
         Check(job.Status == Core.Jobs.JobStatus.Done, $"queue: job done – {job.Status} {job.Outcome} {string.Join(" | ", job.Messages.Select(m => m.Text))}");
-        var queued = await inspector.InspectAsync(copy);
-        Check(queued.Tracks[1].Language.Primary == "en" && queued.Tracks[2].Language.Primary == "cs", "queue: job wrote the changes");
+        Check(File.ReadAllBytes(copy).AsSpan().SequenceEqual(originalBytes), "queue: original unchanged, byte for byte");
+        if (job.Result?.OutputPath is { } queuedPath)
+        {
+            var queued = await inspector.InspectAsync(queuedPath);
+            Check(services.Library!.Contains(queuedPath) && queued.Tracks[1].Language.Primary == "en" && queued.Tracks[2].Language.Primary == "cs", "queue: job wrote the library file");
+        }
+
         Check(editor.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "queue: editor shows the job's outcome – " + editor.Result);
         model.SelectedTool = model.Tools.First(t => t.Page == model.Queue);
         model.Queue.SelectedRow = model.Queue.Rows.First(r => r.Job == job);
@@ -314,13 +333,11 @@ internal static class SelfTest
         await Screenshot(window, "job-output.png");
     }
 
-    /// <summary>Multiplexer: a film and a subtitle file, a track left out, the rules over both, written as a queue job.</summary>
+    /// <summary>Multiplexer: a film and a subtitle file, a track left out, the rules over both, written into the library as a queue job.</summary>
     private static async Task TestMultiplexerAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
         var srt = Path.Combine(work, "titulky-sk.srt");
         File.WriteAllText(srt, "1\n00:00:00,500 --> 00:00:01,500\nVymyslený slovenský titulok.\n\n");
-        var output = Path.Combine(work, "zlucene.mkv");
-        File.Delete(output);
         var mux = model.Mux;
         model.SelectedTool = model.Tools.First(t => t.Page == mux);
         await mux.AddFilesAsync([Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), srt]);
@@ -331,12 +348,16 @@ internal static class SelfTest
         mux.Tracks[6].Language = Lang(mux.Tracks[6], "sk");
         mux.Tracks[5].Include = false;
         mux.ApplyRules();
+        mux.Library.IsMovie = true;
+        mux.Library.TitleText = "Zlúčený film (2026)";
         Check(mux.Findings.Count == 0, "mux: nothing to check after the rules – " + string.Join(" | ", mux.Findings));
-        mux.OutputPath = output;
         Check(mux.StartCommand.CanExecute(null), "mux: ready to write – " + mux.Problems);
+        Check(mux.Library.Description.StartsWith(Path.Combine("MOVIES", "Zlúčený film (2026)", "Zlúčený film (2026) - CZ EN SK"), StringComparison.Ordinal) ||
+              mux.Library.Description.StartsWith(Path.Combine("MOVIES", "Zlúčený film (2026)", "Zlúčený film (2026) - CZ EN"), StringComparison.Ordinal),
+            "mux: name by the rules – " + mux.Library.Description);
         await Screenshot(window, "mux.png");
         mux.StartCommand.Execute(null);
-        var job = services.Jobs.Jobs[^1];
+        var job = (Core.Jobs.MuxJob)services.Jobs.Jobs[^1];
         for (var i = 0; i < 300 && !job.IsFinished; i++)
         {
             await Task.Delay(100);
@@ -344,37 +365,48 @@ internal static class SelfTest
 
         await Settle();
         Check(job.Status == Core.Jobs.JobStatus.Done, $"mux: job done – {job.Status} {job.Outcome} {string.Join(" | ", job.Messages.Select(m => m.Text))}");
-        if (File.Exists(output))
+        if (job.Result?.OutputPath is { } output)
         {
             var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(output);
-            Check(string.Join(",", written.Tracks.Select(t => t.Language.Primary)) == "und,cs,en,cs,cs,sk",
-                "mux: tracks in the rules' order with the Slovak subtitles from the second file – " + string.Join(",", written.Tracks.Select(t => t.Language.Primary)));
+            Check(services.Library!.Contains(output) && string.Join(",", written.Tracks.Select(t => t.Language.Primary)) == "und,cs,en,cs,cs,sk",
+                "mux: written into the library in the rules' order – " + output + " " + string.Join(",", written.Tracks.Select(t => t.Language.Primary)));
         }
 
         Check(mux.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "mux: page shows the outcome – " + mux.Result);
     }
 
-    /// <summary>Chapter editor: read, rename, add, save (verified), undo, generate.</summary>
+    /// <summary>Chapter editor: read, rename, add; the result is a library copy (original unchanged); a library file edited again can be undone.</summary>
     private static async Task TestChaptersAsync(MainViewModel model, MainWindow window, string work)
     {
         var copy = Path.Combine(work, "kapitoly.mkv");
         File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
+        var originalBytes = File.ReadAllBytes(copy);
         var chapters = model.Chapters;
         model.SelectedTool = model.Tools.First(t => t.Page == chapters);
         await chapters.LoadAsync(copy);
+        chapters.Library.IsMovie = true;
+        chapters.Library.TitleText = "Kapitoly test (2026)";
         Check(chapters.Rows.Count == 2 && chapters.Rows[1].Name == "Koniec", $"chapters: two read ({chapters.Rows.Count}) – {chapters.Summary}");
         chapters.Rows[0].Name = "Začiatok";
         chapters.SelectedRow = chapters.Rows[0];
         chapters.AddCommand.Execute(null);
         chapters.Rows[1].Start = "00:00:01.5";
         chapters.Rows[1].Name = "Polovica";
-        Check(chapters.Problems.Length == 0 && chapters.SaveCommand.CanExecute(null), "chapters: ready to save – " + chapters.Problems);
+        Check(chapters.Problems.Length == 0 && chapters.SaveCommand.CanExecute(null), "chapters: ready to save – " + chapters.Problems + " " + chapters.Library.Description);
         await Screenshot(window, "chapters.png");
         await chapters.SaveCommand.ExecuteAsync(null);
-        Check(chapters.Result.StartsWith("Uložené: 3 kapitoly", StringComparison.Ordinal), "chapters: saved – " + chapters.Result);
-        Check(string.Join("|", chapters.Rows.Select(r => r.Name)) == "Začiatok|Koniec|Polovica", "chapters: read back sorted by time – " + string.Join("|", chapters.Rows.Select(r => r.Name)));
+        Check(chapters.Result.StartsWith("Uložené do knižnice (3 kapitoly)", StringComparison.Ordinal), "chapters: saved – " + chapters.Result);
+        Check(File.ReadAllBytes(copy).AsSpan().SequenceEqual(originalBytes), "chapters: original unchanged, byte for byte");
+        Check(chapters.FilePath != copy && string.Join("|", chapters.Rows.Select(r => r.Name)) == "Začiatok|Koniec|Polovica",
+            "chapters: the library copy has them, sorted by time – " + string.Join("|", chapters.Rows.Select(r => r.Name)));
+
+        chapters.SelectedRow = chapters.Rows[2];
+        chapters.RemoveCommand.Execute(null);
+        await chapters.SaveCommand.ExecuteAsync(null);
+        Check(chapters.Rows.Count == 2 && chapters.UndoCommand.CanExecute(null), "chapters: library file edited again, can be undone – " + chapters.Result);
         await chapters.UndoCommand.ExecuteAsync(null);
-        Check(chapters.Rows.Count == 2 && chapters.Rows[0].Name == "Chapter 01", "chapters: undo – " + chapters.Result);
+        Check(chapters.Rows.Count == 3, "chapters: undo – " + chapters.Result);
+
         chapters.Rows[0].Start = "1:75";
         Check(chapters.Problems.Contains("HH:MM:SS", StringComparison.Ordinal) && !chapters.SaveCommand.CanExecute(null), "chapters: wrong time blocks saving");
         chapters.Interval = "1";

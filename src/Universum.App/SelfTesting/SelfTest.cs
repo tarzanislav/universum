@@ -178,6 +178,8 @@ internal static class SelfTest
         await model.Rules.ApplyCommand.ExecuteAsync(null);
         Check(model.Rules.Result.StartsWith("Rovnaký stream", StringComparison.Ordinal), "rules: the same stream is not written twice – " + model.Rules.Result);
 
+        await TestHeaderEditorAsync(model, window, services, work);
+
         // TMDB key: protected for the Windows account, never stored as plain text
         var secret = UserSecret.Protect("test-key-123");
         Check(UserSecret.Unprotect(secret) == "test-key-123" && !secret.Contains("test-key", StringComparison.Ordinal), "TMDB key protected with DPAPI");
@@ -241,6 +243,50 @@ internal static class SelfTest
     }
 
     /// <summary>Batch page: three episodes of one structure, a clean file; group decision, series title, run into the library.</summary>
+    /// <summary>Header editor: check panel, edit in place with title, undo, UNIVERSUM rules with one click, moving tracks.</summary>
+    private static async Task TestHeaderEditorAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var copy = Path.Combine(work, "header.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
+        var inspector = new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner);
+        var original = await inspector.InspectAsync(copy);
+        var editor = model.HeaderEditor;
+        model.SelectedTool = model.Tools.First(t => t.Page == editor);
+        await editor.LoadAsync(copy);
+        Check(editor.Rows.Count == 6, $"header editor: 6 tracks ({editor.Rows.Count})");
+        Check(editor.Findings.Any(f => f.Contains("neurčený", StringComparison.Ordinal)), "header editor: check panel shows the undetermined language");
+        Check(!editor.SaveCommand.CanExecute(null), "header editor: nothing to save yet");
+
+        editor.Rows[2].Language = editor.Rows[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
+        editor.Rows[1].Name = "Originál";
+        editor.Title = "Vymyslený film";
+        editor.SelectedRow = editor.Rows[2];
+        Check(editor.Method.StartsWith("Zmení sa len hlavička", StringComparison.Ordinal), "header editor: header only – " + editor.Method);
+        await Screenshot(window, "header-editor.png");
+        await editor.SaveCommand.ExecuteAsync(null);
+        Check(editor.Result.StartsWith("Uložené", StringComparison.Ordinal), "header editor: saved – " + editor.Result);
+        var edited = await inspector.InspectAsync(copy);
+        Check(edited.Title == "Vymyslený film" && edited.Tracks[2].Language.Primary == "cs" && edited.Tracks[1].Name == "Originál", "header editor: file edited in place");
+
+        await editor.UndoCommand.ExecuteAsync(null);
+        var restored = await inspector.InspectAsync(copy);
+        Check(restored.Title == original.Title && restored.Tracks[2].Language.IsUndetermined && restored.Tracks[1].Name == original.Tracks[1].Name,
+            "header editor: undo restored title, language and name – " + editor.Result);
+
+        editor.Rows[2].Language = editor.Rows[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
+        editor.Rows[3].Language = editor.Rows[3].LanguageChoices.First(c => c.Tag.Primary == "cs");
+        editor.ApplyRules();
+        Check(editor.Rows[1].TrackId == 2 && editor.Rows[1].IsDefault, "header editor: rules put the Czech audio first, default");
+        Check(editor.Method.StartsWith("Zapíše sa nový súbor", StringComparison.Ordinal), "header editor: new order needs a new file – " + editor.Method);
+        Check(editor.Findings.Count == 0, "header editor: nothing to check after the rules – " + string.Join(" | ", editor.Findings));
+        await Screenshot(window, "header-editor-rules.png");
+        editor.SelectedRow = editor.Rows[1];
+        Check(!editor.MoveUpCommand.CanExecute(null), "header editor: audio cannot move above video");
+        editor.Move(+1);
+        Check(editor.Rows[1].TrackId == 1 && editor.Rows[2].TrackId == 2, "header editor: audio moved among audio");
+        Check(editor.Findings.Any(f => f.StartsWith("Poradie zvuku", StringComparison.Ordinal)), "header editor: check panel notices the order");
+    }
+
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)
     {
         var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media");

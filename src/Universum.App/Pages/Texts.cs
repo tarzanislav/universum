@@ -21,6 +21,11 @@ public static class Texts
         _ => "Iné",
     };
 
+    /// <summary>One line about a file: container, length, tracks, chapters, tags, attachments.</summary>
+    public static string FileSummary(MediaFile file) =>
+        $"{file.ContainerType}, trvanie {file.Duration:hh\\:mm\\:ss}, stopy: {file.Tracks.Count}, kapitoly: {file.ChapterEntries}, " +
+        $"tagy: {file.GlobalTagEntries + file.Tracks.Sum(t => t.TagEntries)}, prílohy: {file.AttachmentCount}";
+
     public static string Role(TrackRole role) => Roles.First(r => r.Value == role).Text;
 
     public static string Slot(SlotKey key) => $"{Type(key.Type)} {key.Ordinal + 1}";

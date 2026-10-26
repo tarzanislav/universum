@@ -315,6 +315,60 @@ public sealed class ProcessorTests
         Assert.Equal(ProcessingStatus.NeedsReview, result.Status);
     }
 
+    [Test]
+    public async Task HeaderEditorEditsInPlaceAndUndoRestoresEverything()
+    {
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var file = work.Copy("en-und-cz-forced.mkv");
+        var before = await inspector.InspectAsync(file);
+        var edits = ManualTarget.AsIs(before).Select(e => e.TrackId switch
+        {
+            1 => e with { Name = "Originál", Flags = e.Flags with { Default = false } },
+            2 => e with { Language = LanguageTag.FromCode("cs"), Name = null, Flags = e.Flags with { Default = true } },
+            _ => e,
+        }).ToList();
+        var plan = EditPlan.For(ManualTarget.Create(before, edits, title: "Vymyslený film"));
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method, "names, languages, flags and title: header only");
+
+        var result = await processor.ProcessAsync(plan, Placement.InPlace(file), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.Equal(Path.GetFullPath(file), result.OutputPath, "edited where it is, same name");
+        var after = await inspector.InspectAsync(file);
+        Assert.Equal("Vymyslený film", after.Title, "title");
+        Assert.True(after.Tracks[1].Name == "Originál" && !after.Tracks[1].Flags.Default, "English audio");
+        Assert.True(after.Tracks[2].Language.Primary == "cs" && after.Tracks[2].Name is null && after.Tracks[2].Flags.Default, "Czech audio");
+        Assert.True(after.HasTags == before.HasTags, "tags untouched");
+
+        Assert.Equal(0, (await processor.UndoAsync(result.UndoRecordPath!)).Count, "undo");
+        var restored = await inspector.InspectAsync(file);
+        Assert.Equal(before.Title, restored.Title, "title restored");
+        Assert.Sequence(before.Tracks.Select(t => (t.Name, t.Language.Primary, t.Flags.Default)), restored.Tracks.Select(t => (t.Name, t.Language.Primary, t.Flags.Default)), "tracks restored");
+    }
+
+    [Test]
+    public async Task HeaderEditorReordersByWritingANewFileUnderTheSameName()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var file = work.Copy("en-und-cz-forced.mkv");
+        var before = await inspector.InspectAsync(file);
+        var edits = ManualTarget.AsIs(before).ToList();
+        (edits[1], edits[2]) = (edits[2], edits[1]);
+        var plan = EditPlan.For(ManualTarget.Create(before, edits));
+        Assert.Equal(WriteMethod.Remux, plan.Method, "order: new file");
+
+        var result = await processor.ProcessAsync(plan, Placement.InPlace(file), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.Equal(Path.GetFullPath(file), result.OutputPath, "same name");
+        Assert.Equal(1, bin.Recycled.Count, "the old file went to the Recycle Bin");
+        var after = await inspector.InspectAsync(file);
+        Assert.Sequence([before.Tracks[2].Name, before.Tracks[1].Name], after.TracksOf(TrackType.Audio).Select(t => t.Name), "audio swapped");
+        Assert.Equal(before.Title, after.Title, "title kept by mkvmerge");
+        Assert.True(!Directory.EnumerateFiles(work.Path).Any(f => FileProcessor.IsTemporaryFile(f) || FileProcessor.IsInterruptedFile(f)), "nothing left over");
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();

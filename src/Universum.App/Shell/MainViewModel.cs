@@ -24,12 +24,13 @@ public sealed class MainViewModel : ObservableObject
         Rules = new RulesPageViewModel(services);
         Batch = new BatchPageViewModel(services);
         Settings = new SettingsPageViewModel(services);
+        HeaderEditor = new HeaderEditorPageViewModel(services);
         Tools =
         [
             new("Zlučovanie", "\uE71D", new PlaceholderPageViewModel("Zlučovanie", "Zdrojové súbory, stopy a ich vlastnosti, výstup a prílohy – ako Multiplexer v MKVToolNix GUI.", "etapa E4")),
             new("Informácie", "\uE946", Info),
             new("Pravidlá UNIVERSUM", "\uE90F", Rules),
-            new("Úprava hlavičky", "\uE70F", new PlaceholderPageViewModel("Úprava hlavičky", "Zmena názvov, jazykov a príznakov stôp priamo v súbore – ako Header editor v MKVToolNix GUI. Pravidlá UNIVERSUM sú už v nástroji Pravidlá UNIVERSUM.", "etapa E4")),
+            new("Úprava hlavičky", "\uE70F", HeaderEditor),
             new("Kapitoly", "\uE8FD", new PlaceholderPageViewModel("Kapitoly", "Editor kapitol.", "etapa E4")),
             new("Hromadné spracovanie", "\uE8B7", Batch),
             new("Fronta úloh", "\uE823", new PlaceholderPageViewModel("Fronta úloh", "Úlohy čakajúce na spracovanie.", "etapa E4")),
@@ -78,6 +79,8 @@ public sealed class MainViewModel : ObservableObject
     public BatchPageViewModel Batch { get; }
 
     public SettingsPageViewModel Settings { get; }
+
+    public HeaderEditorPageViewModel HeaderEditor { get; }
 
     public ToolItem SelectedTool { get => _selectedTool; set => SetProperty(ref _selectedTool, value); }
 
@@ -171,7 +174,9 @@ public sealed class MainViewModel : ObservableObject
     private void OpenMkvToolNixGui()
     {
         var gui = _services.CurrentMkvToolNix?.ToolPath(MkvToolNixTool.Gui);
-        var file = SelectedTool.Page == Rules ? Rules.Plan?.Target.Source.Path : Info.File?.Path;
+        var file = SelectedTool.Page == Rules ? Rules.Plan?.Target.Source.Path
+            : SelectedTool.Page == HeaderEditor ? HeaderEditor.FilePath
+            : Info.File?.Path;
         if (gui is not null)
         {
             var start = new ProcessStartInfo(gui) { UseShellExecute = false };

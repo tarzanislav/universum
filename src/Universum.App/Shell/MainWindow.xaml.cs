@@ -38,6 +38,12 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (Model.SelectedTool.Page == Model.HeaderEditor)
+            {
+                await Model.HeaderEditor.LoadAsync(files[0]);
+                return;
+            }
+
             Model.SelectedTool = Model.Tools.First(t => t.Page == Model.Info);
             await Model.Info.LoadAsync(files[0]);
         }

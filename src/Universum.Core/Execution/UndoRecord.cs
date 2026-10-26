@@ -21,6 +21,12 @@ public sealed record UndoRecord
     /// <summary>False when the file was only moved (its header was not edited).</summary>
     public bool HeaderChanged { get; init; } = true;
 
+    /// <summary>True when the segment title was saved (records from before E4 do not have it).</summary>
+    public bool TitleSaved { get; init; }
+
+    /// <summary>Segment title before the edit; null when the file had none.</summary>
+    public string? Title { get; init; }
+
     /// <summary>Last-modified time of the file before the edit; restored by undo.</summary>
     public DateTime? ModifiedUtc { get; init; }
 

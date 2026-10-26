@@ -21,6 +21,12 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--tags", "all:"]);
         }
 
+        if (target.TitleChanged)
+        {
+            arguments.AddRange(["--edit", "info"]);
+            arguments.AddRange(target.ResultTitle is null ? ["--delete", "title"] : ["--set", "title=" + target.ResultTitle]);
+        }
+
         for (var position = 0; position < target.Tracks.Count; position++)
         {
             var track = target.Tracks[position];
@@ -52,6 +58,11 @@ public static class MkvToolNixArguments
     public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath)
     {
         var arguments = new List<string> { "--gui-mode", "--output", outputPath };
+        if (target.TitleChanged)
+        {
+            arguments.AddRange(["--title", target.ResultTitle ?? ""]);
+        }
+
         if (target.RemoveTags)
         {
             arguments.AddRange(["--no-global-tags", "--no-track-tags", "--disable-track-statistics-tags"]);

@@ -301,6 +301,12 @@ public sealed class FileProcessor(
     private static List<string> UndoArguments(UndoRecord record, string path)
     {
         var arguments = new List<string> { path, "--tags", "all:" + (record.TagsXmlPath ?? "") };
+        if (record.TitleSaved)
+        {
+            arguments.AddRange(["--edit", "info"]);
+            arguments.AddRange(record.Title is null ? ["--delete", "title"] : ["--set", "title=" + record.Title]);
+        }
+
         foreach (var track in record.Tracks)
         {
             arguments.AddRange(["--edit", "track:@" + track.Number.ToString(CultureInfo.InvariantCulture)]);
@@ -726,6 +732,8 @@ public sealed class FileProcessor(
             HeaderChanged = headerChanged,
             TagsXmlPath = tagsPath,
             ModifiedUtc = File.GetLastWriteTimeUtc(file.Path),
+            TitleSaved = true,
+            Title = file.Title,
             Tracks = file.Tracks.Where(t => t.Number is not null)
                 .Select(t => new UndoTrack(t.Number!.Value, t.Name, t.Language.Legacy, t.Language.Ietf, t.Flags.Default, t.Flags.Enabled, t.Flags.Forced, t.Uid))
                 .ToList(),

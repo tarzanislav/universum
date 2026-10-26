@@ -59,6 +59,9 @@ jobs:
         shell: pwsh
         run: |
           $sdks = & dotnet --list-sdks 2>$null
+          # (the release workflow requires the SDK preinstalled; this notice tells whether it is)
+          if ($sdks -match '^10\.') { Write-Host "::notice title=.NET 10 SDK::preinstalled on the runner" }
+          else { Write-Host "::warning title=.NET 10 SDK::not preinstalled, installed with dotnet-install" }
           if (-not ($sdks -match '^10\.')) {
             Invoke-WebRequest https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
             & "$env:RUNNER_TEMP\dotnet-install.ps1" -Channel 10.0 -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir "$env:ProgramFiles\dotnet"

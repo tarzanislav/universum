@@ -398,6 +398,8 @@
                                 </StackPanel>
                                 <TextBox Text="{Binding TmdbKeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč TMDB" />
                             </DockPanel>
+                            <CheckBox Content="Pripájať sa k TMDB" IsChecked="{Binding TmdbEnabled}" Margin="0,8,0,0"
+                                      ToolTip="Vypnutím sa na TMDB nič neposiela; uložený kľúč ostáva." />
                             <TextBlock Text="{Binding TmdbStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
                         </StackPanel>
@@ -416,7 +418,10 @@
                                 </StackPanel>
                                 <TextBox Text="{Binding HistraTokenInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový token HISTRA" />
                             </DockPanel>
+                            <CheckBox Content="Pripájať sa k HISTRA" IsChecked="{Binding HistraEnabled}" Margin="0,8,0,0"
+                                      ToolTip="Vypnutím sa na HISTRA nič neposiela; uložený token ostáva." />
                             <TextBlock Text="{Binding HistraStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}">

@@ -41,6 +41,8 @@ public sealed class SettingsPageViewModel : ObservableObject
         SaveHistraTokenCommand = new RelayCommand(SaveHistraToken, () => HistraTokenInput.Trim().Length > 0);
         RemoveHistraTokenCommand = new RelayCommand(RemoveHistraToken, () => _services.Settings.HistraTokenProtected is not null);
         OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraApi.TokenPage));
+        services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
+        services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
@@ -85,7 +87,48 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string TmdbStatus => _tmdbStatus.Length > 0
         ? _tmdbStatus
-        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne." : "Kľúč je uložený (chránený pre vaše konto Windows).";
+        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne."
+        : TmdbEnabled ? "Kľúč je uložený (chránený pre vaše konto Windows)."
+        : "Kľúč je uložený, pripájanie je vypnuté – na TMDB sa nič neposiela.";
+
+    /// <summary>Connect to TMDB; switching it off keeps the key.</summary>
+    public bool TmdbEnabled
+    {
+        get => _services.Settings.TmdbEnabled;
+        set
+        {
+            if (value != _services.Settings.TmdbEnabled)
+            {
+                _services.SetTmdbEnabled(value);
+                _tmdbStatus = "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(TmdbStatus));
+            }
+        }
+    }
+
+    /// <summary>Connect to HISTRA; switching it off keeps the token.</summary>
+    public bool HistraEnabled
+    {
+        get => _services.Settings.HistraEnabled;
+        set
+        {
+            if (value != _services.Settings.HistraEnabled)
+            {
+                _services.SetHistraEnabled(value);
+                _histraStatus = "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HistraStatus));
+            }
+        }
+    }
+
+    /// <summary>What happens with TMDB and HISTRA together.</summary>
+    public string SyncStatus =>
+        _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – budú sa synchronizovať (pripravuje sa podľa API HISTRA)."
+        : _services.Tmdb is not null ? "Zapnuté je len TMDB."
+        : _services.HistraActive ? "Zapnutá je len HISTRA."
+        : "TMDB ani HISTRA sa nepripájajú.";
 
     public string TmdbAttribution => TmdbClient.Attribution;
 
@@ -110,7 +153,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string HistraStatus => _histraStatus.Length > 0
         ? _histraStatus
-        : _services.HistraToken is null ? "Token nie je zadaný." : "Token je uložený (chránený pre vaše konto Windows).";
+        : _services.HistraToken is null ? "Token nie je zadaný."
+        : HistraEnabled ? "Token je uložený (chránený pre vaše konto Windows)."
+        : "Token je uložený, pripájanie je vypnuté – na HISTRA sa nič neposiela.";
 
     public string OutputDescription => _services.Library is { } library
         ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"

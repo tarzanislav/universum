@@ -74,6 +74,9 @@ in next to it without changing the rules, planning or UI.
 - `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
   user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
   TMDB key; `Request` sends it only to histra.net over HTTPS. No HISTRA requests are made yet (endpoints to come).
+- TMDB and HISTRA each have a "connect" switch in the settings (`TmdbEnabled`, `HistraEnabled`, on by default):
+  switched off, nothing is sent there and the stored key or token stays (the CLI honours the TMDB switch for the
+  stored key). With both on, the two are to be synchronised (`SyncActive`; what exactly follows the HISTRA API).
 
 ## Batch processing
 

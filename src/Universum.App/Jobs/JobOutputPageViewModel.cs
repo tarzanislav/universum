@@ -36,7 +36,7 @@ public sealed class JobOutputPageViewModel : ObservableObject
 
     public string Summary => _job is null
         ? "Vyberte úlohu. Počas behu fronty sa tu ukazuje práve spracovaná úloha."
-        : $"{_job.Status}. {_job.Outcome}".Trim() + (_job.Job.StartedUtc is null ? "" : $" Trvanie: {_job.Duration}.") +
+        : $"{char.ToUpper(_job.Status[0])}{_job.Status[1..]}. {_job.Outcome}".Trim() + (_job.Job.StartedUtc is null ? "" : $" Trvanie: {_job.Duration}.") +
           $" Upozornenia: {_job.Job.Warnings}, chyby: {_job.Job.Errors}.";
 
     public double Progress => _job?.Progress ?? 0;

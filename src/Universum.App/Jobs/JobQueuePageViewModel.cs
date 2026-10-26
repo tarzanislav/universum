@@ -93,7 +93,7 @@ public sealed class JobQueuePageViewModel : ObservableObject
             var waiting = jobs.Count(j => j.Status == JobStatus.Waiting);
             var failed = jobs.Count(j => j.Status == JobStatus.Failed);
             var done = jobs.Count(j => j.Status is JobStatus.Done or JobStatus.DoneWithWarnings);
-            return (Queue.Running is { } running ? $"Beží: {running.Description}. " : Queue.IsStarted ? "" : "Fronta je zastavená. ") +
+            return (Queue.Running is { } running ? $"Beží: {running.Description}. " : Queue.IsStarted || waiting == 0 ? "" : "Fronta je zastavená. ") +
                    $"Čaká: {waiting}, hotovo: {done}" + (failed > 0 ? $", s chybou: {failed}" : "") + ".";
         }
     }

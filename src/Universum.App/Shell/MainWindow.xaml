@@ -310,13 +310,15 @@
                         </Grid>
                         <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
                             <TextBlock Text="Kontrola" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding Findings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Findings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
@@ -329,6 +331,85 @@
                             </StackPanel>
                         </DockPanel>
                     </StackPanel>
+                </Border>
+            </Grid>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:ChaptersPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Otvoriť súbor…" Command="{Binding OpenCommand}" Padding="16,6" VerticalAlignment="Top" />
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Kapitoly" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
+                    </StackPanel>
+                </DockPanel>
+                <WrapPanel Grid.Row="1" Margin="0,10,0,10">
+                    <Button Content="Pridať" Command="{Binding AddCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Nová kapitola za vybranou (o minútu neskôr)" />
+                    <Button Content="Odstrániť" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" />
+                    <Button Content="Zoradiť podľa času" Command="{Binding SortCommand}" Padding="12,4" Margin="0,0,16,0" />
+                    <TextBlock Text="Každých" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding Interval, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="0,0,6,0" />
+                    <TextBlock Text="min" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button Content="Vygenerovať" Command="{Binding GenerateCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Nahradí zoznam kapitolami po celej dĺžke súboru" />
+                    <TextBlock Text="Posun" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding Shift, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="0,0,6,0" />
+                    <TextBlock Text="s" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button Content="Posunúť všetky" Command="{Binding ShiftCommand}" Padding="12,4" Margin="0,0,16,0" />
+                    <Button Content="Načítať zo súboru…" Command="{Binding ImportCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Kapitoly XML alebo OGM (.txt)" />
+                    <Button Content="Odstrániť všetky" Command="{Binding RemoveAllCommand}" Padding="12,4" />
+                </WrapPanel>
+                <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Number}" />
+                        <DataGridTemplateColumn Header="Začiatok (HH:MM:SS.mmm)" Width="190">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox x:Name="start" Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" />
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsValid}" Value="False">
+                                            <Setter TargetName="start" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Názov" Width="*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Jazyk" Width="170">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                            <Button Content="Obnoviť zo súboru" Command="{Binding ResetCommand}" Margin="0,0,8,0" Padding="12,6" />
+                            <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
+                            <Button Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,16,0">
+                            <TextBlock Text="Uloženie zmení len kapitoly v súbore (sekundy) a dá sa vrátiť späť." Style="{StaticResource Hint}" />
+                            <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
                 </Border>
             </Grid>
         </DataTemplate>
@@ -429,14 +510,22 @@
                     <StackPanel>
                         <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
                             <TextBlock Text="Kontrola" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding Findings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Findings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
+                        <WrapPanel Margin="0,0,0,8">
+                            <TextBlock Text="Pri novom súbore (poradie, vynechané stopy) originál:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0" />
+                            <RadioButton Content="zachovať (nový súbor „… (upravené).mkv“)" IsChecked="{Binding KeepOriginal}" GroupName="headerOriginal" Margin="0,0,16,0" />
+                            <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" GroupName="headerOriginal"
+                                         ToolTip="Nový súbor dostane pôvodný názov a originál ide do Koša – nikdy sa nemaže natrvalo" />
+                        </WrapPanel>
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                                 <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />

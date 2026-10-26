@@ -30,6 +30,18 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         };
     }
 
+    /// <summary>
+    /// A new file next to <paramref name="path"/> named "name (upravené).mkv" (then "name (upravené) (2).mkv" …): the
+    /// original is not touched (header editor with "keep originals").
+    /// </summary>
+    public static Placement Beside(string path, string suffix = " (upravené)")
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        var prefix = System.IO.Path.GetFileNameWithoutExtension(full) + suffix;
+        var extension = System.IO.Path.GetExtension(full);
+        return new Placement(System.IO.Path.GetDirectoryName(full)!, prefix, "", new SizeClasses(), extension) { FixedName = prefix + extension };
+    }
+
     public string FileName(long size, int number = 1) =>
         FixedName is not null
             ? number <= 1 ? FixedName : $"{Prefix} ({number.ToString(CultureInfo.InvariantCulture)}){Extension}"

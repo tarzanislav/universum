@@ -26,6 +26,7 @@ public sealed class MainViewModel : ObservableObject
         Settings = new SettingsPageViewModel(services);
         HeaderEditor = new HeaderEditorPageViewModel(services);
         Mux = new MultiplexerPageViewModel(services);
+        Chapters = new ChaptersPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Tools =
@@ -34,7 +35,7 @@ public sealed class MainViewModel : ObservableObject
             new("Informácie", "\uE946", Info),
             new("Pravidlá UNIVERSUM", "\uE90F", Rules),
             new("Úprava hlavičky", "\uE70F", HeaderEditor),
-            new("Kapitoly", "\uE8FD", new PlaceholderPageViewModel("Kapitoly", "Editor kapitol.", "etapa E4")),
+            new("Kapitoly", "\uE8FD", Chapters),
             new("Hromadné spracovanie", "\uE8B7", Batch),
             new("Fronta úloh", "\uE823", Queue),
             new("Výstup úloh", "\uE7C3", Output),
@@ -91,6 +92,8 @@ public sealed class MainViewModel : ObservableObject
     public HeaderEditorPageViewModel HeaderEditor { get; }
 
     public MultiplexerPageViewModel Mux { get; }
+
+    public ChaptersPageViewModel Chapters { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }
 

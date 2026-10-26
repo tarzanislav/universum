@@ -44,6 +44,12 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (Model.SelectedTool.Page == Model.Chapters)
+            {
+                await Model.Chapters.LoadAsync(files[0]);
+                return;
+            }
+
             if (Model.SelectedTool.Page == Model.HeaderEditor)
             {
                 await Model.HeaderEditor.LoadAsync(files[0]);

@@ -141,6 +141,42 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     public string? FilePath => _file?.Path;
 
+    /// <summary>The user chose to remove originals (shared with the rules and batch pages); otherwise they are never removed.</summary>
+    public bool DeletesOriginal => _services.Settings.OriginalHandling == OriginalHandling.Delete;
+
+    public bool KeepOriginal
+    {
+        get => !DeletesOriginal;
+        set => SetHandling(value ? OriginalHandling.Keep : OriginalHandling.Delete);
+    }
+
+    public bool DeleteOriginal
+    {
+        get => DeletesOriginal;
+        set => SetHandling(value ? OriginalHandling.Delete : OriginalHandling.Keep);
+    }
+
+    private void SetHandling(OriginalHandling handling)
+    {
+        if (_services.Settings.OriginalHandling == handling)
+        {
+            return;
+        }
+
+        _services.Settings.OriginalHandling = handling;
+        _services.Settings.Save();
+        OnPropertyChanged(nameof(KeepOriginal));
+        OnPropertyChanged(nameof(DeleteOriginal));
+        Recalculate();
+    }
+
+    /// <summary>
+    /// Where the result goes: header-only changes edit the file in place (with undo); a new file replaces the original
+    /// only when the user chose to delete originals, otherwise it is written beside it and the original stays.
+    /// </summary>
+    private static Placement Destination(EditPlan plan, bool deleteOriginal) =>
+        plan.Method == WriteMethod.Remux && !deleteOriginal ? Placement.Beside(plan.Target.Source.Path) : Placement.InPlace(plan.Target.Source.Path);
+
     public async Task LoadAsync(string path)
     {
         Result = "";
@@ -280,7 +316,8 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             {
                 WriteMethod.None => "Bez zmien.",
                 WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({Count(plan.Changes.Count)}) – trvá to sekundy.",
-                _ => $"Zapíše sa nový súbor s rovnakým názvom ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty, pôvodný pôjde do Koša.",
+                _ when DeletesOriginal => $"Zapíše sa nový súbor s rovnakým názvom ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty, originál pôjde do Koša (zvolené: vymazať).",
+                _ => $"Zapíše sa nový súbor „{Placement.Beside(target.Source.Path).FileName(0)}“ ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty, originál ostane nezmenený.",
             };
             foreach (var finding in TargetChecks.Review(target, _services.Profile))
             {
@@ -368,12 +405,13 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         {
             var plan = EditPlan.For(target);
             var processor = _services.Processor(installation);
-            var result = await processor.ProcessAsync(plan, Placement.InPlace(target.Source.Path), new OutputOptions(OriginalHandling.Keep), new Progress<double>(p => Progress = p));
+            var result = await processor.ProcessAsync(plan, Destination(plan, DeletesOriginal), new OutputOptions(OriginalHandling.Keep), new Progress<double>(p => Progress = p));
             _services.Inspector(installation).Invalidate(target.Source.Path);
             _undoRecord = result.UndoRecordPath;
             Result = result.Status switch
             {
-                ProcessingStatus.Done when plan.Method == WriteMethod.Remux => "Uložené ako nový súbor s rovnakým názvom; pôvodný je v Koši.",
+                ProcessingStatus.Done when plan.Method == WriteMethod.Remux && DeletesOriginal => "Uložené ako nový súbor s rovnakým názvom; originál je v Koši.",
+                ProcessingStatus.Done when plan.Method == WriteMethod.Remux => $"Uložené ako nový súbor: {Path.GetFileName(result.OutputPath)}. Originál ostal nezmenený.",
                 ProcessingStatus.Done => "Uložené." + (_undoRecord is null ? "" : " Zmenu je možné vrátiť späť."),
                 ProcessingStatus.Unchanged => "Bez zmien.",
                 ProcessingStatus.Cancelled => "Zrušené.",
@@ -408,8 +446,9 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         }
 
         var path = target.Source.Path;
-        var job = new FileJob($"Úprava hlavičky: {Path.GetFileName(path)}", _services.Processor(installation), EditPlan.For(target),
-            Placement.InPlace(path), new OutputOptions(OriginalHandling.Keep));
+        var plan = EditPlan.For(target);
+        var job = new FileJob($"Úprava hlavičky: {Path.GetFileName(path)}", _services.Processor(installation), plan,
+            Destination(plan, DeletesOriginal), new OutputOptions(OriginalHandling.Keep));
         job.Finished += (finished, result) => JobRow.OnUi(() => _ = AfterJobAsync(finished, result, installation));
         _services.Enqueue(job);
         Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");

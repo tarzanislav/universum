@@ -142,8 +142,6 @@ internal static class SelfTest
             await Settle();
         }
 
-        model.SelectedTool = model.Tools.First(t => t.Title == "Kapitoly");
-        await Screenshot(window, "main-placeholder.png");
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
 
@@ -181,6 +179,7 @@ internal static class SelfTest
 
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
+        await TestChaptersAsync(model, window, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
         var secret = UserSecret.Protect("test-key-123");
@@ -353,6 +352,34 @@ internal static class SelfTest
         }
 
         Check(mux.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "mux: page shows the outcome – " + mux.Result);
+    }
+
+    /// <summary>Chapter editor: read, rename, add, save (verified), undo, generate.</summary>
+    private static async Task TestChaptersAsync(MainViewModel model, MainWindow window, string work)
+    {
+        var copy = Path.Combine(work, "kapitoly.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
+        var chapters = model.Chapters;
+        model.SelectedTool = model.Tools.First(t => t.Page == chapters);
+        await chapters.LoadAsync(copy);
+        Check(chapters.Rows.Count == 2 && chapters.Rows[1].Name == "Koniec", $"chapters: two read ({chapters.Rows.Count}) – {chapters.Summary}");
+        chapters.Rows[0].Name = "Začiatok";
+        chapters.SelectedRow = chapters.Rows[0];
+        chapters.AddCommand.Execute(null);
+        chapters.Rows[1].Start = "00:00:01.5";
+        chapters.Rows[1].Name = "Polovica";
+        Check(chapters.Problems.Length == 0 && chapters.SaveCommand.CanExecute(null), "chapters: ready to save – " + chapters.Problems);
+        await Screenshot(window, "chapters.png");
+        await chapters.SaveCommand.ExecuteAsync(null);
+        Check(chapters.Result.StartsWith("Uložené: 3 kapitoly", StringComparison.Ordinal), "chapters: saved – " + chapters.Result);
+        Check(string.Join("|", chapters.Rows.Select(r => r.Name)) == "Začiatok|Koniec|Polovica", "chapters: read back sorted by time – " + string.Join("|", chapters.Rows.Select(r => r.Name)));
+        await chapters.UndoCommand.ExecuteAsync(null);
+        Check(chapters.Rows.Count == 2 && chapters.Rows[0].Name == "Chapter 01", "chapters: undo – " + chapters.Result);
+        chapters.Rows[0].Start = "1:75";
+        Check(chapters.Problems.Contains("HH:MM:SS", StringComparison.Ordinal) && !chapters.SaveCommand.CanExecute(null), "chapters: wrong time blocks saving");
+        chapters.Interval = "1";
+        chapters.Generate();
+        Check(chapters.Rows.Count == 1 && chapters.Rows[0].Name == "Kapitola 01", "chapters: generated for a 2-second file");
     }
 
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)

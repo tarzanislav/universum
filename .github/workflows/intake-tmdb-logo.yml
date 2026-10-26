@@ -1,0 +1,48 @@
+name: Intake – official TMDB logos
+
+# One-off, only on this temporary branch (never merged): the approved TMDB logos from the official page
+# https://www.themoviedb.org/about/logos-attribution, downloaded over HTTPS from www.themoviedb.org only, with
+# their SHA-256 compared to the fingerprint in the file name. The result goes to the branch intake/tmdb-logo-result.
+on:
+  push:
+    branches: ['intake/tmdb-logo']
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download from the official page
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -fsSL --proto '=https' --max-redirs 2 -A "Mozilla/5.0 (UNIVERSUM logo intake)" \
+            https://www.themoviedb.org/about/logos-attribution -o page.html
+          grep -oE 'https://www\.themoviedb\.org/assets/[^"'"'"' )]+\.(svg|png)|"/assets/[^"'"'"' )]+\.(svg|png)' page.html \
+            | tr -d '"' | sed -E 's#^/assets#https://www.themoviedb.org/assets#' | sort -u > out/links.txt
+          cat out/links.txt
+          test -s out/links.txt
+          while read -r url; do
+            case "$url" in https://www.themoviedb.org/assets/*) ;; *) echo "skip $url"; continue ;; esac
+            name=$(basename "$url")
+            curl -fsSL --proto '=https' --max-redirs 0 -A "Mozilla/5.0 (UNIVERSUM logo intake)" "$url" -o "out/$name"
+            hash=$(sha256sum "out/$name" | cut -d' ' -f1)
+            fp=$(echo "$name" | sed -nE 's/.*-([0-9a-f]{64})\.[a-z]+$/\1/p')
+            match=no; [ "$hash" = "$fp" ] && match=yes
+            echo "$name sha256=$hash fingerprint=${fp:-none} match=$match url=$url" | tee -a out/report.txt
+          done < out/links.txt
+          grep -oiE '<h[1-4][^>]*>[^<]{0,80}</h[1-4]>' page.html | head -40 > out/headings.txt || true
+
+      - name: Result to intake/tmdb-logo-result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          git init -q -b intake/tmdb-logo-result
+          git config user.name "UNIVERSUM CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Official TMDB logos ($(date -u +%F))"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" intake/tmdb-logo-result

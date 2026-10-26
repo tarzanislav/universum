@@ -3,7 +3,9 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Jobs;
 using Universum.Core.Execution;
+using Universum.Core.Jobs;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
@@ -44,6 +46,7 @@ public sealed class RulesPageViewModel : ObservableObject
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
         ApplyCommand = new AsyncRelayCommand(ApplyAsync, CanApply);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
+        QueueCommand = new RelayCommand(Enqueue, CanApply);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
         services.TmdbChanged += Tmdb.Refresh;
@@ -59,6 +62,9 @@ public sealed class RulesPageViewModel : ObservableObject
     public AsyncRelayCommand ApplyCommand { get; }
 
     public AsyncRelayCommand UndoCommand { get; }
+
+    /// <summary>Adds the file to the job queue instead of processing it now.</summary>
+    public RelayCommand QueueCommand { get; }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
@@ -374,6 +380,27 @@ public sealed class RulesPageViewModel : ObservableObject
         }
     }
 
+    private void Enqueue()
+    {
+        if (_plan is null || _placement is null || _services.CurrentMkvToolNix is not { } installation || _services.Settings.OriginalHandling is not { } handling)
+        {
+            return;
+        }
+
+        var job = new FileJob($"Pravidlá UNIVERSUM: {Path.GetFileName(_plan.Target.Source.Path)} → {Path.GetFileName(_placement.Directory)}",
+            _services.Processor(installation), _plan, _placement, new OutputOptions(handling));
+        job.Finished += (_, result) => JobRow.OnUi(() =>
+        {
+            _services.Inspector(installation).Invalidate(result.SourcePath);
+            if (result.OutputPath is not null)
+            {
+                _services.Inspector(installation).Invalidate(result.OutputPath);
+            }
+        });
+        _services.Enqueue(job);
+        Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
+    }
+
     private async Task UndoAsync()
     {
         if (_undoRecord is null || _services.CurrentMkvToolNix is null)
@@ -435,6 +462,7 @@ public sealed class RulesPageViewModel : ObservableObject
         OpenCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
+        QueueCommand?.NotifyCanExecuteChanged();
         ChooseOutputDirectoryCommand.NotifyCanExecuteChanged();
     }
 

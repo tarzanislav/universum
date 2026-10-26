@@ -285,6 +285,32 @@ internal static class SelfTest
         editor.Move(+1);
         Check(editor.Rows[1].TrackId == 1 && editor.Rows[2].TrackId == 2, "header editor: audio moved among audio");
         Check(editor.Findings.Any(f => f.StartsWith("Poradie zvuku", StringComparison.Ordinal)), "header editor: check panel notices the order");
+
+        // the same change through the job queue: a new file under the same name, output with the job's messages
+        editor.QueueCommand.Execute(null);
+        Check(editor.Result.StartsWith("Pridané do fronty", StringComparison.Ordinal), "queue: header editor adds a job – " + editor.Result);
+        var job = services.Jobs.Jobs[^1];
+        for (var i = 0; i < 300 && !job.IsFinished; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        for (var i = 0; i < 50 && !editor.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Settle();
+        Check(job.Status == Core.Jobs.JobStatus.Done, $"queue: job done – {job.Status} {job.Outcome} {string.Join(" | ", job.Messages.Select(m => m.Text))}");
+        var queued = await inspector.InspectAsync(copy);
+        Check(queued.Tracks[1].Language.Primary == "en" && queued.Tracks[2].Language.Primary == "cs", "queue: job wrote the changes");
+        Check(editor.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "queue: editor shows the job's outcome – " + editor.Result);
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Queue);
+        model.Queue.SelectedRow = model.Queue.Rows.First(r => r.Job == job);
+        await Screenshot(window, "queue.png");
+        model.Queue.OutputCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.Output && model.Output.Messages.Count > 0, "output: the job's messages are shown");
+        await Screenshot(window, "job-output.png");
     }
 
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)

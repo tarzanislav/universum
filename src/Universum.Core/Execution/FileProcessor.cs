@@ -467,6 +467,9 @@ public sealed class FileProcessor(
     /// <summary>Message of a failed edit after which the original state was restored.</summary>
     public const string RestoredMessage = "the original was restored";
 
+    /// <summary>A corrected run replaced the earlier result made from the same original (K8); the original is untouched.</summary>
+    public const string ReplacedPreviousPrefix = "the earlier result of this original went to the Recycle Bin: ";
+
     /// <summary>Start of messages saying that something could not be put back (the user has to look).</summary>
     public const string RestoreFailedPrefix = "RESTORE FAILED: ";
 
@@ -635,7 +638,7 @@ public sealed class FileProcessor(
                 }
             }
 
-            messages.Add("the earlier result of this original went to the Recycle Bin: " + Path.GetFileName(previous));
+            messages.Add(ReplacedPreviousPrefix + Path.GetFileName(previous));
             return result with { OutputPath = lower, Messages = messages };
         }
         catch (Exception ex) when (IsFileError(ex))

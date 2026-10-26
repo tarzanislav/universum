@@ -93,9 +93,10 @@ public sealed class FileProcessor(
             }
 
             var sourceSize = new FileInfo(source).Length;
-            // a file in the placement's folder is reworked there – unless the placement names another file (a new one beside it)
-            var inLibrary = Paths.IsIn(source, placement.Directory) &&
-                            (placement.FixedName is null || string.Equals(Path.GetFileName(source), placement.FixedName, Paths.Comparison));
+            // a file is reworked where it is only when it is a library result of this title: in the placement's folder AND
+            // named by the library ("Creep (2004) - CZ EN FHD H264 BIG.mkv"). Any other file – also an original that happens
+            // to lie in the title folder ("Creep.2004.1080p.mkv") – is only read; the result is a new file.
+            var inLibrary = Paths.IsIn(source, placement.Directory) && placement.IsLibraryName(Path.GetFileName(source));
             if (inLibrary && plan.Method == WriteMethod.None && placement.Holds(source, sourceSize))
             {
                 return Result(plan, ProcessingStatus.Unchanged, source, null, []);

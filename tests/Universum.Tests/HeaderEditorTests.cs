@@ -82,6 +82,12 @@ public sealed class HeaderEditorTests
         Assert.Equal("Film.Name.2026.mkv", placement.FileName(5_000_000_000));
         Assert.Equal("Film.Name.2026 (2).mkv", placement.FileName(5_000_000_000, 2));
         Assert.True(placement.Holds(path, 123) && !placement.Holds(Path.Combine(Path.GetTempPath(), "Other.mkv"), 123), "holds only its own file");
+
+        var library = new Placement(Path.GetTempPath(), "Creep (2004)", "CZ EN FHD H264", new SizeClasses());
+        Assert.True(library.IsLibraryName("Creep (2004) - CZ EN FHD H264 BIG.mkv") && library.IsLibraryName("Creep (2004) - EN FHD HEVC BluRay BIG2.mkv"),
+            "library names of the title, any stream description");
+        Assert.True(!library.IsLibraryName("Creep.2004.1080p.mkv") && !library.IsLibraryName("Creep (2004).mkv") && !library.IsLibraryName("Creep (2004) - režisérska verzia.mkv"),
+            "other names in the title folder are not library results");
     }
 
     private static MediaFile Sample() => new()

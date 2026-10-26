@@ -1,4 +1,5 @@
 using Universum.Core.Execution;
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -408,6 +409,39 @@ public sealed class ProcessorTests
         var written = await processor.ProcessAsync(remux, work.Movie(remux), Keep);
         Assert.Equal(ProcessingStatus.Done, written.Status, string.Join("; ", written.Messages));
         Assert.Sequence(["Začiatok"], (await chaptersReader.ReadAsync(written.OutputPath!)).Chapters.Select(c => c.Name), "only the new chapters");
+    }
+
+    [Test]
+    public async Task OriginalLyingInItsTitleFolderIsOnlyRead()
+    {
+        // an existing collection: originals already sit in MOVIES\Vymyslený film (2026)\ under their own names
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var folder = work.InMovies("Vymyslený film (2026)");
+        Directory.CreateDirectory(folder);
+        var cases = new (string File, Func<MediaFile, TargetState> Target, WriteMethod Method)[]
+        {
+            ("Vymysleny.Film.2026.cz.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
+            ("Vymysleny.Film.2026.header.mkv", f => ManualTarget.Create(f, ManualTarget.AsIs(f), title: "Iný názov"), WriteMethod.HeaderEdit),
+            ("Vymysleny.Film.2026.remux.mkv", f => UniversumRules.Apply(f, decisions: CzechDub), WriteMethod.Remux),
+        };
+        var sources = new[] { "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv" };
+        for (var i = 0; i < cases.Length; i++)
+        {
+            var original = Path.Combine(folder, cases[i].File);
+            System.IO.File.Copy(TestData.Media(sources[i]), original);
+            var bytes = await System.IO.File.ReadAllBytesAsync(original);
+            var plan = EditPlan.For(cases[i].Target(await inspector.InspectAsync(original)));
+            Assert.Equal(cases[i].Method, plan.Method, cases[i].File);
+            var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+            Assert.True(result.Status is ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary, $"{cases[i].File}: {result.Status} {string.Join("; ", result.Messages)}");
+            var now = await System.IO.File.ReadAllBytesAsync(original);
+            Assert.True(bytes.SequenceEqual(now), $"{cases[i].File}: the original is still there, unchanged");
+            Assert.True(result.UndoRecordPath is null && !Paths.Same(result.OutputPath!, original), $"{cases[i].File}: a new file, no in-place edit");
+        }
+
+        Assert.Equal(0, bin.Recycled.Count, "nothing in the Recycle Bin");
     }
 
     [Test]

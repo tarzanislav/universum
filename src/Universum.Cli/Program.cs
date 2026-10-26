@@ -319,6 +319,13 @@ static void SaveReport(string? file, IReadOnlyList<BatchItem> items, IReadOnlyLi
         return;
     }
 
+    // a report never overwrites a media file (or anything that is not a report)
+    if (!new[] { ".html", ".htm", ".csv" }.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine($"Správa sa neuložila: {file} – správa musí mať príponu .html alebo .csv.");
+        return;
+    }
+
     File.WriteAllText(file, file.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
         ? "﻿" + BatchReport.Csv(items, results)
         : BatchReport.Html("UNIVERSUM – hromadné spracovanie", items, results));

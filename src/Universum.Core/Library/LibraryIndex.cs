@@ -124,6 +124,50 @@ public sealed class LibraryIndex
         }
     }
 
+    /// <summary>
+    /// True when UNIVERSUM made <paramref name="path"/> and it has not changed size since: only such a file may be edited
+    /// or replaced in the library. Any other file – also one with a library-like name – is treated as an original.
+    /// </summary>
+    public bool IsResult(string path)
+    {
+        lock (_entries)
+        {
+            return File.Exists(path) && _entries.TryGetValue(Path.GetFullPath(path), out var entry) && entry.Size == new FileInfo(path).Length;
+        }
+    }
+
+    /// <summary>A library result was reworked: it may have a new path, size and target; it still comes from the same original.</summary>
+    public void Replace(string oldPath, string newPath, string targetSignature)
+    {
+        lock (_entries)
+        {
+            if (!_entries.Remove(Path.GetFullPath(oldPath), out var entry))
+            {
+                return;
+            }
+
+            _entries[Path.GetFullPath(newPath)] = entry with { Size = new FileInfo(newPath).Length, RecordedUtc = DateTime.UtcNow, Target = targetSignature };
+            Save();
+        }
+    }
+
+    /// <summary>
+    /// An edit of a library result was undone: the entry follows the file (its size, maybe its name back). What the
+    /// result now holds is not known, so a later run of the original replaces it rather than finding it done.
+    /// </summary>
+    public void Undone(string path, string finalPath)
+    {
+        lock (_entries)
+        {
+            if (_entries.Remove(Path.GetFullPath(path), out var entry) && File.Exists(finalPath))
+            {
+                _entries[Path.GetFullPath(finalPath)] = entry with { Size = new FileInfo(finalPath).Length, Target = "" };
+            }
+
+            Save();
+        }
+    }
+
     /// <summary>Forgets a library file (it went to the Recycle Bin or was renamed).</summary>
     public void Forget(string resultPath)
     {

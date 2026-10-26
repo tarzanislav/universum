@@ -401,6 +401,13 @@ public sealed class ProcessorTests
         Assert.Equal(0, (await processor.UndoAsync(edited.UndoRecordPath!)).Count, "undo");
         Assert.Equal(3, (await chaptersReader.ReadAsync(edited.OutputPath!)).Chapters.Count, "chapters back");
 
+        // the library index follows the result through edit and undo: it is still a result and is edited where it is
+        Assert.True(new LibraryIndex(Path.Combine(work.Path, "library-index.json")).IsResult(edited.OutputPath!), "still recorded as a result");
+        var restored = await inspector.InspectAsync(edited.OutputPath!);
+        var third = await processor.ProcessAsync(EditPlan.For(ManualTarget.Create(restored, ManualTarget.AsIs(restored)) with { NewChapters = [] }), work.Movie(again), Keep);
+        Assert.True(third.Status == ProcessingStatus.Done && third.UndoRecordPath is not null && Paths.Same(third.OutputPath!, edited.OutputPath!), "edited in the library again: " + string.Join("; ", third.Messages));
+        Assert.Equal(0, (await processor.UndoAsync(third.UndoRecordPath!)).Count, "undo again");
+
         // a new order and new chapters: mkvmerge takes the chapters from the file
         var reorder = ManualTarget.AsIs(source).ToList();
         (reorder[1], reorder[2]) = (reorder[2], reorder[1]);
@@ -420,13 +427,19 @@ public sealed class ProcessorTests
         var (processor, inspector) = await CreateAsync(work, bin);
         var folder = work.InMovies("Vymyslený film (2026)");
         Directory.CreateDirectory(folder);
+        // also names that look like library names (Jellyfin's own naming of versions)
+        // first an original lying exactly where its result would go
         var cases = new (string File, Func<MediaFile, TargetState> Target, WriteMethod Method)[]
         {
+            ("Vymyslený film (2026) - CZ SD H264 SMALL.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
             ("Vymysleny.Film.2026.cz.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
             ("Vymysleny.Film.2026.header.mkv", f => ManualTarget.Create(f, ManualTarget.AsIs(f), title: "Iný názov"), WriteMethod.HeaderEdit),
             ("Vymysleny.Film.2026.remux.mkv", f => UniversumRules.Apply(f, decisions: CzechDub), WriteMethod.Remux),
+            ("Vymyslený film (2026) - 1080p BluRay.mkv", f => UniversumRules.Apply(f), WriteMethod.None),
+            ("Vymyslený film (2026) - Bluray.mkv", f => ManualTarget.Create(f, ManualTarget.AsIs(f), title: "Iný názov 2"), WriteMethod.HeaderEdit),
+            ("Vymyslený film (2026) - Think Big.mkv", f => UniversumRules.Apply(f, decisions: CzechDub) with { NewTitle = "Iný 3" }, WriteMethod.Remux),
         };
-        var sources = new[] { "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv" };
+        var sources = new[] { "cz-only.mkv", "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv", "cz-only.mkv", "sk-cz-mixed.mkv", "en-und-cz-forced.mkv" };
         for (var i = 0; i < cases.Length; i++)
         {
             var original = Path.Combine(folder, cases[i].File);
@@ -441,7 +454,8 @@ public sealed class ProcessorTests
             Assert.True(result.UndoRecordPath is null && !Paths.Same(result.OutputPath!, original), $"{cases[i].File}: a new file, no in-place edit");
         }
 
-        Assert.Equal(0, bin.Recycled.Count, "nothing in the Recycle Bin");
+        // results of the same original replace each other (K8); an original never goes to the Recycle Bin
+        Assert.True(bin.Recycled.All(r => !cases.Any(c => r.Contains(Path.GetFileNameWithoutExtension(c.File), StringComparison.Ordinal))), "no original in the Recycle Bin: " + string.Join(", ", bin.Recycled));
     }
 
     [Test]

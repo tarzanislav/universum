@@ -93,10 +93,14 @@ public sealed class FileProcessor(
             }
 
             var sourceSize = new FileInfo(source).Length;
-            // a file is reworked where it is only when it is a library result of this title: in the placement's folder AND
-            // named by the library ("Creep (2004) - CZ EN FHD H264 BIG.mkv"). Any other file – also an original that happens
-            // to lie in the title folder ("Creep.2004.1080p.mkv") – is only read; the result is a new file.
-            var inLibrary = Paths.IsIn(source, placement.Directory) && placement.IsLibraryName(Path.GetFileName(source));
+            // a file is reworked where it is only when it is a library result UNIVERSUM made: in the placement's folder,
+            // named by the library and recorded in the library index as a result, unchanged since. Any other file – also an
+            // original lying in the title folder, whatever its name ("Creep (2004) - 1080p BluRay.mkv") – is only read and
+            // the result is a new file. Without an index nothing is reworked.
+            var inLibrary = Paths.IsIn(source, placement.Directory) &&
+                            (placement.FixedName is not null
+                                ? placement.IsLibraryName(Path.GetFileName(source))
+                                : placement.IsLibraryName(Path.GetFileName(source)) && index?.IsResult(source) == true);
             if (inLibrary && plan.Method == WriteMethod.None && placement.Holds(source, sourceSize))
             {
                 return Result(plan, ProcessingStatus.Unchanged, source, null, []);
@@ -141,6 +145,19 @@ public sealed class FileProcessor(
             }
 
             result = Finish(result, fingerprint, signature, output.PreserveModifiedTime ? originalTime : null);
+            if (inLibrary)
+            {
+                // the reworked library result keeps its origin in the index under its (possibly new) name and size
+                try
+                {
+                    index?.Replace(source, result.OutputPath!, signature);
+                }
+                catch (Exception ex) when (IsFileError(ex))
+                {
+                    result = result with { Messages = [.. result.Messages, "done, but the library index was not updated: " + ex.Message] };
+                }
+            }
+
             return previous is null ? result : ReplacePrevious(result, previous, placement, fingerprint!, signature);
         }
         catch (OperationCanceledException)
@@ -259,6 +276,15 @@ public sealed class FileProcessor(
             {
                 problems.Add($"the file could not be moved back to {back}: {ex.Message}");
             }
+        }
+
+        try
+        {
+            index?.Undone(path, finalPath);
+        }
+        catch (Exception ex) when (IsFileError(ex))
+        {
+            problems.Add("the library index could not be updated: " + ex.Message);
         }
 
         if (problems.Count == 0)

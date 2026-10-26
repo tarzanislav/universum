@@ -58,9 +58,12 @@ in next to it without changing the rules, planning or UI.
     app: film/series, title, episode, TMDB): rules, batch, header editor, chapter editor (`TargetState.NewChapters`)
     and multiplexer (`MuxSpec.Placement`, name chosen after writing by the size class); `Placement.InPlace` /
     `Placement.Beside` remain for later use;
-  - only a library result of the title (in its folder and named "{Prefix} - … {size}{n}.mkv", `Placement.IsLibraryName`)
-    is reworked where it is; any other file in the folder – an existing collection, originals put there by hand – is only
-    read and the result is a new file; the batch analyses again when the library comes to contain analysed files;
+  - only a library result UNIVERSUM made is reworked where it is: in the title folder, named "{Prefix} - … {size}{n}.mkv"
+    (`Placement.IsLibraryName`) **and** recorded in the library index as a result of the same size
+    (`LibraryIndex.IsResult`); the index follows the result through edits, renames and undo (`Replace`, `Undone`).
+    Any other file in the folder – an existing collection, originals put there by hand, also ones with library-like
+    names ("Creep (2004) - 1080p BluRay.mkv") – is only read and the result is a new file; without an index nothing is
+    reworked; the batch analyses again when the library comes to contain analysed files;
   - a file already in its library folder is edited with undo, or replaced: the old one is renamed to
     `*.universum-old`, the new one takes its place, then the old one goes to the Recycle Bin;
   - `Library/LibraryIndex` remembers which original (fingerprint of its content) each library file came from, so

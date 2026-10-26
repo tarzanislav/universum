@@ -1,3 +1,4 @@
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Planning;
@@ -20,8 +21,95 @@ public static class BatchPlanner
     public static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null, LibraryJob? library = null)
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
-        return analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
+        var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
+        return library is null ? items : library.Kind == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
     }
+
+    /// <summary>
+    /// Versions of one film must be the same film: when files named after different films ("Okno (2014)", "Ticho (2010)")
+    /// get the same title, the ones named otherwise go for review ("process anyway" lets them through).
+    /// </summary>
+    private static List<BatchItem> CheckFilms(List<BatchItem> items)
+    {
+        var flagged = new Dictionary<int, string>();
+        foreach (var same in Enumerable.Range(0, items.Count).Where(i => items[i].Title is not null).GroupBy(i => items[i].Title!.FolderName, Paths.Comparer))
+        {
+            // only names that carry a title with a year ("Okno (2014)", "Ticho.2010.1080p"), not "okno-2160p"
+            var own = same.Select(i => (Index: i, Guess: TitleGuess.FromName(Path.GetFileNameWithoutExtension(items[i].File.Path), MediaKind.Movie)))
+                .Where(x => x.Guess is { Year: not null })
+                .Select(x => (x.Index, Name: x.Guess!.Name)).ToList();
+            if (own.Select(x => Words.Normalize(x.Name)).Distinct(StringComparer.Ordinal).Count() < 2)
+            {
+                continue;
+            }
+
+            var title = Words.Normalize(items[same.First()].Title!.Name);
+            foreach (var (index, name) in own.Where(x => Words.Normalize(x.Name) != title))
+            {
+                flagged[index] = name!;
+            }
+        }
+
+        return items.Select((item, i) => flagged.TryGetValue(i, out var name) && !item.Group.Decisions.ProcessAnyway.Contains(item.File.Path)
+            ? item with { Reasons = [.. item.Reasons, new ReviewReason(ReviewReasonKind.OtherSeries, Detail: name)] }
+            : item).ToList();
+    }
+
+    /// <summary>
+    /// Checks across the files of a series (specification 13.5): two files of the same episode with the same description
+    /// go for review, and so does a file whose name names another series than most files (one folder is one series).
+    /// "Process anyway" lets a file through; a second version of an episode then gets a number (K1).
+    /// </summary>
+    private static List<BatchItem> CheckEpisodes(List<BatchItem> items, LibraryJob library)
+    {
+        var added = items.Select(_ => new List<ReviewReason>()).ToList();
+        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path), library.Root);
+        for (var i = 0; i < items.Count; i++)
+        {
+            var path = items[i].File.Path;
+            var name = Path.GetFileNameWithoutExtension(path);
+            // an episode named after another series, or a film in library form ("Okno (2014)") among the episodes
+            var own = EpisodeParser.FromPath(path, library.Root) is not null ? TitleGuess.FromName(name, MediaKind.Series)
+                : TitleGuess.HasYearInParentheses(name) ? TitleGuess.FromName(name, MediaKind.Movie)
+                : null;
+            var expected = series?.Name ?? library.Series?.Name;
+            if (own is not null && expected is not null && Words.Normalize(own.Name) != Words.Normalize(expected) &&
+                (library.Series is null || Words.Normalize(own.Name) != Words.Normalize(library.Series.Name)))
+            {
+                added[i].Add(new ReviewReason(ReviewReasonKind.OtherSeries, Detail: own.Name));
+            }
+        }
+
+        // files already in their place are versions kept earlier (K1); only new results are compared
+        var placed = Enumerable.Range(0, items.Count)
+            .Where(i => items[i] is { Placement: not null, Episode: not null } item && !item.Placement.Holds(item.File.Path, item.FileSize))
+            .ToList();
+        foreach (var same in placed.GroupBy(i => Path.GetFullPath(items[i].Placement!.Directory) + "\n" + items[i].Placement!.Stem + "\n" + items[i].Placement!.Sizes.Label(items[i].FileSize), Paths.Comparer))
+        {
+            var list = same.ToList();
+            for (var a = 0; a < list.Count; a++)
+            {
+                for (var b = a + 1; b < list.Count; b++)
+                {
+                    var (x, y) = (items[list[a]], items[list[b]]);
+                    if (Overlap(x.Episode!, y.Episode!))
+                    {
+                        added[list[a]].Add(new ReviewReason(ReviewReasonKind.DuplicateEpisode, Detail: Path.GetFileName(y.File.Path)));
+                        added[list[b]].Add(new ReviewReason(ReviewReasonKind.DuplicateEpisode, Detail: Path.GetFileName(x.File.Path)));
+                    }
+                }
+            }
+        }
+
+        return items.Select((item, i) =>
+        {
+            var extra = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path) ? [] : added[i].DistinctBy(r => r.Kind).ToList();
+            return extra.Count == 0 ? item : item with { Reasons = [.. item.Reasons, .. extra] };
+        }).ToList();
+    }
+
+    private static bool Overlap(EpisodeNumber x, EpisodeNumber y) =>
+        x.Season == y.Season && x.Episode <= (y.LastEpisode ?? y.Episode) && y.Episode <= (x.LastEpisode ?? x.Episode);
 
     public static BatchItem PlanFile(MediaFile file, BatchGroup group, BatchTemplate template, RuleProfile profile, LibraryJob? library = null)
     {
@@ -80,10 +168,28 @@ public static class BatchPlanner
     private static BatchItem Place(BatchItem item, LibraryJob library, RuleProfile profile, List<ReviewReason> reasons)
     {
         var path = item.File.Path;
+        if (!library.KindConfirmed)
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: library.Kind == MediaKind.Series ? "seriál" : "filmy"));
+        }
+
+        var anyway = item.Group.Decisions.ProcessAnyway.Contains(path);
+        if (EpisodeParser.IsExtra(path, library.Root) && !anyway)
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.ExtraFile));
+        }
+
+        // films: an episode would become a version of a film
+        if (library.Kind == MediaKind.Movie && !anyway &&
+            (LibraryJob.LooksLikeEpisode(path, library.Root) || EpisodeParser.SeasonOfPath(path, library.Root) is not null))
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.EpisodeAmongFilms));
+        }
+
         var title = library.TitleFor(path);
         if (title is null || title.Problem is not null)
         {
-            reasons.Add(new ReviewReason(ReviewReasonKind.MissingTitle));
+            reasons.Add(new ReviewReason(ReviewReasonKind.MissingTitle, Detail: title?.Problem));
             return item;
         }
 
@@ -93,11 +199,16 @@ public static class BatchPlanner
             var (number, suggested) = library.EpisodeFor(path);
             if (number is null || suggested)
             {
-                reasons.Add(new ReviewReason(ReviewReasonKind.MissingEpisode));
+                reasons.Add(new ReviewReason(library.SeasonQuestions.Contains(path) ? ReviewReasonKind.SeasonQuestion : ReviewReasonKind.MissingEpisode,
+                    Detail: library.EpisodeDoubt(path)));
                 return item with { Title = title, Episode = number };
             }
 
             episode = number;
+            if (!library.TmdbKnows(number) && !item.Group.Decisions.ProcessAnyway.Contains(path))
+            {
+                reasons.Add(new ReviewReason(ReviewReasonKind.UnknownEpisode));
+            }
         }
 
         var placement = library.Layout.Place(item.Target, title, episode, profile);

@@ -29,8 +29,29 @@ public enum ReviewReasonKind
     /// <summary>The film or series title is not decided (or a suggestion waits for confirmation).</summary>
     MissingTitle,
 
-    /// <summary>A series file without a decided episode number.</summary>
+    /// <summary>A series file without a decided episode number (or only a suggested one).</summary>
     MissingEpisode,
+
+    /// <summary>Another file of the batch is the same episode with the same description (specification 13.5).</summary>
+    DuplicateEpisode,
+
+    /// <summary>TMDB lists the seasons of the series and does not know this season or episode (specification 13.5).</summary>
+    UnknownEpisode,
+
+    /// <summary>The file name names another series than most files of the folder (one folder is one series).</summary>
+    OtherSeries,
+
+    /// <summary>Films or series is only guessed from the names; the user has to confirm it (specification 13.5).</summary>
+    KindNotConfirmed,
+
+    /// <summary>An extra (trailer, sample, featurette …), not a film or an episode.</summary>
+    ExtraFile,
+
+    /// <summary>Among films, a file named like an episode (S01E04, "… (2008) Díl 1") or lying in a season folder.</summary>
+    EpisodeAmongFilms,
+
+    /// <summary>Season 00 (specials) or a regular season: a question the user answers for the file (owner's decision).</summary>
+    SeasonQuestion,
 
     /// <summary>The path in the library would be too long for Windows.</summary>
     PathTooLong,
@@ -39,7 +60,13 @@ public enum ReviewReasonKind
 /// <summary>Why a file is not processed automatically.</summary>
 /// <param name="Slot">The track position (undetermined language) or null.</param>
 /// <param name="TemplateSlot">The missing template slot, if that is the reason.</param>
-public sealed record ReviewReason(ReviewReasonKind Kind, SlotKey? Slot = null, TemplateSlot? TemplateSlot = null);
+/// <param name="Detail">What exactly is missing or wrong (Slovak), e.g. "chýba rok" or the other file's name.</param>
+public sealed record ReviewReason(ReviewReasonKind Kind, SlotKey? Slot = null, TemplateSlot? TemplateSlot = null, string? Detail = null)
+{
+    /// <summary>The user may process the file anyway (then a second version gets a number, K1).</summary>
+    public bool CanBeOverridden => Kind is ReviewReasonKind.MissingRequiredSlot or ReviewReasonKind.DuplicateEpisode or ReviewReasonKind.UnknownEpisode or
+        ReviewReasonKind.OtherSeries or ReviewReasonKind.ExtraFile or ReviewReasonKind.EpisodeAmongFilms;
+}
 
 /// <summary>One file of a batch with everything decided for it: the simulation result.</summary>
 public sealed record BatchItem(
@@ -74,7 +101,8 @@ public sealed record BatchItem(
     /// <summary>Planned path in the library, with the size class estimated from the original size.</summary>
     public string? PlannedPath => Placement?.PathFor(FileSize);
 
-    private long FileSize => _size ??= System.IO.File.Exists(File.Path) ? new FileInfo(File.Path).Length : 0;
+    /// <summary>Size of the original (estimate of the result's size class).</summary>
+    public long FileSize => _size ??= System.IO.File.Exists(File.Path) ? new FileInfo(File.Path).Length : 0;
 
     private long? _size;
 }

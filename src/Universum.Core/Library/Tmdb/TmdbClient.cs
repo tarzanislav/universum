@@ -21,14 +21,23 @@ public sealed record TmdbTitle(
         (string.Equals(Title, OriginalTitle, StringComparison.Ordinal) ? "" : " · " + OriginalTitle);
 
     /// <summary>True when the season and episode exist on TMDB (unknown seasons count as existing).</summary>
-    public bool HasEpisode(EpisodeNumber episode)
-    {
-        var season = Seasons.FirstOrDefault(s => s.Number == episode.Season);
-        return Seasons.Count == 0 || (season is not null && (season.EpisodeCount == 0 || (episode.LastEpisode ?? episode.Episode) <= season.EpisodeCount));
-    }
+    public bool HasEpisode(EpisodeNumber episode) => TmdbSeasons.Has(Seasons, episode);
 }
 
 public sealed record TmdbSeason(int Number, int EpisodeCount);
+
+public static class TmdbSeasons
+{
+    /// <summary>
+    /// True when the season exists and has the episode (all of them, for a file with several); true as well when the
+    /// seasons are not known or TMDB gives no episode count for the season.
+    /// </summary>
+    public static bool Has(IReadOnlyList<TmdbSeason> seasons, EpisodeNumber episode)
+    {
+        var season = seasons.FirstOrDefault(s => s.Number == episode.Season);
+        return seasons.Count == 0 || (season is not null && (season.EpisodeCount == 0 || (episode.LastEpisode ?? episode.Episode) <= season.EpisodeCount));
+    }
+}
 
 public sealed class TmdbException(string message, Exception? inner = null) : Exception(message, inner);
 

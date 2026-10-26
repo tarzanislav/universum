@@ -35,6 +35,7 @@ public sealed class RulesPageViewModel : ObservableObject
     private MediaKind _kind = MediaKind.Movie;
     private string _titleText = "";
     private string _episodeText = "";
+    private string _episodeNote = "";
     private Placement? _placement;
     private string _target = "";
     private TmdbTitle? _tmdbTitle;
@@ -137,6 +138,11 @@ public sealed class RulesPageViewModel : ObservableObject
                 // typed by the user: the title chosen on TMDB no longer applies
                 _tmdbTitle = null;
                 TitleNote = "";
+                if (UseTmdbAddress(value))
+                {
+                    return;
+                }
+
                 UpdateTarget();
             }
         }
@@ -150,6 +156,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             if (SetProperty(ref _episodeText, value))
             {
+                _episodeNote = "";
                 UpdateTarget();
             }
         }
@@ -238,19 +245,12 @@ public sealed class RulesPageViewModel : ObservableObject
     /// <summary>Kind, title and episode guessed from the file and folder names; the user can correct them.</summary>
     private void GuessTitle(string path)
     {
-        var episode = EpisodeParser.FromPath(path);
-        _kind = episode is null ? MediaKind.Movie : MediaKind.Series;
-        var folder = Path.GetFileName(Path.GetDirectoryName(path));
-        if (_kind == MediaKind.Series && EpisodeParser.SeasonOfFolder(folder) is not null)
-        {
-            folder = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path)));
-        }
-
-        var fromFolder = TitleGuess.FromName(folder);
-        var fromFile = TitleGuess.FromName(Path.GetFileNameWithoutExtension(path));
-        var guess = fromFolder is { Year: not null } or { TmdbId: not null } ? fromFolder : fromFile ?? fromFolder;
-        _titleText = guess is null ? "" : new TitleInfo(_kind, guess.Name, guess.Year, guess.TmdbId, guess.TmdbId is not null).FolderName;
-        _episodeText = episode?.Number.Tag ?? "";
+        var guess = TitleGuess.ForFile(path);
+        _kind = guess.Kind;
+        _titleText = guess.TitleText;
+        // Season 00 or a regular season: asked – the field stays empty until the user answers
+        _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
+        _episodeNote = LibraryTargetPicker.EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
         Tmdb.Refresh();
@@ -275,13 +275,17 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             Target = "Najprv nastavte výstupný priečinok (knižnicu).";
         }
-        else if (title is null || title.Problem is not null)
+        else if (title is null)
         {
             Target = "Zadajte názov titulu, napr. Creep (2004).";
         }
+        else if (title.Problem is { } problem)
+        {
+            Target = $"Názov titulu: {problem} – napr. Creep (2004).";
+        }
         else if (_kind == MediaKind.Series && episode is null)
         {
-            Target = "Zadajte epizódu, napr. S01E04.";
+            Target = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : "Zadajte epizódu, napr. S01E04.";
         }
         else
         {
@@ -291,10 +295,44 @@ public sealed class RulesPageViewModel : ObservableObject
                 ? "Súbor už je v knižnici na svojom mieste."
                 : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
                   (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +
-                  (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "");
+                  (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "") +
+                  (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");
         }
 
         RefreshCommands();
+    }
+
+    // a TMDB address or ID pasted as the title: the address tells film (/movie/) or series (/tv/); the title is read from TMDB
+    private bool UseTmdbAddress(string text)
+    {
+        // only an address (with /movie/ or /tv/): a bare number may be a title like "1917"; the TMDB button looks numbers up
+        if (TitleGuess.ParseTmdb(text) is not { Kind: { } kind })
+        {
+            return false;
+        }
+
+        if (kind != _kind)
+        {
+            _kind = kind;
+            OnPropertyChanged(nameof(IsMovie));
+            OnPropertyChanged(nameof(IsSeries));
+        }
+
+        // nothing is placed until a TMDB title is chosen
+        _placement = null;
+        if (_services.Tmdb is not null)
+        {
+            Target = "Hľadám titul na TMDB…";
+            _ = Tmdb.SearchAsync();
+        }
+        else
+        {
+            TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
+            Target = "Zadajte názov titulu, napr. Creep (2004).";
+        }
+
+        RefreshCommands();
+        return true;
     }
 
     private void ChooseTmdbTitle(TmdbTitle title)

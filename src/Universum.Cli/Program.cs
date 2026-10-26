@@ -118,6 +118,18 @@ if (options.Kind is { } kind)
     library.Kind = kind;
 }
 
+// a TMDB address tells the kind: themoviedb.org/tv/… is a series, themoviedb.org/movie/… a film
+if (options.Tmdb is { Kind: { } addressKind })
+{
+    if (options.Kind is { } chosen && chosen != addressKind)
+    {
+        Console.Error.WriteLine($"Adresa TMDB je {(addressKind == MediaKind.Series ? "seriál (/tv/)" : "film (/movie/)")}, ale zadané je {(chosen == MediaKind.Series ? "--serial" : "--film")}.");
+        return 2;
+    }
+
+    library.Kind = addressKind;
+}
+
 var tmdbKey = options.TmdbKey ?? Environment.GetEnvironmentVariable("UNIVERSUM_TMDB_KEY") ??
               (OperatingSystem.IsWindows() && SettingsProfile.TmdbEnabled() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
@@ -131,6 +143,12 @@ if (tmdb is not null)
 
 try
 {
+    if (options.Tmdb is { Kind: null } && !library.KindConfirmed)
+    {
+        Console.Error.WriteLine("--tmdb s číslom: zadajte aj --film alebo --serial (alebo celú adresu TMDB s /movie/ alebo /tv/).");
+        return 2;
+    }
+
     if (options.Tmdb is { } reference && tmdb is not null)
     {
         var tmdbKind = reference.Kind ?? library.Kind;
@@ -150,6 +168,11 @@ try
 
         Console.WriteLine($"TMDB: {found.Display} → {fromTmdb.FolderName}");
         SetTitle(library, analysis, fromTmdb);
+        if (tmdbKind == MediaKind.Series && found.Seasons.Count > 0)
+        {
+            library.SeriesOnTmdb = (fromTmdb, found.Seasons);
+        }
+
         titleFromTmdb = true;
     }
     else if (options.Tmdb is not null && options.Title is null)
@@ -162,6 +185,7 @@ try
         Console.WriteLine($"TMDB: spresnené návrhy názvov: {await RefineSuggestionsAsync(tmdb, library)}");
     }
 
+
     tmdb?.SaveCache();
 }
 catch (TmdbException ex)
@@ -171,7 +195,22 @@ catch (TmdbException ex)
 
 if (options.Title is { } name && !titleFromTmdb)
 {
-    var title = new TitleInfo(library.Kind, name, options.Year, options.Tmdb?.Id, options.Tmdb is not null);
+    // "Sága - Časť 2 (2011)" or "Nine Puzzles (2025) [tmdbid-227191]" typed as the name: year and ID are read from it
+    var typed = TitleGuess.Typed(library.Kind, name);
+    if (options.Year is { } year && typed?.Year is { } typedYear && year != typedYear)
+    {
+        Console.Error.WriteLine($"--rok {year} sa líši od roku v --nazov ({typedYear}).");
+        return 2;
+    }
+
+    if (options.Tmdb?.Id is { } tmdbId && typed?.TmdbId is { } typedId && tmdbId != typedId)
+    {
+        Console.Error.WriteLine($"--tmdb {tmdbId} sa líši od ID v --nazov ({typedId}).");
+        return 2;
+    }
+
+    var title = new TitleInfo(library.Kind, typed?.Name ?? name, options.Year ?? typed?.Year, options.Tmdb?.Id ?? typed?.TmdbId,
+        options.Tmdb is not null || typed?.IncludeId == true);
     if (title.Problem is { } problem)
     {
         Console.Error.WriteLine($"Názov {name}: {problem}.");
@@ -179,6 +218,35 @@ if (options.Title is { } name && !titleFromTmdb)
     }
 
     SetTitle(library, analysis, title);
+}
+
+// the series' seasons on TMDB, so every episode is checked (specification 13.5): by its ID (folder "[tmdbid-…]", --nazov
+// with an ID) or, without one, by the exact name and year
+if (tmdb is not null && library is { Kind: MediaKind.Series, Series: { } named, SeriesOnTmdb: null })
+{
+    try
+    {
+        var details = named.TmdbId is { } seriesId
+            ? await tmdb.GetAsync(MediaKind.Series, seriesId)
+            : TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, named.Name, named.Year), named.Name, named.Year) is { } match
+                ? await tmdb.GetAsync(MediaKind.Series, match.Id)
+                : null;
+        if (details is { Seasons.Count: > 0 })
+        {
+            library.SeriesOnTmdb = (named, details.Seasons);
+        }
+
+        if (named.TmdbId is { } id && details?.ToTitleInfo() is { } byTmdb && byTmdb.FolderName != named.FolderName)
+        {
+            Console.WriteLine($"TMDB: titul {id} je „{byTmdb.FolderName}“, zadaný alebo z priečinka „{named.FolderName}“ – skontrolujte --tmdb alebo --nazov.");
+        }
+
+        tmdb.SaveCache();
+    }
+    catch (TmdbException ex)
+    {
+        Console.Error.WriteLine("TMDB (sezóny): " + ex.Message);
+    }
 }
 
 foreach (var (fileName, number) in options.Episodes)
@@ -193,6 +261,25 @@ foreach (var (fileName, number) in options.Episodes)
     }
 
     library.Episodes[matches[0].Path] = number;
+}
+
+foreach (var fileName in options.ProcessAnyway)
+{
+    var matches = analysis.Groups.SelectMany(g => g.Files.Select(f => (Group: g, f.Path))).Where(f =>
+        Path.GetFileName(f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase) ||
+        Path.GetRelativePath(analysis.Folder, f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (matches.Count != 1)
+    {
+        Console.Error.WriteLine($"Súbor {fileName} pre --aj-tak {(matches.Count == 0 ? "sa nenašiel" : "nie je jednoznačný")} – voľba sa preskočí.");
+        continue;
+    }
+
+    matches[0].Group.Decisions.ProcessAnyway.Add(matches[0].Path);
+}
+
+if (options.SpecialsIntoSeason00)
+{
+    Console.WriteLine($"Špeciály do Season 00: {library.AnswerSpecials()} súborov");
 }
 
 if (options.ConfirmSuggestions)
@@ -265,9 +352,16 @@ static async Task<string> RefineSuggestionsAsync(TmdbClient tmdb, LibraryJob lib
     if (library.Kind == MediaKind.Series)
     {
         if (library.Series is null && library.SeriesSuggestion is { } guess &&
-            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year)?.ToTitleInfo() is { } series)
+            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year) is { } match &&
+            match.ToTitleInfo() is { } series)
         {
             library.SeriesSuggestion = series;
+            // seasons and episode counts for the check that every episode exists
+            if (await tmdb.GetAsync(MediaKind.Series, match.Id) is { Seasons.Count: > 0 } details)
+            {
+                library.SeriesOnTmdb = (series, details.Seasons);
+            }
+
             return "seriál " + series.FolderName;
         }
 

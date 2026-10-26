@@ -36,6 +36,12 @@ public sealed class Options
     /// <summary>Episode numbers by file name: "Seriál E2.mkv=S01E02".</summary>
     public List<(string File, EpisodeNumber Number)> Episodes { get; } = [];
 
+    /// <summary>Files to process although they wait for review for a reason the user may override (--aj-tak).</summary>
+    public List<string> ProcessAnyway { get; } = [];
+
+    /// <summary>The answer to the questions Season 00 or a regular season: specials go into Season 00 (--specialy).</summary>
+    public bool SpecialsIntoSeason00 { get; private set; }
+
     public bool DryRun { get; private set; }
 
     public string? ReportFile { get; private set; }
@@ -99,6 +105,12 @@ public sealed class Options
                     break;
                 case "--epizoda" or "--episode":
                     options.Episodes.Add(ParseEpisode(value()));
+                    break;
+                case "--specialy" or "--specials":
+                    options.SpecialsIntoSeason00 = true;
+                    break;
+                case "--aj-tak" or "--anyway":
+                    options.ProcessAnyway.Add(value());
                     break;
                 case "--dry-run":
                     options.DryRun = true;

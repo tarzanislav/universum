@@ -89,6 +89,33 @@ in next to it without changing the rules, planning or UI.
   gets a number (`BIG2`, `BIG3`).
 - `Library/EpisodeParser`, `TitleGuess`, `LibraryJob` – episode numbers and titles from file and folder names (only
   suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
+  Series rules (specification 13.5):
+  - season from the name, else from the nearest season folder ("Season 2", "Séria 2", "Sezóna 2", "Řada 2", "S02",
+    a season pack "Show.S02.1080p", "Specials"/"Špeciály" = season 0 → `Season 00`); a season assumed (none in name
+    or folder) or a name that disagrees with its season folder is only a suggestion (`EpisodeMatch.NeedsConfirmation`);
+  - one analysed folder is one series: season folders count as series evidence; the series title comes from the
+    folder when it is in library form ("Name (Year)", "[tmdbid-…]"), otherwise from the start of the episode names,
+    which ends at an episode or season ("Kriminálka Anděl Díl 4" → "Kriminálka Anděl"); films keep "Časť 2" in titles;
+  - files without a number get the next free numbers of their season in natural order (suggestions);
+  - `BatchPlanner.CheckEpisodes`: the same episode (overlapping ranges) with the same description twice, a file named
+    after another series, and – with `LibraryJob.SeriesOnTmdb` – an episode TMDB does not list go for review;
+    "process anyway" lets a file through (a second version then gets a number, K1);
+  - the kind film/series is only proposed (`LibraryJob.KindConfirmed`; batch: "Potvrdiť" / choosing a kind / accepting
+    suggestions; CLI: `--film`, `--serial`, `--confirm-suggestions`); it is guessed from clear numbers (S01E04, 1x04)
+    and season folders; a number before the year of a library-form name belongs to a film's title ("Sága - Časť 2
+    (2011)", "Rally 4x10 (2015)"), after it is an episode ("Kriminálka Anděl (2008) Díl 1"); episodes among films and
+    different films under one title go for review; a TMDB address tells the kind (`/tv/` series, `/movie/` film);
+  - fixed by the owner (26 Oct 2026): season folders have two digits (`Season 01`, never `Season 1`) and specials
+    ("Specials", "Špeciály", "Season 00", "… Specials", "Špeciálne epizódy") are `Season 00`; whenever Season 00 or a
+    regular season is in doubt – a specials folder (anywhere up to four levels above) with S01 in the name, S00 in a
+    "Season 1" folder, episode 00 – UNIVERSUM asks (`EpisodeMatch.IsSeasonQuestion`, review `SeasonQuestion`): never
+    answered by "accept all suggestions", only per file or by "Špeciály do Season 00" (`LibraryJob.AnswerSpecials`,
+    CLI `--specialy`); folders naming several seasons ("Season 1-3", "S01-03", "Séria 1 až 3") name none;
+  - seasons are looked for only below the analysed folder; extras (Extras, Trailers, Featurettes, Samples … folders,
+    "- trailer" names) are no films or episodes and go for review; ranges S01E18-S01E19, S01E20E21E22, 1x15-16;
+  - `TitleInfo.Problem`: the year is required ("Name (Year)") and the name must be in Latin script; titles in library
+    form are everything before "(Year)"; `TitleGuess.ForFile` is the shared guess of the pages; the TMDB picker, the
+    batch (folder "[tmdbid-…]") and the CLI load a series' seasons, so episodes are checked against TMDB.
 - `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
   user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
   TMDB key; `Request` sends it only to histra.net over HTTPS. `HistraClient` is ready for the endpoints: requests

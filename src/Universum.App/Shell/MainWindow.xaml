@@ -887,7 +887,11 @@
                         <WrapPanel Margin="0,6,0,0">
                             <TextBlock Text="Obsah:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <RadioButton Content="filmy" IsChecked="{Binding IsMovies}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding KindNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <Button Content="Potvrdiť" Command="{Binding ConfirmKindCommand}" Padding="10,3" Margin="0,0,20,0"
+                                    Visibility="{Binding KindNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Druh (filmy alebo seriál) je odhadnutý z mien súborov – potvrďte ho, alebo zvoľte druhý" />
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Seriál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding SeriesTitle, UpdateSourceTrigger=LostFocus}" Width="230" Margin="0,0,6,0"
@@ -901,7 +905,10 @@
                                     Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Spresní navrhnuté názvy filmov podľa TMDB (len presná zhoda názvu a roku)" />
                             <Button Content="Prijať návrhy názvov" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
-                                    ToolTip="Názvy a čísla epizód odhadnuté z mien súborov a priečinkov" />
+                                    ToolTip="Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)" />
+                            <Button Content="Špeciály do Season 00" Command="{Binding AnswerSpecialsCommand}" Padding="10,3" Margin="6,0,0,0"
+                                    Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore." />
                         </WrapPanel>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">

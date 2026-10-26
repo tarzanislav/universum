@@ -1,6 +1,8 @@
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.IO;
 using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
@@ -124,7 +126,165 @@ public sealed class BatchTests
 
         job.ConfirmSuggestions();
         items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.True(items.All(i => i.Reasons.Single() is { Kind: ReviewReasonKind.MissingTitle, Detail: "chýba rok" }), "the folder is \"Name (Year)\": the year is required");
+
+        job.Series = job.Series! with { Year = 2026 };
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
         Assert.True(items.All(i => i.Reasons.Count == 0), string.Join("; ", items.SelectMany(i => i.Reasons).Select(r => r.Kind)));
+    }
+
+    [Test]
+    public void SeriesFolderIsCheckedEpisodeByEpisode()
+    {
+        // one analysed folder = one series; season folders, specials, files without numbers, a name/folder conflict,
+        // the same episode twice and a file of another series
+        using var work = new Work();
+        var root = Path.Combine(work.Path, "Vymyslený seriál (2024)");
+        string P(params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (!File.Exists(path))
+            {
+                File.WriteAllBytes(path, []);
+            }
+
+            return path;
+        }
+
+        var analysis = Synthetic(root,
+            P("Season 1", "Vymysleny.Serial.S01E01.mkv"),
+            P("Season 1", "Vymysleny.Serial.S01E02-E03.mkv"),
+            P("Season 1", "Vymysleny.Serial.S01E03.v2.mkv"),
+            P("Season 2", "prvá.mkv"),
+            P("Season 2", "druhá.mkv"),
+            P("Season 2", "Vymysleny.Serial.S01E04.mkv"),
+            P("Specials", "Vymysleny Serial E01.mkv"),
+            P("Season 1", "Iny.Serial.S01E05.mkv"),
+            P("Season 3", "07.mkv"),
+            P("Season 2", "Extras", "Vymysleny Serial E09.mkv"));
+        var output = Path.Combine(work.Path, "OUTPUT");
+        var job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+
+        Assert.True(job is { Kind: MediaKind.Series, KindConfirmed: false }, "season folders: a series, to be confirmed");
+        Assert.Equal("Vymyslený seriál (2024)", job.SeriesSuggestion?.FolderName, "the folder in library form wins over the file names");
+        Assert.Equal((new EpisodeNumber(2, 1), true), job.EpisodeFor(P("Season 2", "druhá.mkv")), "folder order, season of the folder");
+        Assert.Equal((new EpisodeNumber(2, 2), true), job.EpisodeFor(P("Season 2", "prvá.mkv")));
+        Assert.Equal((new EpisodeNumber(1, 4), true), job.EpisodeFor(P("Season 2", "Vymysleny.Serial.S01E04.mkv")), "name and folder disagree: to confirm");
+        Assert.Equal((new EpisodeNumber(0, 1), false), job.EpisodeFor(P("Specials", "Vymysleny Serial E01.mkv")), "specials: season 0");
+        Assert.Equal((new EpisodeNumber(3, 7), true), job.EpisodeFor(P("Season 3", "07.mkv")), "a bare number is suggested as the episode");
+
+        job.Series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2024);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.True(items.All(i => i.Reasons.Any(r => r is { Kind: ReviewReasonKind.KindNotConfirmed, Detail: "seriál" })), "the kind waits for confirmation");
+        job.Kind = MediaKind.Series;
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        ReviewReasonKind[] Kinds(string path) => items.Single(i => Paths.Same(i.File.Path, path)).Reasons
+            .Select(r => r.Kind).Where(k => k is not (ReviewReasonKind.NoAudio or ReviewReasonKind.MultipleVideoTracks or ReviewReasonKind.UndeterminedLanguage)).ToArray();
+        Assert.Sequence([ReviewReasonKind.MissingEpisode], Kinds(P("Season 2", "Vymysleny.Serial.S01E04.mkv")), "conflict");
+        Assert.Sequence([ReviewReasonKind.DuplicateEpisode], Kinds(P("Season 1", "Vymysleny.Serial.S01E02-E03.mkv")), "episode 3 twice");
+        Assert.Sequence([ReviewReasonKind.DuplicateEpisode], Kinds(P("Season 1", "Vymysleny.Serial.S01E03.v2.mkv")));
+        Assert.Sequence([ReviewReasonKind.OtherSeries], Kinds(P("Season 1", "Iny.Serial.S01E05.mkv")), "another series");
+        Assert.Sequence([], Kinds(P("Season 1", "Vymysleny.Serial.S01E01.mkv")));
+        Assert.Sequence([ReviewReasonKind.ExtraFile], Kinds(P("Season 2", "Extras", "Vymysleny Serial E09.mkv")), "an extra is no episode");
+        foreach (var item in items.Where(i => i.PlannedPath is not null))
+        {
+            var season = Path.GetFileName(Path.GetDirectoryName(item.PlannedPath))!;
+            Assert.True(season is "Season 00" or "Season 01" or "Season 02" or "Season 03", "two-digit season folders: " + item.PlannedPath);
+        }
+
+        Assert.Equal(
+            Path.Combine(output, "TVSHOWS", "Vymyslený seriál (2024)", "Season 00", "Vymyslený seriál S00E01 - SMALL.mkv"),
+            items.Single(i => Paths.Same(i.File.Path, P("Specials", "Vymysleny Serial E01.mkv"))).PlannedPath, "Season 00 (no tracks: no languages, quality or codec)");
+
+        // a file in Specials named S01: Season 00 or Season 01 is asked; accepting all suggestions does not answer it
+        var question = P("Specials", "Vymysleny.Serial.S01E02.mkv");
+        analysis.Groups[0].Files.Add(new MediaFile { Path = question });
+        job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        job.Kind = MediaKind.Series;
+        job.Series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2024);
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([ReviewReasonKind.SeasonQuestion], Kinds(question), "asked, not accepted");
+        Assert.True(items.Single(i => Paths.Same(i.File.Path, question)).Reasons.Single(r => r.Kind == ReviewReasonKind.SeasonQuestion).Detail?.Contains("Season 00", StringComparison.Ordinal) == true, "the question names both seasons");
+        var bonus = P("Specials", "Season 1", "Bonus noc.mkv");
+        analysis.Groups[0].Files.Add(new MediaFile { Path = bonus });
+        job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        job.Kind = MediaKind.Series;
+        job.Series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2024);
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([ReviewReasonKind.SeasonQuestion], Kinds(bonus), "a file without a number under Specials is asked too");
+        Assert.True(job.EpisodeFor(bonus) is ({ Season: 0 }, true), "suggested in Season 00");
+        Assert.Equal(2, job.AnswerSpecials(), "answer: specials");
+        analysis.Groups[0].Files.RemoveAll(f => Paths.Same(f.Path, bonus));
+        Assert.Equal((new EpisodeNumber(0, 2), false), job.EpisodeFor(question));
+        analysis.Groups[0].Files.RemoveAll(f => Paths.Same(f.Path, question));
+
+        // TMDB knows four episodes of season 1 and the specials without a count
+        job.ConfirmSuggestions();
+        job.SeriesOnTmdb = (job.Series, [new TmdbSeason(0, 0), new TmdbSeason(1, 4), new TmdbSeason(2, 1)]);
+        analysis.Groups[0].Decisions.ProcessAnyway.Add(P("Season 1", "Vymysleny.Serial.S01E03.v2.mkv"));
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([], Kinds(P("Season 1", "Vymysleny.Serial.S01E03.v2.mkv")), "processed anyway: a second version (K1)");
+        Assert.Sequence([ReviewReasonKind.UnknownEpisode], Kinds(P("Season 2", "prvá.mkv")), "S02E02: TMDB has one episode in season 2");
+        Assert.Sequence([], Kinds(P("Season 2", "druhá.mkv")));
+        Assert.Sequence([], Kinds(P("Specials", "Vymysleny Serial E01.mkv")), "no count: not checked");
+        Assert.Sequence([ReviewReasonKind.UnknownEpisode, ReviewReasonKind.OtherSeries], Kinds(P("Season 1", "Iny.Serial.S01E05.mkv")));
+
+        job.Series = new TitleInfo(MediaKind.Series, "Iný názov", 2024);
+        Assert.True(job.TmdbKnows(new EpisodeNumber(9, 9)), "the seasons belong to the other title");
+    }
+
+    [Test]
+    public void FilmsAndEpisodesAreToldApart()
+    {
+        using var work = new Work();
+        string F(string folder, string name)
+        {
+            var path = Path.Combine(work.Path, folder, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        // "Name - Díl N (Year)" with the same year: episodes too
+        var parts = Synthetic(Path.Combine(work.Path, "c"), F("c", "Kriminálka Anděl - Díl 1 (2008).mkv"), F("c", "Kriminálka Anděl - Díl 2 (2008).mkv"), F("c", "Kriminálka Anděl - Díl 3 (2008).mkv"));
+        Assert.Equal(MediaKind.Series, LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), parts).Kind, "numbered parts of one year");
+        var saga = Synthetic(Path.Combine(work.Path, "d"), F("d", "Sága - Časť 1 (2010).mkv"), F("d", "Sága - Časť 2 (2011).mkv"));
+        Assert.Equal(MediaKind.Movie, LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), saga).Kind, "parts of different years: films");
+
+        // "Name (Year) Díl N" is a series
+        var series = Synthetic(Path.Combine(work.Path, "a"), F("a", "Kriminálka Anděl (2008) Díl 1.mkv"), F("a", "Kriminálka Anděl (2008) Díl 2.mkv"));
+        var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), series);
+        Assert.True(job is { Kind: MediaKind.Series, SeriesSuggestion.FolderName: "Kriminálka Anděl (2008)" }, "a series with its year");
+
+        // films with numbers in their titles stay films; episodes among them and different films under one title go for review
+        var films = Synthetic(Path.Combine(work.Path, "b"),
+            F("b", "Sága - Časť 2 (2011).mkv"), F("b", "Rally 4x10 (2015).mkv"), F("b", "Okno (2014).mkv"), F("b", "Nine Puzzles S01E01.mkv"));
+        job = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), films);
+        Assert.Equal(MediaKind.Movie, job.Kind);
+        job.ConfirmSuggestions();
+        foreach (var (path, title) in job.Movies.ToList())
+        {
+            job.Movies[path] = title with { Year = title.Year ?? 2025 };
+        }
+
+        ReviewReasonKind[] Kinds(IReadOnlyList<BatchItem> items, string name) => items.Single(i => Path.GetFileName(i.File.Path) == name).Reasons
+            .Select(r => r.Kind).Where(k => k is not (ReviewReasonKind.NoAudio or ReviewReasonKind.MultipleVideoTracks or ReviewReasonKind.UndeterminedLanguage)).ToArray();
+        var planned = BatchPlanner.Plan(films, BatchTemplate.RulesOnly, library: job);
+        Assert.Equal("Sága - Časť 2 (2011)", planned.Single(i => i.File.Path.EndsWith("Sága - Časť 2 (2011).mkv", StringComparison.Ordinal)).Title?.FolderName);
+        Assert.Sequence([], Kinds(planned, "Rally 4x10 (2015).mkv"), "a film");
+        Assert.Sequence([ReviewReasonKind.EpisodeAmongFilms], Kinds(planned, "Nine Puzzles S01E01.mkv"), "an episode among films");
+
+        foreach (var path in job.Movies.Keys.ToList())
+        {
+            job.Movies[path] = new TitleInfo(MediaKind.Movie, "Okno", 2014);
+        }
+
+        planned = BatchPlanner.Plan(films, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([], Kinds(planned, "Okno (2014).mkv"), "its own title");
+        Assert.Sequence([ReviewReasonKind.OtherSeries], Kinds(planned, "Rally 4x10 (2015).mkv"), "another film is no version of Okno");
     }
 
     [Test]
@@ -169,6 +329,8 @@ public sealed class BatchTests
 
         var inLibrary = await AnalyzeAsync(Path.Combine(library.Layout.Shows, "Seriál (2026)"));
         var again = LibraryJob.Guess(library.Layout, inLibrary);
+        Assert.True(again is { Kind: MediaKind.Series, KindConfirmed: false }, "the kind is only proposed");
+        again.Kind = MediaKind.Series;
         again.Series = library.Series;
         var plan = BatchPlanner.Plan(inLibrary, BatchTemplate.RulesOnly, library: again);
         Assert.True(plan.All(i => i.Status == BatchStatus.Unchanged), string.Join("; ", plan.Select(i => i.Status + " " + Path.GetFileName(i.File.Path))));
@@ -182,6 +344,7 @@ public sealed class BatchTests
         analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
         var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
         library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
         var control = new BatchControl();
         var results = await RunAsync(work.Path, BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library),
             new SyncProgress<BatchProgress>(p => { if (p.Result is not null) { control.StopAfterCurrent = true; } }), control);
@@ -361,6 +524,11 @@ public sealed class BatchTests
         var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(root, "OUTPUT")), analysis);
         job.Kind = MediaKind.Movie;
         job.ConfirmSuggestions();
+        foreach (var (path, title) in job.Movies.ToList())
+        {
+            job.Movies[path] = title with { Year = title.Year ?? 2026 };
+        }
+
         return job;
     }
 

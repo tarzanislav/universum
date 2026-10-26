@@ -17,7 +17,10 @@ public static class UniversumInstaller
 
     static UniversumInstaller() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("UNIVERSUM-updater");
 
-    public static async Task<string> DownloadAsync(UniversumRelease release, IProgress<double>? progress, CancellationToken cancellationToken = default)
+    /// <summary>A downloaded installer and the signed SHA-256 it must still have when it is started.</summary>
+    public sealed record VerifiedInstaller(string Path, string Sha256);
+
+    public static async Task<VerifiedInstaller> DownloadAsync(UniversumRelease release, IProgress<double>? progress, CancellationToken cancellationToken = default)
     {
         if (release.Installer is null || release.Checksums is null || release.ChecksumsSignature is null || !ReleaseSignature.IsConfigured)
         {
@@ -39,15 +42,24 @@ public static class UniversumInstaller
             throw new SetupException("Stiahnutý inštalátor UNIVERSUM nemá podpísaný kontrolný súčet, preto sa zmazal.");
         }
 
-        return target;
+        return new VerifiedInstaller(target, expected);
     }
 
-    /// <summary>Starts the verified installer (it closes nothing else, restarts UNIVERSUM afterwards); false when declined.</summary>
-    public static bool Start(string installerPath)
+    /// <summary>
+    /// Starts the installer (it restarts UNIVERSUM afterwards); false when the user declined. The file is locked against
+    /// changes and checked once more while it is started, so it cannot be swapped between the check and the start.
+    /// </summary>
+    public static bool Start(VerifiedInstaller installer)
     {
+        using var locked = new FileStream(installer.Path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (!FileHashes.Matches(installer.Sha256, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(locked))))
+        {
+            throw new SetupException("Inštalátor UNIVERSUM sa po overení zmenil – nespustil sa.");
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo(installerPath, "/SILENT /SUPPRESSMSGBOXES /NORESTART /SPUSTIT=1") { UseShellExecute = true })?.Dispose();
+            Process.Start(new ProcessStartInfo(installer.Path, "/SILENT /SUPPRESSMSGBOXES /NORESTART /SPUSTIT=1") { UseShellExecute = true })?.Dispose();
             return true;
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)

@@ -70,6 +70,13 @@ public sealed class MkvToolNixInstaller
     /// <summary>Runs the verified installer and waits for it. Returns false when the user declined the Windows prompt.</summary>
     public static async Task<bool> RunAsync(string installerPath, bool silent, CancellationToken cancellationToken = default)
     {
+        // locked against changes and checked once more, so it cannot be swapped between the check and the start
+        using var locked = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (!AuthenticodeVerifier.Verify(installerPath).IsSignedBy(MkvToolNixDownloads.WindowsSignerName))
+        {
+            throw new SetupException("Inštalátor MKVToolNix sa po overení zmenil – nespustil sa.");
+        }
+
         Process? process;
         try
         {

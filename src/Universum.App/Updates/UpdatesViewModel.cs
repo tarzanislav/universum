@@ -73,6 +73,10 @@ public sealed class UpdatesViewModel : ObservableObject
 
     public string MkvNews => _report?.MkvToolNix is { IsAvailable: true } m ? FormatNews(m.News) : "";
 
+    public bool HasMkvNews => MkvNews.Length > 0;
+
+    public bool HasUniversumNotes => UniversumNotes.Length > 0;
+
     public string UniversumLine => _report switch
     {
         null => "Zisťujem…",

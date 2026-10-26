@@ -1,7 +1,13 @@
 # Poznámky k vydaniam
 
 Ku každému vydaniu patrí súbor `vX.Y.Z.md` s popisom zmien po slovensky. Zobrazí ho okno Aktualizácie v UNIVERSUM.
-Vydanie vznikne len značkou `vX.Y.Z` (so súhlasom vlastníka) a len ak je nastavený podpisový kľúč vydaní
+
+**Spustenie vydania (vlastník):** GitHub → **Actions → Release → Run workflow** (vetva `main`) → verzia, napr. `0.1.0`
+→ **Run workflow**. Po zostavení a testoch (10–15 min) beh čaká: otvoriť ho → **Review deployments** → zaškrtnúť
+`release` → **Approve and deploy**. Značka `vX.Y.Z` vznikne až pri zverejnení. Prostredie `release` musí povoliť
+vetvu `main` (Settings → Environments → release → Deployment branches and tags → pravidlo typu Branch, `main`).
+
+Vydanie vznikne len so súhlasom vlastníka (tlačidlom alebo značkou `vX.Y.Z`) a len ak je nastavený podpisový kľúč vydaní
 (tajomstvo `UNIVERSUM_RELEASE_KEY`, verejný kľúč v `src/Universum.Core/Updates/ReleaseSignature.cs`).
 
 Postup v `release.yml`: úloha `build` (len čítanie, bez tajomstiev) zostaví, otestuje a zabalí inštalátor a zoznam

@@ -220,7 +220,7 @@
                         <KeyBinding Key="Down" Modifiers="Control" Command="{Binding MoveDownCommand}" />
                     </DataGrid.InputBindings>
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="Vziať" Width="56">
+                        <DataGridTemplateColumn Header="Vziať" Width="66">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />

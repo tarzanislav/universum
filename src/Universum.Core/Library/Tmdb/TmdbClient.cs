@@ -46,7 +46,6 @@ public sealed class TmdbClient
     private static readonly Uri BaseAddress = new("https://api.themoviedb.org/3/");
     private static readonly TimeSpan DetailsLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan SearchLifetime = TimeSpan.FromDays(7);
-    private static readonly TimeSpan MaxDelay = TimeSpan.FromSeconds(60);
     private const int MaxRetriesWhenLimited = 4;
     private const int MaxRetriesOnServerError = 2;
 
@@ -206,7 +205,7 @@ public sealed class TmdbClient
                             : $"TMDB má problém ({(int)response.StatusCode}) – skúste to neskôr.");
                     }
 
-                    var delay = RetryDelay(response, attempt);
+                    var delay = RequestPacer.RetryDelay(response, attempt);
                     _pacer.PauseFor(delay);
                     Waiting?.Invoke(delay);
                     continue;
@@ -245,22 +244,6 @@ public sealed class TmdbClient
             }
         }
     }
-
-    /// <summary>How long to wait before the next attempt: what TMDB asks for (Retry-After), else 2, 4, 8, 16 s; at most 60 s.</summary>
-    internal static TimeSpan RetryDelay(HttpResponseMessage response, int attempt)
-    {
-        var asked = response.Headers.RetryAfter switch
-        {
-            { Delta: { } delta } => delta,
-            { Date: { } date } => date - DateTimeOffset.UtcNow,
-            _ => (TimeSpan?)null,
-        };
-        var delay = asked is { } a && a > TimeSpan.Zero ? a : TimeSpan.FromSeconds(2 << Math.Min(attempt, 4));
-        return (delay > MaxDelay ? MaxDelay : delay) * DelayScale;
-    }
-
-    /// <summary>Tests shorten the waiting (1 = real time).</summary>
-    internal static double DelayScale { get; set; } = 1;
 
     private HttpRequestMessage Request(string path)
     {

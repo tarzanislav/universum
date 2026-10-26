@@ -124,7 +124,7 @@ public sealed class TmdbTests
         var client = new TmdbClient(server.Http, "abc123", pacer: new RequestPacer(100));
         var waits = new List<TimeSpan>();
         client.Waiting += waits.Add;
-        TmdbClient.DelayScale = 0.05;
+        RequestPacer.DelayScale = 0.05;
         try
         {
             Assert.Equal("Creep", (await client.GetAsync(MediaKind.Movie, 8555))?.Title, "answer after waiting");
@@ -139,7 +139,7 @@ public sealed class TmdbTests
         }
         finally
         {
-            TmdbClient.DelayScale = 1;
+            RequestPacer.DelayScale = 1;
         }
     }
 

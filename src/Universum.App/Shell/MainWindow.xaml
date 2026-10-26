@@ -278,8 +278,8 @@
                 <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                             <WrapPanel DataContext="{Binding Library}">
-                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
+                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                                 <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                          ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
@@ -296,34 +296,36 @@
                                 <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
                                 <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                             </TextBlock>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
-                            <TextBlock Grid.Row="1" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
-                                     ToolTip="Kapitoly XML, OGM (.txt) alebo cue – pridajú sa ku kapitolám zo vstupov, ktoré sú zaškrtnuté" />
-                            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
-                                <Button Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="12,4" Margin="0,0,6,0" />
-                                <Button Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,4" ToolTip="Bez súboru s kapitolami" />
-                            </StackPanel>
-                            <TextBlock Grid.Row="2" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
-                            <ListBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="70" MinHeight="30" Margin="0,0,8,0" />
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
-                                <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="12,4" Margin="0,0,6,0" />
-                                <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Padding="8,4" />
-                            </StackPanel>
-                        </Grid>
+                        <Expander Header="Názov (title), kapitoly zo súboru, nové prílohy" Margin="0,0,0,4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
+                                <TextBlock Grid.Row="1" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
+                                         ToolTip="Kapitoly XML, OGM (.txt) alebo cue – pridajú sa ku kapitolám zo vstupov, ktoré sú zaškrtnuté" />
+                                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Button Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="12,4" Margin="0,0,6,0" />
+                                    <Button Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,4" ToolTip="Bez súboru s kapitolami" />
+                                </StackPanel>
+                                <TextBlock Grid.Row="2" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
+                                <ListBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="70" MinHeight="30" Margin="0,0,8,0" />
+                                <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="12,4" Margin="0,0,6,0" />
+                                    <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Padding="8,4" />
+                                </StackPanel>
+                            </Grid>
+                        </Expander>
                         <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
                             <TextBlock Text="Kontrola" FontWeight="SemiBold" />
                             <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto">
@@ -416,8 +418,8 @@
                 <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
                             <WrapPanel DataContext="{Binding Library}">
-                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
+                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                                 <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                          ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
@@ -558,8 +560,8 @@
                             </ScrollViewer>
                         </StackPanel>
                         <WrapPanel Margin="0,0,0,4" DataContext="{Binding Library}">
-                            <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                            <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                             <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="280" Margin="0,0,6,0"
                                      ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />

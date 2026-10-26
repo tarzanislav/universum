@@ -1,0 +1,18 @@
+<h3 class="background_color light_blue">FAQ</h3>
+<h2>Logos & Attribution</h2>
+<h3>Primary Color (Dark blue)</h3>
+<h3>Secondary Color (Light blue)</h3>
+<h3>Tertiary Color (Light green)</h3>
+<h3>The Basics</h3>
+<h3>Get Involved</h3>
+<h3>Community</h3>
+<h3>Legal</h3>
+<h3>Global</h3>
+<h3>On media pages</h3>
+<h3>On TV season pages</h3>
+<h3>On TV episode pages</h3>
+<h3>On all image pages</h3>
+<h3>On all edit pages</h3>
+<h3>On discussion pages</h3>
+<h3 class="k-pb-1 k-font-weight-bold settings_label">Settings</h3>
+<h2>No Results</h2>

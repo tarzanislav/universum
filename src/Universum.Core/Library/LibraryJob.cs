@@ -130,6 +130,14 @@ public sealed class LibraryJob(LibraryLayout layout)
         foreach (var file in content.Where(f => EpisodeParser.FromPath(f, root) is null))
         {
             var season = SeasonFolderBelow(root, file) ?? 1;
+            // under a specials folder ("Specials\Season 1\Bonus.mkv", or above the analysed folder): Season 00 or the
+            // season is a question
+            if (season != 0 && EpisodeParser.UnderSpecials(file))
+            {
+                season = 0;
+                job.SeasonQuestions.Add(file);
+            }
+
             var next = 1;
             if (BareNumber(Path.GetFileNameWithoutExtension(file)) is { } own && !used.Contains((season, own)))
             {
@@ -248,6 +256,8 @@ public sealed class LibraryJob(LibraryLayout layout)
             { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia",
             { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
             { RangeRejected: true } => "rozsah epizód v mene sa nedá zapísať (iná sezóna alebo opačné poradie) – berie sa prvá epizóda",
+            null when SeasonQuestions.Contains(path) && EpisodeSuggestions.TryGetValue(path, out var special) =>
+                $"OTÁZKA: súbor bez čísla je pod priečinkom špeciálov – patrí do Season 00 (návrh {special.Tag}) alebo do bežnej sezóny? Zadajte číslo epizódy",
             null when EpisodeSuggestions.ContainsKey(path) => "číslo nie je v mene – návrh podľa poradia",
             _ => null,
         };

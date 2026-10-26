@@ -115,7 +115,7 @@ public static partial class EpisodeParser
                 break;
             }
 
-            if (SeasonOfFolder(Path.GetFileName(folder)) is { } season)
+            if (SeasonAt(Path.GetFileName(folder), level) is { } season)
             {
                 return season;
             }
@@ -135,9 +135,16 @@ public static partial class EpisodeParser
         var folder = Path.GetDirectoryName(Path.GetFullPath(path));
         for (var level = 0; level < 4 && !string.IsNullOrEmpty(folder); level++)
         {
-            if (IsSpecialsFolder(Path.GetFileName(folder)))
+            var name = Path.GetFileName(folder);
+            if (IsSpecials(name, level))
             {
                 return true;
+            }
+
+            // specials lie inside the title folder ("Nine Puzzles (2025)\Specials"): nothing above it counts
+            if (IsTitleFolder(name))
+            {
+                break;
             }
 
             folder = Path.GetDirectoryName(folder);
@@ -146,17 +153,25 @@ public static partial class EpisodeParser
         return false;
     }
 
-    /// <summary>"Specials", "Special", "Špeciály", "Speciály", "Season 00", "Nine Puzzles Specials", "Špeciálne epizódy", "Speciální díly".</summary>
-    public static bool IsSpecialsFolder(string? folderName)
+    /// <summary>
+    /// A specials folder: "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Špeciálne epizódy", "Speciální díly",
+    /// "Špeciálny diel"; "Nine Puzzles Specials" only as the file's own folder and not in library form ("Lake Specials
+    /// (2021)" is a series, "Seriály a špeciály" a collection).
+    /// </summary>
+    public static bool IsSpecialsFolder(string? folderName) => IsSpecials(folderName, 0);
+
+    private static bool IsSpecials(string? folderName, int level)
     {
         var words = Words.Normalize(folderName);
-        return SpecialsFolder().IsMatch(words) || SpecialsWord().IsMatch(words) || SeasonOfFolderExact(words) == 0;
+        return SpecialsFolder().IsMatch(words) || SpecialsEpisodes().IsMatch(words) ||
+               (SeasonFolder().Match(words) is { Success: true } exact && Number(exact.Groups["s"]) == 0) ||
+               (SeasonOnly().IsMatch(words) && SeasonWord().Match(words) is { Success: true } named && Number(named.Groups["s"]) == 0) ||
+               (level == 0 && SpecialsSuffix().IsMatch(words) && !IsTitleFolder(folderName));
     }
 
-    private static int? SeasonOfFolderExact(string words) =>
-        SeasonFolder().Match(words) is { Success: true } exact ? Number(exact.Groups["s"])
-        : SeasonOnly().IsMatch(words) && SeasonWord().Match(words) is { Success: true } named ? Number(named.Groups["s"])
-        : null;
+    // a title folder in library form: "Nine Puzzles (2025)", "… [tmdbid-227191]"
+    private static bool IsTitleFolder(string? folderName) =>
+        folderName is not null && (TitleGuess.HasYearInParentheses(folderName) || folderName.Contains("tmdbid-", StringComparison.OrdinalIgnoreCase));
 
     public static EpisodeMatch? FromText(string? name)
     {
@@ -238,7 +253,10 @@ public static partial class EpisodeParser
     /// Season of a folder named "Season 2", "Séria 2", "Sezóna 2", "Řada 2", "S02", "Specials" / "Špeciály" (season 0),
     /// or of a season pack named "Nine.Puzzles.S02.1080p.WEB-DL" (exactly one season in the name).
     /// </summary>
-    public static int? SeasonOfFolder(string? folderName)
+    public static int? SeasonOfFolder(string? folderName) => SeasonAt(folderName, 0);
+
+    // level: how far above the file the folder is ("X Specials" names the specials only as the file's own folder)
+    private static int? SeasonAt(string? folderName, int level)
     {
         var words = Words.Normalize(folderName);
         if (SeasonFolder().Match(words) is { Success: true } exact)
@@ -246,7 +264,7 @@ public static partial class EpisodeParser
             return Number(exact.Groups["s"]);
         }
 
-        if (SpecialsFolder().IsMatch(words) || SpecialsWord().IsMatch(words))
+        if (IsSpecials(folderName, level))
         {
             return 0;
         }
@@ -361,7 +379,11 @@ public static partial class EpisodeParser
     [GeneratedRegex(@"(?<![a-z])(?:season|s[eé]ri[ae]|s[eé]rie|series|sez[oó]na|[řr]ada|staffel|sezon|s)\s*\d{1,3}\s*(?:[-–&,+]|až|az|to|and|a|und)\s*(?:s|season\s*)?\d{1,3}(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SeasonRange();
 
-    // a specials folder named with more words: "nine puzzles specials", "specialne epizody", "specialni dily"
-    [GeneratedRegex(@"\b(?:specials|specialy|specialne|specialni)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex SpecialsWord();
+    // "specialne epizody", "specialni dily", "specialny diel", "specialne diely", "special episodes"
+    [GeneratedRegex(@"^(?:specialne|specialni|specialny|special|specialy) (?:epizody|epizoda|dily|dil|diely|diel|casti|episodes?)(?: (?:19|20)\d\d)?$", RegexOptions.CultureInvariant)]
+    private static partial Regex SpecialsEpisodes();
+
+    // "nine puzzles specials" (not "serialy a specialy": a collection)
+    [GeneratedRegex(@"^(?!.*\b(?:a|and|und)\b).+ (?:specials|specialy)$", RegexOptions.CultureInvariant)]
+    private static partial Regex SpecialsSuffix();
 }

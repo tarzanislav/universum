@@ -156,7 +156,7 @@ public sealed class LibraryTests
         Assert.Sequence(["Season 00", "Season 01", "Season 02", "Season 09", "Season 10", "Season 100"],
             new[] { 0, 1, 2, 9, 10, 100 }.Select(LibraryNames.SeasonFolder), "two digits");
         // a special never goes into Season 01 by itself; Season 00 or Season 01 is a question for the user
-        foreach (var specials in new[] { "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Season 0", "Nine Puzzles Specials", "Špeciálne epizódy", "Speciální díly" })
+        foreach (var specials in new[] { "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Season 0", "Nine Puzzles Specials", "Špeciálne epizódy", "Speciální díly", "Špeciálny diel" })
         {
             Assert.Equal(0, EpisodeParser.SeasonOfFolder(specials), specials);
             Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv")) is { Number.Tag: "S00E01", NameSeason: 1, IsSeasonQuestion: true },
@@ -172,6 +172,10 @@ public sealed class LibraryTests
         Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 1", "Seriál S01E00.mkv")) is { IsSeasonQuestion: true }, "episode 00");
         Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 2", "Seriál S01E03.mkv")) is { NeedsConfirmation: true, IsSeasonQuestion: false }, "S01 in Season 2: to confirm, no 00/01 question");
         Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder("Special Forces (2019)"), "a title");
+        // "Specials" in a series' or a collection's name is no specials folder
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Lake Specials (2021)", "Season 1", "Lake Specials S01E02.mkv")) is { Number.Tag: "S01E02", NeedsConfirmation: false }, "a series named … Specials");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriály a špeciály", "Lake", "Season 1", "Lake S01E02.mkv")) is { Number.Tag: "S01E02", NeedsConfirmation: false }, "a collection");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Lake Specials (2021)", "Lake Specials S01E03.mkv")) is { Number.Tag: "S01E03", NeedsConfirmation: false }, "files right in the series folder");
         foreach (var pack in new[] { "Nine.Puzzles.Season.1-3.1080p", "Nine.Puzzles.S01-03.1080p", "Nine Puzzles Séria 1 až 3", "Nine Puzzles S01-S03" })
         {
             Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder(pack), pack);

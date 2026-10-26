@@ -207,7 +207,17 @@ public sealed class BatchTests
         items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
         Assert.Sequence([ReviewReasonKind.SeasonQuestion], Kinds(question), "asked, not accepted");
         Assert.True(items.Single(i => Paths.Same(i.File.Path, question)).Reasons.Single(r => r.Kind == ReviewReasonKind.SeasonQuestion).Detail?.Contains("Season 00", StringComparison.Ordinal) == true, "the question names both seasons");
-        Assert.Equal(1, job.AnswerSpecials(), "answer: specials");
+        var bonus = P("Specials", "Season 1", "Bonus noc.mkv");
+        analysis.Groups[0].Files.Add(new MediaFile { Path = bonus });
+        job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        job.Kind = MediaKind.Series;
+        job.Series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2024);
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([ReviewReasonKind.SeasonQuestion], Kinds(bonus), "a file without a number under Specials is asked too");
+        Assert.True(job.EpisodeFor(bonus) is ({ Season: 0 }, true), "suggested in Season 00");
+        Assert.Equal(2, job.AnswerSpecials(), "answer: specials");
+        analysis.Groups[0].Files.RemoveAll(f => Paths.Same(f.Path, bonus));
         Assert.Equal((new EpisodeNumber(0, 2), false), job.EpisodeFor(question));
         analysis.Groups[0].Files.RemoveAll(f => Paths.Same(f.Path, question));
 

@@ -141,8 +141,15 @@ public sealed class ChaptersPageViewModel : ObservableObject
         }
 
         Fill(ChapterChecks.Every(TimeSpan.FromMinutes(minutes), duration, Language()), dirty: true);
-        Result = $"Vygenerované: {Rows.Count} kapitol každých {minutes} min.";
+        Result = $"Vygenerované: {Count(Rows.Count)} každých {minutes} min.";
     }
+
+    private static string Count(int chapters) => chapters switch
+    {
+        1 => "1 kapitola",
+        >= 2 and <= 4 => $"{chapters} kapitoly",
+        _ => $"{chapters} kapitol",
+    };
 
     private LanguageTag Language() => LanguageTag.FromCode(_services.Profile.PreferredLanguages.FirstOrDefault() ?? "cs");
 
@@ -291,7 +298,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
                 ? ChapterFormats.ParseXml(text).Chapters
                 : ChapterFormats.ParseOgm(text, Language());
             Fill(chapters, dirty: true);
-            Result = $"Načítané zo súboru: {chapters.Count} kapitol.";
+            Result = $"Načítané zo súboru: {Count(chapters.Count)}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException or FormatException)
         {
@@ -317,7 +324,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
             {
                 _undoRecord = result.UndoRecordPath;
                 await ReadAsync(_file.Path);
-                Result = chapters.Count == 0 ? "Kapitoly sú odstránené. Dá sa to vrátiť späť." : $"Uložené: {chapters.Count} kapitol. Dá sa to vrátiť späť.";
+                Result = chapters.Count == 0 ? "Kapitoly sú odstránené. Dá sa to vrátiť späť." : $"Uložené: {Count(chapters.Count)}. Dá sa to vrátiť späť.";
             }
             else
             {

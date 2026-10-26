@@ -371,7 +371,7 @@ internal static class SelfTest
         Check(chapters.Problems.Length == 0 && chapters.SaveCommand.CanExecute(null), "chapters: ready to save – " + chapters.Problems);
         await Screenshot(window, "chapters.png");
         await chapters.SaveCommand.ExecuteAsync(null);
-        Check(chapters.Result.StartsWith("Uložené: 3", StringComparison.Ordinal), "chapters: saved – " + chapters.Result);
+        Check(chapters.Result.StartsWith("Uložené: 3 kapitoly", StringComparison.Ordinal), "chapters: saved – " + chapters.Result);
         Check(string.Join("|", chapters.Rows.Select(r => r.Name)) == "Začiatok|Koniec|Polovica", "chapters: read back sorted by time – " + string.Join("|", chapters.Rows.Select(r => r.Name)));
         await chapters.UndoCommand.ExecuteAsync(null);
         Check(chapters.Rows.Count == 2 && chapters.Rows[0].Name == "Chapter 01", "chapters: undo – " + chapters.Result);

@@ -310,13 +310,15 @@
                         </Grid>
                         <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
                             <TextBlock Text="Kontrola" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding Findings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Findings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
@@ -508,16 +510,18 @@
                     <StackPanel>
                         <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
                             <TextBlock Text="Kontrola" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding Findings}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer MaxHeight="72" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Findings}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                         <WrapPanel Margin="0,0,0,8">
-                            <TextBlock Text="Ak treba nový súbor (poradie, vynechané stopy), originál:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0" />
+                            <TextBlock Text="Pri novom súbore (poradie, vynechané stopy) originál:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0" />
                             <RadioButton Content="zachovať (nový súbor „… (upravené).mkv“)" IsChecked="{Binding KeepOriginal}" GroupName="headerOriginal" Margin="0,0,16,0" />
                             <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" GroupName="headerOriginal"
                                          ToolTip="Nový súbor dostane pôvodný názov a originál ide do Koša – nikdy sa nemaže natrvalo" />

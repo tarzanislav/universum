@@ -115,8 +115,8 @@
                         <WrapPanel>
                             <TextBlock Text="Originál:" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
                             <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
-                            <RadioButton Content="vymazať" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
-                                         ToolTip="Pri zmene len hlavičky na tom istom disku sa originál presunie do knižnice, inak ide do Koša" />
+                            <RadioButton Content="vymazať (zatiaľ vypnuté)" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
+                                         ToolTip="Zatiaľ vypnuté: kým program v praxi neodladíme, originály sa vždy zachovajú." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
                             <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
                                 <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
@@ -277,6 +277,25 @@
                 </DataGrid>
                 <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
+                            <WrapPanel DataContext="{Binding Library}">
+                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                                <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
+                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
+                                          IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
+                                    <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                </StackPanel>
+                                <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
+                            </WrapPanel>
+                            <TextBlock TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}" Margin="0,4,0,8">
+                                <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
+                                <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </TextBlock>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -289,21 +308,18 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="Výstupný súbor:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Column="1" Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
-                            <Button Grid.Column="2" Content="Uložiť ako…" Command="{Binding ChooseOutputCommand}" Padding="12,4" Margin="0,0,0,6" />
-                            <TextBlock Grid.Row="1" Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
-                            <TextBlock Grid.Row="2" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
+                            <TextBlock Grid.Row="0" Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
+                            <TextBlock Grid.Row="1" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
                                      ToolTip="Kapitoly XML, OGM (.txt) alebo cue – pridajú sa ku kapitolám zo vstupov, ktoré sú zaškrtnuté" />
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
+                            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
                                 <Button Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="12,4" Margin="0,0,6,0" />
                                 <Button Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,4" ToolTip="Bez súboru s kapitolami" />
                             </StackPanel>
-                            <TextBlock Grid.Row="3" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
-                            <ListBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="70" MinHeight="30" Margin="0,0,8,0" />
-                            <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                            <TextBlock Grid.Row="2" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
+                            <ListBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="70" MinHeight="30" Margin="0,0,8,0" />
+                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
                                 <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="12,4" Margin="0,0,6,0" />
                                 <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Padding="8,4" />
                             </StackPanel>
@@ -398,6 +414,26 @@
                     </DataGrid.Columns>
                 </DataGrid>
                 <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                            <WrapPanel DataContext="{Binding Library}">
+                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                                <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
+                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
+                                          IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
+                                    <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                </StackPanel>
+                                <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
+                            </WrapPanel>
+                            <TextBlock TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}" Margin="0,4,0,8">
+                                <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
+                                <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </TextBlock>
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                             <Button Content="Obnoviť zo súboru" Command="{Binding ResetCommand}" Margin="0,0,8,0" Padding="12,6" />
@@ -405,11 +441,12 @@
                             <Button Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" />
                         </StackPanel>
                         <StackPanel Margin="0,0,16,0">
-                            <TextBlock Text="Uloženie zmení len kapitoly v súbore (sekundy) a dá sa vrátiť späť." Style="{StaticResource Hint}" />
+                            <TextBlock Text="Uloží sa kópia s novými kapitolami do knižnice; originál ostane nezmenený." Style="{StaticResource Hint}" />
                             <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
                         </StackPanel>
                     </DockPanel>
+                    </StackPanel>
                 </Border>
             </Grid>
         </DataTemplate>
@@ -520,12 +557,25 @@
                                 </ItemsControl>
                             </ScrollViewer>
                         </StackPanel>
-                        <WrapPanel Margin="0,0,0,8">
-                            <TextBlock Text="Pri novom súbore (poradie, vynechané stopy) originál:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,12,0" />
-                            <RadioButton Content="zachovať (nový súbor „… (upravené).mkv“)" IsChecked="{Binding KeepOriginal}" GroupName="headerOriginal" Margin="0,0,16,0" />
-                            <RadioButton Content="vymazať (do Koša)" IsChecked="{Binding DeleteOriginal}" GroupName="headerOriginal"
-                                         ToolTip="Nový súbor dostane pôvodný názov a originál ide do Koša – nikdy sa nemaže natrvalo" />
+                        <WrapPanel Margin="0,0,0,4" DataContext="{Binding Library}">
+                            <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,20,0" />
+                            <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                            <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="280" Margin="0,0,6,0"
+                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                            <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
+                                      IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
+                                <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                            </StackPanel>
+                            <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                         </WrapPanel>
+                        <TextBlock Margin="0,0,0,8" TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}">
+                            <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
+                            <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </TextBlock>
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                                 <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
@@ -825,8 +875,8 @@
                         <WrapPanel>
                             <TextBlock Text="Originál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" GroupName="batchOriginal" Margin="0,0,12,0" />
-                            <RadioButton Content="vymazať" IsChecked="{Binding DeleteOriginal}" GroupName="batchOriginal" Margin="0,0,20,0"
-                                         ToolTip="Pri zmene len hlavičky na tom istom disku sa originál presunie do knižnice, inak ide do Koša" />
+                            <RadioButton Content="vymazať (zatiaľ vypnuté)" IsChecked="{Binding DeleteOriginal}" GroupName="batchOriginal" Margin="0,0,20,0"
+                                         ToolTip="Zatiaľ vypnuté: kým program v praxi neodladíme, originály sa vždy zachovajú." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
                             <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>

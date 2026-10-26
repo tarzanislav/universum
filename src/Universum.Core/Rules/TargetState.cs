@@ -1,3 +1,4 @@
+using Universum.Core.Chapters;
 using Universum.Core.Media;
 
 namespace Universum.Core.Rules;
@@ -14,6 +15,15 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>New segment title: null keeps the title of the file, "" removes it.</summary>
     public string? NewTitle { get; init; }
 
+    /// <summary>New chapters (chapter editor): null keeps the file's chapters, an empty list removes them.</summary>
+    public IReadOnlyList<Chapter>? NewChapters { get; init; }
+
+    /// <summary>The chapters are replaced.</summary>
+    public bool ChaptersChanged => NewChapters is not null;
+
+    /// <summary>Number of chapter entries the result has.</summary>
+    public int ResultChapterEntries => NewChapters?.Count ?? Source.ChapterEntries;
+
     /// <summary>The segment title changes (header editor).</summary>
     public bool TitleChanged => NewTitle is not null && !string.Equals(NewTitle, Source.Title ?? "", StringComparison.Ordinal);
 
@@ -25,7 +35,7 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
 
     public bool TagsChanged => RemoveTags && Source.HasTags;
 
-    public bool HasChanges => OrderChanged || RepairIndex || TagsChanged || TitleChanged || Removed.Count > 0 || Tracks.Any(t => t.HasChanges);
+    public bool HasChanges => OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || Removed.Count > 0 || Tracks.Any(t => t.HasChanges);
 
     /// <summary>A new file must be written (order, removed tracks, index repair); otherwise a header edit is enough.</summary>
     public bool NeedsRewrite => OrderChanged || RepairIndex;

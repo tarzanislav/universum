@@ -49,6 +49,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             changes.Add(new PlannedChange(null, ChangeKind.Index, "0", null));
         }
 
+        if (target.ChaptersChanged)
+        {
+            changes.Add(new PlannedChange(null, ChangeKind.Chapters, target.Source.ChapterEntries.ToString(), target.NewChapters!.Count.ToString()));
+        }
+
         if (target.TitleChanged)
         {
             changes.Add(new PlannedChange(null, ChangeKind.Title, target.Source.Title, target.ResultTitle));

@@ -27,6 +27,12 @@ public sealed record UndoRecord
     /// <summary>Segment title before the edit; null when the file had none.</summary>
     public string? Title { get; init; }
 
+    /// <summary>True when the chapters were saved because the edit replaces them.</summary>
+    public bool ChaptersSaved { get; init; }
+
+    /// <summary>Chapters before the edit (mkvextract XML); null when the file had none.</summary>
+    public string? ChaptersXmlPath { get; init; }
+
     /// <summary>Last-modified time of the file before the edit; restored by undo.</summary>
     public DateTime? ModifiedUtc { get; init; }
 

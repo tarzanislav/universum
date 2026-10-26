@@ -1,3 +1,4 @@
+using Universum.Core.Library;
 using Universum.Core.Media;
 
 namespace Universum.Core.Muxing;
@@ -30,6 +31,12 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
 
     public IReadOnlyList<MuxAttachment> Attachments { get; init; } = [];
 
+    /// <summary>
+    /// Place in the library (title folder, name by the rules); the size class is known only after writing, so the
+    /// final name is chosen then. When set, <see cref="OutputPath"/> is not used.
+    /// </summary>
+    public Placement? Placement { get; init; }
+
     public MediaTrack TrackOf(MuxTrack track) => Sources[track.Source].File.Tracks.First(t => t.Id == track.TrackId);
 
     /// <summary>Problems that stop the multiplexer (in Slovak, for the user); empty when the spec can be written.</summary>
@@ -59,6 +66,21 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
             problems.Add("Niektorá stopa je vybraná dvakrát.");
         }
 
+        if (!string.IsNullOrEmpty(ChaptersFile) && !File.Exists(ChaptersFile))
+        {
+            problems.Add("Súbor s kapitolami neexistuje.");
+        }
+
+        foreach (var attachment in Attachments.Where(a => !File.Exists(a.Path)))
+        {
+            problems.Add("Príloha neexistuje: " + attachment.Path);
+        }
+
+        if (Placement is not null)
+        {
+            return problems;
+        }
+
         if (string.IsNullOrWhiteSpace(OutputPath))
         {
             problems.Add("Zadajte výstupný súbor.");
@@ -84,16 +106,6 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
         if (Path.GetDirectoryName(output) is not { } folder || !Directory.Exists(folder))
         {
             problems.Add("Priečinok výstupného súboru neexistuje.");
-        }
-
-        if (!string.IsNullOrEmpty(ChaptersFile) && !File.Exists(ChaptersFile))
-        {
-            problems.Add("Súbor s kapitolami neexistuje.");
-        }
-
-        foreach (var attachment in Attachments.Where(a => !File.Exists(a.Path)))
-        {
-            problems.Add("Príloha neexistuje: " + attachment.Path);
         }
 
         return problems;

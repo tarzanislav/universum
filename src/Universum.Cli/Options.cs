@@ -73,8 +73,7 @@ public sealed class Options
                     options.Original = OriginalHandling.Keep;
                     break;
                 case "--delete":
-                    options.Original = OriginalHandling.Delete;
-                    break;
+                    throw new UsageException("Mazanie originálov je zatiaľ vypnuté – kým program v praxi neodladíme, originály sa vždy zachovajú.");
                 case "--output" or "-o" or "--vystup":
                     options.OutputDirectory = value();
                     break;
@@ -130,10 +129,8 @@ public sealed class Options
             throw new UsageException("Rok patrí k názvu: zadajte aj --nazov.");
         }
 
-        if (options.Command == "apply" && !options.DryRun && options.Original is null)
-        {
-            throw new UsageException("Pri apply zvoľte --keep (originál zachovať) alebo --delete (originál do Koša), prípadne --dry-run.");
-        }
+        // originals are always kept (deleting is switched off until the program is proven in practice)
+        options.Original ??= OriginalHandling.Keep;
 
         return options;
     }

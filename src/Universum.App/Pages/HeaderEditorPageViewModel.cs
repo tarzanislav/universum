@@ -42,14 +42,16 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
     public HeaderEditorPageViewModel(AppServices services)
     {
         _services = services;
+        Library = new LibraryTargetPicker(services, Target);
+        Library.Changed += RefreshCommands;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
         ApplyRulesCommand = new RelayCommand(ApplyRules, () => !Busy && _file is not null);
         ResetCommand = new RelayCommand(() => Fill(_file), () => !Busy && _file is not null);
         MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
         MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !Busy && Target() is { HasChanges: true });
+        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !Busy && Target() is { HasChanges: true } && Library.Placement is not null);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
-        QueueCommand = new RelayCommand(Enqueue, () => !Busy && Target() is { HasChanges: true });
+        QueueCommand = new RelayCommand(Enqueue, () => !Busy && Target() is { HasChanges: true } && Library.Placement is not null);
     }
 
     /// <summary>Adds the change to the job queue instead of saving now.</summary>
@@ -141,47 +143,15 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     public string? FilePath => _file?.Path;
 
-    /// <summary>The user chose to remove originals (shared with the rules and batch pages); otherwise they are never removed.</summary>
-    public bool DeletesOriginal => _services.Settings.OriginalHandling == OriginalHandling.Delete;
-
-    public bool KeepOriginal
-    {
-        get => !DeletesOriginal;
-        set => SetHandling(value ? OriginalHandling.Keep : OriginalHandling.Delete);
-    }
-
-    public bool DeleteOriginal
-    {
-        get => DeletesOriginal;
-        set => SetHandling(value ? OriginalHandling.Delete : OriginalHandling.Keep);
-    }
-
-    private void SetHandling(OriginalHandling handling)
-    {
-        if (_services.Settings.OriginalHandling == handling)
-        {
-            return;
-        }
-
-        _services.Settings.OriginalHandling = handling;
-        _services.Settings.Save();
-        OnPropertyChanged(nameof(KeepOriginal));
-        OnPropertyChanged(nameof(DeleteOriginal));
-        Recalculate();
-    }
-
-    /// <summary>
-    /// Where the result goes: header-only changes edit the file in place (with undo); a new file replaces the original
-    /// only when the user chose to delete originals, otherwise it is written beside it and the original stays.
-    /// </summary>
-    private static Placement Destination(EditPlan plan, bool deleteOriginal) =>
-        plan.Method == WriteMethod.Remux && !deleteOriginal ? Placement.Beside(plan.Target.Source.Path) : Placement.InPlace(plan.Target.Source.Path);
+    /// <summary>Where the result goes in the library (title, episode, name by the rules).</summary>
+    public LibraryTargetPicker Library { get; }
 
     public async Task LoadAsync(string path)
     {
         Result = "";
         _undoRecord = null;
         await ReadAsync(path);
+        Library.Guess(path);
     }
 
     /// <summary>The target state the editor describes now; null without a file.</summary>
@@ -315,9 +285,8 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             Method = plan.Method switch
             {
                 WriteMethod.None => "Bez zmien.",
-                WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({Count(plan.Changes.Count)}) – trvá to sekundy.",
-                _ when DeletesOriginal => $"Zapíše sa nový súbor s rovnakým názvom ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty, originál pôjde do Koša (zvolené: vymazať).",
-                _ => $"Zapíše sa nový súbor „{Placement.Beside(target.Source.Path).FileName(0)}“ ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty, originál ostane nezmenený.",
+                WriteMethod.HeaderEdit => $"Kópia v knižnici so zmenenou hlavičkou ({Count(plan.Changes.Count)}) – trvá to sekundy až minúty (kopírovanie). Originál ostane nezmenený.",
+                _ => $"Zapíše sa nový súbor do knižnice ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty. Originál ostane nezmenený.",
             };
             foreach (var finding in TargetChecks.Review(target, _services.Profile))
             {
@@ -326,8 +295,13 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(HasFindings));
+        Library?.Update();
         RefreshCommands();
     }
+
+    /// <summary>A path in the library, relative to it (or as it is).</summary>
+    private string LibraryPath(string? path) =>
+        path is null ? "" : _services.Library is { } layout && layout.Contains(path) ? Path.GetRelativePath(layout.Root, path) : path;
 
     private static string Count(int changes) => changes switch
     {
@@ -393,7 +367,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     private async Task SaveAsync()
     {
-        if (Target() is not { HasChanges: true } target || _services.CurrentMkvToolNix is not { } installation)
+        if (Target() is not { HasChanges: true } target || _services.CurrentMkvToolNix is not { } installation || Library.Placement is not { } placement)
         {
             return;
         }
@@ -405,14 +379,14 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         {
             var plan = EditPlan.For(target);
             var processor = _services.Processor(installation);
-            var result = await processor.ProcessAsync(plan, Destination(plan, DeletesOriginal), new OutputOptions(OriginalHandling.Keep), new Progress<double>(p => Progress = p));
+            var result = await processor.ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep), new Progress<double>(p => Progress = p));
             _services.Inspector(installation).Invalidate(target.Source.Path);
             _undoRecord = result.UndoRecordPath;
             Result = result.Status switch
             {
-                ProcessingStatus.Done when plan.Method == WriteMethod.Remux && DeletesOriginal => "Uložené ako nový súbor s rovnakým názvom; originál je v Koši.",
-                ProcessingStatus.Done when plan.Method == WriteMethod.Remux => $"Uložené ako nový súbor: {Path.GetFileName(result.OutputPath)}. Originál ostal nezmenený.",
-                ProcessingStatus.Done => "Uložené." + (_undoRecord is null ? "" : " Zmenu je možné vrátiť späť."),
+                ProcessingStatus.Done => $"Uložené do knižnice: {LibraryPath(result.OutputPath)}." +
+                                         (_undoRecord is null ? " Originál ostal nezmenený." : " Zmenu súboru v knižnici je možné vrátiť späť."),
+                ProcessingStatus.AlreadyInLibrary => $"Rovnaký výsledok už v knižnici je: {LibraryPath(result.OutputPath)}. Nič sa nezapísalo.",
                 ProcessingStatus.Unchanged => "Bez zmien.",
                 ProcessingStatus.Cancelled => "Zrušené.",
                 _ when FileProcessor.NeedsAttention(result) =>
@@ -440,7 +414,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     private void Enqueue()
     {
-        if (Target() is not { HasChanges: true } target || _services.CurrentMkvToolNix is not { } installation)
+        if (Target() is not { HasChanges: true } target || _services.CurrentMkvToolNix is not { } installation || Library.Placement is not { } placement)
         {
             return;
         }
@@ -448,7 +422,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         var path = target.Source.Path;
         var plan = EditPlan.For(target);
         var job = new FileJob($"Úprava hlavičky: {Path.GetFileName(path)}", _services.Processor(installation), plan,
-            Destination(plan, DeletesOriginal), new OutputOptions(OriginalHandling.Keep));
+            placement, new OutputOptions(OriginalHandling.Keep));
         job.Finished += (finished, result) => JobRow.OnUi(() => _ = AfterJobAsync(finished, result, installation));
         _services.Enqueue(job);
         Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");

@@ -52,10 +52,12 @@ in next to it without changing the rules, planning or UI.
     also an exception, restores the header and moves it back;
   - otherwise the result is written as `*.universum-tmp`, flushed, read back, verified and renamed, and only then is
     the original sent to the Recycle Bin;
-  - header editor: header-only changes edit the file where it is (`Placement.InPlace`, with undo, also the segment
-    title); a new order or left-out tracks need a new file – written beside the original as "name (upravené).mkv"
-    (`Placement.Beside`, the original untouched, never overwriting an earlier result), or – only when the user chose
-    to delete originals – under the same name with the old file in the Recycle Bin;
+  - originals are always kept: `FileProcessor.DeleteOriginalsAllowed` is off, so "delete" means "keep" (owner's
+    decision of 26 October 2026, until the program is proven in practice); the apps offer no delete;
+  - every tool writes its result as a new file into the library, named by the rules (`LibraryTargetPicker` in the
+    app: film/series, title, episode, TMDB): rules, batch, header editor, chapter editor (`TargetState.NewChapters`)
+    and multiplexer (`MuxSpec.Placement`, name chosen after writing by the size class); `Placement.InPlace` /
+    `Placement.Beside` remain for later use;
   - a file already in its library folder is edited with undo, or replaced: the old one is renamed to
     `*.universum-old`, the new one takes its place, then the old one goes to the Recycle Bin;
   - `Library/LibraryIndex` remembers which original (fingerprint of its content) each library file came from, so

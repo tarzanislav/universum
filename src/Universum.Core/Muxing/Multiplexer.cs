@@ -33,8 +33,21 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
             return new MuxResult(MuxStatus.Failed, null, problems);
         }
 
-        var output = Path.GetFullPath(spec.OutputPath);
-        var temporary = Path.Combine(Path.GetDirectoryName(output)!,
+        // in the library the folder is created and the name chosen after writing (size class); otherwise the given file
+        var output = spec.Placement is { } placement
+            ? Path.Combine(placement.Directory, placement.Prefix + placement.Extension)
+            : Path.GetFullPath(spec.OutputPath);
+        string temporary;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new MuxResult(MuxStatus.Failed, null, [ex.Message]);
+        }
+
+        temporary = Path.Combine(Path.GetDirectoryName(output)!,
             Path.GetFileNameWithoutExtension(output) + "." + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant() + FileProcessor.TemporaryExtension);
         try
         {
@@ -70,7 +83,15 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
                 return new MuxResult(MuxStatus.Failed, null, [.. messages, .. differences.Select(d => "verification: " + d)]);
             }
 
-            File.Move(temporary, output, overwrite: false);
+            if (spec.Placement is { } place)
+            {
+                output = MoveToFreeName(temporary, place);
+            }
+            else
+            {
+                File.Move(temporary, output, overwrite: false);
+            }
+
             return new MuxResult(MuxStatus.Done, output, messages);
         }
         catch (OperationCanceledException)
@@ -82,6 +103,30 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
         {
             TryDelete(temporary);
             return new MuxResult(MuxStatus.Failed, null, [ex.Message]);
+        }
+    }
+
+    /// <summary>The first free name of the placement for the written size (… BIG, … BIG2 …); never overwrites.</summary>
+    private static string MoveToFreeName(string path, Library.Placement placement)
+    {
+        var size = new FileInfo(path).Length;
+        for (var number = 1; ; number++)
+        {
+            var target = placement.PathFor(size, number);
+            if (File.Exists(target) || Directory.Exists(target))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Move(path, target, overwrite: false);
+                return target;
+            }
+            catch (IOException) when (File.Exists(target))
+            {
+                // taken in the meantime; try the next number
+            }
         }
     }
 

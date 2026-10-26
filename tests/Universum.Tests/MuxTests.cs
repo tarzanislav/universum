@@ -121,6 +121,41 @@ public sealed class MuxTests
         }
     }
 
+    [Test]
+    public async Task MuxIntoTheLibraryIsNamedByTheRules()
+    {
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-mux-library-");
+        try
+        {
+            var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+            var film = await inspector.InspectAsync(TestData.Media("en-und-cz-forced.mkv"));
+            var sources = new[] { new MuxSource(film, KeepTags: false) };
+            var tracks = new List<MuxTrack>
+            {
+                new(0, 0, null, LanguageTag.Undetermined, new TrackFlags()),
+                new(0, 2, null, LanguageTag.FromCode("cs"), new TrackFlags(Default: true)),
+                new(0, 1, null, LanguageTag.FromCode("en"), new TrackFlags(Default: false)),
+            };
+            var layout = new Universum.Core.Library.LibraryLayout(Path.Combine(work.FullName, "OUTPUT"));
+            var title = new Universum.Core.Library.TitleInfo(Universum.Core.Library.MediaKind.Movie, "Vymyslený film", 2026);
+            var placement = layout.Place(MuxRules.Target(sources, tracks), title, null, RuleProfile.Default);
+            var spec = new MuxSpec(sources, tracks, "") { Placement = placement };
+            Assert.Equal(0, spec.Validate().Count, string.Join("; ", spec.Validate()));
+
+            var multiplexer = new Multiplexer(installation, new ProcessRunner());
+            var first = await multiplexer.MuxAsync(spec);
+            Assert.Equal(MuxStatus.Done, first.Status, string.Join("; ", first.Messages));
+            Assert.Equal(Path.Combine(layout.Movies, "Vymyslený film (2026)", "Vymyslený film (2026) - CZ EN SD H264 SMALL.mkv"), first.OutputPath, "name by the rules");
+            var second = await multiplexer.MuxAsync(spec);
+            Assert.Equal(Path.Combine(layout.Movies, "Vymyslený film (2026)", "Vymyslený film (2026) - CZ EN SD H264 SMALL2.mkv"), second.OutputPath, "a second version gets a number, nothing overwritten");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
     private static MediaFile Film(string path) => new()
     {
         Path = path,

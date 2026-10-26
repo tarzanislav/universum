@@ -20,8 +20,7 @@ internal static class Help
           --epizoda "súbor.mkv=S01E04" číslo epizódy súboru
           -r, --recursive              aj podpriečinky
           -t, --template <súbor.json>  šablóna (uložená v programe UNIVERSUM)
-          --keep                       originál zachovať
-          --delete                     originál odstrániť (presun do knižnice alebo do Koša)
+          --keep                       originál zachovať (predvolené; mazanie originálov je zatiaľ vypnuté)
           --dry-run                    len simulácia, nič sa nezapíše
           -l, --language A:audio:2=cs  jazyk neurčenej stopy pre celú skupinu A
           --forced A:subtitles:1       titulky 1 skupiny A sú forced

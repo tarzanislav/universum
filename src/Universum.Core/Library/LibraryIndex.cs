@@ -67,6 +67,15 @@ public sealed class LibraryIndex
         }
 
         text.Append("removed:").AppendJoin(',', target.Removed.Select(t => t.Id)).Append(";tags:").Append(target.RemoveTags).Append(";index:").Append(target.RepairIndex);
+        if (target.TitleChanged)
+        {
+            text.Append(";title:").Append(target.ResultTitle);
+        }
+
+        if (target.NewChapters is { } chapters)
+        {
+            text.Append(";chapters:").AppendJoin('|', chapters.OrderBy(c => c.Start).Select(c => $"{c.Start.Ticks}/{c.Name}/{c.Language.Primary}"));
+        }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())))[..24];
     }
 

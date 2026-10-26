@@ -1,6 +1,7 @@
 name: Release
 
-# A release is made only by pushing a tag "v1.2.3" (with the owner's consent). It is published only when the
+# A release is made only with the owner's consent: by pushing a tag "v1.2.3", or by the owner's "Run workflow" on main
+# with the version (the tag is then created by the release itself, after the approval). It is published only when the
 # checksum list can be signed with the UNIVERSUM release key (secret UNIVERSUM_RELEASE_KEY) and that key matches
 # the public key built into the program – otherwise UNIVERSUM would refuse its own update.
 #
@@ -9,6 +10,12 @@ name: Release
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Verzia (napr. 0.1.0) – vznikne značka v0.1.0 a vydanie z vetvy main'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -29,16 +36,28 @@ jobs:
     runs-on: windows-2025
     outputs:
       version: ${{ steps.version.outputs.number }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
-      # the tag is checked before it is used anywhere; it reaches scripts only through the environment
-      - name: Version from the tag
+      # the tag (or the typed version) is checked before it is used anywhere; it reaches scripts only through the
+      # environment; a version typed by the owner is released only from main
+      - name: Version from the tag or the input
         id: version
         shell: pwsh
         env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           TAG: ${{ github.ref_name }}
+          INPUT: ${{ inputs.version }}
         run: |
-          if (-not ($env:TAG -cmatch '^v(\d{1,4}\.\d{1,4}\.\d{1,4})$')) { throw "the tag is not v1.2.3" }
+          if ($env:EVENT -eq 'workflow_dispatch') {
+            if ($env:REF -cne 'refs/heads/main') { throw "a release is made only from main" }
+            $tag = "v$($env:INPUT.Trim())"
+          } else {
+            $tag = $env:TAG
+          }
+          if (-not ($tag -cmatch '^v(\d{1,4}\.\d{1,4}\.\d{1,4})$')) { throw "the version is not 1.2.3" }
           "number=$($Matches[1])" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -136,7 +155,9 @@ jobs:
         shell: pwsh
         env:
           VERSION: ${{ needs.build.outputs.version }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.build.outputs.tag }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
           RELEASE_KEY: ${{ secrets.UNIVERSUM_RELEASE_KEY }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -160,6 +181,14 @@ jobs:
           $signature = $key.SignData([IO.File]::ReadAllBytes($sums), [Security.Cryptography.HashAlgorithmName]::SHA256)
           [IO.File]::WriteAllBytes((Join-Path release "SHA256SUMS.txt.sig"), $signature)
 
+          # started by "Run workflow": the tag is created now, on the commit that was built and tested
+          if ($env:EVENT -eq 'workflow_dispatch') {
+            gh release view $env:TAG *> $null
+            if ($LASTEXITCODE -eq 0) { throw "release $env:TAG already exists" }
+            $target = @('--target', $env:SHA)
+          } else {
+            $target = @('--verify-tag')
+          }
           gh release create $env:TAG (Join-Path release $file) $sums (Join-Path release "SHA256SUMS.txt.sig") `
-            --title "UNIVERSUM $env:VERSION" --notes-file "docs/releases/v$env:VERSION.md" --verify-tag
+            --title "UNIVERSUM $env:VERSION" --notes-file "docs/releases/v$env:VERSION.md" @target
           exit $LASTEXITCODE

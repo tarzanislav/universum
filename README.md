@@ -3,9 +3,9 @@
 Grafická nadstavba pre Windows nad nástrojmi [MKVToolNix](https://mkvtoolnix.download/) – úprava stôp
 v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý priečinok.
 
-> Stav: **vo vývoji** (etapa E2b – knižnica). Program zatiaľ nie je určený na bežné používanie.
+> Stav: **skúšobné vydanie 0.1.0** – na skúšanie v praxi. Originálne súbory sa vždy zachovajú.
 
-## Čo bude UNIVERSUM vedieť
+## Čo UNIVERSUM vie
 
 - **Rozhranie ako MKVToolNix GUI** – zlučovanie, informácie o súbore, úprava hlavičky, kapitoly, fronta úloh.
 - **Pravidlá UNIVERSUM jedným klikom** – názvy stôp, jazyky, príznaky *Default*, *Enabled*, *Forced*,
@@ -16,8 +16,8 @@ v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý prie
   a `TVSHOWS\Nine Puzzles (2025) [tmdbid-227191]\Season 01\Nine Puzzles S01E04 - CZ titulky FHD H264 SMALL.mkv`.
   Názvy vie vyhľadať na [TMDB](https://www.themoviedb.org/) s vlastným bezplatným kľúčom používateľa.
   V Nastaveniach sa dá uložiť aj vlastný token [HISTRA](https://histra.net) (sledovanie filmov a seriálov).
-- **Bezpečnosť súborov** – simulácia pred zápisom, overenie výsledku, Vrátiť späť, originál podľa voľby
-  zachovaný alebo odstránený (presunutý do knižnice alebo do Koša, nikdy natrvalo).
+- **Bezpečnosť súborov** – simulácia pred zápisom, overenie výsledku, Vrátiť späť; originál sa vždy zachová
+  (každý výsledok je nový súbor v knižnici), voľba vymazania je zatiaľ vypnutá.
 - **Aktualizácie** UNIVERSUM aj MKVToolNix z jedného miesta.
 
 ## Požiadavky

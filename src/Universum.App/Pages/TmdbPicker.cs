@@ -77,6 +77,8 @@ public sealed class TmdbPicker : ObservableObject
         _selected = null;
         OnPropertyChanged(nameof(Selected));
         Message = "Hľadám na TMDB…";
+        void OnWaiting(TimeSpan delay) => Message = $"TMDB žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…";
+        tmdb.Waiting += OnWaiting;
         try
         {
             var results = await tmdb.FindAsync(_kind(), _text());
@@ -103,6 +105,7 @@ public sealed class TmdbPicker : ObservableObject
         }
         finally
         {
+            tmdb.Waiting -= OnWaiting;
             _busy = false;
             SearchCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(HasResults));

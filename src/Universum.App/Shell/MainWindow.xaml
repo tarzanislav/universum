@@ -193,42 +193,42 @@
                         <DataGridTextColumn Header="#" Binding="{Binding Position}" />
                         <DataGridTextColumn Header="Typ" Binding="{Binding Type}" />
                         <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="70" />
-                        <DataGridTemplateColumn Header="Názov" Width="*" MinWidth="120">
+                        <DataGridTemplateColumn Header="Názov" Width="2*" MinWidth="100">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding Before}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Jazyk" Width="150">
+                        <DataGridTemplateColumn Header="Jazyk" Width="145">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Default" Width="64">
+                        <DataGridTemplateColumn Header="Default" Width="74">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsDefault, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Enabled" Width="64">
+                        <DataGridTemplateColumn Header="Enabled" Width="74">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Forced" Width="64">
+                        <DataGridTemplateColumn Header="Forced" Width="74">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsForced, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Vynechať" Width="78">
+                        <DataGridTemplateColumn Header="Vynechať" Width="86">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <CheckBox IsChecked="{Binding IsRemoved, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanRemove}" HorizontalAlignment="Center"
@@ -236,7 +236,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Zmeny" Binding="{Binding Changes}" Width="120">
+                        <DataGridTextColumn Header="Zmeny" Binding="{Binding Changes}" Width="*" MinWidth="70">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />

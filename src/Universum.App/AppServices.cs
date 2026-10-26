@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text.Json;
 using Universum.Core.Execution;
 using Universum.Core.Library;
+using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -100,6 +101,12 @@ public sealed class AppServices
     /// <summary>HISTRA is used: a token is stored and connecting is switched on.</summary>
     public bool HistraActive => Settings.HistraEnabled && HistraToken is not null;
 
+    private HistraClient? _histra;
+
+    /// <summary>HISTRA client with the user's token; null without a usable token or with connecting switched off.</summary>
+    public HistraClient? Histra =>
+        HistraActive && HistraToken is { } token && HistraApi.IsValidToken(token) ? (_histra ??= new HistraClient(Http, token)) : null;
+
     /// <summary>
     /// TMDB and HISTRA both switched on: the two are to be kept in sync (what is synchronised is decided with the HISTRA
     /// API description; until then nothing is sent).
@@ -111,6 +118,7 @@ public sealed class AppServices
     {
         Settings.HistraEnabled = enabled;
         Settings.Save();
+        _histra = null;
         HistraChanged?.Invoke();
     }
 
@@ -119,6 +127,7 @@ public sealed class AppServices
     {
         Settings.HistraTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
         Settings.Save();
+        _histra = null;
         HistraChanged?.Invoke();
     }
 

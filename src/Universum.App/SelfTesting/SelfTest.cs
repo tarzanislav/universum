@@ -197,13 +197,16 @@ internal static class SelfTest
         model.Settings.SaveHistraTokenCommand.Execute(null);
         Check(services.HistraToken == "hst_selftest-0123456789" && model.Settings.HistraTokenInput.Length == 0, "settings: HISTRA token saved");
         Check(services.SyncActive && model.Settings.SyncStatus.StartsWith("TMDB aj HISTRA", StringComparison.Ordinal), "settings: TMDB and HISTRA both on");
+        Check(services.Histra is not null, "settings: HISTRA client ready with a token");
         model.Settings.HistraEnabled = false;
         Check(!services.HistraActive && !services.SyncActive && services.HistraToken is not null && model.Settings.SyncStatus == "Zapnuté je len TMDB.", "settings: HISTRA switched off, token kept");
+        Check(services.Histra is null, "settings: no HISTRA client while switched off");
         model.Settings.TmdbEnabled = false;
         model.Settings.HistraEnabled = true;
         Check(model.Settings.SyncStatus == "Zapnutá je len HISTRA.", "settings: only HISTRA on");
         model.Settings.TmdbEnabled = true;
         Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("hst_selftest", StringComparison.Ordinal), "settings hold no plain HISTRA token");
+        Check(Application.GetResourceStream(new Uri("pack://application:,,,/Assets/tmdb-logo.png")) is { } logo && logo.Stream.Length > 1000, "TMDB logo bundled");
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings-library.png");
         services.SetTmdbKey(null);

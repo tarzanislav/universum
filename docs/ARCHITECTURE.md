@@ -73,7 +73,15 @@ in next to it without changing the rules, planning or UI.
   suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
 - `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
   user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
-  TMDB key; `Request` sends it only to histra.net over HTTPS. No HISTRA requests are made yet (endpoints to come).
+  TMDB key; `Request` sends it only to histra.net over HTTPS. `HistraClient` is ready for the endpoints: requests
+  through `RequestPacer.Histra` (2 per second), 429/5xx waited out like TMDB, 401/403 explained, answers limited to
+  4 MiB, redirects elsewhere refused. No HISTRA requests are made yet (endpoints and the TMDB synchronisation to come).
+- TMDB attribution: the notice and the official logo `Assets/tmdb-logo.svg` (blue_short from
+  https://www.themoviedb.org/about/logos-attribution, SHA-256 = the fingerprint in its official file name
+  `8e7b30f7…5f6c`, kept byte-identical) shown as `tmdb-logo.png` rendered from it (WPF draws no SVG), smaller than the
+  UNIVERSUM name, in the TMDB card of the settings.
+- `Library/RequestPacer` – shared by TMDB and HISTRA: one request at a time per service, a fixed rate, pauses after
+  "too many requests" and `RetryDelay` (Retry-After, else 2–16 s, at most 60 s).
 - TMDB and HISTRA each have a "connect" switch in the settings (`TmdbEnabled`, `HistraEnabled`, on by default):
   switched off, nothing is sent there and the stored key or token stays (the CLI honours the TMDB switch for the
   stored key). With both on, the two are to be synchronised (`SyncActive`; what exactly follows the HISTRA API).

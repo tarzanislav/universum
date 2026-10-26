@@ -143,4 +143,30 @@ public sealed class UpdateTests
 
         return output.ToArray();
     }
+
+    /// <summary>
+    /// tools/New-ReleaseKey.ps1 builds the keys from fixed DER prefixes (it must run in Windows PowerShell 5.1 too);
+    /// the prefixes must give exactly what .NET reads in the release workflow and in ReleaseSignature.
+    /// </summary>
+    [Test]
+    public void ReleaseKeyScriptBuildsValidKeys()
+    {
+        var script = File.ReadAllText(Path.Combine(TestData.Root, "..", "tools", "New-ReleaseKey.ps1"));
+        var prefixes = System.Text.RegularExpressions.Regex.Matches(script, @"FromHex '([0-9a-f]+)'").Select(m => Convert.FromHexString(m.Groups[1].Value)).ToArray();
+        Assert.Equal(3, prefixes.Length);
+        for (var i = 0; i < 20; i++)
+        {
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            var p = key.ExportParameters(true);
+            byte[] point = [4, .. p.Q.X!, .. p.Q.Y!];
+            byte[] publicKey = [.. prefixes[0], .. point];
+            byte[] privateKey = [.. prefixes[1], .. p.D!, .. prefixes[2], .. point];
+            Assert.True(publicKey.SequenceEqual(key.ExportSubjectPublicKeyInfo()), "public key = SubjectPublicKeyInfo");
+            using var imported = ECDsa.Create();
+            imported.ImportPkcs8PrivateKey(privateKey, out var read);
+            Assert.True(read == privateKey.Length && imported.ExportSubjectPublicKeyInfo().SequenceEqual(publicKey), "private key = PKCS#8 of the same key");
+            var sums = Encoding.UTF8.GetBytes("# UNIVERSUM 1.0.0\n" + new string('A', 64) + "  UNIVERSUM_Setup_1.0.0.exe\n");
+            Assert.Equal(new string('A', 64), ReleaseSignature.ExpectedInstallerHash(sums, imported.SignData(sums, HashAlgorithmName.SHA256), new Version(1, 0, 0), Convert.ToBase64String(publicKey)));
+        }
+    }
 }

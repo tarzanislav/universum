@@ -15,6 +15,12 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- official TMDB logo (blue_short) from https://www.themoviedb.org/about/logos-attribution; the PNG is rendered
+         from the unchanged SVG because WPF does not draw SVG -->
+    <Resource Include="Assets\tmdb-logo.png" />
+    <None Include="Assets\tmdb-logo.svg" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Universum.Core\Universum.Core.csproj" />
     <ProjectReference Include="..\Universum.Platform.Windows\Universum.Platform.Windows.csproj" />
   </ItemGroup>

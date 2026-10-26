@@ -1,4 +1,6 @@
-namespace Universum.Core.Library.Tmdb;
+using System.Net.Http;
+
+namespace Universum.Core.Library;
 
 /// <summary>
 /// Spaces requests to a web service out: one at a time and at most <see cref="PerSecond"/> per second, however many
@@ -23,6 +25,31 @@ public sealed class RequestPacer
     /// (https://developer.themoviedb.org/docs/rate-limiting), so UNIVERSUM uses at most a tenth of it.
     /// </summary>
     public static RequestPacer Tmdb { get; } = new(4);
+
+    /// <summary>The pacer of all HISTRA requests: 2 per second (HISTRA publishes no limit, so UNIVERSUM stays gentle).</summary>
+    public static RequestPacer Histra { get; } = new(2);
+
+    /// <summary>The longest wait before a retry, whatever the service asks.</summary>
+    public static TimeSpan MaxRetryDelay { get; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How long to wait before the next attempt after "too many requests" or a passing server error: what the service
+    /// asks for (Retry-After), else 2, 4, 8, 16 s; at most <see cref="MaxRetryDelay"/>.
+    /// </summary>
+    public static TimeSpan RetryDelay(HttpResponseMessage response, int attempt)
+    {
+        var asked = response.Headers.RetryAfter switch
+        {
+            { Delta: { } delta } => delta,
+            { Date: { } date } => date - DateTimeOffset.UtcNow,
+            _ => (TimeSpan?)null,
+        };
+        var delay = asked is { } a && a > TimeSpan.Zero ? a : TimeSpan.FromSeconds(2 << Math.Min(attempt, 4));
+        return (delay > MaxRetryDelay ? MaxRetryDelay : delay) * DelayScale;
+    }
+
+    /// <summary>Tests shorten the waiting (1 = real time).</summary>
+    internal static double DelayScale { get; set; } = 1;
 
     public double PerSecond { get; }
 

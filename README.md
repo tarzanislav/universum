@@ -34,3 +34,7 @@ UNIVERSUM je samostatný projekt. Nie je súčasťou MKVToolNix a jeho autor ho 
 MKVToolNix (© Moritz Bunkus) má vlastnú licenciu; UNIVERSUM ho iba spúšťa ako samostatné programy.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+Logo TMDB (`src/Universum.App/Assets/tmdb-logo.*`) je ochranná známka [TMDB](https://www.themoviedb.org),
+použitá nezmenená podľa [pravidiel uvádzania zdroja](https://www.themoviedb.org/about/logos-attribution);
+licencia Apache 2.0 sa naň nevzťahuje.

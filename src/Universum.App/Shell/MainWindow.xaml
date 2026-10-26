@@ -192,15 +192,15 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="#" Binding="{Binding Position}" />
                         <DataGridTextColumn Header="Typ" Binding="{Binding Type}" />
-                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="90" />
-                        <DataGridTemplateColumn Header="Názov" Width="*" MinWidth="160">
+                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="80" />
+                        <DataGridTemplateColumn Header="Názov" Width="*" MinWidth="120">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding Before}" />
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Jazyk" Width="190">
+                        <DataGridTemplateColumn Header="Jazyk" Width="165">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" />
@@ -236,7 +236,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Zmeny" Binding="{Binding Changes}" Width="150">
+                        <DataGridTextColumn Header="Zmeny" Binding="{Binding Changes}" Width="120">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />

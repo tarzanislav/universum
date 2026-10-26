@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Execution;
 using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Planning;
@@ -34,6 +35,8 @@ public sealed class RulesPageViewModel : ObservableObject
     private string _episodeText = "";
     private Placement? _placement;
     private string _target = "";
+    private TmdbTitle? _tmdbTitle;
+    private string _titleNote = "";
 
     public RulesPageViewModel(AppServices services)
     {
@@ -42,6 +45,8 @@ public sealed class RulesPageViewModel : ObservableObject
         ApplyCommand = new AsyncRelayCommand(ApplyAsync, CanApply);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
+        Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
+        services.TmdbChanged += Tmdb.Refresh;
         services.LibraryChanged += () =>
         {
             OnPropertyChanged(nameof(OutputDescription));
@@ -56,6 +61,12 @@ public sealed class RulesPageViewModel : ObservableObject
     public AsyncRelayCommand UndoCommand { get; }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
+
+    /// <summary>Looking up the title on TMDB.</summary>
+    public TmdbPicker Tmdb { get; }
+
+    /// <summary>A note to the title (e.g. TMDB has no English title).</summary>
+    public string TitleNote { get => _titleNote; private set => SetProperty(ref _titleNote, value); }
 
     public ObservableCollection<RuleRow> Rows { get; } = [];
 
@@ -117,6 +128,9 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             if (SetProperty(ref _titleText, value))
             {
+                // typed by the user: the title chosen on TMDB no longer applies
+                _tmdbTitle = null;
+                TitleNote = "";
                 UpdateTarget();
             }
         }
@@ -231,6 +245,9 @@ public sealed class RulesPageViewModel : ObservableObject
         var guess = fromFolder is { Year: not null } or { TmdbId: not null } ? fromFolder : fromFile ?? fromFolder;
         _titleText = guess is null ? "" : new TitleInfo(_kind, guess.Name, guess.Year, guess.TmdbId, guess.TmdbId is not null).FolderName;
         _episodeText = episode?.Number.Tag ?? "";
+        _tmdbTitle = null;
+        TitleNote = "";
+        Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(TitleText));
@@ -267,10 +284,28 @@ public sealed class RulesPageViewModel : ObservableObject
             Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
                 ? "Súbor už je v knižnici na svojom mieste."
                 : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
-                  (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "");
+                  (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +
+                  (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "");
         }
 
         RefreshCommands();
+    }
+
+    private void ChooseTmdbTitle(TmdbTitle title)
+    {
+        _tmdbTitle = title;
+        if (title.Kind != _kind)
+        {
+            _kind = title.Kind;
+            OnPropertyChanged(nameof(IsMovie));
+            OnPropertyChanged(nameof(IsSeries));
+        }
+
+        var (text, note) = TmdbPicker.TitleText(title);
+        TitleNote = note;
+        _titleText = text;
+        OnPropertyChanged(nameof(TitleText));
+        UpdateTarget();
     }
 
     private bool CanApply() =>

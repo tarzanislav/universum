@@ -10,6 +10,10 @@ internal static class SettingsProfile
     public static RuleProfile Load() =>
         Read("Profile", e => e.ValueKind == JsonValueKind.Object ? e.Deserialize<RuleProfile>() : null) ?? RuleProfile.Default;
 
+    /// <summary>The TMDB key saved by the application (protected for the Windows account).</summary>
+    public static string? TmdbKeyProtected() =>
+        Read("TmdbKeyProtected", e => e.ValueKind == JsonValueKind.String ? e.GetString() : null);
+
     /// <summary>The output folder chosen in the application.</summary>
     public static string? OutputDirectory() =>
         Read("OutputDirectory", e => e.ValueKind == JsonValueKind.String ? e.GetString() : null);

@@ -178,6 +178,17 @@ internal static class SelfTest
         await model.Rules.ApplyCommand.ExecuteAsync(null);
         Check(model.Rules.Result.StartsWith("Rovnaký stream", StringComparison.Ordinal), "rules: the same stream is not written twice – " + model.Rules.Result);
 
+        // TMDB key: protected for the Windows account, never stored as plain text
+        var secret = UserSecret.Protect("test-key-123");
+        Check(UserSecret.Unprotect(secret) == "test-key-123" && !secret.Contains("test-key", StringComparison.Ordinal), "TMDB key protected with DPAPI");
+        Check(!model.Rules.Tmdb.SearchCommand.CanExecute(null), "rules: TMDB button disabled without a key");
+        services.SetTmdbKey("test-key-123");
+        Check(model.Rules.Tmdb.SearchCommand.CanExecute(null), "rules: TMDB button enabled with a key");
+        Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("test-key-123", StringComparison.Ordinal), "settings hold no plain TMDB key");
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
+        await Screenshot(window, "settings-library.png");
+        services.SetTmdbKey(null);
+
         await TestBatchPageAsync(model, window);
         window.Close();
 

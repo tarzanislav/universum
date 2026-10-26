@@ -125,8 +125,11 @@
                             <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,12,0" />
                             <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,20,0" />
                             <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                            <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="320" Margin="0,0,16,0"
-                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]" />
+                            <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="300" Margin="0,0,6,0"
+                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                            <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="220" Margin="0,0,16,0"
+                                      IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -134,6 +137,9 @@
                         </WrapPanel>
                         <TextBlock Margin="0,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Target}">
                             <Run Text="Cieľ:" FontWeight="SemiBold" /> <Run Text="{Binding Target, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap">
+                            <Run Text="{Binding Tmdb.Message, Mode=OneWay}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" />
                         </TextBlock>
                         <DockPanel Margin="0,12,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -177,8 +183,8 @@
 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="250" />
-                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="210" />
+                        <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <DataGrid ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" AutoGenerateColumns="False" IsReadOnly="True"
@@ -198,9 +204,9 @@
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="1.5*" />
-                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1.2*" />
                         </Grid.RowDefinitions>
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -255,7 +261,7 @@
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" MinWidth="110" />
-                                <DataGridTemplateColumn Header="Film / epizóda" Width="170">
+                                <DataGridTemplateColumn Header="Film / epizóda" Width="150">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel>
@@ -266,7 +272,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="1.6*">
+                                <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="1.5*" MinWidth="90">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -274,8 +280,13 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Header="Výsledok" Binding="{Binding Status}" />
-                                <DataGridTextColumn Header="Prečo na kontrolu" Binding="{Binding Reasons}" Width="*" />
+                                <DataGridTextColumn Header="Výsledok" Binding="{Binding Outcome}" Width="*" MinWidth="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextWrapping" Value="Wrap" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTemplateColumn Header="Aj tak">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -326,10 +337,16 @@
                             <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,20,0" />
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Seriál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding SeriesTitle, UpdateSourceTrigger=LostFocus}" Width="300" Margin="0,0,8,0"
-                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]" />
+                                <TextBox Text="{Binding SeriesTitle, UpdateSourceTrigger=LostFocus}" Width="230" Margin="0,0,6,0"
+                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
+                                          IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0" />
                             </StackPanel>
+                            <Button Content="Názvy z TMDB" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
+                                    Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Spresní navrhnuté názvy filmov podľa TMDB (len presná zhoda názvu a roku)" />
                             <Button Content="Prijať návrhy názvov" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
                                     ToolTip="Názvy a čísla epizód odhadnuté z mien súborov a priečinkov" />
                         </WrapPanel>
@@ -367,6 +384,22 @@
                             </DockPanel>
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"
                                        Text="Filmy idú do MOVIES\Názov (rok), seriály do TVSHOWS\Názov (rok)\Season 01 – podľa pravidiel Jellyfin. Priečinky MOVIES a TVSHOWS UNIVERSUM nikdy nemaže." />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="TMDB – názvy filmov a seriálov" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="Vlastný bezplatný kľúč z themoviedb.org (Nastavenia účtu → API): API Key alebo API Read Access Token. Na TMDB sa posiela len názov alebo ID titulu." />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Overiť a uložiť" Command="{Binding SaveTmdbKeyCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveTmdbKeyCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <TextBox Text="{Binding TmdbKeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč TMDB" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding TmdbStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}">

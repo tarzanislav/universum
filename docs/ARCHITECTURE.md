@@ -116,7 +116,8 @@ in next to it without changing the rules, planning or UI.
   key (ECDSA P-256; public key in the program, private key only as the secret of `release.yml`), its signed first
   line is `# UNIVERSUM X.Y.Z` of exactly the offered (newer) version – an older signed release cannot be replayed –
   and the installer `UNIVERSUM_Setup_X.Y.Z.exe` has the SHA-256 listed there. Release data and downloads must come
-  from `github.com/tarzanislav/universum/releases/`. Without a configured key UNIVERSUM opens the release page.
+  from `github.com/tarzanislav/universum/releases/`. The public key is built in (created by the owner on
+  26 Oct 2026); a release without a valid signature is never installed.
 - Installers (MKVToolNix and UNIVERSUM) are downloaded into a new folder with a random name, locked against writes
   while they are checked again and started; MKVToolNix additionally needs its Authenticode signature with a
   successful revocation check (offline revocation servers = no installation).

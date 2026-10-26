@@ -11,6 +11,10 @@ povinné schválenie vlastníkom.
 
 ## Podpisový kľúč – nastavenie (raz)
 
+Hotové 26. 10. 2026: prostredie `release` s povinným schválením, tajomstvo `UNIVERSUM_RELEASE_KEY`, verejný kľúč
+v programe. Postup ostáva pre prípad výmeny kľúča:
+
+
 1. GitHub → repozitár `universum` → **Settings → Environments → New environment** → názov `release`.
    - **Required reviewers**: zaškrtnúť a pridať vlastníka (každé vydanie čaká na jeho schválenie).
    - **Deployment branches and tags** → *Selected branches and tags* → **Add deployment branch or tag rule**

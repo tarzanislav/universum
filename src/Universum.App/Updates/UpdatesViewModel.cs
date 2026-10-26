@@ -88,7 +88,7 @@ public sealed class UpdatesViewModel : ObservableObject
     public string UniversumNotes => _report?.Universum is { IsAvailable: true } u ? u.Release.Notes : "";
 
     public string UniversumInstallHint => _report?.Universum is { IsAvailable: true, CanInstall: false }
-        ? "Toto vydanie ešte nie je podpísané kľúčom vydaní UNIVERSUM – stiahnite ho zo stránky vydania (tlačidlo nižšie)."
+        ? "Toto vydanie nemá podpis kľúčom vydaní UNIVERSUM, preto sa neinštaluje. Vydania UNIVERSUM sú vždy podpísané – nepodpísané radšej neinštalujte."
         : "";
 
     public string Problems => _report is null ? "" : string.Join("\n", _report.Problems);

@@ -13,10 +13,11 @@ namespace Universum.Core.Updates;
 public static class ReleaseSignature
 {
     /// <summary>
-    /// Public release key (SubjectPublicKeyInfo, Base64). Empty until the release key is created; while empty,
-    /// UNIVERSUM does not install its own updates and only opens the release page.
+    /// Public release key (SubjectPublicKeyInfo, Base64; ECDSA P-256), created by the owner on 26 October 2026 with
+    /// tools/New-ReleaseKey.ps1. The private key exists only as the secret UNIVERSUM_RELEASE_KEY of the GitHub
+    /// environment "release". An empty value would switch self-installation off (only the release page opens).
     /// </summary>
-    public const string PublicKey = "";
+    public const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1Gw7xMv8HOczL1NLdp3wSB+xpJhrPjCqoNH2vyJHngQPGCkn7geoU+k+x8OcnwdgxT+78wu2NezoI5FHfIUcFA==";
 
     public static bool IsConfigured => PublicKey.Length > 0;
 

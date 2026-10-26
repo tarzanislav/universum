@@ -20,9 +20,10 @@ v programe. Postup ostáva pre prípad výmeny kľúča:
    - **Deployment branches and tags** → *Selected branches and tags* → **Add deployment branch or tag rule**
      → typ *Tag*, vzor `v*.*.*`.
 2. Na svojom počítači vložiť do okna PowerShell celý obsah `tools/New-ReleaseKey.ps1`. Súkromný kľúč sa
-   nikam neuloží – skript ho dá do schránky a vypíše verejný kľúč.
-3. V prostredí `release` → **Add environment secret** → názov `UNIVERSUM_RELEASE_KEY`, hodnota Ctrl+V.
-   Potom v PowerShell stlačiť Enter (schránka sa vymaže).
+   nikam neuloží – skript ho dá do schránky (Enter ho skopíruje znova).
+3. V prostredí `release` → **Add environment secret** (alebo ceruzka pri existujúcom) → názov
+   `UNIVERSUM_RELEASE_KEY`, hodnota Ctrl+V. Medzitým nič nekopírovať ani nerobiť snímku obrazovky. Potom v
+   PowerShell napísať H a Enter – schránka sa vymaže a až teraz sa vypíše verejný kľúč.
 4. Verejný kľúč (nie je tajný) vložiť do `ReleaseSignature.PublicKey` v
    `src/Universum.Core/Updates/ReleaseSignature.cs`. Od tej verzie si UNIVERSUM overené aktualizácie
    nainštaluje sám.

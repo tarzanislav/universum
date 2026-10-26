@@ -1,9 +1,8 @@
-﻿# UNIVERSUM – nový podpisový kľúč vydaní (ECDSA P-256), vytvára sa raz.
-# Spustite na svojom počítači vo Windows PowerShell 5.1 alebo PowerShell 7: celý obsah vložte do okna PowerShell
-# (je to jeden blok & { … }, vykoná sa naraz až po poslednej zátvorke).
-# Súkromný kľúč sa nikam neukladá: skript ho vloží do schránky, odkiaľ ho vložíte do GitHubu ako tajomstvo
-# UNIVERSUM_RELEASE_KEY prostredia "release". Verejný kľúč vypíše – ten nie je tajný a patrí do
-# src/Universum.Core/Updates/ReleaseSignature.cs.
+﻿# UNIVERSUM - novy podpisovy kluc vydani (ECDSA P-256), vytvara sa raz (alebo pri vymene kluca).
+# Spustite vo Windows PowerShell 5.1 alebo PowerShell 7: cely obsah vlozte do okna PowerShell (je to jeden blok & { }).
+# Sukromny kluc sa nikam neuklada: skript ho da do schranky (na poziadanie aj opakovane), vy ho vlozite do GitHubu ako
+# tajomstvo UNIVERSUM_RELEASE_KEY prostredia "release". Az potom skript vymaze schranku a vypise verejny kluc - ten nie
+# je tajny a patri do src/Universum.Core/Updates/ReleaseSignature.cs. Texty su bez diakritiky (konzola Windows).
 & {
     $ErrorActionPreference = 'Stop'
     function FromHex([string]$hex) { [byte[]]($hex -split '(..)' -ne '' | ForEach-Object { [Convert]::ToByte($_, 16) }) }
@@ -11,24 +10,27 @@
     try {
         $p = $key.ExportParameters($true)
         $point = [byte[]](@([byte]4) + $p.Q.X + $p.Q.Y)
-        # SubjectPublicKeyInfo a PKCS#8 kľúča P-256: pevné začiatky DER + bajty kľúča
+        # SubjectPublicKeyInfo a PKCS#8 kluca P-256: pevne zaciatky DER + bajty kluca
         $public = [byte[]]((FromHex '3059301306072a8648ce3d020106082a8648ce3d030107034200') + $point)
         $private = [byte[]]((FromHex '308187020100301306072a8648ce3d020106082a8648ce3d030107046d306b0201010420') + $p.D + (FromHex 'a144034200') + $point)
-        Set-Clipboard -Value ([Convert]::ToBase64String($private))
+        $privateText = [Convert]::ToBase64String($private)
         [Array]::Clear($private, 0, $private.Length)
         [Array]::Clear($p.D, 0, $p.D.Length)
     } finally {
         $key.Dispose()
     }
+    do {
+        Set-Clipboard -Value $privateText
+        Write-Host ''
+        Write-Host 'KROK 1: Sukromny kluc je v schranke.' -ForegroundColor Green
+        Write-Host 'GitHub: release -> UNIVERSUM_RELEASE_KEY -> ceruzka -> Value: Ctrl+V -> Update secret'
+        Write-Host 'Medzitym NIC nekopirujte a nerobte snimku obrazovky (prepisalo by to schranku).' -ForegroundColor Yellow
+        $answer = Read-Host 'Ulozene? Napiste H a Enter. Skopirovat znova? Len Enter'
+    } until ($answer -match '^[hH]')
+    $privateText = $null
+    Set-Clipboard -Value ' '
     Write-Host ''
-    Write-Host 'Súkromný kľúč je v schránke.' -ForegroundColor Green
-    Write-Host 'GitHub: universum → Settings → Environments → release → Add environment secret'
-    Write-Host '  Name: UNIVERSUM_RELEASE_KEY    Value: Ctrl+V    → Add secret'
-    Write-Host ''
-    Write-Host 'Verejný kľúč (nie je tajný – pošlite ho Claudovi):' -ForegroundColor Cyan
+    Write-Host 'KROK 2: Schranka je vymazana. Verejny kluc (poslite ho Claudovi):' -ForegroundColor Cyan
     Write-Host ([Convert]::ToBase64String($public))
     Write-Host ''
-    Read-Host 'Keď je tajomstvo uložené, stlačte Enter – schránka sa vymaže'
-    Set-Clipboard -Value ' '
-    Write-Host 'Schránka je vymazaná.'
 }

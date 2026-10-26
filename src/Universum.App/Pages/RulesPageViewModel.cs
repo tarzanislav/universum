@@ -138,6 +138,11 @@ public sealed class RulesPageViewModel : ObservableObject
                 // typed by the user: the title chosen on TMDB no longer applies
                 _tmdbTitle = null;
                 TitleNote = "";
+                if (UseTmdbAddress(value))
+                {
+                    return;
+                }
+
                 UpdateTarget();
             }
         }
@@ -294,6 +299,35 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         RefreshCommands();
+    }
+
+    // a TMDB address or ID pasted as the title: the address tells film (/movie/) or series (/tv/); the title is read from TMDB
+    private bool UseTmdbAddress(string text)
+    {
+        // only an address (with /movie/ or /tv/): a bare number may be a title like "1917"; the TMDB button looks numbers up
+        if (TitleGuess.ParseTmdb(text) is not { Kind: { } kind })
+        {
+            return false;
+        }
+
+        if (kind != _kind)
+        {
+            _kind = kind;
+            OnPropertyChanged(nameof(IsMovie));
+            OnPropertyChanged(nameof(IsSeries));
+        }
+
+        if (_services.Tmdb is not null)
+        {
+            _ = Tmdb.SearchAsync();
+        }
+        else
+        {
+            TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
+            UpdateTarget();
+        }
+
+        return true;
     }
 
     private void ChooseTmdbTitle(TmdbTitle title)

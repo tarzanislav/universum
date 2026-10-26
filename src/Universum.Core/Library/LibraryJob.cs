@@ -163,11 +163,12 @@ public sealed class LibraryJob(LibraryLayout layout)
             .Select(g => g.First())
             .FirstOrDefault();
 
-    // an episode by its name: S01E04 or 1x04 always; "Díl 4", "Časť 2", "E04" only when the name is not a film in library
-    // form ("Sága - Časť 2 (2011)", "Zlatý prach Episode 2 (2019)")
-    private static bool LooksLikeEpisode(string file, string root) =>
-        EpisodeParser.FromPath(file, root) is { } match &&
-        (match.Form != EpisodeForm.Word || !TitleGuess.HasYearInParentheses(Path.GetFileNameWithoutExtension(file)));
+    /// <summary>
+    /// An episode by its name: S01E04 always; 1x04, "Díl 4", "E04" unless the number stands in a film's title before its
+    /// year ("Sága - Časť 2 (2011)"); "Kriminálka Anděl (2008) Díl 1" is an episode.
+    /// </summary>
+    public static bool LooksLikeEpisode(string file, string? root) =>
+        TitleGuess.NamesEpisode(EpisodeParser.FromPath(file, root), Path.GetFileNameWithoutExtension(file));
 
     // "03" → 3
     private static int? BareNumber(string name) =>
@@ -214,6 +215,7 @@ public sealed class LibraryJob(LibraryLayout layout)
         {
             { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia",
             { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
+            { RangeRejected: true } => "rozsah epizód v mene sa nedá zapísať (iná sezóna alebo opačné poradie) – berie sa prvá epizóda",
             null when EpisodeSuggestions.ContainsKey(path) => "číslo nie je v mene – návrh podľa poradia",
             _ => null,
         };

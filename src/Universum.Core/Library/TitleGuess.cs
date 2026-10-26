@@ -94,7 +94,7 @@ public static partial class TitleGuess
     {
         var episode = EpisodeParser.FromPath(path);
         var name = Path.GetFileNameWithoutExtension(path);
-        var series = episode is { Form: not EpisodeForm.Word } || (episode is not null && !HasYearInParentheses(name)) || EpisodeParser.SeasonOfPath(path) is not null;
+        var series = NamesEpisode(episode, name) || EpisodeParser.SeasonOfPath(path) is not null;
         var kind = series ? MediaKind.Series : MediaKind.Movie;
         var directory = Path.GetDirectoryName(path);
         if (kind == MediaKind.Series && EpisodeParser.IsSeasonOnlyFolder(Path.GetFileName(directory)))
@@ -128,6 +128,18 @@ public static partial class TitleGuess
 
     /// <summary>True when the name carries a year in parentheses, as films in library form do: "Sága - Časť 2 (2011)".</summary>
     public static bool HasYearInParentheses(string? name) => name is not null && ParenthesizedYear().IsMatch(name);
+
+    /// <summary>
+    /// True when the number found in a name makes it an episode: S01E04 always; 1x04 or a word form ("Díl 4", "Episode 2")
+    /// unless it stands before the year of a library-form name, where it belongs to a film's title ("Sága - Časť 2 (2011)",
+    /// "Rally 4x10 (2015)"); after the year it is an episode ("Kriminálka Anděl (2008) Díl 1").
+    /// </summary>
+    public static bool NamesEpisode(EpisodeMatch? match, string name) =>
+        match is not null && (match.Form == EpisodeForm.SeasonEpisode || !NumberInTitle(name));
+
+    // the number stands in the title part of a library-form name, before "(Year)"
+    private static bool NumberInTitle(string name) =>
+        ParenthesizedYear().Match(name) is { Success: true, Index: > 0 } year && EpisodeParser.FromText(name[..year.Index]) is { Form: not EpisodeForm.SeasonEpisode };
 
     /// <summary>Title, year and TMDB ID from a file or folder name; null when no name is left.</summary>
     /// <param name="kind">
@@ -171,7 +183,11 @@ public static partial class TitleGuess
             }
         }
 
-        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // "Nine Puzzles.S01E09": a clear episode number inside a word starts a word of its own
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(t => EpisodeParser.IndexOfClearNumber(t) is > 0 and var at ? [t[..at].TrimEnd('.', '_', '-'), t[at..]] : new[] { t })
+            .Where(t => t.Length > 0)
+            .ToArray();
         var end = tokens.Length;
         for (var i = 0; i < tokens.Length; i++)
         {

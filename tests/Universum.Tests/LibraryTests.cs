@@ -137,6 +137,7 @@ public sealed class LibraryTests
             ("Show.S01E01E1080p", "S01E01", false),
             ("Show S01E24-S02E01", "S01E24", false),
             ("Rally 4x100 (2015)", null, false),
+            ("Kriminálka Anděl (2008) Díl 1", "S01E01", true),
         };
         foreach (var (name, tag, assumed) in cases)
         {
@@ -149,6 +150,19 @@ public sealed class LibraryTests
         Assert.Equal(1, EpisodeParser.SeasonOfFolder("Season 01"));
         Assert.Equal(4, EpisodeParser.SeasonOfFolder("S04"));
         Assert.Equal(new EpisodeNumber(1, 4), EpisodeNumber.TryParse("s1e4"));
+
+        // FIXED (owner, 26 Oct 2026): season folders have two digits – Season 01, Season 02, never Season 1 – and specials
+        // are always Season 00, never Season 01
+        Assert.Sequence(["Season 00", "Season 01", "Season 02", "Season 09", "Season 10", "Season 100"],
+            new[] { 0, 1, 2, 9, 10, 100 }.Select(LibraryNames.SeasonFolder), "two digits");
+        foreach (var specials in new[] { "Specials", "Special", "Špeciály", "Speciály", "Season 00", "Season 0" })
+        {
+            Assert.Equal(0, EpisodeParser.SeasonOfFolder(specials), specials);
+            Assert.Equal("S00E01", EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv"))?.Number.Tag, specials + ": the folder wins over S01 in the name");
+            Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", specials, "Seriál S01E01.mkv")) is { NeedsConfirmation: false }, specials + ": decided");
+        }
+
+        Assert.Equal(1, EpisodeParser.SeasonOfFolder("Season 1"), "an input folder may be Season 1; the library writes Season 01");
 
         // specials are season 0 (Season 00), season packs name their season, a range of seasons names none
         Assert.Equal(0, EpisodeParser.SeasonOfFolder("Specials"));
@@ -214,6 +228,18 @@ public sealed class LibraryTests
         Assert.True(TitleGuess.Typed(MediaKind.Movie, "Ticho (2010) [tmdbid-99999999999]") is { TmdbId: null, Problem: "chýba TMDB ID" }, "typed: the problem is shown");
         Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Rally 4x100 (2015) [tmdbid-4242]", "Rally 4x100 (2015) [tmdbid-4242].mkv")).Kind, "a film");
         Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Zlatý prach Episode 2 (2019).mkv")).Kind, "a film in library form with a word number");
+        // a number before the year belongs to a film's title, after the year it is an episode
+        Assert.True(TitleGuess.NamesEpisode(EpisodeParser.FromText("Kriminálka Anděl (2008) Díl 1"), "Kriminálka Anděl (2008) Díl 1"), "episode after the year");
+        Assert.True(!TitleGuess.NamesEpisode(EpisodeParser.FromText("Sága - Časť 2 (2011)"), "Sága - Časť 2 (2011)"), "part of a film title");
+        Assert.True(!TitleGuess.NamesEpisode(EpisodeParser.FromText("Rally 4x10 (2015)"), "Rally 4x10 (2015)"), "1x form in a film title");
+        Assert.Equal(new NameGuess("Kriminálka Anděl", 2008, null), TitleGuess.FromName("Kriminálka Anděl (2008) Díl 1", MediaKind.Series));
+        Assert.Equal(new NameGuess("Nine Puzzles", null, null), TitleGuess.FromName("Nine Puzzles.S01E09", MediaKind.Series), "an episode inside a word");
+        // ranges that cannot be written: the first episode, to confirm; typed: invalid
+        Assert.True(EpisodeParser.FromText("Show S01E40-S02E01") is { Number.Tag: "S01E40", RangeRejected: true, NeedsConfirmation: true }, "over two seasons");
+        Assert.Equal<EpisodeNumber?>(null, EpisodeNumber.TryParse("S01E05-E03"), "backwards");
+        Assert.Equal<EpisodeNumber?>(null, EpisodeNumber.TryParse("S01E20-S02E01"), "typed over two seasons");
+        Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder("Nine Puzzles Season 1-3"), "several seasons");
+        Assert.True(!EpisodeParser.IsExtra(Path.Combine("x", "Sample (2020)", "Sample.mkv")), "a film named Sample");
         Assert.Equal(new NameGuess("Kriminálka Anděl", null, null), TitleGuess.Preferred(new NameGuess("Kriminálka Anděl", null, null), new NameGuess("Kriminalka Andel", null, null)), "the folder's diacritics");
         Assert.Equal<string?>(null, new TitleInfo(MediaKind.Series, "Seriál", 2024).Problem);
 

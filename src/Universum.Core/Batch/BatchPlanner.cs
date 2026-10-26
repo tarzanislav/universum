@@ -22,7 +22,35 @@ public static class BatchPlanner
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
         var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
-        return library is { Kind: MediaKind.Series } ? CheckEpisodes(items, library) : items;
+        return library is null ? items : library.Kind == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
+    }
+
+    /// <summary>
+    /// Versions of one film must be the same film: when files named after different films ("Okno (2014)", "Ticho (2010)")
+    /// get the same title, the ones named otherwise go for review ("process anyway" lets them through).
+    /// </summary>
+    private static List<BatchItem> CheckFilms(List<BatchItem> items)
+    {
+        var flagged = new Dictionary<int, string>();
+        foreach (var same in Enumerable.Range(0, items.Count).Where(i => items[i].Title is not null).GroupBy(i => items[i].Title!.FolderName, Paths.Comparer))
+        {
+            var own = same.Select(i => (Index: i, Name: TitleGuess.FromName(Path.GetFileNameWithoutExtension(items[i].File.Path), MediaKind.Movie)?.Name))
+                .Where(x => x.Name is not null).ToList();
+            if (own.Select(x => Words.Normalize(x.Name)).Distinct(StringComparer.Ordinal).Count() < 2)
+            {
+                continue;
+            }
+
+            var title = Words.Normalize(items[same.First()].Title!.Name);
+            foreach (var (index, name) in own.Where(x => Words.Normalize(x.Name) != title))
+            {
+                flagged[index] = name!;
+            }
+        }
+
+        return items.Select((item, i) => flagged.TryGetValue(i, out var name) && !item.Group.Decisions.ProcessAnyway.Contains(item.File.Path)
+            ? item with { Reasons = [.. item.Reasons, new ReviewReason(ReviewReasonKind.OtherSeries, Detail: name)] }
+            : item).ToList();
     }
 
     /// <summary>
@@ -143,9 +171,17 @@ public static class BatchPlanner
             reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: library.Kind == MediaKind.Series ? "seriál" : "filmy"));
         }
 
-        if (EpisodeParser.IsExtra(path, library.Root) && !item.Group.Decisions.ProcessAnyway.Contains(path))
+        var anyway = item.Group.Decisions.ProcessAnyway.Contains(path);
+        if (EpisodeParser.IsExtra(path, library.Root) && !anyway)
         {
             reasons.Add(new ReviewReason(ReviewReasonKind.ExtraFile));
+        }
+
+        // films: an episode would become a version of a film
+        if (library.Kind == MediaKind.Movie && !anyway &&
+            (LibraryJob.LooksLikeEpisode(path, library.Root) || EpisodeParser.SeasonOfPath(path, library.Root) is not null))
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.EpisodeAmongFilms));
         }
 
         var title = library.TitleFor(path);

@@ -102,7 +102,11 @@ in next to it without changing the rules, planning or UI.
     "process anyway" lets a file through (a second version then gets a number, K1);
   - the kind film/series is only proposed (`LibraryJob.KindConfirmed`; batch: "Potvrdiť" / choosing a kind / accepting
     suggestions; CLI: `--film`, `--serial`, `--confirm-suggestions`); it is guessed from clear numbers (S01E04, 1x04)
-    and season folders – word forms ("Díl 4", "Episode 2") not in names with a film year ("Sága - Časť 2 (2011)");
+    and season folders; a number before the year of a library-form name belongs to a film's title ("Sága - Časť 2
+    (2011)", "Rally 4x10 (2015)"), after it is an episode ("Kriminálka Anděl (2008) Díl 1"); episodes among films and
+    different films under one title go for review; a TMDB address tells the kind (`/tv/` series, `/movie/` film);
+  - fixed by the owner (26 Oct 2026): season folders have two digits (`Season 01`, never `Season 1`) and specials
+    ("Specials", "Špeciály", "Season 00") are always `Season 00`, even when a name says S01;
   - seasons are looked for only below the analysed folder; extras (Extras, Trailers, Featurettes, Samples … folders,
     "- trailer" names) are no films or episodes and go for review; ranges S01E18-S01E19, S01E20E21E22, 1x15-16;
   - `TitleInfo.Problem`: the year is required ("Name (Year)") and the name must be in Latin script; titles in library

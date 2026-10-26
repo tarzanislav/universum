@@ -47,6 +47,9 @@ public enum ReviewReasonKind
     /// <summary>An extra (trailer, sample, featurette …), not a film or an episode.</summary>
     ExtraFile,
 
+    /// <summary>Among films, a file named like an episode (S01E04, "… (2008) Díl 1") or lying in a season folder.</summary>
+    EpisodeAmongFilms,
+
     /// <summary>The path in the library would be too long for Windows.</summary>
     PathTooLong,
 }
@@ -59,7 +62,7 @@ public sealed record ReviewReason(ReviewReasonKind Kind, SlotKey? Slot = null, T
 {
     /// <summary>The user may process the file anyway (then a second version gets a number, K1).</summary>
     public bool CanBeOverridden => Kind is ReviewReasonKind.MissingRequiredSlot or ReviewReasonKind.DuplicateEpisode or ReviewReasonKind.UnknownEpisode or
-        ReviewReasonKind.OtherSeries or ReviewReasonKind.ExtraFile;
+        ReviewReasonKind.OtherSeries or ReviewReasonKind.ExtraFile or ReviewReasonKind.EpisodeAmongFilms;
 }
 
 /// <summary>One file of a batch with everything decided for it: the simulation result.</summary>

@@ -33,6 +33,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private CancellationTokenSource? _tmdbCancellation;
     private IReadOnlyList<BatchItem> _items = [];
     private bool _needsAnalysis;
+    private string? _typedTmdb;
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
     private BatchTemplate _template = BatchTemplate.RulesOnly;
@@ -66,7 +67,8 @@ public sealed class BatchPageViewModel : ObservableObject
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
         ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
-        Tmdb = new TmdbPicker(services, () => MediaKind.Series, () => SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? "", ChooseTmdbSeries);
+        Tmdb = new TmdbPicker(services, () => MediaKind.Series,
+            () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? ""), ChooseTmdbSeries);
         FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } && _services.Tmdb is not null);
         services.TmdbChanged += () =>
         {
@@ -252,6 +254,14 @@ public sealed class BatchPageViewModel : ObservableObject
                 return;
             }
 
+            // a TMDB address tells the kind itself: themoviedb.org/tv/… is a series, themoviedb.org/movie/… a film
+            if (TitleGuess.ParseTmdb(value) is { Kind: not null } reference)
+            {
+                UseTmdbReference(reference, value);
+                return;
+            }
+
+            _typedTmdb = null;
             _library.Series = TitleGuess.Typed(MediaKind.Series, value);
             Replan();
         }
@@ -264,6 +274,13 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         if (_library is null)
         {
+            return;
+        }
+
+        // a film's TMDB address or ID: its title from TMDB (the address says film or series)
+        if (_library.Kind == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { Kind: not null } reference)
+        {
+            _ = NameFilmFromTmdbAsync(path, reference);
             return;
         }
 
@@ -488,6 +505,81 @@ public sealed class BatchPageViewModel : ObservableObject
         OnLibraryChanged();
     }
 
+    private void UseTmdbReference(TmdbReference reference, string text)
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        if (reference.Kind is { } kind && (kind != _library.Kind || !_library.KindConfirmed))
+        {
+            _library.Kind = kind;
+            OnLibraryChanged();
+        }
+
+        if (_services.Tmdb is null)
+        {
+            RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok)" +
+                       (reference.Kind == MediaKind.Movie ? " pri súboroch." : $" [tmdbid-{reference.Id}].");
+            return;
+        }
+
+        _typedTmdb = text;
+        _ = SearchTypedAsync();
+    }
+
+    private async Task SearchTypedAsync()
+    {
+        try
+        {
+            await Tmdb.SearchAsync();
+        }
+        finally
+        {
+            _typedTmdb = null;
+        }
+    }
+
+    private async Task NameFilmFromTmdbAsync(string path, TmdbReference reference)
+    {
+        if (_services.Tmdb is not { } tmdb)
+        {
+            RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
+            return;
+        }
+
+        if (reference.Kind == MediaKind.Series)
+        {
+            RunState = "Adresa TMDB je seriál (/tv/) – zvoľte druh seriál a zadajte ju do poľa Seriál.";
+            return;
+        }
+
+        try
+        {
+            if (await tmdb.GetAsync(MediaKind.Movie, reference.Id) is { } film && _library is not null)
+            {
+                TmdbPicker.TrySaveCache(tmdb);
+                var (title, note) = TmdbPicker.TitleText(film);
+                if (TitleGuess.Typed(MediaKind.Movie, title) is { } info)
+                {
+                    _library.Movies[path] = info;
+                }
+
+                RunState = note;
+                Replan();
+            }
+            else
+            {
+                RunState = $"TMDB nepozná film {reference.Id}.";
+            }
+        }
+        catch (TmdbException ex)
+        {
+            RunState = ex.Message;
+        }
+    }
+
     private void ChooseTmdbSeries(TmdbTitle title)
     {
         if (_library is null)
@@ -496,6 +588,23 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var (text, note) = TmdbPicker.TitleText(title);
+        if (title.Kind == MediaKind.Movie)
+        {
+            // a film's address in the series field: the folder holds this film (all files are its versions)
+            _library.Kind = MediaKind.Movie;
+            if (TitleGuess.Typed(MediaKind.Movie, text) is { } film && _analysis is not null)
+            {
+                foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
+                {
+                    _library.Movies[file.Path] = film;
+                }
+            }
+
+            RunState = (note.Length > 0 ? note + " " : "") + "Adresa TMDB je film (/movie/): druh je filmy a všetky súbory dostali tento názov (verzie jedného filmu) – pri súboroch ho môžete zmeniť.";
+            OnLibraryChanged();
+            return;
+        }
+
         _library.Kind = MediaKind.Series;
         _library.Series = TitleGuess.Typed(MediaKind.Series, text);
         // seasons and episode counts: every episode is checked against them (specification 13.5)

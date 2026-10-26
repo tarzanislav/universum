@@ -78,9 +78,10 @@ internal static class Output
             : "chýba číslo epizódy (--epizoda)",
         ReviewReasonKind.DuplicateEpisode => $"rovnaká epizóda s rovnakým popisom ako {reason.Detail} (--epizoda, alebo --aj-tak: ďalšia verzia dostane číslo)",
         ReviewReasonKind.UnknownEpisode => "TMDB takú sezónu alebo epizódu nepozná (--epizoda alebo --aj-tak)",
-        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému titulu: {reason.Detail} (jeden priečinok = jeden seriál; --aj-tak)",
+        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému titulu: {reason.Detail} (skontrolujte --nazov, alebo --aj-tak)",
         ReviewReasonKind.KindNotConfirmed => $"druh je len návrh ({reason.Detail}) – zadajte --film alebo --serial (alebo --confirm-suggestions)",
         ReviewReasonKind.ExtraFile => "doplnok (trailer, ukážka, bonus) – nie je film ani epizóda (--aj-tak)",
+        ReviewReasonKind.EpisodeAmongFilms => "meno vyzerá ako epizóda seriálu – medzi filmami by bol verziou filmu (--serial alebo --aj-tak)",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind + (reason.Slot is { } s ? " " + s : ""),
     };

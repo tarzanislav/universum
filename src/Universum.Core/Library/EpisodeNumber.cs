@@ -15,8 +15,8 @@ public sealed record EpisodeNumber(int Season, int Episode, int? LastEpisode = n
 
     public override string ToString() => Tag;
 
-    /// <summary>Parses a tag as typed by the user: "S01E04", "s1e4", "1x04", "S01E01-E02".</summary>
-    public static EpisodeNumber? TryParse(string? text) => EpisodeParser.FromText(text) is { SeasonAssumed: false } match ? match.Number : null;
+    /// <summary>Parses a tag as typed by the user: "S01E04", "s1e4", "1x04", "S01E01-E02"; a range that cannot be written is invalid.</summary>
+    public static EpisodeNumber? TryParse(string? text) => EpisodeParser.FromText(text) is { SeasonAssumed: false, RangeRejected: false } match ? match.Number : null;
 }
 
 /// <summary>How an episode number was written: the kind film/series is guessed from the clear forms only.</summary>
@@ -38,10 +38,14 @@ public enum EpisodeForm
 /// Season of the nearest season folder when it differs from the season in the name ("Season 2\Show S01E03.mkv"):
 /// one of them is wrong.
 /// </param>
-public sealed record EpisodeMatch(EpisodeNumber Number, bool SeasonAssumed, int? FolderSeason = null, EpisodeForm Form = EpisodeForm.SeasonEpisode)
+/// <param name="RangeRejected">
+/// The name carries a range that cannot be written ("S01E40-S02E01" over two seasons, "S01E05-E03" backwards): only the
+/// first episode is taken, to be confirmed.
+/// </param>
+public sealed record EpisodeMatch(EpisodeNumber Number, bool SeasonAssumed, int? FolderSeason = null, EpisodeForm Form = EpisodeForm.SeasonEpisode, bool RangeRejected = false)
 {
-    /// <summary>The number is a guess the user has to confirm: the season was assumed or the folder disagrees.</summary>
-    public bool NeedsConfirmation => SeasonAssumed || FolderSeason is not null;
+    /// <summary>The number is a guess the user has to confirm: the season was assumed, the folder disagrees or a range was cut.</summary>
+    public bool NeedsConfirmation => SeasonAssumed || FolderSeason is not null || RangeRejected;
 }
 
 /// <summary>Finds season and episode numbers in file and folder names (specification, section 13.5).</summary>
@@ -61,7 +65,9 @@ public static partial class EpisodeParser
         }
 
         var folderSeason = SeasonOfPath(path, root);
-        if (match.SeasonAssumed)
+        // a specials folder ("Specials", "Špeciály", "Season 00") always means Season 00, whatever the name says: a special
+        // must never go into Season 01 (owner's decision of 26 October 2026)
+        if (match.SeasonAssumed || folderSeason == 0)
         {
             return folderSeason is { } season ? match with { Number = match.Number with { Season = season }, SeasonAssumed = false } : match;
         }
@@ -106,16 +112,25 @@ public static partial class EpisodeParser
             var season = Number(se.Groups["s"]);
             var episode = Number(se.Groups["e"]);
             int? last = null;
-            if (se.Groups["l"].Success && se.Groups["ls"].Captures.All(c => Number(c.Value) == season))
+            var rejected = false;
+            if (se.Groups["l"].Success)
             {
-                last = Number(se.Groups["l"]);
+                var end = Number(se.Groups["l"]);
+                if (se.Groups["ls"].Captures.All(c => Number(c.Value) == season) && end > episode && end - episode <= 200)
+                {
+                    last = end;
+                }
+                else
+                {
+                    rejected = true;
+                }
             }
-            else if (se.Groups["b"].Success && Number(se.Groups["b"]) - episode <= 10)
+            else if (se.Groups["b"].Success && Number(se.Groups["b"]) is var bare && bare > episode && bare - episode <= 10)
             {
-                last = Number(se.Groups["b"]);
+                last = bare;
             }
 
-            return new EpisodeMatch(new EpisodeNumber(season, episode, last is { } l && l > episode && l - episode <= 200 ? l : null), false);
+            return new EpisodeMatch(new EpisodeNumber(season, episode, last), false, RangeRejected: rejected);
         }
 
         if (Crossed().Match(name) is { Success: true } x)
@@ -155,6 +170,11 @@ public static partial class EpisodeParser
             return 0;
         }
 
+        if (SeasonRange().IsMatch(folderName ?? ""))
+        {
+            return null;
+        }
+
         if (SeasonWord().Match(words) is { Success: true } named)
         {
             return Number(named.Groups["s"]);
@@ -175,6 +195,16 @@ public static partial class EpisodeParser
     }
 
     /// <summary>
+    /// Position of a clear episode number (S01E04, 1x04) in a text, or -1: "Puzzles.S01E09" → 8.
+    /// </summary>
+    public static int IndexOfClearNumber(string text)
+    {
+        var se = SeasonEpisode().Match(text);
+        var x = Crossed().Match(text);
+        return se.Success && (!x.Success || se.Index <= x.Index) ? se.Index : x.Success ? x.Index : -1;
+    }
+
+    /// <summary>
     /// True for a file that Jellyfin treats as an extra, not as a film or an episode: in a folder such as "Extras",
     /// "Trailers", "Featurettes", "Behind the Scenes", "Deleted Scenes", "Interviews", "Samples", "Shorts", or named
     /// "… - trailer", "…-sample".
@@ -189,6 +219,7 @@ public static partial class EpisodeParser
         var folder = Path.GetDirectoryName(Path.GetFullPath(path));
         for (var level = 0; !string.IsNullOrEmpty(folder) && (root is null ? level < 2 : Paths.IsUnder(folder, root) && !Paths.Same(folder, root)); level++)
         {
+            // "Sample (2020)" is a film's folder, "Samples" an extras folder
             if (ExtrasFolder().IsMatch(Words.Normalize(Path.GetFileName(folder))))
             {
                 return true;
@@ -240,6 +271,11 @@ public static partial class EpisodeParser
     [GeneratedRegex(@"^(?:extras?|trailers?|featurettes?|behind the scenes|deleted scenes|interviews?|scenes|samples?|shorts|clips|other|bonus|bonusy)$", RegexOptions.CultureInvariant)]
     private static partial Regex ExtrasFolder();
 
-    [GeneratedRegex(@"(?:^| )(?:trailer|sample|featurette)$", RegexOptions.CultureInvariant)]
+    // "Film - trailer", "film-sample" (a film named just "Sample" is no extra)
+    [GeneratedRegex(@" (?:trailer|sample|featurette)$", RegexOptions.CultureInvariant)]
     private static partial Regex ExtraSuffix();
+
+    // "Season 1-3", "Séria 1 – 4": several seasons, none of them
+    [GeneratedRegex(@"(?:season|s[eé]ri[ae]|s[eé]rie|series|sez[oó]na|[řr]ada|staffel|sezon)\s*\d{1,3}\s*[-–]\s*\d{1,3}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SeasonRange();
 }

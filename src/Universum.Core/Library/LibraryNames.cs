@@ -104,7 +104,10 @@ public static class LibraryNames
         return name;
     }
 
-    /// <summary>"Season 01"; specials are season 0.</summary>
+    /// <summary>
+    /// "Season 01", "Season 02" … "Season 10" – always at least two digits, never "Season 1"; specials are
+    /// "Season 00" (owner's decision of 26 October 2026: fixed, must not change).
+    /// </summary>
     public static string SeasonFolder(int season) => "Season " + season.ToString("00", CultureInfo.InvariantCulture);
 
     private static bool IsLatinLetter(int c) =>

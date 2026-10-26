@@ -122,7 +122,13 @@ var tmdbKey = options.TmdbKey ?? Environment.GetEnvironmentVariable("UNIVERSUM_T
               (OperatingSystem.IsWindows() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
 var titleFromTmdb = false;
+
 var tmdb = string.IsNullOrWhiteSpace(tmdbKey) ? null : new TmdbClient(http, tmdbKey, Path.Combine(Path.GetDirectoryName(cacheFile)!, "tmdb-cache.json"));
+if (tmdb is not null)
+{
+    tmdb.Waiting += delay => Console.WriteLine($"TMDB žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…");
+}
+
 try
 {
     if (options.Tmdb is { } reference && tmdb is not null)

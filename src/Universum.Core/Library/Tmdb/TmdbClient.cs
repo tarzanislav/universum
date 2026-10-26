@@ -35,7 +35,8 @@ public sealed class TmdbException(string message, Exception? inner = null) : Exc
 /// <summary>
 /// Reads titles from the TMDB API (https://api.themoviedb.org/3) with the user's own key – an API key (v3) or an API
 /// Read Access Token (sent as a bearer token). Only titles and IDs are sent. Answers are cached (details 30 days,
-/// searches 7 days); the cache never contains the key.
+/// searches 7 days); the cache never contains the key. Requests go one at a time through a <see cref="RequestPacer"/>
+/// (4 per second); "too many requests" (429) and passing server errors are waited out and retried.
 /// </summary>
 public sealed class TmdbClient
 {
@@ -45,13 +46,18 @@ public sealed class TmdbClient
     private static readonly Uri BaseAddress = new("https://api.themoviedb.org/3/");
     private static readonly TimeSpan DetailsLifetime = TimeSpan.FromDays(30);
     private static readonly TimeSpan SearchLifetime = TimeSpan.FromDays(7);
+    private static readonly TimeSpan MaxDelay = TimeSpan.FromSeconds(60);
+    private const int MaxRetriesWhenLimited = 4;
+    private const int MaxRetriesOnServerError = 2;
 
     private readonly HttpClient _http;
     private readonly string _key;
     private readonly string? _cacheFile;
     private readonly Dictionary<string, CacheEntry> _cache;
+    private readonly RequestPacer _pacer;
 
-    public TmdbClient(HttpClient http, string key, string? cacheFile = null)
+    /// <param name="pacer">Spacing of requests; the shared <see cref="RequestPacer.Tmdb"/> by default.</param>
+    public TmdbClient(HttpClient http, string key, string? cacheFile = null, RequestPacer? pacer = null)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -62,7 +68,11 @@ public sealed class TmdbClient
         _key = key.Trim();
         _cacheFile = cacheFile;
         _cache = LoadCache(cacheFile);
+        _pacer = pacer ?? RequestPacer.Tmdb;
     }
+
+    /// <summary>Raised when TMDB asked to slow down and the client waits before trying again.</summary>
+    public event Action<TimeSpan>? Waiting;
 
     /// <summary>True for an API Read Access Token (a JWT), false for a v3 API key.</summary>
     public bool UsesBearerToken => _key.Count(c => c == '.') == 2 && _key.Length > 60;
@@ -165,62 +175,103 @@ public sealed class TmdbClient
             }
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(BaseAddress, UsesBearerToken ? path : path + "&api_key=" + Uri.EscapeDataString(_key)));
+        for (var attempt = 0; ; attempt++)
+        {
+            using var request = Request(path);
+            HttpResponseMessage response;
+            try
+            {
+                response = await _pacer.RunAsync(() => _http.SendAsync(request, cancellationToken), cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new TmdbException("TMDB nie je dostupné: " + ex.Message, ex);
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TmdbException("TMDB neodpovedá.", ex);
+            }
+
+            using (response)
+            {
+                // too many requests or a passing server problem: wait (as long as TMDB asks) and try again
+                if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway
+                    or HttpStatusCode.GatewayTimeout or HttpStatusCode.InternalServerError)
+                {
+                    var limited = response.StatusCode == HttpStatusCode.TooManyRequests;
+                    if (attempt >= (limited ? MaxRetriesWhenLimited : MaxRetriesOnServerError))
+                    {
+                        throw new TmdbException(limited
+                            ? "TMDB obmedzilo počet otázok a ani po čakaní ich neprijíma – skúste to o niekoľko minút."
+                            : $"TMDB má problém ({(int)response.StatusCode}) – skúste to neskôr.");
+                    }
+
+                    var delay = RetryDelay(response, attempt);
+                    _pacer.PauseFor(delay);
+                    Waiting?.Invoke(delay);
+                    continue;
+                }
+
+                string? body = null;
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK:
+                        body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        break;
+                    case HttpStatusCode.NotFound:
+                        break;
+                    case HttpStatusCode.Unauthorized:
+                        throw new TmdbException("Kľúč TMDB nie je platný – skontrolujte ho v Nastaveniach.");
+                    default:
+                        throw new TmdbException($"TMDB odpovedalo chybou {(int)response.StatusCode}.");
+                }
+
+                JsonDocument? document;
+                try
+                {
+                    document = body is null ? null : JsonDocument.Parse(body);
+                }
+                catch (JsonException ex)
+                {
+                    throw new TmdbException("TMDB vrátilo nečitateľnú odpoveď.", ex);
+                }
+
+                lock (_cache)
+                {
+                    _cache[path] = new CacheEntry(DateTime.UtcNow, body);
+                }
+
+                return document;
+            }
+        }
+    }
+
+    /// <summary>How long to wait before the next attempt: what TMDB asks for (Retry-After), else 2, 4, 8, 16 s; at most 60 s.</summary>
+    internal static TimeSpan RetryDelay(HttpResponseMessage response, int attempt)
+    {
+        var asked = response.Headers.RetryAfter switch
+        {
+            { Delta: { } delta } => delta,
+            { Date: { } date } => date - DateTimeOffset.UtcNow,
+            _ => (TimeSpan?)null,
+        };
+        var delay = asked is { } a && a > TimeSpan.Zero ? a : TimeSpan.FromSeconds(2 << Math.Min(attempt, 4));
+        return (delay > MaxDelay ? MaxDelay : delay) * DelayScale;
+    }
+
+    /// <summary>Tests shorten the waiting (1 = real time).</summary>
+    internal static double DelayScale { get; set; } = 1;
+
+    private HttpRequestMessage Request(string path)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, new Uri(BaseAddress, UsesBearerToken ? path : path + "&api_key=" + Uri.EscapeDataString(_key)));
         if (UsesBearerToken)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _key);
         }
 
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        HttpResponseMessage response;
-        try
-        {
-            response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new TmdbException("TMDB nie je dostupné: " + ex.Message, ex);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TmdbException("TMDB neodpovedá.", ex);
-        }
-
-        using (response)
-        {
-            string? body = null;
-            switch (response.StatusCode)
-            {
-                case HttpStatusCode.OK:
-                    body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    break;
-                case HttpStatusCode.NotFound:
-                    break;
-                case HttpStatusCode.Unauthorized:
-                    throw new TmdbException("Kľúč TMDB nie je platný – skontrolujte ho v Nastaveniach.");
-                case HttpStatusCode.TooManyRequests:
-                    throw new TmdbException("TMDB dočasne obmedzilo počet otázok – skúste to o chvíľu.");
-                default:
-                    throw new TmdbException($"TMDB odpovedalo chybou {(int)response.StatusCode}.");
-            }
-
-            JsonDocument? document;
-            try
-            {
-                document = body is null ? null : JsonDocument.Parse(body);
-            }
-            catch (JsonException ex)
-            {
-                throw new TmdbException("TMDB vrátilo nečitateľnú odpoveď.", ex);
-            }
-
-            lock (_cache)
-            {
-                _cache[path] = new CacheEntry(DateTime.UtcNow, body);
-            }
-
-            return document;
-        }
+        return request;
     }
 
     private static TmdbTitle? Parse(MediaKind kind, JsonElement element, bool withSeasons)

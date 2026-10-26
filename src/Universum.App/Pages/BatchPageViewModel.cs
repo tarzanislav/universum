@@ -30,6 +30,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private IReadOnlyList<string> _leftovers = [];
     private IReadOnlyList<string> _interrupted = [];
     private bool _ranSinceAnalysis;
+    private CancellationTokenSource? _tmdbCancellation;
     private IReadOnlyList<BatchItem> _items = [];
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
@@ -57,7 +58,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
         RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
-        StopCommand = new RelayCommand(Stop, () => _running);
+        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
@@ -438,6 +439,10 @@ public sealed class BatchPageViewModel : ObservableObject
         OnLibraryChanged();
     }
 
+    /// <summary>
+    /// Refines the suggested film titles on TMDB, one request at a time (at most 4 per second, see RequestPacer); the
+    /// same name and year is asked only once (cache). Stop cancels; titles found so far stay.
+    /// </summary>
     private async Task FindMoviesAsync()
     {
         if (_library is null || _analysis is null || _services.Tmdb is not { } tmdb)
@@ -445,36 +450,47 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        var pending = _analysis.Groups.SelectMany(g => g.Files)
+            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path))
+            .Select(f => (f.Path, Guess: _library.MovieSuggestions[f.Path]))
+            .ToList();
+        var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
         Busy = true;
+        _tmdbCancellation = new CancellationTokenSource();
+        StopCommand.NotifyCanExecuteChanged();
+        void OnWaiting(TimeSpan delay) => RunState = $"TMDB žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s a pokračujem…";
+        tmdb.Waiting += OnWaiting;
         int asked = 0, found = 0;
         try
         {
-            foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
+            foreach (var (path, guess) in pending)
             {
-                if (_library.Movies.ContainsKey(file.Path) || _library.MovieSuggestions.GetValueOrDefault(file.Path) is not { } guess)
-                {
-                    continue;
-                }
-
                 asked++;
-                RunState = $"TMDB: {asked}…";
-                var results = await tmdb.SearchAsync(MediaKind.Movie, guess.Name, guess.Year);
+                RunState = $"TMDB {asked} / {pending.Count} ({questions} rôznych názvov, najviac 4 otázky za sekundu)…";
+                var results = await tmdb.SearchAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
                 if (TmdbClient.ExactMatch(results, guess.Name, guess.Year) is { } match && match.ToTitleInfo() is { } info)
                 {
-                    _library.MovieSuggestions[file.Path] = info;
+                    _library.MovieSuggestions[path] = info;
                     found++;
                 }
             }
 
-            TmdbPicker.TrySaveCache(tmdb);
-            RunState = $"TMDB spresnilo {found} z {asked} navrhnutých názvov – skontrolujte ich a dajte Prijať návrhy názvov.";
+            RunState = $"TMDB spresnilo {found} z {pending.Count} navrhnutých názvov – skontrolujte ich a dajte Prijať návrhy názvov.";
+        }
+        catch (OperationCanceledException)
+        {
+            RunState = $"Zastavené – TMDB spresnilo {found} z {asked} doteraz prejdených názvov.";
         }
         catch (TmdbException ex)
         {
-            RunState = ex.Message;
+            RunState = ex.Message + $" (spresnené doteraz: {found})";
         }
         finally
         {
+            tmdb.Waiting -= OnWaiting;
+            TmdbPicker.TrySaveCache(tmdb);
+            _tmdbCancellation.Dispose();
+            _tmdbCancellation = null;
             Busy = false;
             Replan();
         }
@@ -599,6 +615,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Stop()
     {
+        _tmdbCancellation?.Cancel();
         if (_control is not null)
         {
             _control.StopAfterCurrent = true;

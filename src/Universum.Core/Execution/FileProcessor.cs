@@ -212,6 +212,11 @@ public sealed class FileProcessor(
             return [$"cannot move the file back: {back} exists"];
         }
 
+        if (!trusted && index is not null && index.Knows(path) && !index.IsResult(path))
+        {
+            return [$"{path} has changed since UNIVERSUM wrote it; nothing was restored"];
+        }
+
         if (!trusted)
         {
             try
@@ -280,7 +285,7 @@ public sealed class FileProcessor(
 
         try
         {
-            index?.Undone(path, finalPath);
+            index?.Undone(path, finalPath, sameAsBefore: trusted);
         }
         catch (Exception ex) when (IsFileError(ex))
         {

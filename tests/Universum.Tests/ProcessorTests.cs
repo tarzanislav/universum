@@ -419,6 +419,40 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task ResultChangedOutsideUniversumCountsAsAnOriginal()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var source = await inspector.InspectAsync(original);
+        var first = await processor.ProcessAsync(EditPlan.For(ManualTarget.Create(source, ManualTarget.AsIs(source), title: "Prvý")), work.Movie(EditPlan.For(ManualTarget.Create(source, ManualTarget.AsIs(source)))), Keep);
+        Assert.Equal(ProcessingStatus.Done, first.Status, string.Join("; ", first.Messages));
+        var result = first.OutputPath!;
+
+        // edited in the library with undo, then the file is touched by another program: undo refuses
+        var inLibrary = await inspector.InspectAsync(result);
+        var edit = EditPlan.For(ManualTarget.Create(inLibrary, ManualTarget.AsIs(inLibrary), title: "Druhý"));
+        var edited = await processor.ProcessAsync(edit, work.Movie(edit), Keep);
+        Assert.True(edited.Status == ProcessingStatus.Done && edited.UndoRecordPath is not null, "edited in place: " + string.Join("; ", edited.Messages));
+        System.IO.File.SetLastWriteTimeUtc(edited.OutputPath!, System.IO.File.GetLastWriteTimeUtc(edited.OutputPath!).AddHours(1));
+        var bytes = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True((await processor.UndoAsync(edited.UndoRecordPath!)).Any(p => p.Contains("has changed since", StringComparison.Ordinal)), "undo refused");
+        var afterUndo = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True(bytes.SequenceEqual(afterUndo), "nothing restored");
+
+        // and it is no longer reworked where it is: the next edit writes a new file, the changed one stays as it is
+        var changed = await inspector.InspectAsync(edited.OutputPath!);
+        var again = EditPlan.For(ManualTarget.Create(changed, ManualTarget.AsIs(changed), title: "Tretí"));
+        var third = await processor.ProcessAsync(again, work.Movie(again), Keep);
+        Assert.Equal(ProcessingStatus.Done, third.Status, string.Join("; ", third.Messages));
+        Assert.True(third.UndoRecordPath is null && !Paths.Same(third.OutputPath!, edited.OutputPath!), "a new file");
+        var afterThird = await System.IO.File.ReadAllBytesAsync(edited.OutputPath!);
+        Assert.True(bytes.SequenceEqual(afterThird), "the changed file untouched");
+        Assert.Equal(0, bin.Recycled.Count, "nothing in the Recycle Bin");
+    }
+
+    [Test]
     public async Task OriginalLyingInItsTitleFolderIsOnlyRead()
     {
         // an existing collection: originals already sit in MOVIES\Vymyslený film (2026)\ under their own names

@@ -59,8 +59,10 @@ in next to it without changing the rules, planning or UI.
     and multiplexer (`MuxSpec.Placement`, name chosen after writing by the size class); `Placement.InPlace` /
     `Placement.Beside` remain for later use;
   - only a library result UNIVERSUM made is reworked where it is: in the title folder, named "{Prefix} - … {size}{n}.mkv"
-    (`Placement.IsLibraryName`) **and** recorded in the library index as a result of the same size
-    (`LibraryIndex.IsResult`); the index follows the result through edits, renames and undo (`Replace`, `Undone`).
+    (`Placement.IsLibraryName`) **and** recorded in the library index as a result with the same size and modification
+    time (`LibraryIndex.IsResult`); the index follows the result through edits, renames and undo (`Replace`, `Undone`);
+    a result changed outside UNIVERSUM counts as an original, and its undo is refused; an undone result is replaced by
+    the next run of its original (K8).
     Any other file in the folder – an existing collection, originals put there by hand, also ones with library-like
     names ("Creep (2004) - 1080p BluRay.mkv") – is only read and the result is a new file; without an index nothing is
     reworked; the batch analyses again when the library comes to contain analysed files;

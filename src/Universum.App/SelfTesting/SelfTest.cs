@@ -184,12 +184,50 @@ internal static class SelfTest
         Check(!model.Rules.Tmdb.SearchCommand.CanExecute(null), "rules: TMDB button disabled without a key");
         services.SetTmdbKey("test-key-123");
         Check(model.Rules.Tmdb.SearchCommand.CanExecute(null), "rules: TMDB button enabled with a key");
+        model.Settings.TmdbEnabled = false;
+        Check(!model.Rules.Tmdb.SearchCommand.CanExecute(null) && services.TmdbKey == "test-key-123", "settings: TMDB switched off, key kept");
+        model.Settings.TmdbEnabled = true;
+        Check(model.Rules.Tmdb.SearchCommand.CanExecute(null), "settings: TMDB switched on again");
         Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("test-key-123", StringComparison.Ordinal), "settings hold no plain TMDB key");
+        // HISTRA token: checked for the Bearer header, protected like the TMDB key
+        model.Settings.HistraTokenInput = "bad token\r\nX: 1";
+        model.Settings.SaveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken is null && model.Settings.HistraStatus.StartsWith("Token sa neuložil", StringComparison.Ordinal), "settings: unsafe HISTRA token refused");
+        model.Settings.HistraTokenInput = "hst_selftest-0123456789";
+        model.Settings.SaveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken == "hst_selftest-0123456789" && model.Settings.HistraTokenInput.Length == 0, "settings: HISTRA token saved");
+        Check(services.SyncActive && model.Settings.SyncStatus.StartsWith("TMDB aj HISTRA", StringComparison.Ordinal), "settings: TMDB and HISTRA both on");
+        model.Settings.HistraEnabled = false;
+        Check(!services.HistraActive && !services.SyncActive && services.HistraToken is not null && model.Settings.SyncStatus == "Zapnuté je len TMDB.", "settings: HISTRA switched off, token kept");
+        model.Settings.TmdbEnabled = false;
+        model.Settings.HistraEnabled = true;
+        Check(model.Settings.SyncStatus == "Zapnutá je len HISTRA.", "settings: only HISTRA on");
+        model.Settings.TmdbEnabled = true;
+        Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("hst_selftest", StringComparison.Ordinal), "settings hold no plain HISTRA token");
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings-library.png");
         services.SetTmdbKey(null);
+        model.Settings.RemoveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken is null, "settings: HISTRA token removed");
 
         await TestBatchPageAsync(model, window);
+
+        // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM
+        var updates = await services.Updates.CheckAsync();
+        Write($"update check: MKVToolNix {updates.MkvToolNix?.Latest} (news {updates.MkvToolNix?.News.Count}), " +
+              $"UNIVERSUM release {updates.Universum?.Release.Version.ToString() ?? "none"}; problems: {string.Join(" | ", updates.Problems)}");
+        Check(updates.MkvToolNix is not null, "update check reads the MKVToolNix release feed");
+        var updatesWindow = model.CreateUpdatesWindow();
+        updatesWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+        updatesWindow.Left = 0;
+        updatesWindow.Top = 0;
+        updatesWindow.Show();
+        await Screenshot(updatesWindow, "updates.png");
+        updatesWindow.Close();
+
+        // "Otvoriť v UNIVERSUM" from the Explorer: a folder opens in batch processing
+        await model.OpenPathAsync(Path.Combine(_outputDirectory, "batch"));
+        Check(model.SelectedTool.Page == model.Batch && model.Batch.Groups.Count > 0, "a folder from the command line opens in batch processing");
         window.Close();
 
         var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
@@ -257,14 +295,17 @@ internal static class SelfTest
             return;
         }
 
+        // the content is drawn at its margin offset, so the picture includes the margins (or the edges are cut off)
+        var width = content.ActualWidth + content.Margin.Left + content.Margin.Right;
+        var height = content.ActualHeight + content.Margin.Top + content.Margin.Bottom;
         var dpi = VisualTreeHelper.GetDpi(content);
         var bitmap = new RenderTargetBitmap(
-            (int)(content.ActualWidth * dpi.DpiScaleX), (int)(content.ActualHeight * dpi.DpiScaleY),
+            (int)(width * dpi.DpiScaleX), (int)(height * dpi.DpiScaleY),
             dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
         var background = new DrawingVisual();
         using (var context = background.RenderOpen())
         {
-            context.DrawRectangle(window.Background ?? Brushes.White, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
+            context.DrawRectangle(window.Background ?? Brushes.White, null, new Rect(0, 0, width, height));
         }
 
         bitmap.Render(background);

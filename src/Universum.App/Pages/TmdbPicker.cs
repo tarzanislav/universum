@@ -41,9 +41,10 @@ public sealed class TmdbPicker : ObservableObject
 
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
-    public string Tooltip => _services.Tmdb is null
-        ? "Vyhľadávanie na TMDB: zadajte svoj kľúč TMDB v Nastaveniach"
-        : "Nájde titul na TMDB podľa ID, adresy alebo názvu a roku";
+    public string Tooltip =>
+        _services.Tmdb is not null ? "Nájde titul na TMDB podľa ID, adresy alebo názvu a roku"
+        : _services.TmdbKey is null ? "Vyhľadávanie na TMDB: zadajte svoj kľúč TMDB v Nastaveniach"
+        : "Pripájanie k TMDB je vypnuté v Nastaveniach";
 
     public TmdbTitle? Selected
     {

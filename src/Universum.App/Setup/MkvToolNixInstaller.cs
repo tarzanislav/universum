@@ -43,8 +43,8 @@ public sealed class MkvToolNixInstaller
             throw new SetupException($"Oficiálny zoznam kontrolných súčtov neobsahuje súbor {fileName}.");
         }
 
-        var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "mkvtoolnix-" + MkvToolNixDownloads.Format(version));
-        Directory.CreateDirectory(folder);
+        // a new folder with a random name: nothing can be prepared there in advance
+        var folder = Directory.CreateTempSubdirectory("UNIVERSUM-mkvtoolnix-").FullName;
         var target = Path.Combine(folder, fileName);
         await DownloadFileAsync(MkvToolNixDownloads.WindowsReleaseFile(version, fileName), target, progress, cancellationToken);
 
@@ -56,6 +56,12 @@ public sealed class MkvToolNixInstaller
         }
 
         var signature = AuthenticodeVerifier.Verify(target);
+        if (signature.IsSignedBy(MkvToolNixDownloads.WindowsSignerName) && !signature.RevocationChecked)
+        {
+            File.Delete(target);
+            throw new SetupException("Nepodarilo sa overiť, či podpis inštalátora MKVToolNix nebol odvolaný (servery certifikátov sú nedostupné). Skúste to neskôr.");
+        }
+
         if (!signature.IsSignedBy(MkvToolNixDownloads.WindowsSignerName))
         {
             File.Delete(target);
@@ -70,6 +76,13 @@ public sealed class MkvToolNixInstaller
     /// <summary>Runs the verified installer and waits for it. Returns false when the user declined the Windows prompt.</summary>
     public static async Task<bool> RunAsync(string installerPath, bool silent, CancellationToken cancellationToken = default)
     {
+        // locked against changes and checked once more, so it cannot be swapped between the check and the start
+        using var locked = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (AuthenticodeVerifier.Verify(installerPath) is not { RevocationChecked: true } verified || !verified.IsSignedBy(MkvToolNixDownloads.WindowsSignerName))
+        {
+            throw new SetupException("Inštalátor MKVToolNix sa po overení zmenil – nespustil sa.");
+        }
+
         Process? process;
         try
         {
@@ -156,6 +169,7 @@ public sealed class MkvToolNixInstaller
         var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 3 })
         {
             Timeout = TimeSpan.FromMinutes(10),
+            MaxResponseContentBufferSize = 16 << 20, // feed and checksum lists; installers are streamed
         };
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"UNIVERSUM/{typeof(MkvToolNixInstaller).Assembly.GetName().Version}");
         return client;

@@ -1,0 +1,127 @@
+name: Compatibility with the newest MKVToolNix
+
+# Weekly (and on demand): UNIVERSUM tested with the newest MKVToolNix release. The result is published as
+# compatibility.json in the branch "compatibility"; the update window shows "overené s UNIVERSUM" from it.
+on:
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  test:
+    name: Tests and self-test with the newest MKVToolNix (Windows)
+    runs-on: windows-2025
+    outputs:
+      mkvtoolnix: ${{ steps.mkvtoolnix.outputs.version }}
+      passed: ${{ steps.result.outputs.passed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: .NET 10 SDK
+        shell: pwsh
+        run: |
+          $sdks = & dotnet --list-sdks 2>$null
+          if (-not ($sdks -match '^10\.')) {
+            Invoke-WebRequest https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
+            & "$env:RUNNER_TEMP\dotnet-install.ps1" -Channel 10.0 -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir "$env:ProgramFiles\dotnet"
+          }
+          dotnet --list-sdks
+
+      # the newest release from the official feed; the archive is checked against the official checksum list and
+      # mkvmerge.exe against the official signer (no pinned hash: the version is new by design)
+      - name: Newest MKVToolNix (checksum and signature verified)
+        id: mkvtoolnix
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $feed = Join-Path $env:RUNNER_TEMP "latest-release.xml.gz"
+          Invoke-WebRequest "https://mkvtoolnix.download/latest-release.xml.gz" -OutFile $feed
+          $stream = [IO.Compression.GZipStream]::new([IO.File]::OpenRead($feed), [IO.Compression.CompressionMode]::Decompress)
+          [xml]$xml = [IO.StreamReader]::new($stream).ReadToEnd()
+          $v = ($xml.SelectNodes("//*[starts-with(local-name(), 'latest-source')]/*[local-name()='version']") | Select-Object -First 1).InnerText
+          if (-not ($v -match '^\d+\.\d+(\.\d+)?$')) { throw "no version in the release feed" }
+          $base = "https://mkvtoolnix.download/windows/releases/$v"
+          $name = "mkvtoolnix-64-bit-$v.7z"
+          $work = Join-Path $env:RUNNER_TEMP "mkvtoolnix-download"
+          New-Item -ItemType Directory -Force $work | Out-Null
+          Invoke-WebRequest "$base/$name" -OutFile (Join-Path $work $name)
+          Invoke-WebRequest "$base/sha256sums.txt" -OutFile (Join-Path $work "sha256sums.txt")
+          $expected = (Get-Content (Join-Path $work "sha256sums.txt") | Where-Object { $_ -match [regex]::Escape($name) + '$' } | ForEach-Object { ($_ -split '\s+')[0] }) | Select-Object -First 1
+          $actual = (Get-FileHash (Join-Path $work $name) -Algorithm SHA256).Hash
+          if (-not $expected -or $expected.ToUpperInvariant() -ne $actual) { throw "SHA-256 mismatch for $name" }
+          $target = Join-Path $env:RUNNER_TEMP "mkvtoolnix"
+          7z x -y "-o$target" (Join-Path $work $name) | Out-Null
+          $mkvmerge = Get-ChildItem $target -Recurse -Filter mkvmerge.exe | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $mkvmerge.FullName
+          $signer = $signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          if ($signature.Status -ne 'Valid' -or $signer -cne 'LINET Services GmbH') {
+            throw "mkvmerge.exe signature: $($signature.Status) $($signature.SignerCertificate.Subject)"
+          }
+          & $mkvmerge.FullName --version
+          "UNIVERSUM_MKVTOOLNIX_DIR=$($mkvmerge.DirectoryName)" >> $env:GITHUB_ENV
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "::notice title=MKVToolNix::$v"
+
+      - name: Core tests
+        id: tests
+        continue-on-error: true
+        run: dotnet run --project tests/Universum.Tests -c Release
+
+      - name: Publish and self-test
+        id: selftest
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true -o publish
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $out = Join-Path $env:RUNNER_TEMP "selftest"
+          $env:UNIVERSUM_SELFTEST_DIR = $out
+          $env:UNIVERSUM_TESTDATA = Join-Path $PWD "testdata"
+          $p = Start-Process -FilePath "publish\Universum.exe" -ArgumentList "--samotest" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(600000)) { $p.Kill(); exit 1 }
+          if (Test-Path (Join-Path $out "selftest.log")) { Get-Content (Join-Path $out "selftest.log") }
+          exit $p.ExitCode
+
+      - name: Result
+        id: result
+        shell: pwsh
+        run: |
+          $passed = '${{ steps.tests.outcome }}' -eq 'success' -and '${{ steps.selftest.outcome }}' -eq 'success'
+          "passed=$($passed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if (-not $passed) { Write-Host "::error::UNIVERSUM is not compatible with MKVToolNix ${{ steps.mkvtoolnix.outputs.version }}" }
+
+  publish:
+    name: Publish the result
+    needs: test
+    if: ${{ needs.test.outputs.mkvtoolnix != '' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: compatibility.json to the branch "compatibility"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MKVTOOLNIX: ${{ needs.test.outputs.mkvtoolnix }}
+          PASSED: ${{ needs.test.outputs.passed }}
+        run: |
+          mkdir result && cd result
+          printf '{"mkvtoolnix":"%s","universum":"%s","tested":"%s","passed":%s}\n' \
+            "$MKVTOOLNIX" "${{ github.sha }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${PASSED:-false}" > compatibility.json
+          cat compatibility.json
+          git init -q -b compatibility
+          git config user.name "UNIVERSUM CI"
+          git config user.email "ci@users.noreply.github.com"
+          git add compatibility.json
+          git commit -q -m "Compatibility with MKVToolNix $MKVTOOLNIX: ${PASSED:-false}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" compatibility

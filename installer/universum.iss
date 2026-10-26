@@ -54,6 +54,15 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Name: "{autoprograms}\UNIVERSUM"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\UNIVERSUM"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
+[Registry]
+; Explorer context menu: a file goes to the UNIVERSUM rules, a folder to batch processing (removed when uninstalling)
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.mkv\shell\UNIVERSUM"; ValueType: string; ValueName: ""; ValueData: "Otvoriť v UNIVERSUM"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.mkv\shell\UNIVERSUM"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#AppExe}"
+Root: HKA; Subkey: "Software\Classes\SystemFileAssociations\.mkv\shell\UNIVERSUM\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Directory\shell\UNIVERSUM"; ValueType: string; ValueName: ""; ValueData: "Spracovať v UNIVERSUM"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Directory\shell\UNIVERSUM"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#AppExe}"
+Root: HKA; Subkey: "Software\Classes\Directory\shell\UNIVERSUM\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
+
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,UNIVERSUM}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 ; after an automatic update (silent install with /SPUSTIT=1) UNIVERSUM starts again

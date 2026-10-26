@@ -15,6 +15,7 @@ v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý prie
 - **Knižnica pre Jellyfin** – výsledky idú do výstupného priečinka: `MOVIES\Creep (2004)\Creep (2004) - CZ EN FHD H264 BIG.mkv`
   a `TVSHOWS\Nine Puzzles (2025) [tmdbid-227191]\Season 01\Nine Puzzles S01E04 - CZ titulky FHD H264 SMALL.mkv`.
   Názvy vie vyhľadať na [TMDB](https://www.themoviedb.org/) s vlastným bezplatným kľúčom používateľa.
+  V Nastaveniach sa dá uložiť aj vlastný token [HISTRA](https://histra.net) (sledovanie filmov a seriálov).
 - **Bezpečnosť súborov** – simulácia pred zápisom, overenie výsledku, Vrátiť späť, originál podľa voľby
   zachovaný alebo odstránený (presunutý do knižnice alebo do Koša, nikdy natrvalo).
 - **Aktualizácie** UNIVERSUM aj MKVToolNix z jedného miesta.

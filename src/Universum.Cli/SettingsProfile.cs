@@ -14,6 +14,10 @@ internal static class SettingsProfile
     public static string? TmdbKeyProtected() =>
         Read("TmdbKeyProtected", e => e.ValueKind == JsonValueKind.String ? e.GetString() : null);
 
+    /// <summary>"Connect to TMDB" in the application (on unless switched off); the stored key is used only then.</summary>
+    public static bool TmdbEnabled() =>
+        Read("TmdbEnabled", e => e.ValueKind == JsonValueKind.False ? "off" : null) is null;
+
     /// <summary>The output folder chosen in the application.</summary>
     public static string? OutputDirectory() =>
         Read("OutputDirectory", e => e.ValueKind == JsonValueKind.String ? e.GetString() : null);

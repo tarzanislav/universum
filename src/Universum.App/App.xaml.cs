@@ -41,10 +41,16 @@ public partial class App : Application
             return;
         }
 
-        var window = new MainWindow(new MainViewModel(services));
+        var model = new MainViewModel(services);
+        var window = new MainWindow(model);
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
+
+        // "Otvoriť v UNIVERSUM" from the Explorer passes a file or folder
+        // ("C:\" arrives as C:" because of the backslash before the closing quote)
+        var path = e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal))?.TrimEnd('"');
+        await model.StartAsync(path is { Length: 2 } && path[1] == ':' ? path + "\\" : path);
     }
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

@@ -67,8 +67,17 @@ public sealed class AppServices
             ? fromEnvironment
             : Settings.TmdbKeyProtected is { Length: > 0 } stored ? UserSecret.Unprotect(stored) : null;
 
-    /// <summary>TMDB client with the user's key; null without a key.</summary>
-    public TmdbClient? Tmdb => _tmdb ??= TmdbKey is { } key ? new TmdbClient(Http, key, AppSettings.TmdbCacheFile) : null;
+    /// <summary>TMDB client with the user's key; null without a key or with connecting switched off (the key stays).</summary>
+    public TmdbClient? Tmdb => _tmdb ??= Settings.TmdbEnabled && TmdbKey is { } key ? new TmdbClient(Http, key, AppSettings.TmdbCacheFile) : null;
+
+    /// <summary>Switches connecting to TMDB on or off; the stored key is kept either way.</summary>
+    public void SetTmdbEnabled(bool enabled)
+    {
+        Settings.TmdbEnabled = enabled;
+        Settings.Save();
+        _tmdb = null;
+        TmdbChanged?.Invoke();
+    }
 
     /// <summary>Stores the TMDB key protected for the current Windows user (null removes it).</summary>
     public void SetTmdbKey(string? key)
@@ -81,6 +90,45 @@ public sealed class AppServices
 
     /// <summary>Raised when the TMDB key changes.</summary>
     public event Action? TmdbChanged;
+
+    /// <summary>The user's HISTRA token (UNIVERSUM_HISTRA_TOKEN wins over the settings); null when none is set.</summary>
+    public string? HistraToken =>
+        Environment.GetEnvironmentVariable("UNIVERSUM_HISTRA_TOKEN") is { Length: > 0 } fromEnvironment
+            ? fromEnvironment
+            : Settings.HistraTokenProtected is { Length: > 0 } stored ? UserSecret.Unprotect(stored) : null;
+
+    /// <summary>HISTRA is used: a token is stored and connecting is switched on.</summary>
+    public bool HistraActive => Settings.HistraEnabled && HistraToken is not null;
+
+    /// <summary>
+    /// TMDB and HISTRA both switched on: the two are to be kept in sync (what is synchronised is decided with the HISTRA
+    /// API description; until then nothing is sent).
+    /// </summary>
+    public bool SyncActive => Tmdb is not null && HistraActive;
+
+    /// <summary>Switches connecting to HISTRA on or off; the stored token is kept either way.</summary>
+    public void SetHistraEnabled(bool enabled)
+    {
+        Settings.HistraEnabled = enabled;
+        Settings.Save();
+        HistraChanged?.Invoke();
+    }
+
+    /// <summary>Stores the HISTRA token protected for the current Windows user (null removes it).</summary>
+    public void SetHistraToken(string? token)
+    {
+        Settings.HistraTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
+        Settings.Save();
+        HistraChanged?.Invoke();
+    }
+
+    /// <summary>Raised when the HISTRA token changes.</summary>
+    public event Action? HistraChanged;
+
+    private Updates.UpdateService? _updates;
+
+    /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
+    public Updates.UpdateService Updates => _updates ??= new Updates.UpdateService(this);
 
     /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
     public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
@@ -129,8 +177,30 @@ public sealed class AppSettings
     /// <summary>Output folder with MOVIES and TVSHOWS (specification, section 13); must be set before processing.</summary>
     public string? OutputDirectory { get; set; }
 
+    /// <summary>Check for updates at start and then once a day.</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>"Skip this version" (MKVToolNix, UNIVERSUM).</summary>
+    public string? SkippedMkvToolNixVersion { get; set; }
+
+    public string? SkippedUniversumVersion { get; set; }
+
+    /// <summary>"Remind me later": no offer before this time (security fixes excepted).</summary>
+    public DateTime? RemindUpdatesAfterUtc { get; set; }
+
     /// <summary>The user's TMDB key, protected with the Windows data protection API (readable only by this account).</summary>
     public string? TmdbKeyProtected { get; set; }
+
+    /// <summary>The user's HISTRA token, protected with the Windows data protection API (readable only by this account).</summary>
+    public string? HistraTokenProtected { get; set; }
+
+    /// <summary>Connect to TMDB (the key stays stored when switched off).</summary>
+    public bool TmdbEnabled { get; set; } = true;
+
+    /// <summary>Connect to HISTRA (the token stays stored when switched off).</summary>
+    public bool HistraEnabled { get; set; } = true;
 
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }

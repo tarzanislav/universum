@@ -290,6 +290,9 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>A run is in progress (updates wait for it).</summary>
+    public bool IsRunning => _running;
+
     public string PauseText => _control?.IsPaused == true ? "Pokračovať" : "Pozastaviť";
 
     public async Task AnalyzeAsync()

@@ -119,7 +119,7 @@ if (options.Kind is { } kind)
 }
 
 var tmdbKey = options.TmdbKey ?? Environment.GetEnvironmentVariable("UNIVERSUM_TMDB_KEY") ??
-              (OperatingSystem.IsWindows() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
+              (OperatingSystem.IsWindows() && SettingsProfile.TmdbEnabled() && SettingsProfile.TmdbKeyProtected() is { } stored ? Unprotect(stored) : null);
 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
 var titleFromTmdb = false;
 

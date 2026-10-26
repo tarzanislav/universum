@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Library;
+using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.Rules;
@@ -25,6 +26,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private string _message = "";
     private string _tmdbKeyInput = "";
     private string _tmdbStatus = "";
+    private string _histraTokenInput = "";
+    private string _histraStatus = "";
 
     public SettingsPageViewModel(AppServices services)
     {
@@ -35,11 +38,35 @@ public sealed class SettingsPageViewModel : ObservableObject
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
         SaveTmdbKeyCommand = new AsyncRelayCommand(SaveTmdbKeyAsync, () => TmdbKeyInput.Trim().Length > 0);
         RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
+        SaveHistraTokenCommand = new RelayCommand(SaveHistraToken, () => HistraTokenInput.Trim().Length > 0);
+        RemoveHistraTokenCommand = new RelayCommand(RemoveHistraToken, () => _services.Settings.HistraTokenProtected is not null);
+        OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraApi.TokenPage));
+        services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
+        services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
+
+    /// <summary>Asks the main window to open the update window.</summary>
+    public event Action? ShowUpdatesRequested;
+
+    public RelayCommand ShowUpdatesCommand => _showUpdates ??= new RelayCommand(() => ShowUpdatesRequested?.Invoke());
+
+    private RelayCommand? _showUpdates;
+
+    /// <summary>Check for updates at start and then once a day.</summary>
+    public bool AutoCheckUpdates
+    {
+        get => _services.Settings.AutoCheckUpdates;
+        set
+        {
+            _services.Settings.AutoCheckUpdates = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
 
     public AsyncRelayCommand SaveTmdbKeyCommand { get; }
 
@@ -60,9 +87,75 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string TmdbStatus => _tmdbStatus.Length > 0
         ? _tmdbStatus
-        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne." : "Kľúč je uložený (chránený pre vaše konto Windows).";
+        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne."
+        : TmdbEnabled ? "Kľúč je uložený (chránený pre vaše konto Windows)."
+        : "Kľúč je uložený, pripájanie je vypnuté – na TMDB sa nič neposiela.";
+
+    /// <summary>Connect to TMDB; switching it off keeps the key.</summary>
+    public bool TmdbEnabled
+    {
+        get => _services.Settings.TmdbEnabled;
+        set
+        {
+            if (value != _services.Settings.TmdbEnabled)
+            {
+                _services.SetTmdbEnabled(value);
+                _tmdbStatus = "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(TmdbStatus));
+            }
+        }
+    }
+
+    /// <summary>Connect to HISTRA; switching it off keeps the token.</summary>
+    public bool HistraEnabled
+    {
+        get => _services.Settings.HistraEnabled;
+        set
+        {
+            if (value != _services.Settings.HistraEnabled)
+            {
+                _services.SetHistraEnabled(value);
+                _histraStatus = "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HistraStatus));
+            }
+        }
+    }
+
+    /// <summary>What happens with TMDB and HISTRA together.</summary>
+    public string SyncStatus =>
+        _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – budú sa synchronizovať (pripravuje sa podľa API HISTRA)."
+        : _services.Tmdb is not null ? "Zapnuté je len TMDB."
+        : _services.HistraActive ? "Zapnutá je len HISTRA."
+        : "TMDB ani HISTRA sa nepripájajú.";
 
     public string TmdbAttribution => TmdbClient.Attribution;
+
+    public RelayCommand SaveHistraTokenCommand { get; }
+
+    public RelayCommand RemoveHistraTokenCommand { get; }
+
+    public RelayCommand OpenHistraTokenPageCommand { get; }
+
+    /// <summary>A new HISTRA token typed by the user (the stored token is never shown).</summary>
+    public string HistraTokenInput
+    {
+        get => _histraTokenInput;
+        set
+        {
+            if (SetProperty(ref _histraTokenInput, value))
+            {
+                SaveHistraTokenCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string HistraStatus => _histraStatus.Length > 0
+        ? _histraStatus
+        : _services.HistraToken is null ? "Token nie je zadaný."
+        : HistraEnabled ? "Token je uložený (chránený pre vaše konto Windows)."
+        : "Token je uložený, pripájanie je vypnuté – na HISTRA sa nič neposiela.";
 
     public string OutputDescription => _services.Library is { } library
         ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
@@ -149,6 +242,48 @@ public sealed class SettingsPageViewModel : ObservableObject
         _tmdbStatus = "";
         OnPropertyChanged(nameof(TmdbStatus));
         RemoveTmdbKeyCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Stores the token after checking that it can go into a Bearer header. It is not tried on HISTRA yet: the requests
+    /// UNIVERSUM will make are added once the HISTRA API is described.
+    /// </summary>
+    private void SaveHistraToken()
+    {
+        var token = HistraTokenInput.Trim();
+        if (!HistraApi.IsValidToken(token))
+        {
+            _histraStatus = "Token sa neuložil: nevyzerá ako token HISTRA (len písmená, číslice a - . _ ~ + / =, bez medzier, aspoň 8 znakov).";
+        }
+        else
+        {
+            _services.SetHistraToken(token);
+            HistraTokenInput = "";
+            _histraStatus = "Token je uložený (chránený pre vaše konto Windows).";
+        }
+
+        OnPropertyChanged(nameof(HistraStatus));
+        RemoveHistraTokenCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RemoveHistraToken()
+    {
+        _services.SetHistraToken(null);
+        _histraStatus = "";
+        OnPropertyChanged(nameof(HistraStatus));
+        RemoveHistraTokenCommand.NotifyCanExecuteChanged();
+    }
+
+    private static void OpenInBrowser(Uri page)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // no browser registered: the address is in the tooltip
+        }
     }
 
     private void ChooseOutputDirectory()

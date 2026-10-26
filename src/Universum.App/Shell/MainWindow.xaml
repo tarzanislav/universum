@@ -398,8 +398,30 @@
                                 </StackPanel>
                                 <TextBox Text="{Binding TmdbKeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč TMDB" />
                             </DockPanel>
+                            <CheckBox Content="Pripájať sa k TMDB" IsChecked="{Binding TmdbEnabled}" Margin="0,8,0,0"
+                                      ToolTip="Vypnutím sa na TMDB nič neposiela; uložený kľúč ostáva." />
                             <TextBlock Text="{Binding TmdbStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="HISTRA – sledovanie filmov a seriálov" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="Vlastný token z histra.net (Nastavenia → Tracking API). Posiela sa ako hlavička Authorization: Bearer. Zatiaľ sa na HISTRA nič neposiela – token sa len bezpečne uloží." />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Uložiť" Command="{Binding SaveHistraTokenCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveHistraTokenCommand}" Margin="0,0,8,0" Padding="12,5" />
+                                    <Button Content="Získať token…" Command="{Binding OpenHistraTokenPageCommand}" Padding="12,5"
+                                            ToolTip="Otvorí https://histra.net/settings/tracking-api" />
+                                </StackPanel>
+                                <TextBox Text="{Binding HistraTokenInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový token HISTRA" />
+                            </DockPanel>
+                            <CheckBox Content="Pripájať sa k HISTRA" IsChecked="{Binding HistraEnabled}" Margin="0,8,0,0"
+                                      ToolTip="Vypnutím sa na HISTRA nič neposiela; uložený token ostáva." />
+                            <TextBlock Text="{Binding HistraStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}">
@@ -433,6 +455,17 @@
                             </StackPanel>
                             <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,8,0,0" />
                         </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Skontrolovať teraz…" Command="{Binding ShowUpdatesCommand}" Padding="12,5" VerticalAlignment="Center" />
+                            <StackPanel>
+                                <TextBlock Text="Aktualizácie" FontWeight="SemiBold" />
+                                <CheckBox Content="Kontrolovať automaticky (pri spustení, najviac raz za deň)" IsChecked="{Binding AutoCheckUpdates}" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Text="Pýta sa len mkvtoolnix.download a github.com, nič o vás sa neposiela." />
+                            </StackPanel>
+                        </DockPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                         <StackPanel>
@@ -475,6 +508,19 @@
         <Border Grid.Row="1" Grid.ColumnSpan="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="16,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="{Binding UpdateBadge}" Command="{Binding ShowUpdatesCommand}" Margin="0,0,8,0" Padding="12,4"
+                            ToolTip="Aktualizácie MKVToolNix a UNIVERSUM">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="Otvoriť v MKVToolNix GUI" Command="{Binding OpenMkvToolNixGuiCommand}" Margin="0,0,8,0" Padding="12,4" />
                     <Button Content="MKVToolNix…" Command="{Binding SetupCommand}" Padding="12,4" />
                 </StackPanel>

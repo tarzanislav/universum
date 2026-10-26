@@ -1,3 +1,4 @@
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Planning;
@@ -20,8 +21,60 @@ public static class BatchPlanner
     public static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null, LibraryJob? library = null)
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
-        return analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
+        var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
+        return library is { Kind: MediaKind.Series } ? CheckEpisodes(items) : items;
     }
+
+    /// <summary>
+    /// Checks across the files of a series (specification 13.5): two files of the same episode with the same description
+    /// go for review, and so does a file whose name names another series than most files (one folder is one series).
+    /// "Process anyway" lets a file through; a second version of an episode then gets a number (K1).
+    /// </summary>
+    private static List<BatchItem> CheckEpisodes(List<BatchItem> items)
+    {
+        var added = items.Select(_ => new List<ReviewReason>()).ToList();
+        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path));
+        for (var i = 0; i < items.Count; i++)
+        {
+            var path = items[i].File.Path;
+            if (series is not null && EpisodeParser.FromPath(path) is not null &&
+                TitleGuess.FromName(Path.GetFileNameWithoutExtension(path)) is { } own &&
+                Words.Normalize(own.Name) != Words.Normalize(series.Name))
+            {
+                added[i].Add(new ReviewReason(ReviewReasonKind.OtherSeries, Detail: own.Name));
+            }
+        }
+
+        // files already in their place are versions kept earlier (K1); only new results are compared
+        var placed = Enumerable.Range(0, items.Count)
+            .Where(i => items[i] is { Placement: not null, Episode: not null } item && !item.Placement.Holds(item.File.Path, item.FileSize))
+            .ToList();
+        foreach (var same in placed.GroupBy(i => Path.GetFullPath(items[i].Placement!.Directory) + "\n" + items[i].Placement!.Stem + "\n" + items[i].Placement!.Sizes.Label(items[i].FileSize), Paths.Comparer))
+        {
+            var list = same.ToList();
+            for (var a = 0; a < list.Count; a++)
+            {
+                for (var b = a + 1; b < list.Count; b++)
+                {
+                    var (x, y) = (items[list[a]], items[list[b]]);
+                    if (Overlap(x.Episode!, y.Episode!))
+                    {
+                        added[list[a]].Add(new ReviewReason(ReviewReasonKind.DuplicateEpisode, Detail: Path.GetFileName(y.File.Path)));
+                        added[list[b]].Add(new ReviewReason(ReviewReasonKind.DuplicateEpisode, Detail: Path.GetFileName(x.File.Path)));
+                    }
+                }
+            }
+        }
+
+        return items.Select((item, i) =>
+        {
+            var extra = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path) ? [] : added[i].DistinctBy(r => r.Kind).ToList();
+            return extra.Count == 0 ? item : item with { Reasons = [.. item.Reasons, .. extra] };
+        }).ToList();
+    }
+
+    private static bool Overlap(EpisodeNumber x, EpisodeNumber y) =>
+        x.Season == y.Season && x.Episode <= (y.LastEpisode ?? y.Episode) && y.Episode <= (x.LastEpisode ?? x.Episode);
 
     public static BatchItem PlanFile(MediaFile file, BatchGroup group, BatchTemplate template, RuleProfile profile, LibraryJob? library = null)
     {
@@ -83,7 +136,7 @@ public static class BatchPlanner
         var title = library.TitleFor(path);
         if (title is null || title.Problem is not null)
         {
-            reasons.Add(new ReviewReason(ReviewReasonKind.MissingTitle));
+            reasons.Add(new ReviewReason(ReviewReasonKind.MissingTitle, Detail: title?.Problem));
             return item;
         }
 
@@ -93,11 +146,15 @@ public static class BatchPlanner
             var (number, suggested) = library.EpisodeFor(path);
             if (number is null || suggested)
             {
-                reasons.Add(new ReviewReason(ReviewReasonKind.MissingEpisode));
+                reasons.Add(new ReviewReason(ReviewReasonKind.MissingEpisode, Detail: library.EpisodeDoubt(path)));
                 return item with { Title = title, Episode = number };
             }
 
             episode = number;
+            if (!library.TmdbKnows(number) && !item.Group.Decisions.ProcessAnyway.Contains(path))
+            {
+                reasons.Add(new ReviewReason(ReviewReasonKind.UnknownEpisode));
+            }
         }
 
         var placement = library.Layout.Place(item.Target, title, episode, profile);

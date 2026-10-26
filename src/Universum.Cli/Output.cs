@@ -69,12 +69,16 @@ internal static class Output
 
     private static string Reason(ReviewReason reason, BatchItem item, LibraryJob library) => reason.Kind switch
     {
+        ReviewReasonKind.MissingTitle when reason.Detail is { } problem => $"názov {library.TitleFor(item.File.Path)?.FolderName}: {problem} (--nazov, --rok)",
         ReviewReasonKind.MissingTitle => library.SuggestedTitleFor(item.File.Path) is { } suggested
             ? $"názov: návrh „{suggested.FolderName}“ (--confirm-suggestions)"
             : "chýba názov (--nazov, --rok)",
         ReviewReasonKind.MissingEpisode => item.Episode is { } episode
-            ? $"epizóda: návrh {episode.Tag} (--confirm-suggestions)"
+            ? $"epizóda: návrh {episode.Tag}{(reason.Detail is { } doubt ? " – " + doubt : "")} (--confirm-suggestions alebo --epizoda)"
             : "chýba číslo epizódy (--epizoda)",
+        ReviewReasonKind.DuplicateEpisode => $"rovnaká epizóda s rovnakým popisom ako {reason.Detail} (--epizoda, alebo --aj-tak: ďalšia verzia dostane číslo)",
+        ReviewReasonKind.UnknownEpisode => "TMDB takú sezónu alebo epizódu nepozná (--epizoda alebo --aj-tak)",
+        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému seriálu: {reason.Detail} (jeden priečinok = jeden seriál; --aj-tak)",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind + (reason.Slot is { } s ? " " + s : ""),
     };

@@ -19,33 +19,56 @@ public sealed record EpisodeNumber(int Season, int Episode, int? LastEpisode = n
 }
 
 /// <summary>An episode number found in a name.</summary>
-/// <param name="SeasonAssumed">No season was found; season 1 is assumed.</param>
-public sealed record EpisodeMatch(EpisodeNumber Number, bool SeasonAssumed);
+/// <param name="SeasonAssumed">No season was found in the name or in the folders; season 1 is assumed.</param>
+/// <param name="FolderSeason">
+/// Season of the nearest season folder when it differs from the season in the name ("Season 2\Show S01E03.mkv"):
+/// one of them is wrong.
+/// </param>
+public sealed record EpisodeMatch(EpisodeNumber Number, bool SeasonAssumed, int? FolderSeason = null)
+{
+    /// <summary>The number is a guess the user has to confirm: the season was assumed or the folder disagrees.</summary>
+    public bool NeedsConfirmation => SeasonAssumed || FolderSeason is not null;
+}
 
 /// <summary>Finds season and episode numbers in file and folder names (specification, section 13.5).</summary>
 public static partial class EpisodeParser
 {
-    /// <summary>Episode of a file from its name and, for the season, the names of its folders.</summary>
+    /// <summary>
+    /// Episode of a file from its name and, for the season, the names of its folders (the nearest season folder at most
+    /// two levels up). A season in the name that differs from the folder is kept but marked for confirmation.
+    /// </summary>
     public static EpisodeMatch? FromPath(string path)
     {
         var match = FromText(Path.GetFileNameWithoutExtension(path));
-        if (match is null || !match.SeasonAssumed)
+        if (match is null)
         {
-            return match;
+            return null;
         }
 
+        var folderSeason = SeasonOfPath(path);
+        if (match.SeasonAssumed)
+        {
+            return folderSeason is { } season ? new EpisodeMatch(match.Number with { Season = season }, false) : match;
+        }
+
+        return folderSeason is { } other && other != match.Number.Season ? match with { FolderSeason = other } : match;
+    }
+
+    /// <summary>Season of the nearest season folder of a file (at most two levels up), or null.</summary>
+    public static int? SeasonOfPath(string path)
+    {
         var folder = Path.GetDirectoryName(path);
         for (var level = 0; level < 2 && !string.IsNullOrEmpty(folder); level++)
         {
             if (SeasonOfFolder(Path.GetFileName(folder)) is { } season)
             {
-                return new EpisodeMatch(match.Number with { Season = season }, false);
+                return season;
             }
 
             folder = Path.GetDirectoryName(folder);
         }
 
-        return match;
+        return null;
     }
 
     public static EpisodeMatch? FromText(string? name)
@@ -80,7 +103,10 @@ public static partial class EpisodeParser
             : new EpisodeMatch(new EpisodeNumber(1, Number(episodeWord.Groups["e"])), true);
     }
 
-    /// <summary>Season of a folder named "Season 2", "Séria 2", "Sezóna 2", "Řada 2", "S02" …</summary>
+    /// <summary>
+    /// Season of a folder named "Season 2", "Séria 2", "Sezóna 2", "Řada 2", "S02", "Specials" / "Špeciály" (season 0),
+    /// or of a season pack named "Nine.Puzzles.S02.1080p.WEB-DL" (exactly one season in the name).
+    /// </summary>
     public static int? SeasonOfFolder(string? folderName)
     {
         var words = Words.Normalize(folderName);
@@ -89,7 +115,28 @@ public static partial class EpisodeParser
             return Number(exact.Groups["s"]);
         }
 
-        return SeasonWord().Match(words) is { Success: true } named ? Number(named.Groups["s"]) : null;
+        if (SpecialsFolder().IsMatch(words))
+        {
+            return 0;
+        }
+
+        if (SeasonWord().Match(words) is { Success: true } named)
+        {
+            return Number(named.Groups["s"]);
+        }
+
+        var packs = SeasonToken().Matches(words);
+        return packs.Count == 1 ? Number(packs[0].Groups["s"]) : null;
+    }
+
+    /// <summary>
+    /// True for a folder that only names a season ("Season 2", "Séria 2 (2019)", "S02", "Specials"): the series is the
+    /// folder above it. A season pack with a title ("Nine.Puzzles.S02.1080p") names the series itself.
+    /// </summary>
+    public static bool IsSeasonOnlyFolder(string? folderName)
+    {
+        var words = Words.Normalize(folderName);
+        return SeasonFolder().IsMatch(words) || SpecialsFolder().IsMatch(words) || SeasonOnly().IsMatch(words);
     }
 
     private static int Number(Group group) => int.Parse(group.Value, NumberStyles.None, CultureInfo.InvariantCulture);
@@ -112,4 +159,16 @@ public static partial class EpisodeParser
 
     [GeneratedRegex(@"^s(?<s>\d{1,3})$", RegexOptions.CultureInvariant)]
     private static partial Regex SeasonFolder();
+
+    // "specials", "special", "špeciály" / "speciály" → "specialy"
+    [GeneratedRegex(@"^(?:specials?|specialy)(?: (?:19|20)\d\d)?$", RegexOptions.CultureInvariant)]
+    private static partial Regex SpecialsFolder();
+
+    // "season 2", "seria 02 2019": only the season (and maybe its year)
+    [GeneratedRegex(@"^(?:season|seria|serie|series|sezona|rada|staffel|sezon)\s?\d{1,3}(?: (?:19|20)\d\d)?$", RegexOptions.CultureInvariant)]
+    private static partial Regex SeasonOnly();
+
+    // a season in a release name: "nine puzzles s02 1080p"
+    [GeneratedRegex(@"\bs(?<s>\d{1,2})\b", RegexOptions.CultureInvariant)]
+    private static partial Regex SeasonToken();
 }

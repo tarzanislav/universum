@@ -449,6 +449,8 @@ public sealed class BatchPageViewModel : ObservableObject
         var (text, note) = TmdbPicker.TitleText(title);
         _library.Kind = MediaKind.Series;
         _library.Series = TitleGuess.Typed(MediaKind.Series, text);
+        // seasons and episode counts: every episode is checked against them (specification 13.5)
+        _library.SeriesOnTmdb = _library.Series is { } series && title.Seasons.Count > 0 ? (series, title.Seasons) : null;
         RunState = note;
         OnLibraryChanged();
     }

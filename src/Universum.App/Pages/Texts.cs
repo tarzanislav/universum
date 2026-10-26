@@ -68,8 +68,13 @@ public static class Texts
             $"chýba povinná stopa: {Type(missing.Type)} {Language(LanguageTag.FromCode(missing.Language))}, {Role(missing.Role)}",
         ReviewReasonKind.MultipleVideoTracks => "viac video stôp",
         ReviewReasonKind.NoAudio => "bez zvuku",
+        ReviewReasonKind.MissingTitle when reason.Detail is { } problem => "názov titulu: " + problem,
         ReviewReasonKind.MissingTitle => "chýba názov titulu",
+        ReviewReasonKind.MissingEpisode when reason.Detail is { } doubt => "číslo epizódy treba potvrdiť: " + doubt,
         ReviewReasonKind.MissingEpisode => "chýba číslo epizódy",
+        ReviewReasonKind.DuplicateEpisode => $"rovnaká epizóda s rovnakým popisom ako {reason.Detail} – opravte číslo, alebo „spracovať aj tak“ (ďalšia verzia dostane číslo)",
+        ReviewReasonKind.UnknownEpisode => "TMDB takú sezónu alebo epizódu nepozná – opravte číslo, alebo „spracovať aj tak“",
+        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému seriálu ({reason.Detail}) – jeden priečinok je jeden seriál",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind.ToString(),
     };

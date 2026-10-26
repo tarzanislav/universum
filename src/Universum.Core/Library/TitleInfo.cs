@@ -39,11 +39,12 @@ public sealed record TitleInfo(MediaKind Kind, string Name, int? Year, int? Tmdb
     /// <summary>The name without year and ID (start of episode file names).</summary>
     public string CleanName => LibraryNames.Clean(Name);
 
-    /// <summary>Problem preventing use of this title (Slovak), or null.</summary>
+    /// <summary>Problem preventing use of this title (Slovak), or null. The folder is "Name (Year)" (section 13.2), so the year is required.</summary>
     public string? Problem =>
         CleanName.Length == 0 ? "chýba názov"
         : LibraryNames.IsReserved(FolderName) ? "názov nie je vo Windows povolený"
         : IncludeId && TmdbId is null ? "chýba TMDB ID"
+        : Year is null ? "chýba rok"
         : null;
 
     public override string ToString() => FolderName;

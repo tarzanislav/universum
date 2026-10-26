@@ -53,8 +53,37 @@ public sealed class TmdbPicker : ObservableObject
         {
             if (SetProperty(ref _selected, value) && value is not null)
             {
-                _chosen(value);
+                if (value is { Kind: MediaKind.Series, Seasons.Count: 0 } && _services.Tmdb is { } tmdb)
+                {
+                    // a search result has no seasons: the details do, for the check that the episode exists
+                    _ = ChooseWithSeasonsAsync(tmdb, value);
+                }
+                else
+                {
+                    _chosen(value);
+                }
             }
+        }
+    }
+
+    private async Task ChooseWithSeasonsAsync(TmdbClient tmdb, TmdbTitle title)
+    {
+        var chosen = title;
+        try
+        {
+            Message = "Načítavam sezóny z TMDB…";
+            chosen = await tmdb.GetAsync(MediaKind.Series, title.Id) ?? title;
+            TrySaveCache(tmdb);
+            Message = "";
+        }
+        catch (TmdbException ex)
+        {
+            Message = "Sezóny seriálu sa nenačítali (epizódy sa nedajú overiť): " + ex.Message;
+        }
+
+        if (ReferenceEquals(_selected, title))
+        {
+            _chosen(chosen);
         }
     }
 

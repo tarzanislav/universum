@@ -18,6 +18,8 @@ internal static class Help
           --tmdb-key <kľúč>            kľúč TMDB (inak UNIVERSUM_TMDB_KEY alebo kľúč uložený v programe UNIVERSUM);
                                        s kľúčom sa návrhy názvov z mien súborov spresnia podľa TMDB
           --epizoda "súbor.mkv=S01E04" číslo epizódy súboru
+          --aj-tak "súbor.mkv"         spracovať aj tak: chýbajúca povinná stopa, rovnaká epizóda (dostane číslo),
+                                       epizóda neznáma na TMDB, meno iného seriálu
           -r, --recursive              aj podpriečinky
           -t, --template <súbor.json>  šablóna (uložená v programe UNIVERSUM)
           --keep                       originál zachovať (predvolené; mazanie originálov je zatiaľ vypnuté)

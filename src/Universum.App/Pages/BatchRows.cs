@@ -196,7 +196,7 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
 
     /// <summary>Required template tracks are missing: the user may still allow processing.</summary>
     public bool CanProcessAnyway =>
-        Item.Group.Decisions.ProcessAnyway.Contains(Item.File.Path) || Item.Reasons.Any(r => r.Kind == ReviewReasonKind.MissingRequiredSlot);
+        Item.Group.Decisions.ProcessAnyway.Contains(Item.File.Path) || Item.Reasons.Any(r => r.CanBeOverridden);
 
     public bool ProcessAnyway
     {

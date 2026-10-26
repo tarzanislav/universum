@@ -140,6 +140,24 @@ public sealed class LibraryTests
         Assert.Equal(1, EpisodeParser.SeasonOfFolder("Season 01"));
         Assert.Equal(4, EpisodeParser.SeasonOfFolder("S04"));
         Assert.Equal(new EpisodeNumber(1, 4), EpisodeNumber.TryParse("s1e4"));
+
+        // specials are season 0 (Season 00), season packs name their season, a range of seasons names none
+        Assert.Equal(0, EpisodeParser.SeasonOfFolder("Specials"));
+        Assert.Equal(0, EpisodeParser.SeasonOfFolder("Špeciály"));
+        Assert.Equal("S00E01", EpisodeParser.FromPath(Path.Combine("Seriál", "Specials", "Seriál E01.mkv"))?.Number.Tag, "special");
+        Assert.Equal("Season 00", LibraryNames.SeasonFolder(0));
+        Assert.Equal(2, EpisodeParser.SeasonOfFolder("Nine.Puzzles.S02.1080p.WEB-DL"), "season pack");
+        Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder("Nine.Puzzles.S01-S03.Complete"), "several seasons");
+        Assert.Equal<int?>(null, EpisodeParser.SeasonOfFolder("Special Forces (2019)"), "a title, not specials");
+        Assert.True(EpisodeParser.IsSeasonOnlyFolder("Season 2") && EpisodeParser.IsSeasonOnlyFolder("Séria 2 (2019)") && EpisodeParser.IsSeasonOnlyFolder("S02") &&
+                    EpisodeParser.IsSeasonOnlyFolder("Specials"), "season folders");
+        Assert.True(!EpisodeParser.IsSeasonOnlyFolder("Nine.Puzzles.S02.1080p") && !EpisodeParser.IsSeasonOnlyFolder("Nine Puzzles (2025)"), "the series folder");
+
+        // the season in the name wins, but a different season folder makes the number a suggestion
+        var conflict = EpisodeParser.FromPath(Path.Combine("Seriál", "Season 2", "Seriál S01E03.mkv"))!;
+        Assert.True(conflict is { Number.Tag: "S01E03", FolderSeason: 2, NeedsConfirmation: true }, "name and folder disagree");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 1", "Seriál S01E03.mkv")) is { NeedsConfirmation: false }, "they agree");
+        Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Seriál Díl 3.mkv")) is { SeasonAssumed: true, NeedsConfirmation: true }, "season assumed");
     }
 
     [Test]
@@ -150,6 +168,25 @@ public sealed class LibraryTests
         Assert.Equal(new NameGuess("Nine Puzzles", null, null), TitleGuess.FromName("Nine.Puzzles.S01E04.1080p.WEB"));
         Assert.Equal(new NameGuess("2001 A Space Odyssey", 1968, null), TitleGuess.FromName("2001 A Space Odyssey (1968)"));
         Assert.Equal(new NameGuess("Creep", 2004, null), TitleGuess.FromName("Creep (2004) - CZ EN FHD H264 BIG"), "library file name");
+
+        // an episode or season ends a series title; a name that starts with one has no title
+        Assert.Equal(new NameGuess("Kriminálka Vymyslená", null, null), TitleGuess.FromName("Kriminálka Vymyslená Díl 4"));
+        Assert.Equal(new NameGuess("Iný seriál", null, null), TitleGuess.FromName("Iný seriál - Epizóda 1"));
+        Assert.Equal(new NameGuess("Seriál", null, null), TitleGuess.FromName("Seriál Řada 2"));
+        Assert.Equal<NameGuess?>(null, TitleGuess.FromName("Diel 3"));
+        Assert.Equal<NameGuess?>(null, TitleGuess.FromName("E04"));
+        // a film keeps its part number and the year in parentheses
+        Assert.Equal(new NameGuess("Vymyslená sága - Časť 2", 2011, null), TitleGuess.FromName("Vymyslená sága - Časť 2 (2011)", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Vymyslená sága", 2011, null), TitleGuess.FromName("Vymyslená sága - Časť 2 (2011)"), "as an episode name");
+
+        // one file: kind, title from the title folder (above a season folder) when it is in library form
+        Assert.Equal(new FileGuess(MediaKind.Series, new NameGuess("Vymyslený seriál", 2024, null), new EpisodeMatch(new EpisodeNumber(2, 3), false)),
+            TitleGuess.ForFile(Path.Combine("x", "Vymyslený seriál (2024)", "Season 2", "Vymysleny.Serial.S02E03.mkv")));
+        Assert.Equal("Nine Puzzles", TitleGuess.ForFile(Path.Combine("x", "Nine.Puzzles.S02.1080p", "E03.mkv")) is { Kind: MediaKind.Series, Episode.Number.Tag: "S02E03" } pack ? pack.Title?.Name : "not a series", "season pack");
+        Assert.Equal(MediaKind.Series, TitleGuess.ForFile(Path.Combine("x", "Seriál (2024)", "Season 2", "prvá.mkv")).Kind, "season folder without a number");
+        Assert.Equal(new FileGuess(MediaKind.Movie, new NameGuess("Creep", 2004, null), null), TitleGuess.ForFile(Path.Combine("x", "Filmy", "Creep.2004.1080p.mkv")));
+        Assert.Equal("chýba rok", new TitleInfo(MediaKind.Series, "Seriál", null).Problem, "the folder is \"Name (Year)\"");
+        Assert.Equal<string?>(null, new TitleInfo(MediaKind.Series, "Seriál", 2024).Problem);
 
         Assert.Equal(new TitleInfo(MediaKind.Movie, "Charlotte's Web", 2006), TitleGuess.Typed(MediaKind.Movie, "Charlotte's Web (2006)"), "typed: nothing cut away");
         Assert.Equal(new TitleInfo(MediaKind.Series, "Nine Puzzles", 2025, 227191, true), TitleGuess.Typed(MediaKind.Series, " Nine Puzzles (2025) [tmdbid-227191] "));

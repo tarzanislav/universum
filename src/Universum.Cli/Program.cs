@@ -150,6 +150,11 @@ try
 
         Console.WriteLine($"TMDB: {found.Display} → {fromTmdb.FolderName}");
         SetTitle(library, analysis, fromTmdb);
+        if (tmdbKind == MediaKind.Series && found.Seasons.Count > 0)
+        {
+            library.SeriesOnTmdb = (fromTmdb, found.Seasons);
+        }
+
         titleFromTmdb = true;
     }
     else if (options.Tmdb is not null && options.Title is null)
@@ -193,6 +198,20 @@ foreach (var (fileName, number) in options.Episodes)
     }
 
     library.Episodes[matches[0].Path] = number;
+}
+
+foreach (var fileName in options.ProcessAnyway)
+{
+    var matches = analysis.Groups.SelectMany(g => g.Files.Select(f => (Group: g, f.Path))).Where(f =>
+        Path.GetFileName(f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase) ||
+        Path.GetRelativePath(analysis.Folder, f.Path).Equals(fileName, StringComparison.OrdinalIgnoreCase)).ToList();
+    if (matches.Count != 1)
+    {
+        Console.Error.WriteLine($"Súbor {fileName} pre --aj-tak {(matches.Count == 0 ? "sa nenašiel" : "nie je jednoznačný")} – voľba sa preskočí.");
+        continue;
+    }
+
+    matches[0].Group.Decisions.ProcessAnyway.Add(matches[0].Path);
 }
 
 if (options.ConfirmSuggestions)
@@ -265,9 +284,16 @@ static async Task<string> RefineSuggestionsAsync(TmdbClient tmdb, LibraryJob lib
     if (library.Kind == MediaKind.Series)
     {
         if (library.Series is null && library.SeriesSuggestion is { } guess &&
-            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year)?.ToTitleInfo() is { } series)
+            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year) is { } match &&
+            match.ToTitleInfo() is { } series)
         {
             library.SeriesSuggestion = series;
+            // seasons and episode counts for the check that every episode exists
+            if (await tmdb.GetAsync(MediaKind.Series, match.Id) is { Seasons.Count: > 0 } details)
+            {
+                library.SeriesOnTmdb = (series, details.Seasons);
+            }
+
             return "seriál " + series.FolderName;
         }
 

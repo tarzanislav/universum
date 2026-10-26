@@ -89,6 +89,19 @@ in next to it without changing the rules, planning or UI.
   gets a number (`BIG2`, `BIG3`).
 - `Library/EpisodeParser`, `TitleGuess`, `LibraryJob` – episode numbers and titles from file and folder names (only
   suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
+  Series rules (specification 13.5):
+  - season from the name, else from the nearest season folder ("Season 2", "Séria 2", "Sezóna 2", "Řada 2", "S02",
+    a season pack "Show.S02.1080p", "Specials"/"Špeciály" = season 0 → `Season 00`); a season assumed (none in name
+    or folder) or a name that disagrees with its season folder is only a suggestion (`EpisodeMatch.NeedsConfirmation`);
+  - one analysed folder is one series: season folders count as series evidence; the series title comes from the
+    folder when it is in library form ("Name (Year)", "[tmdbid-…]"), otherwise from the start of the episode names,
+    which ends at an episode or season ("Kriminálka Anděl Díl 4" → "Kriminálka Anděl"); films keep "Časť 2" in titles;
+  - files without a number get the next free numbers of their season in natural order (suggestions);
+  - `BatchPlanner.CheckEpisodes`: the same episode (overlapping ranges) with the same description twice, a file named
+    after another series, and – with `LibraryJob.SeriesOnTmdb` – an episode TMDB does not list go for review;
+    "process anyway" lets a file through (a second version then gets a number, K1);
+  - `TitleInfo.Problem`: the year is required ("Name (Year)"); `TitleGuess.ForFile` is the shared guess of the pages;
+    the TMDB picker loads a chosen series' seasons, so the pages check the episode too.
 - `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
   user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
   TMDB key; `Request` sends it only to histra.net over HTTPS. `HistraClient` is ready for the endpoints: requests

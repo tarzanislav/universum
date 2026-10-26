@@ -22,6 +22,7 @@ public sealed class LibraryTargetPicker : ObservableObject
     private string _episodeText = "";
     private string _titleNote = "";
     private string _description = "";
+    private string _episodeNote = "";
     private TmdbTitle? _tmdbTitle;
     private Placement? _placement;
 
@@ -69,7 +70,18 @@ public sealed class LibraryTargetPicker : ObservableObject
     }
 
     /// <summary>Episode of a series file: "S01E04".</summary>
-    public string EpisodeText { get => _episodeText; set { if (SetProperty(ref _episodeText, value)) { Update(); } } }
+    public string EpisodeText
+    {
+        get => _episodeText;
+        set
+        {
+            if (SetProperty(ref _episodeText, value))
+            {
+                _episodeNote = "";
+                Update();
+            }
+        }
+    }
 
     public string TitleNote { get => _titleNote; private set => SetProperty(ref _titleNote, value); }
 
@@ -82,19 +94,11 @@ public sealed class LibraryTargetPicker : ObservableObject
     /// <summary>Kind, title and episode guessed from a file's and its folders' names; the user can correct them.</summary>
     public void Guess(string path)
     {
-        var episode = EpisodeParser.FromPath(path);
-        _kind = episode is null ? MediaKind.Movie : MediaKind.Series;
-        var folder = Path.GetFileName(Path.GetDirectoryName(path));
-        if (_kind == MediaKind.Series && EpisodeParser.SeasonOfFolder(folder) is not null)
-        {
-            folder = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path)));
-        }
-
-        var fromFolder = TitleGuess.FromName(folder);
-        var fromFile = TitleGuess.FromName(Path.GetFileNameWithoutExtension(path));
-        var guess = fromFolder is { Year: not null } or { TmdbId: not null } ? fromFolder : fromFile ?? fromFolder;
-        _titleText = guess is null ? "" : new TitleInfo(_kind, guess.Name, guess.Year, guess.TmdbId, guess.TmdbId is not null).FolderName;
-        _episodeText = episode?.Number.Tag ?? "";
+        var guess = TitleGuess.ForFile(path);
+        _kind = guess.Kind;
+        _titleText = guess.TitleText;
+        _episodeText = guess.Episode?.Number.Tag ?? "";
+        _episodeNote = EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
         Tmdb.Refresh();
@@ -121,9 +125,13 @@ public sealed class LibraryTargetPicker : ObservableObject
         {
             Description = "Najprv nastavte výstupný priečinok (knižnicu).";
         }
-        else if (title is null || title.Problem is not null)
+        else if (title is null)
         {
             Description = "Zadajte názov titulu, napr. Creep (2004).";
+        }
+        else if (title.Problem is { } problem)
+        {
+            Description = $"Názov titulu: {problem} – napr. Creep (2004).";
         }
         else if (_kind == MediaKind.Series && episode is null)
         {
@@ -135,7 +143,8 @@ public sealed class LibraryTargetPicker : ObservableObject
             var size = File.Exists(target.Source.Path) ? new FileInfo(target.Source.Path).Length : 0;
             Description = Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
                           (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +
-                          (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "");
+                          (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "") +
+                          (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");
             if (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength)
             {
                 _placement = null;
@@ -145,6 +154,14 @@ public sealed class LibraryTargetPicker : ObservableObject
         OnPropertyChanged(nameof(Placement));
         Changed?.Invoke();
     }
+
+    /// <summary>Why a guessed episode number should be checked (Slovak), or "".</summary>
+    public static string EpisodeNote(EpisodeMatch? episode) => episode switch
+    {
+        { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia – skontrolujte epizódu",
+        { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
+        _ => "",
+    };
 
     private void SetKind(bool selected, MediaKind kind)
     {

@@ -63,7 +63,8 @@ jobs:
           7z x -y "-o$target" (Join-Path $work $name) | Out-Null
           $mkvmerge = Get-ChildItem $target -Recurse -Filter mkvmerge.exe | Select-Object -First 1
           $signature = Get-AuthenticodeSignature $mkvmerge.FullName
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=LINET Services GmbH') {
+          $signer = $signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          if ($signature.Status -ne 'Valid' -or $signer -cne 'LINET Services GmbH') {
             throw "mkvmerge.exe signature: $($signature.Status) $($signature.SignerCertificate.Subject)"
           }
           & $mkvmerge.FullName --version

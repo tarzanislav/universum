@@ -43,10 +43,25 @@ public static class ReleaseSignature
 
     /// <summary>
     /// The SHA-256 the installer must have, taken from a checksum list signed by the release key; null when the list is
-    /// not signed by the key or does not name the installer.
+    /// not signed by the key, is not the list of <paramref name="version"/> (its first line "# UNIVERSUM 1.2.3" is
+    /// signed too, so an older signed release cannot be passed off as a newer one) or does not name the installer
+    /// "UNIVERSUM_Setup_1.2.3.exe".
     /// </summary>
-    public static string? ExpectedInstallerHash(byte[] checksums, byte[] signature, string installerFileName, string publicKey = PublicKey) =>
-        Verify(checksums, signature, publicKey) && Sha256Sums.Parse(Encoding.UTF8.GetString(checksums)).TryGetValue(installerFileName, out var hash)
-            ? hash
-            : null;
+    public static string? ExpectedInstallerHash(byte[] checksums, byte[] signature, Version version, string publicKey = PublicKey)
+    {
+        if (!Verify(checksums, signature, publicKey))
+        {
+            return null;
+        }
+
+        var text = Encoding.UTF8.GetString(checksums);
+        var header = text.Split('\n').FirstOrDefault()?.Trim();
+        return header == VersionLine(version) && Sha256Sums.Parse(text).TryGetValue(InstallerFileName(version), out var hash) ? hash : null;
+    }
+
+    /// <summary>First line of the signed checksum list of a release.</summary>
+    public static string VersionLine(Version version) => "# UNIVERSUM " + version.ToString(3);
+
+    /// <summary>The only installer name a release may have.</summary>
+    public static string InstallerFileName(Version version) => $"UNIVERSUM_Setup_{version.ToString(3)}.exe";
 }

@@ -67,7 +67,11 @@ public sealed class UpdateService(AppServices services)
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 3 }) { Timeout = TimeSpan.FromSeconds(30) };
+        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 3 })
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+            MaxResponseContentBufferSize = 16 << 20, // feed, change log, release data
+        };
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"UNIVERSUM/{CurrentVersion.ToString(3)}");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json, */*");
         return client;

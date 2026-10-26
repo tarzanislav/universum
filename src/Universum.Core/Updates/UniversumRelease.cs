@@ -14,6 +14,9 @@ public sealed record UniversumRelease(Version Version, string Notes, Uri Page, U
     /// <summary>GitHub API address of the latest release (pre-releases and drafts are not "latest").</summary>
     public static Uri LatestApi { get; } = new($"https://api.github.com/repos/{Repository}/releases/latest");
 
+    /// <summary>Release pages and downloads of this repository on GitHub.</summary>
+    public static string ReleasesPrefix { get; } = $"https://github.com/{Repository}/releases/";
+
     /// <summary>All files of a release must come from GitHub over HTTPS.</summary>
     public static bool IsOfficial(Uri address) =>
         address.Scheme == Uri.UriSchemeHttps &&
@@ -30,7 +33,8 @@ public sealed record UniversumRelease(Version Version, string Notes, Uri Page, U
         var root = document.RootElement;
         if (Bool(root, "draft") || Bool(root, "prerelease") ||
             Text(root, "tag_name") is not { } tag || !Version.TryParse(tag.TrimStart('v', 'V'), out var version) ||
-            Text(root, "html_url") is not { } page)
+            version.Build < 0 || version.Revision >= 0 || // releases are numbered 1.2.3
+            Text(root, "html_url") is not { } page || !page.StartsWith(ReleasesPrefix, StringComparison.Ordinal))
         {
             return null;
         }
@@ -40,8 +44,9 @@ public sealed record UniversumRelease(Version Version, string Notes, Uri Page, U
         {
             foreach (var asset in assets.EnumerateArray())
             {
+                // downloads only from this repository's releases (redirects to GitHub's storage are checked when downloading)
                 if (Text(asset, "name") is not { } name || Text(asset, "browser_download_url") is not { } url ||
-                    !Uri.TryCreate(url, UriKind.Absolute, out var address) || !IsOfficial(address))
+                    !url.StartsWith(ReleasesPrefix + "download/", StringComparison.Ordinal) || !Uri.TryCreate(url, UriKind.Absolute, out var address))
                 {
                     continue;
                 }
@@ -54,8 +59,7 @@ public sealed record UniversumRelease(Version Version, string Notes, Uri Page, U
                 {
                     signature = address;
                 }
-                else if (name.StartsWith("UNIVERSUM", StringComparison.OrdinalIgnoreCase) && name.Contains("setup", StringComparison.OrdinalIgnoreCase) &&
-                         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                else if (name == ReleaseSignature.InstallerFileName(version))
                 {
                     installer = address;
                 }

@@ -185,9 +185,19 @@ internal static class SelfTest
         services.SetTmdbKey("test-key-123");
         Check(model.Rules.Tmdb.SearchCommand.CanExecute(null), "rules: TMDB button enabled with a key");
         Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("test-key-123", StringComparison.Ordinal), "settings hold no plain TMDB key");
+        // HISTRA token: checked for the Bearer header, protected like the TMDB key
+        model.Settings.HistraTokenInput = "bad token\r\nX: 1";
+        model.Settings.SaveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken is null && model.Settings.HistraStatus.StartsWith("Token sa neuložil", StringComparison.Ordinal), "settings: unsafe HISTRA token refused");
+        model.Settings.HistraTokenInput = "hst_selftest-0123456789";
+        model.Settings.SaveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken == "hst_selftest-0123456789" && model.Settings.HistraTokenInput.Length == 0, "settings: HISTRA token saved");
+        Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("hst_selftest", StringComparison.Ordinal), "settings hold no plain HISTRA token");
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings-library.png");
         services.SetTmdbKey(null);
+        model.Settings.RemoveHistraTokenCommand.Execute(null);
+        Check(services.HistraToken is null, "settings: HISTRA token removed");
 
         await TestBatchPageAsync(model, window);
 

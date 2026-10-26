@@ -13,7 +13,11 @@ namespace Universum.App.Setup;
 /// </summary>
 public static class UniversumInstaller
 {
-    private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 5 }) { Timeout = TimeSpan.FromMinutes(10) };
+    private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 5 })
+    {
+        Timeout = TimeSpan.FromMinutes(10),
+        MaxResponseContentBufferSize = 1 << 20, // checksum lists and signatures; the installer itself is streamed
+    };
 
     static UniversumInstaller() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("UNIVERSUM-updater");
 
@@ -27,14 +31,13 @@ public static class UniversumInstaller
             throw new SetupException("Toto vydanie UNIVERSUM nie je podpísané – inštalujte ho ručne zo stránky vydania.");
         }
 
-        var name = Path.GetFileName(release.Installer.AbsolutePath);
         var expected = ReleaseSignature.ExpectedInstallerHash(
-            await GetBytesAsync(release.Checksums, cancellationToken), await GetBytesAsync(release.ChecksumsSignature, cancellationToken), name)
+            await GetBytesAsync(release.Checksums, cancellationToken), await GetBytesAsync(release.ChecksumsSignature, cancellationToken), release.Version)
             ?? throw new SetupException("Podpis vydania UNIVERSUM nesedí – inštalátor sa nestiahol ani nespustil.");
 
-        var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "update-" + release.Version);
-        Directory.CreateDirectory(folder);
-        var target = Path.Combine(folder, name);
+        // a new folder with a random name: nothing can be prepared there in advance
+        var folder = Directory.CreateTempSubdirectory("UNIVERSUM-update-").FullName;
+        var target = Path.Combine(folder, ReleaseSignature.InstallerFileName(release.Version));
         await DownloadFileAsync(release.Installer, target, progress, cancellationToken);
         if (!FileHashes.Matches(expected, await FileHashes.Sha256Async(target, cancellationToken)))
         {
@@ -51,6 +54,7 @@ public static class UniversumInstaller
     /// </summary>
     public static bool Start(VerifiedInstaller installer)
     {
+        // no write or delete sharing: the file cannot be changed or replaced until the installer has started
         using var locked = new FileStream(installer.Path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (!FileHashes.Matches(installer.Sha256, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(locked))))
         {

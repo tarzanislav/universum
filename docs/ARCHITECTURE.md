@@ -71,6 +71,8 @@ in next to it without changing the rules, planning or UI.
   gets a number (`BIG2`, `BIG3`).
 - `Library/EpisodeParser`, `TitleGuess`, `LibraryJob` – episode numbers and titles from file and folder names (only
   suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
+- `Library/Histra/HistraToken` – the user's HISTRA token (histra.net, tracking of watched titles): accepted only when
+  it fits a Bearer header (RFC 6750 token68), stored with DPAPI like the TMDB key. Nothing is sent to HISTRA yet.
 
 ## Batch processing
 
@@ -99,10 +101,17 @@ in next to it without changing the rules, planning or UI.
 - Order: MKVToolNix first (official installer, SHA-256 + Authenticode as at installation), then UNIVERSUM (its
   installer restarts the program).
 - `Updates/ReleaseSignature`: a UNIVERSUM release is installed only when `SHA256SUMS.txt` is signed with the release
-  key (ECDSA P-256; public key in the program, private key only as the secret of `release.yml`) and the installer has
-  the SHA-256 listed there. Without a configured key UNIVERSUM opens the release page instead.
-- `release.yml` publishes a release only from a tag `vX.Y.Z` with notes in `docs/releases/`, and only signed with the
-  key matching the program.
+  key (ECDSA P-256; public key in the program, private key only as the secret of `release.yml`), its signed first
+  line is `# UNIVERSUM X.Y.Z` of exactly the offered (newer) version – an older signed release cannot be replayed –
+  and the installer `UNIVERSUM_Setup_X.Y.Z.exe` has the SHA-256 listed there. Release data and downloads must come
+  from `github.com/tarzanislav/universum/releases/`. Without a configured key UNIVERSUM opens the release page.
+- Installers (MKVToolNix and UNIVERSUM) are downloaded into a new folder with a random name, locked against writes
+  while they are checked again and started; MKVToolNix additionally needs its Authenticode signature with a
+  successful revocation check (offline revocation servers = no installation).
+- `release.yml` publishes a release only from a tag `vX.Y.Z` (validated before use, passed to scripts only through
+  the environment) with notes in `docs/releases/`. Job `build` compiles, tests and packs with read-only access, no
+  secrets and only preinstalled tools; job `publish` (environment `release`) only signs the checksum list with the
+  key matching the program and creates the release.
 
 ## Processes
 

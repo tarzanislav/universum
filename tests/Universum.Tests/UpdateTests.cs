@@ -65,6 +65,10 @@ public sealed class UpdateTests
         Assert.True(release.Checksums is not null && release.ChecksumsSignature is not null, "checksums and signature");
         Assert.Equal<UniversumRelease?>(null, UniversumRelease.Parse(Release.Replace("\"prerelease\":false", "\"prerelease\":true")), "pre-releases are not offered");
         Assert.True(!UniversumRelease.IsOfficial(new Uri("http://github.com/x")) && !UniversumRelease.IsOfficial(new Uri("https://example.com/x")), "only GitHub over HTTPS");
+        var foreign = UniversumRelease.Parse(Release.Replace("tarzanislav/universum/releases/download/v0.3.0/UNIVERSUM_Setup", "someone/else/releases/download/v0.3.0/UNIVERSUM_Setup"))!;
+        Assert.Equal<Uri?>(null, foreign.Installer, "downloads only from this repository");
+        Assert.Equal<UniversumRelease?>(null, UniversumRelease.Parse(Release.Replace("\"tag_name\":\"v0.3.0\"", "\"tag_name\":\"v0.3\"")), "releases are numbered 1.2.3");
+        Assert.Equal<UniversumRelease?>(null, UniversumRelease.Parse(Release.Replace("https://github.com/tarzanislav/universum/releases/tag", "https://github.com/someone/else/releases/tag")), "release page of this repository only");
     }
 
     [Test]
@@ -72,18 +76,20 @@ public sealed class UpdateTests
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var publicKey = Convert.ToBase64String(key.ExportSubjectPublicKeyInfo());
-        var sums = Encoding.UTF8.GetBytes(new string('A', 64) + "  UNIVERSUM_Setup_0.3.0.exe\n");
+        var version = new Version(0, 3, 0);
+        var sums = Encoding.UTF8.GetBytes("# UNIVERSUM 0.3.0\n" + new string('A', 64) + "  UNIVERSUM_Setup_0.3.0.exe\n");
         var signature = key.SignData(sums, HashAlgorithmName.SHA256);
 
-        Assert.Equal(new string('A', 64), ReleaseSignature.ExpectedInstallerHash(sums, signature, "UNIVERSUM_Setup_0.3.0.exe", publicKey));
+        Assert.Equal(new string('A', 64), ReleaseSignature.ExpectedInstallerHash(sums, signature, version, publicKey));
+        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(sums, signature, new Version(0, 4, 0), publicKey), "an older signed list passed off as a newer release");
         Assert.True(ReleaseSignature.Verify(sums, key.SignData(sums, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence), publicKey), "DER signature");
 
         var changed = (byte[])sums.Clone();
-        changed[0] = (byte)'B';
-        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(changed, signature, "UNIVERSUM_Setup_0.3.0.exe", publicKey), "changed list refused");
+        changed[20] = (byte)'B';
+        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(changed, signature, version, publicKey), "changed list refused");
         using var other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(sums, other.SignData(sums, HashAlgorithmName.SHA256), "UNIVERSUM_Setup_0.3.0.exe", publicKey), "other key refused");
-        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(sums, signature, "UNIVERSUM_Setup_0.3.0.exe", ""), "no key: nothing installs");
+        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(sums, other.SignData(sums, HashAlgorithmName.SHA256), version, publicKey), "other key refused");
+        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash(sums, signature, version, ""), "no key: nothing installs");
     }
 
     [Test]

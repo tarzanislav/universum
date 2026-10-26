@@ -3,12 +3,19 @@ name: Release
 # A release is made only by pushing a tag "v1.2.3" (with the owner's consent). It is published only when the
 # checksum list can be signed with the UNIVERSUM release key (secret UNIVERSUM_RELEASE_KEY) and that key matches
 # the public key built into the program – otherwise UNIVERSUM would refuse its own update.
+#
+# Two jobs: "build" compiles, tests and packs with read-only access and no secrets; "publish" (environment
+# "release") only signs and publishes what "build" produced, so nothing built or tested ever runs next to the key.
 on:
   push:
     tags: ['v*.*.*']
 
 permissions:
   contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -17,33 +24,40 @@ env:
   MKVTOOLNIX_PORTABLE_SHA256: '01D76DBFDBD5615D9E02F69B0710D1429A902D47A98C8EEE33BD884C4FCB3CBF'
 
 jobs:
-  release:
-    name: Build, sign and publish
+  build:
+    name: Build, test and pack (read-only, no secrets)
     runs-on: windows-2025
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.number }}
     steps:
+      # the tag is checked before it is used anywhere; it reaches scripts only through the environment
+      - name: Version from the tag
+        id: version
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if (-not ($env:TAG -cmatch '^v(\d{1,4}\.\d{1,4}\.\d{1,4})$')) { throw "the tag is not v1.2.3" }
+          "number=$($Matches[1])" >> $env:GITHUB_OUTPUT
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: .NET 10 SDK
+        with:
+          persist-credentials: false
+
+      - name: Release notes
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.number }}
+        run: |
+          if (-not (Test-Path "docs/releases/v$env:VERSION.md")) { throw "release notes docs/releases/v$env:VERSION.md are missing" }
+
+      # nothing is downloaded and run unpinned in a release: the tools must already be on the runner
+      - name: Required tools (preinstalled)
         shell: pwsh
         run: |
           $sdks = & dotnet --list-sdks 2>$null
-          if (-not ($sdks -match '^10\.')) {
-            Invoke-WebRequest https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
-            & "$env:RUNNER_TEMP\dotnet-install.ps1" -Channel 10.0 -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir "$env:ProgramFiles\dotnet"
-          }
-
-      - name: Version and release notes
-        id: version
-        shell: pwsh
-        run: |
-          $tag = '${{ github.ref_name }}'
-          if (-not ($tag -match '^v(\d+\.\d+\.\d+)$')) { throw "tag $tag is not v1.2.3" }
-          $v = $Matches[1]
-          $notes = "docs/releases/v$v.md"
-          if (-not (Test-Path $notes)) { throw "release notes $notes are missing" }
-          "number=$v" >> $env:GITHUB_OUTPUT
-          "notes=$notes" >> $env:GITHUB_OUTPUT
+          if (-not ($sdks -match '^10\.')) { throw ".NET 10 SDK is not preinstalled on the runner" }
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "Inno Setup 6 is not preinstalled on the runner" }
 
       - name: MKVToolNix portable for the tests (checksum and signature verified)
         shell: pwsh
@@ -60,7 +74,8 @@ jobs:
           7z x -y "-o$target" (Join-Path $work $name) | Out-Null
           $mkvmerge = Get-ChildItem $target -Recurse -Filter mkvmerge.exe | Select-Object -First 1
           $signature = Get-AuthenticodeSignature $mkvmerge.FullName
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=LINET Services GmbH') { throw "mkvmerge.exe signature" }
+          $signer = $signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+          if ($signature.Status -ne 'Valid' -or $signer -cne 'LINET Services GmbH') { throw "mkvmerge.exe signature: $($signature.Status) $signer" }
           "UNIVERSUM_MKVTOOLNIX_DIR=$($mkvmerge.DirectoryName)" >> $env:GITHUB_ENV
 
       - name: Tests
@@ -68,49 +83,83 @@ jobs:
 
       - name: Publish program
         shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.number }}
         run: |
-          dotnet publish src/Universum.Cli/Universum.Cli.csproj -c Release -r win-x64 --self-contained true "-p:Version=${{ steps.version.outputs.number }}" -o publish
+          dotnet publish src/Universum.Cli/Universum.Cli.csproj -c Release -r win-x64 --self-contained true "-p:Version=$env:VERSION" -o publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true "-p:Version=${{ steps.version.outputs.number }}" -o publish
+          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true "-p:Version=$env:VERSION" -o publish
           exit $LASTEXITCODE
 
-      - name: Installer
-        shell: pwsh
-        run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
-          & $iscc "/DAppVersion=${{ steps.version.outputs.number }}" "/DSourceDir=$PWD\publish" installer\universum.iss
-          exit $LASTEXITCODE
-
-      - name: Checksums and signature
+      - name: Installer and checksum list
         shell: pwsh
         env:
+          VERSION: ${{ steps.version.outputs.number }}
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:VERSION" "/DSourceDir=$PWD\publish" installer\universum.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $dir = "installer\Output"
+          $file = "UNIVERSUM_Setup_$env:VERSION.exe"
+          $hash = (Get-FileHash (Join-Path $dir $file) -Algorithm SHA256).Hash
+          # the first line names the version, so the signed list cannot be reused for another release
+          [IO.File]::WriteAllText((Join-Path $dir "SHA256SUMS.txt"), "# UNIVERSUM $env:VERSION`n$hash  $file`n")
+          Write-Host "::notice title=Release::$file SHA-256 $hash"
+
+      - name: Keep for signing
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            installer/Output/UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe
+            installer/Output/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Sign and publish
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+
+      - name: Check, sign and publish
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          TAG: ${{ github.ref_name }}
           RELEASE_KEY: ${{ secrets.UNIVERSUM_RELEASE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
+          if (-not ($env:VERSION -cmatch '^\d{1,4}\.\d{1,4}\.\d{1,4}$') -or $env:TAG -cne "v$env:VERSION") { throw "version and tag differ" }
           if (-not $env:RELEASE_KEY) { throw "The release key (secret UNIVERSUM_RELEASE_KEY) is not set: no unsigned release is published." }
-          $dir = "installer\Output"
-          $file = "UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe"
-          $hash = (Get-FileHash (Join-Path $dir $file) -Algorithm SHA256).Hash
-          [IO.File]::WriteAllText((Join-Path $dir "SHA256SUMS.txt"), "$hash  $file`n")
-          $key = [System.Security.Cryptography.ECDsa]::Create()
+          $file = "UNIVERSUM_Setup_$env:VERSION.exe"
+          $sums = Join-Path release "SHA256SUMS.txt"
+          $lines = [IO.File]::ReadAllText($sums) -split "`n"
+          $hash = (Get-FileHash (Join-Path release $file) -Algorithm SHA256).Hash
+          if ($lines[0] -cne "# UNIVERSUM $env:VERSION" -or $lines[1] -cne "$hash  $file") { throw "the checksum list does not describe the installer" }
+
+          $key = [Security.Cryptography.ECDsa]::Create()
           $read = 0
           $key.ImportPkcs8PrivateKey([Convert]::FromBase64String($env:RELEASE_KEY), [ref]$read)
-          $data = [IO.File]::ReadAllBytes((Join-Path $dir "SHA256SUMS.txt"))
-          [IO.File]::WriteAllBytes((Join-Path $dir "SHA256SUMS.txt.sig"), $key.SignData($data, [System.Security.Cryptography.HashAlgorithmName]::SHA256))
           # the key must be the one built into the program, or UNIVERSUM would refuse the update
           $public = [Convert]::ToBase64String($key.ExportSubjectPublicKeyInfo())
-          $source = Get-Content src\Universum.Core\Updates\ReleaseSignature.cs -Raw
+          $source = Get-Content src/Universum.Core/Updates/ReleaseSignature.cs -Raw
           if (-not $source.Contains("""$public""")) { throw "The release key does not match ReleaseSignature.PublicKey in the program." }
-          Write-Host "::notice title=Release::$file SHA-256 $hash, signed"
+          $signature = $key.SignData([IO.File]::ReadAllBytes($sums), [Security.Cryptography.HashAlgorithmName]::SHA256)
+          [IO.File]::WriteAllBytes((Join-Path release "SHA256SUMS.txt.sig"), $signature)
 
-      - name: Publish the release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $v = '${{ steps.version.outputs.number }}'
-          $dir = "installer\Output"
-          gh release create '${{ github.ref_name }}' "$dir\UNIVERSUM_Setup_$v.exe" "$dir\SHA256SUMS.txt" "$dir\SHA256SUMS.txt.sig" `
-            --title "UNIVERSUM $v" --notes-file '${{ steps.version.outputs.notes }}' --verify-tag
+          gh release create $env:TAG (Join-Path release $file) $sums (Join-Path release "SHA256SUMS.txt.sig") `
+            --title "UNIVERSUM $env:VERSION" --notes-file "docs/releases/v$env:VERSION.md" --verify-tag
           exit $LASTEXITCODE

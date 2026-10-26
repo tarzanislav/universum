@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Library;
+using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.Rules;
@@ -25,6 +26,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private string _message = "";
     private string _tmdbKeyInput = "";
     private string _tmdbStatus = "";
+    private string _histraTokenInput = "";
+    private string _histraStatus = "";
 
     public SettingsPageViewModel(AppServices services)
     {
@@ -35,6 +38,9 @@ public sealed class SettingsPageViewModel : ObservableObject
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
         SaveTmdbKeyCommand = new AsyncRelayCommand(SaveTmdbKeyAsync, () => TmdbKeyInput.Trim().Length > 0);
         RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
+        SaveHistraTokenCommand = new RelayCommand(SaveHistraToken, () => HistraTokenInput.Trim().Length > 0);
+        RemoveHistraTokenCommand = new RelayCommand(RemoveHistraToken, () => _services.Settings.HistraTokenProtected is not null);
+        OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraToken.TokenPage));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
@@ -82,6 +88,29 @@ public sealed class SettingsPageViewModel : ObservableObject
         : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne." : "Kľúč je uložený (chránený pre vaše konto Windows).";
 
     public string TmdbAttribution => TmdbClient.Attribution;
+
+    public RelayCommand SaveHistraTokenCommand { get; }
+
+    public RelayCommand RemoveHistraTokenCommand { get; }
+
+    public RelayCommand OpenHistraTokenPageCommand { get; }
+
+    /// <summary>A new HISTRA token typed by the user (the stored token is never shown).</summary>
+    public string HistraTokenInput
+    {
+        get => _histraTokenInput;
+        set
+        {
+            if (SetProperty(ref _histraTokenInput, value))
+            {
+                SaveHistraTokenCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string HistraStatus => _histraStatus.Length > 0
+        ? _histraStatus
+        : _services.HistraToken is null ? "Token nie je zadaný." : "Token je uložený (chránený pre vaše konto Windows).";
 
     public string OutputDescription => _services.Library is { } library
         ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
@@ -168,6 +197,48 @@ public sealed class SettingsPageViewModel : ObservableObject
         _tmdbStatus = "";
         OnPropertyChanged(nameof(TmdbStatus));
         RemoveTmdbKeyCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Stores the token after checking that it can go into a Bearer header. It is not tried on HISTRA yet: the requests
+    /// UNIVERSUM will make are added once the HISTRA API is described.
+    /// </summary>
+    private void SaveHistraToken()
+    {
+        var token = HistraTokenInput.Trim();
+        if (!HistraToken.IsValid(token))
+        {
+            _histraStatus = "Token sa neuložil: nevyzerá ako token HISTRA (len písmená, číslice a - . _ ~ + / =, bez medzier, aspoň 8 znakov).";
+        }
+        else
+        {
+            _services.SetHistraToken(token);
+            HistraTokenInput = "";
+            _histraStatus = "Token je uložený (chránený pre vaše konto Windows).";
+        }
+
+        OnPropertyChanged(nameof(HistraStatus));
+        RemoveHistraTokenCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RemoveHistraToken()
+    {
+        _services.SetHistraToken(null);
+        _histraStatus = "";
+        OnPropertyChanged(nameof(HistraStatus));
+        RemoveHistraTokenCommand.NotifyCanExecuteChanged();
+    }
+
+    private static void OpenInBrowser(Uri page)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // no browser registered: the address is in the tooltip
+        }
     }
 
     private void ChooseOutputDirectory()

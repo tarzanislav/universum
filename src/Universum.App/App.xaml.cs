@@ -48,7 +48,9 @@ public partial class App : Application
         window.Show();
 
         // "Otvoriť v UNIVERSUM" from the Explorer passes a file or folder
-        await model.StartAsync(e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)));
+        // ("C:\" arrives as C:" because of the backslash before the closing quote)
+        var path = e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal))?.TrimEnd('"');
+        await model.StartAsync(path is { Length: 2 } && path[1] == ':' ? path + "\\" : path);
     }
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

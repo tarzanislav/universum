@@ -82,6 +82,23 @@ public sealed class AppServices
     /// <summary>Raised when the TMDB key changes.</summary>
     public event Action? TmdbChanged;
 
+    /// <summary>The user's HISTRA token (UNIVERSUM_HISTRA_TOKEN wins over the settings); null when none is set.</summary>
+    public string? HistraToken =>
+        Environment.GetEnvironmentVariable("UNIVERSUM_HISTRA_TOKEN") is { Length: > 0 } fromEnvironment
+            ? fromEnvironment
+            : Settings.HistraTokenProtected is { Length: > 0 } stored ? UserSecret.Unprotect(stored) : null;
+
+    /// <summary>Stores the HISTRA token protected for the current Windows user (null removes it).</summary>
+    public void SetHistraToken(string? token)
+    {
+        Settings.HistraTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
+        Settings.Save();
+        HistraChanged?.Invoke();
+    }
+
+    /// <summary>Raised when the HISTRA token changes.</summary>
+    public event Action? HistraChanged;
+
     private Updates.UpdateService? _updates;
 
     /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
@@ -149,6 +166,9 @@ public sealed class AppSettings
 
     /// <summary>The user's TMDB key, protected with the Windows data protection API (readable only by this account).</summary>
     public string? TmdbKeyProtected { get; set; }
+
+    /// <summary>The user's HISTRA token, protected with the Windows data protection API (readable only by this account).</summary>
+    public string? HistraTokenProtected { get; set; }
 
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }

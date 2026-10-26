@@ -107,7 +107,11 @@ public sealed class UpdateTests
         Assert.Equal(0, report.Problems.Count, string.Join("; ", report.Problems));
         Assert.True(report.MkvToolNix is { IsAvailable: true, HasSecurityFixes: true } && report.MkvToolNix.News.Count == 2, "MKVToolNix 105.0 with security fixes");
         Assert.Equal("overené s UNIVERSUM (21. 12. 2026)", report.MkvToolNix!.CompatibilityText);
-        Assert.True(report.Universum is { IsAvailable: true, CanInstall: false }, "UNIVERSUM 0.3.0, not installed without the release key");
+        Assert.True(report.Universum is { IsAvailable: true, CanInstall: true }, "UNIVERSUM 0.3.0 with a signed checksum list can be installed");
+        answers[UniversumRelease.LatestApi] = Encoding.UTF8.GetBytes(Release.Replace("SHA256SUMS.txt.sig", "SHA256SUMS.txt.asc"));
+        var unsigned = await UpdateChecker.CheckAsync(new Version(103, 0), new Version(0, 2, 41), (uri, _) => Task.FromResult(answers.GetValueOrDefault(uri)));
+        Assert.True(unsigned.Universum is { IsAvailable: true, CanInstall: false }, "a release without the signature is never installed");
+        answers[UniversumRelease.LatestApi] = Encoding.UTF8.GetBytes(Release);
 
         var none = await UpdateChecker.CheckAsync(new Version(105, 0), new Version(0, 3, 0), (uri, _) => Task.FromResult(uri == UniversumRelease.LatestApi ? null : answers.GetValueOrDefault(uri)));
         Assert.True(!none.AnyAvailable && none.Universum is null, "nothing newer; no release yet");
@@ -148,6 +152,17 @@ public sealed class UpdateTests
     /// tools/New-ReleaseKey.ps1 builds the keys from fixed DER prefixes (it must run in Windows PowerShell 5.1 too);
     /// the prefixes must give exactly what .NET reads in the release workflow and in ReleaseSignature.
     /// </summary>
+    [Test]
+    public void BuiltInReleaseKeyIsAP256Key()
+    {
+        Assert.True(ReleaseSignature.IsConfigured, "release key built in");
+        using var key = ECDsa.Create();
+        key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(ReleaseSignature.PublicKey), out var read);
+        Assert.Equal(91, read);
+        Assert.Equal(256, key.KeySize);
+        Assert.Equal<string?>(null, ReleaseSignature.ExpectedInstallerHash("# UNIVERSUM 1.0.0\n"u8.ToArray(), new byte[64], new Version(1, 0, 0)), "a made-up signature is refused");
+    }
+
     [Test]
     public void ReleaseKeyScriptBuildsValidKeys()
     {

@@ -25,11 +25,12 @@ public sealed class MainViewModel : ObservableObject
         Batch = new BatchPageViewModel(services);
         Settings = new SettingsPageViewModel(services);
         HeaderEditor = new HeaderEditorPageViewModel(services);
+        Mux = new MultiplexerPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Tools =
         [
-            new("Zlučovanie", "\uE71D", new PlaceholderPageViewModel("Zlučovanie", "Zdrojové súbory, stopy a ich vlastnosti, výstup a prílohy – ako Multiplexer v MKVToolNix GUI.", "etapa E4")),
+            new("Zlučovanie", "\uE71D", Mux),
             new("Informácie", "\uE946", Info),
             new("Pravidlá UNIVERSUM", "\uE90F", Rules),
             new("Úprava hlavičky", "\uE70F", HeaderEditor),
@@ -88,6 +89,8 @@ public sealed class MainViewModel : ObservableObject
     public SettingsPageViewModel Settings { get; }
 
     public HeaderEditorPageViewModel HeaderEditor { get; }
+
+    public MultiplexerPageViewModel Mux { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }
 

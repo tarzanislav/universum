@@ -157,6 +157,181 @@
                 </Border>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:MultiplexerPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Content="Pridať súbory…" Command="{Binding AddFilesCommand}" Padding="14,6" Margin="0,0,8,0" />
+                        <Button Content="Odstrániť vstup" Command="{Binding RemoveInputCommand}" Padding="12,6" Margin="0,0,8,0" />
+                        <Button Content="Nové" Command="{Binding ClearCommand}" Padding="12,6" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Zlučovanie" />
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
+                    </StackPanel>
+                </DockPanel>
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Inputs}" SelectedItem="{Binding SelectedInput}" AutoGenerateColumns="False" IsReadOnly="True" MaxHeight="130" Margin="0,10,0,0"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Number}" />
+                        <DataGridTextColumn Header="Vstupný súbor" Binding="{Binding FileName}" Width="2*" />
+                        <DataGridTextColumn Header="Obsah" Binding="{Binding Details}" Width="2*" />
+                        <DataGridTemplateColumn Header="Kapitoly" Width="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding KeepChapters, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding HasChapters}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Prílohy" Width="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding KeepAttachments, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding HasAttachments}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Tagy" Width="70">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding KeepTags, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding HasTags}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <WrapPanel Grid.Row="2" Margin="0,10,0,6">
+                    <TextBlock Text="Stopy vo výstupe (poradie zhora nadol)" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <Button Content="Pravidlá UNIVERSUM" Command="{Binding ApplyRulesCommand}" Padding="12,4" Margin="0,0,8,0"
+                            ToolTip="Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM" />
+                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑)" />
+                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" ToolTip="Posunúť nižšie (Ctrl+↓)" />
+                </WrapPanel>
+                <DataGrid Grid.Row="3" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                    <DataGrid.InputBindings>
+                        <KeyBinding Key="Up" Modifiers="Control" Command="{Binding MoveUpCommand}" />
+                        <KeyBinding Key="Down" Modifiers="Control" Command="{Binding MoveDownCommand}" />
+                    </DataGrid.InputBindings>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Vziať" Width="66">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="#" Binding="{Binding Position}" />
+                        <DataGridTextColumn Header="Zo súboru" Binding="{Binding Source}" Width="*" MinWidth="90">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding Source}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Typ" Binding="{Binding Type}" />
+                        <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="70" />
+                        <DataGridTemplateColumn Header="Názov" Width="1.5*" MinWidth="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Jazyk" Width="145">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Default" Width="74">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsDefault, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Enabled" Width="74">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Forced" Width="74">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsForced, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Výstupný súbor:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <TextBox Grid.Column="1" Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
+                            <Button Grid.Column="2" Content="Uložiť ako…" Command="{Binding ChooseOutputCommand}" Padding="12,4" Margin="0,0,0,6" />
+                            <TextBlock Grid.Row="1" Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
+                            <TextBlock Grid.Row="2" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
+                                     ToolTip="Kapitoly XML, OGM (.txt) alebo cue – pridajú sa ku kapitolám zo vstupov, ktoré sú zaškrtnuté" />
+                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
+                                <Button Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="12,4" Margin="0,0,6,0" />
+                                <Button Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,4" ToolTip="Bez súboru s kapitolami" />
+                            </StackPanel>
+                            <TextBlock Grid.Row="3" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
+                            <ListBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="70" MinHeight="30" Margin="0,0,8,0" />
+                            <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="12,4" Margin="0,0,6,0" />
+                                <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Padding="8,4" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
+                            <TextBlock Text="Kontrola" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding Findings}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <DockPanel Margin="0,8,0,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Content="Do fronty" Command="{Binding QueueCommand}" Padding="16,6" Margin="0,0,8,0" />
+                                <Button Content="Spustiť zlučovanie" Command="{Binding StartCommand}" Padding="16,6" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:HeaderEditorPageViewModel}">
             <Grid Margin="32,24,32,16">
                 <Grid.RowDefinitions>

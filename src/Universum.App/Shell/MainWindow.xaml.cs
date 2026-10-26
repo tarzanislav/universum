@@ -22,6 +22,12 @@ public partial class MainWindow : Window
 
     private async void OnDrop(object sender, DragEventArgs e)
     {
+        if (Model.SelectedTool.Page == Model.Mux && e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } inputs)
+        {
+            await Model.Mux.AddFilesAsync(inputs.Where(File.Exists));
+            return;
+        }
+
         if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } dropped && Directory.Exists(dropped[0]))
         {
             Model.SelectedTool = Model.Tools.First(t => t.Page == Model.Batch);

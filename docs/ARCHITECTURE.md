@@ -71,8 +71,9 @@ in next to it without changing the rules, planning or UI.
   gets a number (`BIG2`, `BIG3`).
 - `Library/EpisodeParser`, `TitleGuess`, `LibraryJob` – episode numbers and titles from file and folder names (only
   suggestions until confirmed, except names in library form with a TMDB ID), kind film/series, per-batch decisions.
-- `Library/Histra/HistraToken` – the user's HISTRA token (histra.net, tracking of watched titles): accepted only when
-  it fits a Bearer header (RFC 6750 token68), stored with DPAPI like the TMDB key. Nothing is sent to HISTRA yet.
+- `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
+  user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
+  TMDB key; `Request` sends it only to histra.net over HTTPS. No HISTRA requests are made yet (endpoints to come).
 
 ## Batch processing
 

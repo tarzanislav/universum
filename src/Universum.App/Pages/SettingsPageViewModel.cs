@@ -40,7 +40,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
         SaveHistraTokenCommand = new RelayCommand(SaveHistraToken, () => HistraTokenInput.Trim().Length > 0);
         RemoveHistraTokenCommand = new RelayCommand(RemoveHistraToken, () => _services.Settings.HistraTokenProtected is not null);
-        OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraToken.TokenPage));
+        OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraApi.TokenPage));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         Load(services.Profile);
     }
@@ -206,7 +206,7 @@ public sealed class SettingsPageViewModel : ObservableObject
     private void SaveHistraToken()
     {
         var token = HistraTokenInput.Trim();
-        if (!HistraToken.IsValid(token))
+        if (!HistraApi.IsValidToken(token))
         {
             _histraStatus = "Token sa neuložil: nevyzerá ako token HISTRA (len písmená, číslice a - . _ ~ + / =, bez medzier, aspoň 8 znakov).";
         }

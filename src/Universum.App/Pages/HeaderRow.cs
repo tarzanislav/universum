@@ -7,6 +7,10 @@ namespace Universum.App.Pages;
 /// <summary>A language in the header editor's list.</summary>
 public sealed record LanguageChoice(LanguageTag Tag, string Display)
 {
+    /// <summary>"neurčený" and the built-in languages.</summary>
+    public static IReadOnlyList<LanguageChoice> Common { get; } =
+        [Of(LanguageTag.Undetermined), .. Languages.All.Select(l => Of(LanguageTag.FromCode(l.Ietf)))];
+
     public static LanguageChoice Of(LanguageTag tag)
     {
         if (tag.IsUndetermined)

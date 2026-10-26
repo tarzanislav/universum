@@ -93,6 +93,18 @@ in next to it without changing the rules, planning or UI.
   switched off, nothing is sent there and the stored key or token stays (the CLI honours the TMDB switch for the
   stored key). With both on, the two are to be synchronised (`SyncActive`; what exactly follows the HISTRA API).
 
+## Multiplexer (specification, section 5)
+
+- `Muxing/MuxSpec` – input files (`MuxSource`: keep chapters / attachments / tags), the tracks taken in output order
+  with names, languages and flags (`MuxTrack`), title, chapter file, new attachments, output file; `Validate` stops
+  writing over an existing file or an input, unknown or duplicate tracks, wrong extensions, missing files.
+- `Muxing/MuxArguments` – mkvmerge arguments per input (track selection, per-track values) and `--track-order`
+  across inputs; always through an options file.
+- `Muxing/Multiplexer` – writes `*.universum-tmp` next to the output, flushes, reads it back and compares it
+  (`MuxVerifier`: tracks, names, languages, flags, title, chapters, attachments), then gives it its name; never
+  overwrites. `MuxRules` runs the UNIVERSUM rules and the Check panel over the chosen tracks of all inputs.
+- `Jobs/MuxJob` – the multiplexer as a queue job.
+
 ## Job queue (specification, section 5)
 
 - `Jobs/Job` – description, status (waiting, running, done, done with warnings, failed, cancelled), progress, output

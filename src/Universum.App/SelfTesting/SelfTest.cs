@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Universum.App.Pages;
 using Universum.App.Setup;
 using Universum.App.Shell;
 using Universum.Core.Media;
@@ -179,6 +180,7 @@ internal static class SelfTest
         Check(model.Rules.Result.StartsWith("Rovnaký stream", StringComparison.Ordinal), "rules: the same stream is not written twice – " + model.Rules.Result);
 
         await TestHeaderEditorAsync(model, window, services, work);
+        await TestMultiplexerAsync(model, window, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
         var secret = UserSecret.Protect("test-key-123");
@@ -311,6 +313,46 @@ internal static class SelfTest
         model.Queue.OutputCommand.Execute(null);
         Check(model.SelectedTool.Page == model.Output && model.Output.Messages.Count > 0, "output: the job's messages are shown");
         await Screenshot(window, "job-output.png");
+    }
+
+    /// <summary>Multiplexer: a film and a subtitle file, a track left out, the rules over both, written as a queue job.</summary>
+    private static async Task TestMultiplexerAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var srt = Path.Combine(work, "titulky-sk.srt");
+        File.WriteAllText(srt, "1\n00:00:00,500 --> 00:00:01,500\nVymyslený slovenský titulok.\n\n");
+        var output = Path.Combine(work, "zlucene.mkv");
+        File.Delete(output);
+        var mux = model.Mux;
+        model.SelectedTool = model.Tools.First(t => t.Page == mux);
+        await mux.AddFilesAsync([Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), srt]);
+        Check(mux.Inputs.Count == 2 && mux.Tracks.Count == 7, $"mux: two inputs, 7 tracks ({mux.Inputs.Count}, {mux.Tracks.Count}) {mux.Result}");
+        LanguageChoice Lang(MuxTrackRow row, string code) => row.LanguageChoices.First(c => c.Tag.Primary == code);
+        mux.Tracks[2].Language = Lang(mux.Tracks[2], "cs");
+        mux.Tracks[3].Language = Lang(mux.Tracks[3], "cs");
+        mux.Tracks[6].Language = Lang(mux.Tracks[6], "sk");
+        mux.Tracks[5].Include = false;
+        mux.ApplyRules();
+        Check(mux.Findings.Count == 0, "mux: nothing to check after the rules – " + string.Join(" | ", mux.Findings));
+        mux.OutputPath = output;
+        Check(mux.StartCommand.CanExecute(null), "mux: ready to write – " + mux.Problems);
+        await Screenshot(window, "mux.png");
+        mux.StartCommand.Execute(null);
+        var job = services.Jobs.Jobs[^1];
+        for (var i = 0; i < 300 && !job.IsFinished; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Settle();
+        Check(job.Status == Core.Jobs.JobStatus.Done, $"mux: job done – {job.Status} {job.Outcome} {string.Join(" | ", job.Messages.Select(m => m.Text))}");
+        if (File.Exists(output))
+        {
+            var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(output);
+            Check(string.Join(",", written.Tracks.Select(t => t.Language.Primary)) == "und,cs,en,cs,cs,sk",
+                "mux: tracks in the rules' order with the Slovak subtitles from the second file – " + string.Join(",", written.Tracks.Select(t => t.Language.Primary)));
+        }
+
+        Check(mux.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "mux: page shows the outcome – " + mux.Result);
     }
 
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)

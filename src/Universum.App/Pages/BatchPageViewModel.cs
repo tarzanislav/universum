@@ -63,7 +63,9 @@ public sealed class BatchPageViewModel : ObservableObject
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
-        ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null && _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode)));
+        ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
+            (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
+        ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
         Tmdb = new TmdbPicker(services, () => MediaKind.Series, () => SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? "", ChooseTmdbSeries);
         FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } && _services.Tmdb is not null);
         services.TmdbChanged += () =>
@@ -93,8 +95,16 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
-    /// <summary>Accepts titles and episode numbers guessed from the names.</summary>
+    /// <summary>Accepts the kind, titles and episode numbers guessed from the names.</summary>
     public RelayCommand ConfirmTitlesCommand { get; }
+
+    /// <summary>Accepts the proposed kind (films or a series) as it is.</summary>
+    public RelayCommand ConfirmKindCommand { get; }
+
+    /// <summary>"návrh – potvrďte" while the kind is only guessed from the names (specification 13.5).</summary>
+    public string KindNote => _library is { KindConfirmed: false } ? "(návrh podľa mien súborov – potvrďte)" : "";
+
+    public bool KindNeedsConfirmation => _library is { KindConfirmed: false };
 
     /// <summary>Looking up the series title on TMDB.</summary>
     public TmdbPicker Tmdb { get; }
@@ -396,6 +406,8 @@ public sealed class BatchPageViewModel : ObservableObject
                      $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(SeriesSuggestion));
+        OnPropertyChanged(nameof(KindNote));
+        OnPropertyChanged(nameof(KindNeedsConfirmation));
         RefreshCommands();
     }
 
@@ -426,6 +438,43 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsMovies));
         OnPropertyChanged(nameof(IsSeries));
         Replan();
+        _ = LoadSeriesSeasonsAsync();
+    }
+
+    /// <summary>
+    /// A series named by its folder with a TMDB ID ("… (2025) [tmdbid-227191]"): its seasons are read from TMDB so every
+    /// episode is checked (specification 13.5). Without TMDB nothing is checked.
+    /// </summary>
+    private async Task LoadSeriesSeasonsAsync()
+    {
+        if (_library is not { Kind: MediaKind.Series, Series: { TmdbId: { } id } series } library || _services.Tmdb is not { } tmdb ||
+            library.SeriesOnTmdb is { } known && known.Title.FolderName == series.FolderName)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await tmdb.GetAsync(MediaKind.Series, id) is { Seasons.Count: > 0 } details && ReferenceEquals(_library, library) && library.Series == series)
+            {
+                library.SeriesOnTmdb = (series, details.Seasons);
+                TmdbPicker.TrySaveCache(tmdb);
+                Replan();
+            }
+        }
+        catch (TmdbException ex)
+        {
+            RunState = "TMDB: epizódy sa nedajú overiť – " + ex.Message;
+        }
+    }
+
+    private void ConfirmKind()
+    {
+        if (_library is not null)
+        {
+            _library.Kind = _library.Kind;
+            OnLibraryChanged();
+        }
     }
 
     private void SetKind(bool selected, MediaKind kind)
@@ -778,7 +827,7 @@ public sealed class BatchPageViewModel : ObservableObject
                  {
                      ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
-                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand,
+                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

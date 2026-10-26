@@ -100,8 +100,14 @@ in next to it without changing the rules, planning or UI.
   - `BatchPlanner.CheckEpisodes`: the same episode (overlapping ranges) with the same description twice, a file named
     after another series, and – with `LibraryJob.SeriesOnTmdb` – an episode TMDB does not list go for review;
     "process anyway" lets a file through (a second version then gets a number, K1);
-  - `TitleInfo.Problem`: the year is required ("Name (Year)"); `TitleGuess.ForFile` is the shared guess of the pages;
-    the TMDB picker loads a chosen series' seasons, so the pages check the episode too.
+  - the kind film/series is only proposed (`LibraryJob.KindConfirmed`; batch: "Potvrdiť" / choosing a kind / accepting
+    suggestions; CLI: `--film`, `--serial`, `--confirm-suggestions`); it is guessed from clear numbers (S01E04, 1x04)
+    and season folders – word forms ("Díl 4", "Episode 2") not in names with a film year ("Sága - Časť 2 (2011)");
+  - seasons are looked for only below the analysed folder; extras (Extras, Trailers, Featurettes, Samples … folders,
+    "- trailer" names) are no films or episodes and go for review; ranges S01E18-S01E19, S01E20E21E22, 1x15-16;
+  - `TitleInfo.Problem`: the year is required ("Name (Year)") and the name must be in Latin script; titles in library
+    form are everything before "(Year)"; `TitleGuess.ForFile` is the shared guess of the pages; the TMDB picker, the
+    batch (folder "[tmdbid-…]") and the CLI load a series' seasons, so episodes are checked against TMDB.
 - `Library/Histra/HistraApi` – HISTRA (histra.net, tracking of watched titles; API at `https://histra.net`): the
   user's token is accepted only when it fits a Bearer header (RFC 6750 token68) and is stored with DPAPI like the
   TMDB key; `Request` sends it only to histra.net over HTTPS. `HistraClient` is ready for the endpoints: requests

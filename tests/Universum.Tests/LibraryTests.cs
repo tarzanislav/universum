@@ -128,6 +128,15 @@ public sealed class LibraryTests
             ("Seriál Řada 3 Díl 12", "S03E12", false),
             ("Film 1920x1080", null, false),
             ("WALL-E 2008", null, false),
+            // ranges written every way, but no range from "10bit" or "1080p"
+            ("Show.S01E18-S01E19", "S01E18-E19", false),
+            ("Show.S01E20E21E22", "S01E20-E22", false),
+            ("Show.S01E01-E12", "S01E01-E12", false),
+            ("Show 1x15-16", "S01E15-E16", false),
+            ("Show.S01E05-10bit", "S01E05", false),
+            ("Show.S01E01E1080p", "S01E01", false),
+            ("Show S01E24-S02E01", "S01E24", false),
+            ("Rally 4x100 (2015)", null, false),
         };
         foreach (var (name, tag, assumed) in cases)
         {
@@ -158,6 +167,13 @@ public sealed class LibraryTests
         Assert.True(conflict is { Number.Tag: "S01E03", FolderSeason: 2, NeedsConfirmation: true }, "name and folder disagree");
         Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Season 1", "Seriál S01E03.mkv")) is { NeedsConfirmation: false }, "they agree");
         Assert.True(EpisodeParser.FromPath(Path.Combine("Seriál", "Seriál Díl 3.mkv")) is { SeasonAssumed: true, NeedsConfirmation: true }, "season assumed");
+
+        // with the analysed folder as root no season is taken from above it
+        var outside = Path.GetFullPath(Path.Combine("x", "Séria 3", "in", "Show E04.mkv"));
+        Assert.Equal("S03E04", EpisodeParser.FromPath(outside)?.Number.Tag, "a single file: two levels up");
+        Assert.True(EpisodeParser.FromPath(outside, Path.GetDirectoryName(outside)) is { SeasonAssumed: true }, "a batch: only below the analysed folder");
+        Assert.True(EpisodeParser.IsExtra(Path.Combine("Show", "Season 2", "Extras", "Show E03.mkv")) && EpisodeParser.IsExtra(Path.Combine("Film (2020)", "Film - trailer.mkv")) &&
+                    !EpisodeParser.IsExtra(Path.Combine("Film (2020)", "Film (2020).mkv")), "extras");
     }
 
     [Test]
@@ -186,6 +202,19 @@ public sealed class LibraryTests
         Assert.Equal(MediaKind.Series, TitleGuess.ForFile(Path.Combine("x", "Seriál (2024)", "Season 2", "prvá.mkv")).Kind, "season folder without a number");
         Assert.Equal(new FileGuess(MediaKind.Movie, new NameGuess("Creep", 2004, null), null), TitleGuess.ForFile(Path.Combine("x", "Filmy", "Creep.2004.1080p.mkv")));
         Assert.Equal("chýba rok", new TitleInfo(MediaKind.Series, "Seriál", null).Problem, "the folder is \"Name (Year)\"");
+        Assert.True(new TitleInfo(MediaKind.Movie, "Тихий дом", 2019).Problem?.StartsWith("názov nie je latinkou", StringComparison.Ordinal) == true, "Latin script only");
+
+        // library form: everything before the year in parentheses; release form: the last year before the release words
+        Assert.Equal(new NameGuess("Kolónia 2049", 2017, null), TitleGuess.FromName("Kolónia 2049 (2017)"));
+        Assert.Equal(new NameGuess("The Complete Silence", 2019, null), TitleGuess.FromName("The Complete Silence (2019)"));
+        Assert.Equal(new NameGuess("Mesto 1999", 2004, null), TitleGuess.FromName("Mesto.1999.2004.1080p"));
+        Assert.Equal(new NameGuess("Last Season of Ice", 2018, null), TitleGuess.FromName("Last.Season.of.Ice.2018.1080p"));
+        Assert.Equal(new NameGuess("Nine Puzzles", null, null), TitleGuess.FromName("Nine Puzzles S01.E06", MediaKind.Series));
+        Assert.Equal(new NameGuess("Ticho", 2010, null), TitleGuess.FromName("Ticho (2010) [tmdbid-99999999999]"), "an ID too long is no ID");
+        Assert.True(TitleGuess.Typed(MediaKind.Movie, "Ticho (2010) [tmdbid-99999999999]") is { TmdbId: null, Problem: "chýba TMDB ID" }, "typed: the problem is shown");
+        Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Rally 4x100 (2015) [tmdbid-4242]", "Rally 4x100 (2015) [tmdbid-4242].mkv")).Kind, "a film");
+        Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Zlatý prach Episode 2 (2019).mkv")).Kind, "a film in library form with a word number");
+        Assert.Equal(new NameGuess("Kriminálka Anděl", null, null), TitleGuess.Preferred(new NameGuess("Kriminálka Anděl", null, null), new NameGuess("Kriminalka Andel", null, null)), "the folder's diacritics");
         Assert.Equal<string?>(null, new TitleInfo(MediaKind.Series, "Seriál", 2024).Problem);
 
         Assert.Equal(new TitleInfo(MediaKind.Movie, "Charlotte's Web", 2006), TitleGuess.Typed(MediaKind.Movie, "Charlotte's Web (2006)"), "typed: nothing cut away");

@@ -25,8 +25,7 @@ public static partial class TitleGuess
         [
             "4k", "uhd", "hdr", "hdr10", "dv", "sdr", "bluray", "blu-ray", "bdrip", "brrip", "bdremux", "remux", "web", "webrip", "web-dl",
             "webdl", "hdtv", "dvdrip", "dvd", "hdrip", "x264", "x265", "h264", "h.264", "h265", "h.265", "hevc", "avc", "xvid", "divx", "av1",
-            "10bit", "8bit", "cz", "sk", "czech", "slovak", "dabing", "titulky", "multi", "eng", "en", "proper", "repack", "extended",
-            "season", "sezona", "sezóna", "séria", "seria", "serie", "série", "complete", "-",
+            "10bit", "8bit", "cz", "sk", "czech", "slovak", "dabing", "titulky", "multi", "eng", "en", "proper", "repack", "extended", "-",
         ],
         StringComparer.OrdinalIgnoreCase);
 
@@ -55,7 +54,8 @@ public static partial class TitleGuess
 
     /// <summary>
     /// A title typed by the user in library form: "Creep (2004)", "Nine Puzzles (2025) [tmdbid-227191]" or just a name.
-    /// Unlike <see cref="FromName"/> nothing is cut away (a title may contain words like "Web").
+    /// Unlike <see cref="FromName"/> nothing is cut away (a title may contain words like "Web"). An ID that is no valid
+    /// number leaves the title without one (its problem says so).
     /// </summary>
     public static TitleInfo? Typed(MediaKind kind, string? text)
     {
@@ -65,9 +65,11 @@ public static partial class TitleGuess
         }
 
         int? id = null;
+        var hasId = false;
         if (IdTag().Match(text) is { Success: true } idMatch)
         {
-            id = int.Parse(idMatch.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
+            hasId = true;
+            id = Id(idMatch.Groups["id"].Value);
             text = text.Remove(idMatch.Index, idMatch.Length);
         }
 
@@ -79,18 +81,21 @@ public static partial class TitleGuess
         }
 
         var name = LibraryNames.Clean(text);
-        return name.Length == 0 ? null : new TitleInfo(kind, name, year, id, id is not null);
+        return name.Length == 0 ? null : new TitleInfo(kind, name, year, id, hasId);
     }
 
     /// <summary>
     /// Kind, title and episode of one file (header editor, chapters, multiplexer, rules page): a series when the name
-    /// carries an episode number or the file lies in a season folder; the title from the folder of the title (above a
-    /// "Season 2" folder) when it has a year or a TMDB ID, otherwise from the file name.
+    /// carries a clear episode number (S01E04, 1x04; "Díl 4" only without a film year in the name) or the file lies in
+    /// a season folder; the title from the folder of the title (above a "Season 2" folder) when it has a year or a TMDB
+    /// ID, otherwise from the file name.
     /// </summary>
     public static FileGuess ForFile(string path)
     {
         var episode = EpisodeParser.FromPath(path);
-        var kind = episode is not null || EpisodeParser.SeasonOfPath(path) is not null ? MediaKind.Series : MediaKind.Movie;
+        var name = Path.GetFileNameWithoutExtension(path);
+        var series = episode is { Form: not EpisodeForm.Word } || (episode is not null && !HasYearInParentheses(name)) || EpisodeParser.SeasonOfPath(path) is not null;
+        var kind = series ? MediaKind.Series : MediaKind.Movie;
         var directory = Path.GetDirectoryName(path);
         if (kind == MediaKind.Series && EpisodeParser.IsSeasonOnlyFolder(Path.GetFileName(directory)))
         {
@@ -98,19 +103,42 @@ public static partial class TitleGuess
         }
 
         var fromFolder = FromName(Path.GetFileName(directory), kind);
-        var fromFile = FromName(Path.GetFileNameWithoutExtension(path), kind);
-        return new FileGuess(kind, Preferred(fromFolder, fromFile), episode);
+        var fromFile = FromName(name, kind);
+        return new FileGuess(kind, Preferred(fromFolder, fromFile), kind == MediaKind.Series ? episode : null);
     }
 
-    /// <summary>The folder's title when it is in library form (with a year or an ID), otherwise the one from the file names.</summary>
-    public static NameGuess? Preferred(NameGuess? fromFolder, NameGuess? fromFiles) =>
-        fromFolder is { Year: not null } or { TmdbId: not null } ? fromFolder : fromFiles ?? fromFolder;
+    /// <summary>
+    /// The folder's title when it is in library form (with a year or an ID) or spelled like the file names (then with
+    /// its diacritics: "Kriminálka Anděl" rather than "Kriminalka Andel"); otherwise the one from the file names.
+    /// </summary>
+    public static NameGuess? Preferred(NameGuess? fromFolder, NameGuess? fromFiles)
+    {
+        if (fromFolder is { Year: not null } or { TmdbId: not null })
+        {
+            return fromFolder;
+        }
+
+        if (fromFolder is not null && fromFiles is not null && Words.Normalize(fromFolder.Name) == Words.Normalize(fromFiles.Name))
+        {
+            return fromFolder with { Year = fromFiles.Year, TmdbId = fromFiles.TmdbId };
+        }
+
+        return fromFiles ?? fromFolder;
+    }
+
+    /// <summary>True when the name carries a year in parentheses, as films in library form do: "Sága - Časť 2 (2011)".</summary>
+    public static bool HasYearInParentheses(string? name) => name is not null && ParenthesizedYear().IsMatch(name);
 
     /// <summary>Title, year and TMDB ID from a file or folder name; null when no name is left.</summary>
     /// <param name="kind">
-    /// For a film, "Časť 2" or " - " before a year in parentheses belong to the title ("Sága - Časť 2 (2011)"); otherwise an
-    /// episode or season ends the title.
+    /// For a film, "Časť 2" belongs to the title; for a series (or unknown) an episode or season ends the title:
+    /// "Kriminálka Anděl Díl 4" → "Kriminálka Anděl".
     /// </param>
+    /// <remarks>
+    /// Library form: the title is everything before the year in parentheses ("Kolónia 2049 (2017)", "Sága - Časť 2
+    /// (2011)"). Release form: the title ends at a resolution, a release word or an episode; the year is the last year-like
+    /// word before that ("Mesto.1999.2004.1080p" → "Mesto 1999", 2004).
+    /// </remarks>
     public static NameGuess? FromName(string? name, MediaKind? kind = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -121,7 +149,7 @@ public static partial class TitleGuess
         int? tmdbId = null;
         if (IdTag().Match(name) is { Success: true } idMatch)
         {
-            tmdbId = int.Parse(idMatch.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
+            tmdbId = Id(idMatch.Groups["id"].Value);
         }
 
         var text = Brackets().Replace(name, " ");
@@ -130,47 +158,72 @@ public static partial class TitleGuess
             text = text.Replace('.', ' ').Replace('_', ' ');
         }
 
-        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var words = new List<string>();
-        int? year = null;
         var film = kind == MediaKind.Movie;
-        // "Title - Part 2 (2011)": in library form the title ends at the year in parentheses
-        var yearInParentheses = ParenthesizedYear().Match(text);
+        if (ParenthesizedYear().Match(text) is { Success: true } inParentheses && inParentheses.Index > 0)
+        {
+            var before = text[..inParentheses.Index];
+            var titleWords = before.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var cut = film ? titleWords.Length : EpisodeStart(titleWords);
+            var title = Clean(titleWords.Take(cut));
+            if (title.Length > 0)
+            {
+                return new NameGuess(title, int.Parse(inParentheses.Groups["year"].Value, NumberStyles.None, CultureInfo.InvariantCulture), tmdbId);
+            }
+        }
+
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var end = tokens.Length;
         for (var i = 0; i < tokens.Length; i++)
         {
-            var raw = tokens[i];
-            var token = raw.Trim('(', ')', ',');
-            if (words.Count > 0 && Year().IsMatch(token))
+            var token = tokens[i].Trim('(', ')', ',');
+            if ((!film && IsEpisodeAt(tokens, i)) || (i > 0 && (StopWords.Contains(token) || Resolution().IsMatch(token))))
             {
-                year = int.Parse(token, NumberStyles.None, CultureInfo.InvariantCulture);
+                end = i;
                 break;
             }
-
-            // an episode or season ends the title: "Show S01E04", "Kriminálka Anděl Díl 4", "Show Season 2"; a name that
-            // starts with one ("E04", "Diel 3") has no title
-            if (!film && (EpisodeToken().IsMatch(token) ||
-                (NumberedWords.Contains(Words.Normalize(token)) && i + 1 < tokens.Length && Number().IsMatch(tokens[i + 1].Trim('(', ')', ',', '.', ':')))))
-            {
-                break;
-            }
-
-            if (words.Count > 0 && (Resolution().IsMatch(token) ||
-                (StopWords.Contains(token) && !(film && token == "-" && yearInParentheses.Success && yearInParentheses.Index > text.IndexOf(raw, StringComparison.Ordinal)))))
-            {
-                break;
-            }
-
-            words.Add(raw);
         }
 
-        if (year is null && yearInParentheses.Success && words.Count > 0)
+        // the year: the last year-like word of the title part that is not its first word
+        int? year = null;
+        for (var i = end - 1; i > 0; i--)
         {
-            year = int.Parse(yearInParentheses.Groups["year"].Value, NumberStyles.None, CultureInfo.InvariantCulture);
+            if (Year().IsMatch(tokens[i].Trim('(', ')', ',')))
+            {
+                year = int.Parse(tokens[i].Trim('(', ')', ','), NumberStyles.None, CultureInfo.InvariantCulture);
+                end = i;
+                break;
+            }
         }
 
-        var title = LibraryNames.Clean(string.Join(' ', words).Trim(' ', '-', '.', ','));
-        return title.Length == 0 ? null : new NameGuess(title, year, tmdbId);
+        var result = Clean(tokens.Take(end));
+        return result.Length == 0 ? null : new NameGuess(result, year, tmdbId);
     }
+
+    private static string Clean(IEnumerable<string> words) => LibraryNames.Clean(string.Join(' ', words).Trim(' ', '-', '.', ','));
+
+    // index of the first word that starts an episode or a season ("S01E04", "Díl 4", "Season 2"), or the length
+    private static int EpisodeStart(string[] words)
+    {
+        for (var i = 0; i < words.Length; i++)
+        {
+            if (IsEpisodeAt(words, i))
+            {
+                return i;
+            }
+        }
+
+        return words.Length;
+    }
+
+    private static bool IsEpisodeAt(string[] tokens, int i)
+    {
+        var token = tokens[i].Trim('(', ')', ',', '-');
+        return EpisodeToken().IsMatch(token) || EpisodeParser.FromText(token) is { Form: not EpisodeForm.Word } ||
+               (NumberedWords.Contains(Words.Normalize(token)) && i + 1 < tokens.Length && Number().IsMatch(tokens[i + 1].Trim('(', ')', ',', '.', ':')));
+    }
+
+    // a TMDB ID; an ID too long for a number is no ID
+    private static int? Id(string digits) => int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : null;
 
     [GeneratedRegex(@"themoviedb\.org/(?:[a-z]{2}(?:-[A-Z]{2})?/)?(?<kind>movie|tv)/(?<id>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TmdbUrl();
@@ -196,6 +249,6 @@ public static partial class TitleGuess
     [GeneratedRegex(@"\(\s*(?<year>(?:18|19|20|21)\d\d)\s*\)", RegexOptions.CultureInvariant)]
     private static partial Regex ParenthesizedYear();
 
-    [GeneratedRegex(@"^(?:s\d{1,3}(?:e\d{1,4}.*)?|e\d{1,4}|ep\d{1,4}|\d{1,2}x\d{2,3})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:s\d{1,3}(?:[._-]?e\d{1,4}.*)?|e\d{1,4}|ep\d{1,4}|\d{1,2}x\d{2})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EpisodeToken();
 }

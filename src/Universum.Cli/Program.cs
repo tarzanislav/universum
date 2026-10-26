@@ -131,6 +131,12 @@ if (tmdb is not null)
 
 try
 {
+    if (options.Tmdb is { Kind: null } && !library.KindConfirmed)
+    {
+        Console.Error.WriteLine("--tmdb s číslom: zadajte aj --film alebo --serial (alebo celú adresu TMDB s /movie/ alebo /tv/).");
+        return 2;
+    }
+
     if (options.Tmdb is { } reference && tmdb is not null)
     {
         var tmdbKind = reference.Kind ?? library.Kind;
@@ -167,6 +173,21 @@ try
         Console.WriteLine($"TMDB: spresnené návrhy názvov: {await RefineSuggestionsAsync(tmdb, library)}");
     }
 
+    // a series named by its folder with a TMDB ID: its seasons, so every episode is checked (specification 13.5)
+    if (tmdb is not null && library is { Kind: MediaKind.Series, Series: { TmdbId: { } seriesId } named, SeriesOnTmdb: null } &&
+        await tmdb.GetAsync(MediaKind.Series, seriesId) is { } details)
+    {
+        if (details.Seasons.Count > 0)
+        {
+            library.SeriesOnTmdb = (named, details.Seasons);
+        }
+
+        if (details.ToTitleInfo() is { } byTmdb && byTmdb.FolderName != named.FolderName)
+        {
+            Console.WriteLine($"TMDB: titul {seriesId} je „{byTmdb.FolderName}“, priečinok sa volá „{named.FolderName}“ – skontrolujte --tmdb alebo --nazov.");
+        }
+    }
+
     tmdb?.SaveCache();
 }
 catch (TmdbException ex)
@@ -176,7 +197,10 @@ catch (TmdbException ex)
 
 if (options.Title is { } name && !titleFromTmdb)
 {
-    var title = new TitleInfo(library.Kind, name, options.Year, options.Tmdb?.Id, options.Tmdb is not null);
+    // "Sága - Časť 2 (2011)" or "Nine Puzzles (2025) [tmdbid-227191]" typed as the name: year and ID are read from it
+    var typed = TitleGuess.Typed(library.Kind, name);
+    var title = new TitleInfo(library.Kind, typed?.Name ?? name, options.Year ?? typed?.Year, options.Tmdb?.Id ?? typed?.TmdbId,
+        options.Tmdb is not null || typed?.IncludeId == true);
     if (title.Problem is { } problem)
     {
         Console.Error.WriteLine($"Názov {name}: {problem}.");

@@ -41,6 +41,12 @@ public enum ReviewReasonKind
     /// <summary>The file name names another series than most files of the folder (one folder is one series).</summary>
     OtherSeries,
 
+    /// <summary>Films or series is only guessed from the names; the user has to confirm it (specification 13.5).</summary>
+    KindNotConfirmed,
+
+    /// <summary>An extra (trailer, sample, featurette …), not a film or an episode.</summary>
+    ExtraFile,
+
     /// <summary>The path in the library would be too long for Windows.</summary>
     PathTooLong,
 }
@@ -52,7 +58,8 @@ public enum ReviewReasonKind
 public sealed record ReviewReason(ReviewReasonKind Kind, SlotKey? Slot = null, TemplateSlot? TemplateSlot = null, string? Detail = null)
 {
     /// <summary>The user may process the file anyway (then a second version gets a number, K1).</summary>
-    public bool CanBeOverridden => Kind is ReviewReasonKind.MissingRequiredSlot or ReviewReasonKind.DuplicateEpisode or ReviewReasonKind.UnknownEpisode or ReviewReasonKind.OtherSeries;
+    public bool CanBeOverridden => Kind is ReviewReasonKind.MissingRequiredSlot or ReviewReasonKind.DuplicateEpisode or ReviewReasonKind.UnknownEpisode or
+        ReviewReasonKind.OtherSeries or ReviewReasonKind.ExtraFile;
 }
 
 /// <summary>One file of a batch with everything decided for it: the simulation result.</summary>

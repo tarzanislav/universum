@@ -74,7 +74,9 @@ public static class Texts
         ReviewReasonKind.MissingEpisode => "chýba číslo epizódy",
         ReviewReasonKind.DuplicateEpisode => $"rovnaká epizóda s rovnakým popisom ako {reason.Detail} – opravte číslo, alebo „spracovať aj tak“ (ďalšia verzia dostane číslo)",
         ReviewReasonKind.UnknownEpisode => "TMDB takú sezónu alebo epizódu nepozná – opravte číslo, alebo „spracovať aj tak“",
-        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému seriálu ({reason.Detail}) – jeden priečinok je jeden seriál",
+        ReviewReasonKind.OtherSeries => $"meno súboru patrí inému titulu ({reason.Detail}) – jeden priečinok je jeden seriál",
+        ReviewReasonKind.KindNotConfirmed => $"druh ({reason.Detail}) je len návrh – potvrďte ho alebo zvoľte druhý",
+        ReviewReasonKind.ExtraFile => "doplnok (trailer, ukážka, bonus) – nie je film ani epizóda",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         _ => reason.Kind.ToString(),
     };

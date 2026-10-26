@@ -13,6 +13,14 @@ public static class Paths
     /// <summary>True when the file lies directly in the folder.</summary>
     public static bool IsIn(string filePath, string directory) => Same(Path.GetDirectoryName(Path.GetFullPath(filePath))!, directory);
 
+    /// <summary>True when <paramref name="path"/> is <paramref name="directory"/> or lies anywhere below it.</summary>
+    public static bool IsUnder(string path, string directory)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        return string.Equals(full, root, Comparison) || full.StartsWith(root + Path.DirectorySeparatorChar, Comparison);
+    }
+
     /// <summary>
     /// Finds the volume of a path. The default uses the path root ("D:\"); on Windows the platform replaces it with the
     /// real volume, so folders mounted from another drive are told apart.

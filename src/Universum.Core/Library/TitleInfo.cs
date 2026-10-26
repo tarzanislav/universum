@@ -39,9 +39,13 @@ public sealed record TitleInfo(MediaKind Kind, string Name, int? Year, int? Tmdb
     /// <summary>The name without year and ID (start of episode file names).</summary>
     public string CleanName => LibraryNames.Clean(Name);
 
-    /// <summary>Problem preventing use of this title (Slovak), or null. The folder is "Name (Year)" (section 13.2), so the year is required.</summary>
+    /// <summary>
+    /// Problem preventing use of this title (Slovak), or null. The folder is "Name (Year)" in Latin script (section 13.2):
+    /// a title in another script needs its English name and TMDB ID, and the year is required.
+    /// </summary>
     public string? Problem =>
         CleanName.Length == 0 ? "chýba názov"
+        : !LibraryNames.IsLatinScript(CleanName) ? "názov nie je latinkou – použite anglický názov s TMDB ID (napr. Nine Puzzles (2025) [tmdbid-227191])"
         : LibraryNames.IsReserved(FolderName) ? "názov nie je vo Windows povolený"
         : IncludeId && TmdbId is null ? "chýba TMDB ID"
         : Year is null ? "chýba rok"

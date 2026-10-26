@@ -22,7 +22,7 @@ public static class BatchPlanner
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
         var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
-        return library is { Kind: MediaKind.Series } ? CheckEpisodes(items) : items;
+        return library is { Kind: MediaKind.Series } ? CheckEpisodes(items, library) : items;
     }
 
     /// <summary>
@@ -30,16 +30,21 @@ public static class BatchPlanner
     /// go for review, and so does a file whose name names another series than most files (one folder is one series).
     /// "Process anyway" lets a file through; a second version of an episode then gets a number (K1).
     /// </summary>
-    private static List<BatchItem> CheckEpisodes(List<BatchItem> items)
+    private static List<BatchItem> CheckEpisodes(List<BatchItem> items, LibraryJob library)
     {
         var added = items.Select(_ => new List<ReviewReason>()).ToList();
-        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path));
+        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path), library.Root);
         for (var i = 0; i < items.Count; i++)
         {
             var path = items[i].File.Path;
-            if (series is not null && EpisodeParser.FromPath(path) is not null &&
-                TitleGuess.FromName(Path.GetFileNameWithoutExtension(path)) is { } own &&
-                Words.Normalize(own.Name) != Words.Normalize(series.Name))
+            var name = Path.GetFileNameWithoutExtension(path);
+            // an episode named after another series, or a film in library form ("Okno (2014)") among the episodes
+            var own = EpisodeParser.FromPath(path, library.Root) is not null ? TitleGuess.FromName(name, MediaKind.Series)
+                : TitleGuess.HasYearInParentheses(name) ? TitleGuess.FromName(name, MediaKind.Movie)
+                : null;
+            var expected = series?.Name ?? library.Series?.Name;
+            if (own is not null && expected is not null && Words.Normalize(own.Name) != Words.Normalize(expected) &&
+                (library.Series is null || Words.Normalize(own.Name) != Words.Normalize(library.Series.Name)))
             {
                 added[i].Add(new ReviewReason(ReviewReasonKind.OtherSeries, Detail: own.Name));
             }
@@ -133,6 +138,16 @@ public static class BatchPlanner
     private static BatchItem Place(BatchItem item, LibraryJob library, RuleProfile profile, List<ReviewReason> reasons)
     {
         var path = item.File.Path;
+        if (!library.KindConfirmed)
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: library.Kind == MediaKind.Series ? "seriál" : "filmy"));
+        }
+
+        if (EpisodeParser.IsExtra(path, library.Root) && !item.Group.Decisions.ProcessAnyway.Contains(path))
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.ExtraFile));
+        }
+
         var title = library.TitleFor(path);
         if (title is null || title.Problem is not null)
         {

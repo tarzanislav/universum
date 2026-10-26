@@ -74,7 +74,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         RemoveAllCommand = new RelayCommand(RemoveAll, () => CanEdit() && Rows.Count > 0);
         SortCommand = new RelayCommand(Sort, () => CanEdit() && Rows.Count > 1);
         GenerateCommand = new RelayCommand(Generate, () => CanEdit() && _file?.Duration is not null);
-        ShiftCommand = new RelayCommand(Shift, () => CanEdit() && Rows.Count > 0);
+        ShiftCommand = new RelayCommand(ShiftAll, () => CanEdit() && Rows.Count > 0);
         ImportCommand = new RelayCommand(Import, CanEdit);
         ResetCommand = new AsyncRelayCommand(() => ReadAsync(_file!.Path), () => !_busy && _file is not null);
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanEdit() && _dirty && Problems.Length == 0);
@@ -259,7 +259,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         Changed();
     }
 
-    private void Shift()
+    private void ShiftAll()
     {
         if (!double.TryParse(Shift.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds) || seconds == 0)
         {

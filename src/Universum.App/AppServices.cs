@@ -82,6 +82,11 @@ public sealed class AppServices
     /// <summary>Raised when the TMDB key changes.</summary>
     public event Action? TmdbChanged;
 
+    private Updates.UpdateService? _updates;
+
+    /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
+    public Updates.UpdateService Updates => _updates ??= new Updates.UpdateService(this);
+
     /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
     public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
 
@@ -128,6 +133,19 @@ public sealed class AppSettings
 
     /// <summary>Output folder with MOVIES and TVSHOWS (specification, section 13); must be set before processing.</summary>
     public string? OutputDirectory { get; set; }
+
+    /// <summary>Check for updates at start and then once a day.</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>"Skip this version" (MKVToolNix, UNIVERSUM).</summary>
+    public string? SkippedMkvToolNixVersion { get; set; }
+
+    public string? SkippedUniversumVersion { get; set; }
+
+    /// <summary>"Remind me later": no offer before this time (security fixes excepted).</summary>
+    public DateTime? RemindUpdatesAfterUtc { get; set; }
 
     /// <summary>The user's TMDB key, protected with the Windows data protection API (readable only by this account).</summary>
     public string? TmdbKeyProtected { get; set; }

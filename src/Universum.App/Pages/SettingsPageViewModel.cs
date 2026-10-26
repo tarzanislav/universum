@@ -41,6 +41,25 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
+    /// <summary>Asks the main window to open the update window.</summary>
+    public event Action? ShowUpdatesRequested;
+
+    public RelayCommand ShowUpdatesCommand => _showUpdates ??= new RelayCommand(() => ShowUpdatesRequested?.Invoke());
+
+    private RelayCommand? _showUpdates;
+
+    /// <summary>Check for updates at start and then once a day.</summary>
+    public bool AutoCheckUpdates
+    {
+        get => _services.Settings.AutoCheckUpdates;
+        set
+        {
+            _services.Settings.AutoCheckUpdates = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
     public AsyncRelayCommand SaveTmdbKeyCommand { get; }
 
     public RelayCommand RemoveTmdbKeyCommand { get; }

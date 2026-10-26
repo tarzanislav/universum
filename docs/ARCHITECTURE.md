@@ -90,6 +90,20 @@ in next to it without changing the rules, planning or UI.
   another, others in parallel (with one output drive: one at a time); pause, resume, stop after the current file.
   `BatchReport` writes CSV and HTML reports with the target paths.
 
+## Updates (specification, section 4)
+
+- `Updates/UpdateChecker` asks only public addresses: the MKVToolNix release feed and `NEWS.md` (change log, shown
+  in English, security fixes highlighted), `compatibility.json` from the branch `compatibility` (weekly CI run with
+  the newest MKVToolNix) and the latest GitHub release of UNIVERSUM. `UpdatePolicy`: at start, at most once a day,
+  "remind later" (3 days, security fixes excepted) and "skip this version".
+- Order: MKVToolNix first (official installer, SHA-256 + Authenticode as at installation), then UNIVERSUM (its
+  installer restarts the program).
+- `Updates/ReleaseSignature`: a UNIVERSUM release is installed only when `SHA256SUMS.txt` is signed with the release
+  key (ECDSA P-256; public key in the program, private key only as the secret of `release.yml`) and the installer has
+  the SHA-256 listed there. Without a configured key UNIVERSUM opens the release page instead.
+- `release.yml` publishes a release only from a tag `vX.Y.Z` with notes in `docs/releases/`, and only signed with the
+  key matching the program.
+
 ## Processes
 
 `ProcessRunner` starts tools without a shell, passes arguments one by one, reads output as UTF-8, kills the whole

@@ -41,10 +41,14 @@ public partial class App : Application
             return;
         }
 
-        var window = new MainWindow(new MainViewModel(services));
+        var model = new MainViewModel(services);
+        var window = new MainWindow(model);
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
+
+        // "Otvoriť v UNIVERSUM" from the Explorer passes a file or folder
+        await model.StartAsync(e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)));
     }
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

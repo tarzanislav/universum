@@ -1,0 +1,116 @@
+name: Release
+
+# A release is made only by pushing a tag "v1.2.3" (with the owner's consent). It is published only when the
+# checksum list can be signed with the UNIVERSUM release key (secret UNIVERSUM_RELEASE_KEY) and that key matches
+# the public key built into the program – otherwise UNIVERSUM would refuse its own update.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  MKVTOOLNIX_VERSION: '103.0'
+  MKVTOOLNIX_PORTABLE_SHA256: '01D76DBFDBD5615D9E02F69B0710D1429A902D47A98C8EEE33BD884C4FCB3CBF'
+
+jobs:
+  release:
+    name: Build, sign and publish
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: .NET 10 SDK
+        shell: pwsh
+        run: |
+          $sdks = & dotnet --list-sdks 2>$null
+          if (-not ($sdks -match '^10\.')) {
+            Invoke-WebRequest https://builds.dotnet.microsoft.com/dotnet/scripts/v1/dotnet-install.ps1 -OutFile "$env:RUNNER_TEMP\dotnet-install.ps1"
+            & "$env:RUNNER_TEMP\dotnet-install.ps1" -Channel 10.0 -AzureFeed https://builds.dotnet.microsoft.com/dotnet -InstallDir "$env:ProgramFiles\dotnet"
+          }
+
+      - name: Version and release notes
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          if (-not ($tag -match '^v(\d+\.\d+\.\d+)$')) { throw "tag $tag is not v1.2.3" }
+          $v = $Matches[1]
+          $notes = "docs/releases/v$v.md"
+          if (-not (Test-Path $notes)) { throw "release notes $notes are missing" }
+          "number=$v" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: MKVToolNix portable for the tests (checksum and signature verified)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = $env:MKVTOOLNIX_VERSION
+          $name = "mkvtoolnix-64-bit-$v.7z"
+          $work = Join-Path $env:RUNNER_TEMP "mkvtoolnix-download"
+          New-Item -ItemType Directory -Force $work | Out-Null
+          Invoke-WebRequest "https://mkvtoolnix.download/windows/releases/$v/$name" -OutFile (Join-Path $work $name)
+          $actual = (Get-FileHash (Join-Path $work $name) -Algorithm SHA256).Hash
+          if ($actual -ne $env:MKVTOOLNIX_PORTABLE_SHA256) { throw "SHA-256 of $name differs from the pinned value" }
+          $target = Join-Path $env:RUNNER_TEMP "mkvtoolnix"
+          7z x -y "-o$target" (Join-Path $work $name) | Out-Null
+          $mkvmerge = Get-ChildItem $target -Recurse -Filter mkvmerge.exe | Select-Object -First 1
+          $signature = Get-AuthenticodeSignature $mkvmerge.FullName
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=LINET Services GmbH') { throw "mkvmerge.exe signature" }
+          "UNIVERSUM_MKVTOOLNIX_DIR=$($mkvmerge.DirectoryName)" >> $env:GITHUB_ENV
+
+      - name: Tests
+        run: dotnet run --project tests/Universum.Tests -c Release
+
+      - name: Publish program
+        shell: pwsh
+        run: |
+          dotnet publish src/Universum.Cli/Universum.Cli.csproj -c Release -r win-x64 --self-contained true "-p:Version=${{ steps.version.outputs.number }}" -o publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true "-p:Version=${{ steps.version.outputs.number }}" -o publish
+          exit $LASTEXITCODE
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc "/DAppVersion=${{ steps.version.outputs.number }}" "/DSourceDir=$PWD\publish" installer\universum.iss
+          exit $LASTEXITCODE
+
+      - name: Checksums and signature
+        shell: pwsh
+        env:
+          RELEASE_KEY: ${{ secrets.UNIVERSUM_RELEASE_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:RELEASE_KEY) { throw "The release key (secret UNIVERSUM_RELEASE_KEY) is not set: no unsigned release is published." }
+          $dir = "installer\Output"
+          $file = "UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe"
+          $hash = (Get-FileHash (Join-Path $dir $file) -Algorithm SHA256).Hash
+          [IO.File]::WriteAllText((Join-Path $dir "SHA256SUMS.txt"), "$hash  $file`n")
+          $key = [System.Security.Cryptography.ECDsa]::Create()
+          $read = 0
+          $key.ImportPkcs8PrivateKey([Convert]::FromBase64String($env:RELEASE_KEY), [ref]$read)
+          $data = [IO.File]::ReadAllBytes((Join-Path $dir "SHA256SUMS.txt"))
+          [IO.File]::WriteAllBytes((Join-Path $dir "SHA256SUMS.txt.sig"), $key.SignData($data, [System.Security.Cryptography.HashAlgorithmName]::SHA256))
+          # the key must be the one built into the program, or UNIVERSUM would refuse the update
+          $public = [Convert]::ToBase64String($key.ExportSubjectPublicKeyInfo())
+          $source = Get-Content src\Universum.Core\Updates\ReleaseSignature.cs -Raw
+          if (-not $source.Contains("""$public""")) { throw "The release key does not match ReleaseSignature.PublicKey in the program." }
+          Write-Host "::notice title=Release::$file SHA-256 $hash, signed"
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = '${{ steps.version.outputs.number }}'
+          $dir = "installer\Output"
+          gh release create '${{ github.ref_name }}' "$dir\UNIVERSUM_Setup_$v.exe" "$dir\SHA256SUMS.txt" "$dir\SHA256SUMS.txt.sig" `
+            --title "UNIVERSUM $v" --notes-file '${{ steps.version.outputs.notes }}' --verify-tag
+          exit $LASTEXITCODE

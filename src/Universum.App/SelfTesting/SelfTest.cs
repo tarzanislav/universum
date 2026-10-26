@@ -190,6 +190,23 @@ internal static class SelfTest
         services.SetTmdbKey(null);
 
         await TestBatchPageAsync(model, window);
+
+        // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM
+        var updates = await services.Updates.CheckAsync();
+        Write($"update check: MKVToolNix {updates.MkvToolNix?.Latest} (news {updates.MkvToolNix?.News.Count}), " +
+              $"UNIVERSUM release {updates.Universum?.Release.Version.ToString() ?? "none"}; problems: {string.Join(" | ", updates.Problems)}");
+        Check(updates.MkvToolNix is not null, "update check reads the MKVToolNix release feed");
+        var updatesWindow = model.CreateUpdatesWindow();
+        updatesWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+        updatesWindow.Left = 0;
+        updatesWindow.Top = 0;
+        updatesWindow.Show();
+        await Screenshot(updatesWindow, "updates.png");
+        updatesWindow.Close();
+
+        // "Otvoriť v UNIVERSUM" from the Explorer: a folder opens in batch processing
+        await model.OpenPathAsync(Path.Combine(_outputDirectory, "batch"));
+        Check(model.SelectedTool.Page == model.Batch && model.Batch.Groups.Count > 0, "a folder from the command line opens in batch processing");
         window.Close();
 
         var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };

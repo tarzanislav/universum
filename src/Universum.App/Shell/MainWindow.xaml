@@ -435,6 +435,17 @@
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Skontrolovať teraz…" Command="{Binding ShowUpdatesCommand}" Padding="12,5" VerticalAlignment="Center" />
+                            <StackPanel>
+                                <TextBlock Text="Aktualizácie" FontWeight="SemiBold" />
+                                <CheckBox Content="Kontrolovať automaticky (pri spustení, najviac raz za deň)" IsChecked="{Binding AutoCheckUpdates}" Margin="0,6,0,0" />
+                                <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Text="Pýta sa len mkvtoolnix.download a github.com, nič o vás sa neposiela." />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                         <StackPanel>
                             <TextBlock Text="Údržba" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Hint}" Text="{Binding Folders}" Margin="0,4,0,8" />
@@ -475,6 +486,19 @@
         <Border Grid.Row="1" Grid.ColumnSpan="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="16,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="{Binding UpdateBadge}" Command="{Binding ShowUpdatesCommand}" Margin="0,0,8,0" Padding="12,4"
+                            ToolTip="Aktualizácie MKVToolNix a UNIVERSUM">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasUpdate}" Value="True">
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="Otvoriť v MKVToolNix GUI" Command="{Binding OpenMkvToolNixGuiCommand}" Margin="0,0,8,0" Padding="12,4" />
                     <Button Content="MKVToolNix…" Command="{Binding SetupCommand}" Padding="12,4" />
                 </StackPanel>

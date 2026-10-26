@@ -36,6 +36,10 @@ in next to it without changing the rules, planning or UI.
   a `RuleProfile` (preferred languages, keywords for forced / SDH / commentary) and languages chosen for `und`
   tracks. Result: `TargetState` (tracks in final order, flags, names, languages, issues). Blocking issues
   (undetermined language, several video tracks, no audio) stop automatic processing.
+- `Rules/ManualTarget` – the header editor's target: every track with the name, language and flags the user set, in
+  the chosen order, left-out audio/subtitles, tags and the segment title (`TargetState.NewTitle`). Never blocking.
+- `Rules/TargetChecks` – the Check panel: undetermined languages, several defaults of one kind, no enabled track,
+  forced subtitles nobody sees, tags left, order not CZ → SK → others (commentary last). Advice only.
 - `Planning/EditPlan` – write method (`None`, `HeaderEdit` with mkvpropedit, `Remux` with mkvmerge when the order
   changes) and the list of changes for previews; `TargetVerifier` compares a written file with its target.
 - `MkvToolNix/MkvToolNixArguments` – mkvpropedit / mkvmerge arguments (tracks selected by Matroska track number,
@@ -48,6 +52,9 @@ in next to it without changing the rules, planning or UI.
     also an exception, restores the header and moves it back;
   - otherwise the result is written as `*.universum-tmp`, flushed, read back, verified and renamed, and only then is
     the original sent to the Recycle Bin;
+  - `Placement.InPlace` (header editor): the file is edited where it is and keeps its name – header only with undo
+    (also the segment title), a new order or left-out tracks as a new file under the same name, the old one to the
+    Recycle Bin;
   - a file already in its library folder is edited with undo, or replaced: the old one is renamed to
     `*.universum-old`, the new one takes its place, then the old one goes to the Recycle Bin;
   - `Library/LibraryIndex` remembers which original (fingerprint of its content) each library file came from, so

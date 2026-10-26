@@ -39,6 +39,7 @@ public static class TargetVerifier
         Check(problems, result.ChapterEntries == source.ChapterEntries, $"chapters {result.ChapterEntries}, expected {source.ChapterEntries}");
         Check(problems, result.AttachmentCount == source.AttachmentCount, $"attachments {result.AttachmentCount}, expected {source.AttachmentCount}");
         Check(problems, !target.RemoveTags || !result.HasTags, "tags are still present");
+        Check(problems, !target.TitleChanged || (result.Title ?? "") == (target.ResultTitle ?? ""), $"title '{result.Title}', expected '{target.ResultTitle}'");
         if (source.Duration is { } before && result.Duration is { } after)
         {
             Check(problems, Math.Abs((after - before).TotalSeconds) <= 1, $"duration {after}, expected {before}");

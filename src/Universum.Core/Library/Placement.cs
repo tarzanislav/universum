@@ -14,9 +14,27 @@ namespace Universum.Core.Library;
 /// <param name="Stem">Languages, quality and codec ("CZ EN FHD H264").</param>
 public sealed record Placement(string Directory, string Prefix, string Stem, SizeClasses Sizes, string Extension = ".mkv")
 {
+    /// <summary>
+    /// The file keeps exactly this name (header editor: the file is edited where it is); a free name for a second
+    /// file would be "name (2).mkv".
+    /// </summary>
+    public string? FixedName { get; init; }
+
+    /// <summary>The file at <paramref name="path"/> is edited where it is and keeps its name.</summary>
+    public static Placement InPlace(string path)
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        return new Placement(System.IO.Path.GetDirectoryName(full)!, System.IO.Path.GetFileNameWithoutExtension(full), "", new SizeClasses(), System.IO.Path.GetExtension(full))
+        {
+            FixedName = System.IO.Path.GetFileName(full),
+        };
+    }
+
     public string FileName(long size, int number = 1) =>
-        Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "") + Sizes.Label(size) +
-        (number > 1 ? number.ToString(CultureInfo.InvariantCulture) : "") + Extension;
+        FixedName is not null
+            ? number <= 1 ? FixedName : $"{Prefix} ({number.ToString(CultureInfo.InvariantCulture)}){Extension}"
+            : Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "") + Sizes.Label(size) +
+              (number > 1 ? number.ToString(CultureInfo.InvariantCulture) : "") + Extension;
 
     public string PathFor(long size, int number = 1) => Path.Combine(Directory, FileName(size, number));
 
@@ -29,6 +47,11 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     /// </summary>
     public bool IsVersionName(string fileName)
     {
+        if (FixedName is not null)
+        {
+            return string.Equals(fileName, FixedName, Paths.Comparison);
+        }
+
         if (!fileName.StartsWith(VersionStart, StringComparison.OrdinalIgnoreCase) ||
             !fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
         {
@@ -58,6 +81,11 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         if (!Paths.IsIn(path, Directory) || !IsVersionName(name))
         {
             return false;
+        }
+
+        if (FixedName is not null)
+        {
+            return true;
         }
 
         var label = name[VersionStart.Length..^Extension.Length].TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');

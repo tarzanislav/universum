@@ -11,6 +11,7 @@ public enum ChangeKind
     Removed,
     Index,
     Tags,
+    Title,
 }
 
 /// <summary>One visible difference between the file and the target, for previews and reports.</summary>

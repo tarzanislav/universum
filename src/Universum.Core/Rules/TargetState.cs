@@ -11,12 +11,21 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>Tracks left out of the result (only audio and subtitles can be removed).</summary>
     public IReadOnlyList<MediaTrack> Removed { get; init; } = [];
 
+    /// <summary>New segment title: null keeps the title of the file, "" removes it.</summary>
+    public string? NewTitle { get; init; }
+
+    /// <summary>The segment title changes (header editor).</summary>
+    public bool TitleChanged => NewTitle is not null && !string.Equals(NewTitle, Source.Title ?? "", StringComparison.Ordinal);
+
+    /// <summary>The segment title the result has.</summary>
+    public string? ResultTitle => TitleChanged ? (NewTitle!.Length == 0 ? null : NewTitle) : Source.Title;
+
     /// <summary>True when the track order differs from the file (requires writing a new file).</summary>
     public bool OrderChanged => !Tracks.Select(t => t.TrackId).SequenceEqual(Source.Tracks.Select(t => t.Id));
 
     public bool TagsChanged => RemoveTags && Source.HasTags;
 
-    public bool HasChanges => OrderChanged || RepairIndex || TagsChanged || Removed.Count > 0 || Tracks.Any(t => t.HasChanges);
+    public bool HasChanges => OrderChanged || RepairIndex || TagsChanged || TitleChanged || Removed.Count > 0 || Tracks.Any(t => t.HasChanges);
 
     /// <summary>A new file must be written (order, removed tracks, index repair); otherwise a header edit is enough.</summary>
     public bool NeedsRewrite => OrderChanged || RepairIndex;

@@ -49,6 +49,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             changes.Add(new PlannedChange(null, ChangeKind.Index, "0", null));
         }
 
+        if (target.TitleChanged)
+        {
+            changes.Add(new PlannedChange(null, ChangeKind.Title, target.Source.Title, target.ResultTitle));
+        }
+
         if (target.TagsChanged)
         {
             var count = target.Source.GlobalTagEntries + target.Source.Tracks.Sum(t => t.TagEntries);

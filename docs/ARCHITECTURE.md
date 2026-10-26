@@ -52,9 +52,10 @@ in next to it without changing the rules, planning or UI.
     also an exception, restores the header and moves it back;
   - otherwise the result is written as `*.universum-tmp`, flushed, read back, verified and renamed, and only then is
     the original sent to the Recycle Bin;
-  - `Placement.InPlace` (header editor): the file is edited where it is and keeps its name – header only with undo
-    (also the segment title), a new order or left-out tracks as a new file under the same name, the old one to the
-    Recycle Bin;
+  - header editor: header-only changes edit the file where it is (`Placement.InPlace`, with undo, also the segment
+    title); a new order or left-out tracks need a new file – written beside the original as "name (upravené).mkv"
+    (`Placement.Beside`, the original untouched, never overwriting an earlier result), or – only when the user chose
+    to delete originals – under the same name with the old file in the Recycle Bin;
   - a file already in its library folder is edited with undo, or replaced: the old one is renamed to
     `*.universum-old`, the new one takes its place, then the old one goes to the Recycle Bin;
   - `Library/LibraryIndex` remembers which original (fingerprint of its content) each library file came from, so
@@ -104,6 +105,16 @@ in next to it without changing the rules, planning or UI.
   (`MuxVerifier`: tracks, names, languages, flags, title, chapters, attachments), then gives it its name; never
   overwrites. `MuxRules` runs the UNIVERSUM rules and the Check panel over the chosen tracks of all inputs.
 - `Jobs/MuxJob` – the multiplexer as a queue job.
+
+## Chapters (specification, section 5)
+
+- `Chapters/ChapterFormats` – Matroska chapter XML (read with mkvextract, written for mkvpropedit, declared and saved
+  as UTF-8) and OGM text; anything but one edition of flat chapters with one name each is "complex" and left to
+  MKVToolNix GUI. `ChapterTime` parses and formats "HH:MM:SS.mmm"; `ChapterChecks` (after the end, same start) and
+  `Every` (a chapter every N minutes).
+- `Chapters/ChapterEditor` – saves the old chapters to the journal, writes the new ones in place, reads them back and
+  compares (any difference puts the old ones back), keeps the modification time (+2 s); undo restores chapters and
+  time.
 
 ## Job queue (specification, section 5)
 

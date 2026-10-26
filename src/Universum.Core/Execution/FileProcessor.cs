@@ -81,14 +81,17 @@ public sealed class FileProcessor(
             }
 
             var sourceSize = new FileInfo(source).Length;
-            var inLibrary = Paths.IsIn(source, placement.Directory);
+            // a file in the placement's folder is reworked there – unless the placement names another file (a new one beside it)
+            var inLibrary = Paths.IsIn(source, placement.Directory) &&
+                            (placement.FixedName is null || string.Equals(Path.GetFileName(source), placement.FixedName, Paths.Comparison));
             if (inLibrary && plan.Method == WriteMethod.None && placement.Holds(source, sourceSize))
             {
                 return Result(plan, ProcessingStatus.Unchanged, source, null, []);
             }
 
             var originalTime = File.GetLastWriteTimeUtc(source);
-            var fingerprint = index is null || inLibrary ? null : await LibraryIndex.FingerprintAsync(source, cancellationToken);
+            // the library index is for library places; a file next to the original (header editor) never replaces an earlier one
+            var fingerprint = index is null || inLibrary || placement.FixedName is not null ? null : await LibraryIndex.FingerprintAsync(source, cancellationToken);
             var signature = LibraryIndex.TargetSignature(plan.Target);
             string? previous = null;
             if (fingerprint is not null && index!.FindPrevious(placement, fingerprint, signature) is { } found)

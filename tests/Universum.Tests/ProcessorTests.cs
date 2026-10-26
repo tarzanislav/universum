@@ -369,6 +369,30 @@ public sealed class ProcessorTests
         Assert.True(!Directory.EnumerateFiles(work.Path).Any(f => FileProcessor.IsTemporaryFile(f) || FileProcessor.IsInterruptedFile(f)), "nothing left over");
     }
 
+    [Test]
+    public async Task HeaderEditorKeepingOriginalsWritesANewFileBeside()
+    {
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var file = work.Copy("en-und-cz-forced.mkv");
+        var bytes = await System.IO.File.ReadAllBytesAsync(file);
+        var before = await inspector.InspectAsync(file);
+        var edits = ManualTarget.AsIs(before).ToList();
+        (edits[1], edits[2]) = (edits[2], edits[1]);
+        var plan = EditPlan.For(ManualTarget.Create(before, edits));
+
+        var result = await processor.ProcessAsync(plan, Placement.Beside(file), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.Equal(Path.Combine(work.Path, "en-und-cz-forced (upravené).mkv"), result.OutputPath, "new file beside the original");
+        var now = await System.IO.File.ReadAllBytesAsync(file);
+        Assert.True(bytes.SequenceEqual(now) && bin.Recycled.Count == 0, "original untouched, nothing recycled");
+        Assert.Sequence([before.Tracks[2].Name, before.Tracks[1].Name], (await inspector.InspectAsync(result.OutputPath!)).TracksOf(TrackType.Audio).Select(t => t.Name), "new order");
+
+        var second = await processor.ProcessAsync(EditPlan.For(ManualTarget.Create(before, edits, title: "Iný")), Placement.Beside(file), Keep);
+        Assert.Equal(Path.Combine(work.Path, "en-und-cz-forced (upravené) (2).mkv"), second.OutputPath, "never overwrites an earlier result");
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();

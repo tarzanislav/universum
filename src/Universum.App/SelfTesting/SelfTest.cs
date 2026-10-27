@@ -701,10 +701,11 @@ internal static class SelfTest
             "settings: several towns of one name are offered, nothing stored yet – " + string.Join(" | ", settings.WeatherChoices.Select(c => c.FullDisplay)));
         Check(settings.WeatherChoices[1].FullDisplay == "Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m n. m.",
             "settings: a town is told apart by its district, region and height – " + settings.WeatherChoices[1].FullDisplay);
-        if (FindVisual<System.Windows.Controls.ListBox>(window, list => ReferenceEquals(list.ItemsSource, settings.WeatherChoices)) is { } choices)
-        {
-            choices.BringIntoView();
-        }
+        await Settle();
+        window.UpdateLayout();
+        var choices = FindVisual<System.Windows.Controls.ListBox>(window, list => ReferenceEquals(list.ItemsSource, settings.WeatherChoices));
+        Check(choices is { HasItems: true, IsVisible: true }, "settings: the list of places is shown");
+        choices?.BringIntoView(new Rect(0, 0, choices.ActualWidth, choices.ActualHeight + 120));
 
         await Screenshot(window, "settings-weather-choice.png");
         settings.SelectedWeatherChoice = settings.WeatherChoices[1];

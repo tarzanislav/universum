@@ -659,11 +659,11 @@ internal static class SelfTest
 
         model.Settings.WeatherTownInput = "Nikde";
         weather.Found = false;
-        await model.Settings.SaveWeatherTownCommand.ExecuteAsync(null);
+        await model.Settings.FindWeatherTownCommand.ExecuteAsync(null);
         Check(services.Settings.WeatherPlace is null && model.Settings.WeatherStatus.Contains("nenašlo", StringComparison.Ordinal), "settings: a town Open-Meteo does not know is not stored");
         weather.Found = true;
         model.Settings.WeatherTownInput = "Vymyslené Mesto";
-        await model.Settings.SaveWeatherTownCommand.ExecuteAsync(null);
+        await model.Settings.FindWeatherTownCommand.ExecuteAsync(null);
         Check(services.Settings.WeatherPlace is { Name: "Vymyslené Mesto", Latitude: 48.7 }, "settings: the town stored with its coordinates – " + model.Settings.WeatherStatus);
 
         // a new town is read at once by the Dashboard
@@ -691,6 +691,50 @@ internal static class SelfTest
         await Screenshot(window, "dashboard.png");
         dashboard.Library.OpenCommand.Execute(null);
         Check(model.SelectedTool.Page == model.Settings, "dashboard: a line of the overview opens its tool");
+
+        // several places of one name (Valaská, 27. 10.): offered with district, region and height; the chosen one is stored
+        var settings = model.Settings;
+        settings.WeatherTownInput = "Vymyslená Lehota";
+        await settings.FindWeatherTownCommand.ExecuteAsync(null);
+        Check(settings.HasWeatherChoices && settings.WeatherChoices.Count == 2 && services.Settings.WeatherPlace?.Name == "Vymyslené Mesto" &&
+              settings.WeatherStatus.Contains("vyberte", StringComparison.Ordinal),
+            "settings: several towns of one name are offered, nothing stored yet – " + string.Join(" | ", settings.WeatherChoices.Select(c => c.FullDisplay)));
+        Check(settings.WeatherChoices[1].FullDisplay == "Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m n. m.",
+            "settings: a town is told apart by its district, region and height – " + settings.WeatherChoices[1].FullDisplay);
+        await Settle();
+        window.UpdateLayout();
+        var choices = FindVisual<System.Windows.Controls.ListBox>(window, list => ReferenceEquals(list.ItemsSource, settings.WeatherChoices));
+        Check(choices is { HasItems: true, IsVisible: true }, "settings: the list of places is shown");
+        choices?.BringIntoView(new Rect(0, 0, choices.ActualWidth, choices.ActualHeight + 120));
+
+        await Screenshot(window, "settings-weather-choice.png");
+        settings.SelectedWeatherChoice = settings.WeatherChoices[1];
+        settings.UseWeatherChoiceCommand.Execute(null);
+        Check(services.Settings.WeatherPlace is { District: "okres Druhý", Latitude: 48.9 } && !settings.HasWeatherChoices &&
+              settings.WeatherStatus.StartsWith("Počasie pre: Vymyslená Lehota – okres Druhý", StringComparison.Ordinal) &&
+              dashboard.PlaceText == "Vymyslená Lehota, okres Druhý",
+            $"settings: the chosen town is stored and shown with its district – {settings.WeatherStatus} | {dashboard.PlaceText}");
+    }
+
+    /// <summary>The first element of this type below <paramref name="root"/> that matches.</summary>
+    private static T? FindVisual<T>(DependencyObject root, Func<T, bool> match)
+        where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T found && match(found))
+            {
+                return found;
+            }
+
+            if (FindVisual(child, match) is { } deeper)
+            {
+                return deeper;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Open-Meteo with invented answers: one town, a cold day with light snow.</summary>
@@ -713,7 +757,10 @@ internal static class SelfTest
             var today = DateTime.Now.Date;
             var days = string.Join(",", Enumerable.Range(0, 3).Select(i => $"\"{today.AddDays(i):yyyy-MM-dd}\""));
             var body = request.RequestUri.Host.StartsWith("geocoding", StringComparison.Ordinal)
-                ? Found ? """{"results":[{"name":"Vymyslené Mesto","latitude":48.7,"longitude":19.15,"country":"Slovensko"}]}""" : "{}"
+                ? !Found ? "{}"
+                  : request.RequestUri.Query.Contains("Lehota", StringComparison.Ordinal)
+                      ? """{"results":[{"name":"Vymyslená Lehota","latitude":48.2,"longitude":17.5,"elevation":140,"country":"Slovensko","admin1":"Trnavský kraj","admin2":"okres Prvý"},{"name":"Vymyslená Lehota","latitude":48.9,"longitude":19.6,"elevation":612,"country":"Slovensko","admin1":"Banskobystrický kraj","admin2":"okres Druhý"}]}"""
+                      : """{"results":[{"name":"Vymyslené Mesto","latitude":48.7,"longitude":19.15,"country":"Slovensko"}]}"""
                 : "{\"current\":{\"temperature_2m\":-2.6,\"apparent_temperature\":-6.4,\"weather_code\":71,\"wind_speed_10m\":11.8,\"is_day\":1}," +
                   "\"daily\":{\"time\":[" + days + "],\"weather_code\":[71,3,1],\"temperature_2m_max\":[-0.4,2.4,4.9],\"temperature_2m_min\":[-5.2,-3.1,-1.0]," +
                   "\"precipitation_probability_max\":[70,40,10]}}";

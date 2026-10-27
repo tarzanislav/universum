@@ -5,11 +5,25 @@ using System.Text.Json;
 
 namespace Universum.Core.Weather;
 
-/// <summary>A place for the weather: its name as found and its coordinates.</summary>
-public sealed record WeatherPlace(string Name, string? Region, string? Country, double Latitude, double Longitude)
+/// <summary>
+/// A place for the weather: its name as found, where it lies (district, region, country – to tell places of the same name
+/// apart) and its coordinates.
+/// </summary>
+public sealed record WeatherPlace(
+    string Name, string? Region, string? Country, double Latitude, double Longitude, string? District = null, double? Elevation = null)
 {
-    /// <summary>"Bratislava, Slovensko".</summary>
-    public string Display => string.Join(", ", new[] { Name, Country }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    /// <summary>Short, for the Dashboard: "Valaská, okres Brezno" (or the region, or the country).</summary>
+    public string Display => string.Join(", ", new[] { Name, Known(District) ?? Known(Region) ?? Known(Country) }.OfType<string>());
+
+    /// <summary>Where it lies: "okres Brezno, Banskobystrický kraj, Slovensko · 469 m n. m.".</summary>
+    public string Details =>
+        string.Join(", ", new[] { District, Region, Country }.Select(Known).OfType<string>().Distinct()) +
+        (Elevation is { } meters ? string.Create(CultureInfo.GetCultureInfo("sk-SK"), $" · {meters:0} m n. m.") : "");
+
+    /// <summary>For the choice and the settings: "Valaská – okres Brezno, Banskobystrický kraj, Slovensko · 469 m n. m.".</summary>
+    public string FullDisplay => Details.Length == 0 ? Name : $"{Name} – {Details.TrimStart(' ', '·')}";
+
+    private static string? Known(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 }
 
 /// <summary>A day of the forecast.</summary>
@@ -40,32 +54,39 @@ public sealed class OpenMeteo(HttpClient http)
     /// <summary>How long one answer may take (headers and body).</summary>
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(20);
 
-    /// <summary>The town as Open-Meteo finds it (the first, most populous match); null when it finds none.</summary>
-    public async Task<WeatherPlace?> FindAsync(string town, CancellationToken cancellationToken = default)
+    /// <summary>The towns of this name as Open-Meteo finds them (at most <paramref name="count"/>, best first).</summary>
+    public async Task<IReadOnlyList<WeatherPlace>> SearchAsync(string town, int count = 10, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(town))
         {
-            return null;
+            return [];
         }
 
         using var document = await GetAsync(
-            "https://geocoding-api.open-meteo.com/v1/search?count=1&language=sk&format=json&name=" + Uri.EscapeDataString(town.Trim()),
+            string.Create(CultureInfo.InvariantCulture, $"https://geocoding-api.open-meteo.com/v1/search?count={Math.Clamp(count, 1, 100)}&language=sk&format=json&name=") +
+            Uri.EscapeDataString(town.Trim()),
             cancellationToken).ConfigureAwait(false);
         if (!document.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array)
         {
-            return null;
+            return [];
         }
 
+        var places = new List<WeatherPlace>();
         foreach (var place in results.EnumerateArray())
         {
             if (Number(place, "latitude") is { } latitude && Number(place, "longitude") is { } longitude && Text(place, "name") is { } name)
             {
-                return new WeatherPlace(name, Text(place, "admin1"), Text(place, "country"), latitude, longitude);
+                places.Add(new WeatherPlace(name, Text(place, "admin1"), Text(place, "country"), latitude, longitude,
+                    Text(place, "admin2"), Number(place, "elevation")));
             }
         }
 
-        return null;
+        return places;
     }
+
+    /// <summary>The first (best) town of this name; null when Open-Meteo finds none.</summary>
+    public async Task<WeatherPlace?> FindAsync(string town, CancellationToken cancellationToken = default) =>
+        (await SearchAsync(town, 1, cancellationToken).ConfigureAwait(false)).FirstOrDefault();
 
     /// <summary>The weather now and for three days at the coordinates.</summary>
     public async Task<WeatherReport> ForecastAsync(double latitude, double longitude, CancellationToken cancellationToken = default)

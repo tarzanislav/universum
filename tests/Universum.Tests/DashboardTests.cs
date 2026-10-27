@@ -47,6 +47,24 @@ public sealed class DashboardTests
         Assert.True(report.Days[1] is { Max: 11.5, Min: 5.0, PrecipitationChance: 30, Code: 3 }, "tomorrow");
         Assert.Equal("☂", OpenMeteo.Symbol(61));
 
+        // several places of one name: all are offered, told apart by district, region and height
+        server.Answers["/v1/search"] = """
+            {"results":[{"name":"Vymyslená Lehota","latitude":48.81,"longitude":19.56,"elevation":469.0,"country":"Slovensko","admin1":"Banskobystrický kraj","admin2":"okres Brezno"},
+                        {"name":"Vymyslená Lehota","latitude":49.2,"longitude":18.7,"country":"Slovensko","admin1":"Žilinský kraj"},
+                        {"name":"bez súradníc"}]}
+            """;
+        var places = await weather.SearchAsync("Vymyslená Lehota");
+        Assert.True(places.Count == 2 && server.Requests[^1].Contains("count=10", StringComparison.Ordinal), "all places of the name: " + places.Count);
+        Assert.Equal("Vymyslená Lehota – okres Brezno, Banskobystrický kraj, Slovensko · 469 m n. m.", places[0].FullDisplay);
+        Assert.Equal("Vymyslená Lehota, okres Brezno", places[0].Display);
+        Assert.Equal("Vymyslená Lehota – Žilinský kraj, Slovensko", places[1].FullDisplay);
+        Assert.Equal("Vymyslená Lehota, Žilinský kraj", places[1].Display);
+
+        // a place stored by 0.2.0 (without district and height) still reads
+        var stored = System.Text.Json.JsonSerializer.Deserialize<WeatherPlace>(
+            """{"Name":"Valaská","Region":"Banskobystrický kraj","Country":"Slovensko","Latitude":48.81,"Longitude":19.56,"Display":"Valaská, Slovensko"}""");
+        Assert.True(stored is { District: null, Elevation: null, Display: "Valaská, Banskobystrický kraj" }, "older settings: " + stored?.Display);
+
         server.Answers["/v1/search"] = """{"generationtime_ms":0.5}""";
         Assert.Equal(null, await weather.FindAsync("Nikde"));
         server.Status = HttpStatusCode.TooManyRequests;

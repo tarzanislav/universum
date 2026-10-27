@@ -75,7 +75,7 @@ if (options.TemplateFile is not null)
 Console.WriteLine($"MKVToolNix {installation.Version} · {template.Name}");
 var cacheFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "identification-cache.json");
 var inspector = new Universum.Core.Media.CachingInspector(new MkvMergeInspector(installation, runner), cacheFile);
-var analysis = await BatchAnalyzer.AnalyzeAsync(options.Path, options.Recursive, inspector, excludeDirectory: layout.Root);
+var analysis = await BatchAnalyzer.AnalyzeAsync(options.Path, options.Recursive, inspector, excludeDirectories: layout.ResultFolders);
 TrySave(inspector);
 
 foreach (var (label, slot, language) in options.Languages)

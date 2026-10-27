@@ -23,10 +23,11 @@ public static class BatchAnalyzer
     private static readonly string[] Extensions = [".mkv", FileProcessor.TemporaryExtension];
 
     /// <summary>Matroska files of the folder in natural order (Episode 2 before Episode 10).</summary>
-    /// <param name="excludeDirectory">A folder to skip, e.g. the target folder of results inside the analysed folder.</param>
-    public static (IReadOnlyList<string> Files, IReadOnlyList<string> Leftovers) FindFiles(string folder, bool recursive, string? excludeDirectory = null)
+    /// <param name="excludeDirectories">Folders to skip: where results are written (MOVIES and TVSHOWS of the library).</param>
+    public static (IReadOnlyList<string> Files, IReadOnlyList<string> Leftovers) FindFiles(
+        string folder, bool recursive, IEnumerable<string>? excludeDirectories = null)
     {
-        var excluded = excludeDirectory is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(excludeDirectory)) + Path.DirectorySeparatorChar;
+        var excluded = Excluded(excludeDirectories);
         var all = Directory.EnumerateFiles(folder, "*", new EnumerationOptions
             {
                 RecurseSubdirectories = recursive,
@@ -34,10 +35,87 @@ public static class BatchAnalyzer
                 AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
             })
             .Where(f => Extensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
-            .Where(f => excluded is null || !Path.GetFullPath(f).StartsWith(excluded, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            .Where(f => !IsInside(Path.GetFullPath(f), excluded))
             .Order(NaturalComparer.Instance)
             .ToList();
         return (all.Where(f => !FileProcessor.IsTemporaryFile(f)).ToList(), all.Where(FileProcessor.IsTemporaryFile).ToList());
+    }
+
+    private static List<string> Excluded(IEnumerable<string>? folders) =>
+        folders?.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))).ToList() ?? [];
+
+    // the folder itself or anything below it (D:\Video\MOVIES, not D:\Video\MOVIES-old)
+    private static bool IsInside(string path, List<string> folders)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var trimmed = Path.TrimEndingDirectorySeparator(path);
+        return folders.Any(f => string.Equals(trimmed, f, comparison) || trimmed.StartsWith(f + Path.DirectorySeparatorChar, comparison));
+    }
+
+    /// <summary>Video, audio and subtitle files that are not Matroska (batch processing reads only MKV).</summary>
+    private static readonly string[] OtherMedia =
+    [
+        ".mp4", ".m4v", ".mov", ".avi", ".ts", ".m2ts", ".mts", ".mpg", ".mpeg", ".vob", ".webm", ".wmv", ".flv", ".ogm",
+        ".mk3d", ".mka", ".mks",
+    ];
+
+    /// <summary>
+    /// Why a folder gives no file to process (Slovak, for the user): not MKV, only in subfolders, only in the library;
+    /// null when there are MKV files to read.
+    /// </summary>
+    public static string? WhyEmpty(string folder, bool recursive, IEnumerable<string>? excludeDirectories = null)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return "Priečinok neexistuje alebo nie je dostupný: " + folder;
+        }
+
+        folder = Path.GetFullPath(folder);
+        var excluded = Excluded(excludeDirectories);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        bool InLibrary(string path) => IsInside(path, excluded);
+
+        if (InLibrary(folder))
+        {
+            return "Tento priečinok je v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva, sú to " +
+                   "už hotové súbory. Vyberte priečinok s pôvodnými súbormi.";
+        }
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
+        };
+        var all = Directory.EnumerateFiles(folder, "*", options)
+            .Where(f => !FileProcessor.IsTemporaryFile(f))
+            .Select(f => (Path: f, Extension: Path.GetExtension(f).ToLowerInvariant(), Top: string.Equals(Path.GetDirectoryName(f), folder, comparison)))
+            .Where(f => f.Extension == ".mkv" || OtherMedia.Contains(f.Extension))
+            .ToList();
+        var mkv = all.Where(f => f.Extension == ".mkv").ToList();
+        var usable = mkv.Where(f => (recursive || f.Top) && !InLibrary(f.Path)).ToList();
+        if (usable.Count > 0)
+        {
+            return null;
+        }
+
+        if (!recursive && mkv.Any(f => !f.Top && !InLibrary(f.Path)))
+        {
+            return $"Priamo v priečinku nie sú súbory MKV, v podpriečinkoch je ich {mkv.Count(f => !f.Top && !InLibrary(f.Path))} – " +
+                   "zaškrtnite „aj podpriečinky“ a dajte Analyzovať znova.";
+        }
+
+        if (mkv.Count > 0 && mkv.All(f => InLibrary(f.Path)))
+        {
+            return $"Všetky súbory MKV ({mkv.Count}) sú v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva.";
+        }
+
+        var others = all.Where(f => f.Extension != ".mkv" && (recursive || f.Top)).GroupBy(f => f.Extension)
+            .OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} × {g.Key.TrimStart('.').ToUpperInvariant()}").ToList();
+        return others.Count > 0
+            ? $"V priečinku{(recursive ? " ani v podpriečinkoch" : "")} nie sú súbory MKV – Hromadné spracovanie zatiaľ spracúva len MKV. " +
+              $"Nájdené iné súbory: {string.Join(", ", others)}. Tie najprv prevediete do MKV v Zlučovaní."
+            : $"V priečinku{(recursive ? " ani v podpriečinkoch" : "")} nie sú žiadne video súbory.";
     }
 
     /// <summary>Reads the structure of every file (in parallel) and groups the files by structure.</summary>
@@ -47,11 +125,12 @@ public static class BatchAnalyzer
         IMediaInspector inspector,
         IProgress<(int Done, int Total)>? progress = null,
         int parallelism = 4,
-        string? excludeDirectory = null,
-        CancellationToken cancellationToken = default)
+        IEnumerable<string>? excludeDirectories = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MediaFile>? found = null)
     {
         folder = Path.GetFullPath(folder);
-        var (files, leftovers) = FindFiles(folder, recursive, excludeDirectory);
+        var (files, leftovers) = FindFiles(folder, recursive, excludeDirectories);
         var results = new (MediaFile? File, string? Error)[files.Count];
         var done = 0;
         await Parallel.ForEachAsync(
@@ -65,6 +144,11 @@ public static class BatchAnalyzer
                     results[index] = file.IsRecognized && file.ContainerType == "Matroska"
                         ? (file, null)
                         : (null, file.Errors.FirstOrDefault() ?? "not a Matroska file");
+                    if (results[index].File is { } read)
+                    {
+                        // shown at once (the groups grow while the folder is read)
+                        found?.Report(read);
+                    }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

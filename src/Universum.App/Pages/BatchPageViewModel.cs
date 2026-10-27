@@ -31,6 +31,8 @@ public sealed class BatchPageViewModel : ObservableObject
     private IReadOnlyList<string> _interrupted = [];
     private bool _ranSinceAnalysis;
     private CancellationTokenSource? _tmdbCancellation;
+    private CancellationTokenSource? _analysisCancellation;
+    private bool _summaryIsWarning;
     private IReadOnlyList<BatchItem> _items = [];
     private bool _needsAnalysis;
     private string? _typedTmdb;
@@ -63,7 +65,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
         RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
-        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null);
+        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
@@ -90,11 +92,11 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged(nameof(OutputDescription));
             if (_analysis is not null && _services.Library is { } layout)
             {
-                // files of the analysis that now lie in the library must be left out: the folder is analysed again first
-                if (_analysis.Groups.SelectMany(g => g.Files).Any(f => layout.Contains(f.Path)))
+                // files of the analysis that now lie among the results (MOVIES, TVSHOWS) must be left out: analysed again first
+                if (_analysis.Groups.SelectMany(g => g.Files).Any(f => layout.HoldsResult(f.Path)))
                 {
                     _needsAnalysis = true;
-                    Summary = "Výstupný priečinok obsahuje analyzované súbory – analyzujte priečinok znova (súbory v knižnici sa vynechajú).";
+                    Summary = "V MOVIES alebo TVSHOWS nového výstupného priečinka sú analyzované súbory – analyzujte priečinok znova (tie sa vynechajú).";
                     RunCommand.NotifyCanExecuteChanged();
                     return;
                 }
@@ -363,6 +365,12 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public double Progress { get => _progress; private set => SetProperty(ref _progress, value); }
 
+    /// <summary>The folder is being read: groups appear as files are read, a progress bar shows how far.</summary>
+    public bool IsAnalyzing => _analysisCancellation is not null;
+
+    /// <summary>The summary says why nothing can be processed (no MKV, only results…): shown in the warning colour.</summary>
+    public bool SummaryIsWarning { get => _summaryIsWarning; private set => SetProperty(ref _summaryIsWarning, value); }
+
     public bool Busy
     {
         get => _busy;
@@ -395,14 +403,61 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        if (Folder is not { } folder)
+        {
+            return;
+        }
+
         Busy = true;
         _results = [];
+
+        // the groups grow while the folder is read (a group is final once the whole folder is read)
+        var recursive = Recursive;
+        var skipped = _services.Library?.ResultFolders;
+        using var cancellation = new CancellationTokenSource();
+        _analysisCancellation = cancellation;
+        var live = new Dictionary<string, GroupRow>(StringComparer.Ordinal);
+        Groups.Clear();
+        SelectedGroup = null;
+        SummaryIsWarning = false;
+        Summary = "Hľadám súbory MKV…";
+        Progress = 0;
+        OnPropertyChanged(nameof(IsAnalyzing));
+        RefreshCommands();
         try
         {
             var inspector = _services.Inspector(installation);
-            _analysis = await BatchAnalyzer.AnalyzeAsync(Folder, Recursive, inspector,
-                new Progress<(int Done, int Total)>(p => Summary = $"Analyzujem {p.Done} / {p.Total}…"),
-                excludeDirectory: _services.Library?.Root);
+            _analysis = await BatchAnalyzer.AnalyzeAsync(folder, recursive, inspector,
+                new Progress<(int Done, int Total)>(p =>
+                {
+                    // reports still on their way after the end are dropped (they would overwrite the result)
+                    if (ReferenceEquals(_analysisCancellation, cancellation))
+                    {
+                        Summary = $"Analyzujem {p.Done} / {p.Total}…";
+                        Progress = p.Total == 0 ? 0 : (double)p.Done / p.Total;
+                    }
+                }),
+                excludeDirectories: skipped,
+                cancellationToken: cancellation.Token,
+                found: new Progress<MediaFile>(file =>
+                {
+                    if (!ReferenceEquals(_analysisCancellation, cancellation))
+                    {
+                        return;
+                    }
+
+                    var signature = StructureSignature.Of(file);
+                    if (!live.TryGetValue(signature, out var row))
+                    {
+                        live[signature] = row = new GroupRow(new BatchGroup(signature, live.Count)) { State = "číta sa…" };
+                        Groups.Add(row);
+                    }
+
+                    row.Group.Files.Add(file);
+                    row.Refresh();
+                }));
+            _analysisCancellation = null;
+            OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
             IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
@@ -426,13 +481,35 @@ public sealed class BatchPageViewModel : ObservableObject
                       (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "");
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
+
+            // nothing to process: say why (no MKV, only in subfolders, only results in MOVIES / TVSHOWS…)
+            if (_analysis.FileCount == 0 && _analysis.Failed.Count == 0 &&
+                await Task.Run(() => BatchAnalyzer.WhyEmpty(folder, recursive, skipped)) is { } why)
+            {
+                Summary = why;
+            }
+
+            SummaryIsWarning = _analysis.FileCount == 0 || _analysis.Failed.Count > 0;
+        }
+        catch (OperationCanceledException)
+        {
+            _analysis = null;
+            _items = [];
+            Groups.Clear();
+            Summary = "Analýza bola zastavená – dajte Analyzovať znova.";
+            SummaryIsWarning = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            Groups.Clear();
             Summary = ex.Message;
+            SummaryIsWarning = true;
         }
         finally
         {
+            _analysisCancellation = null;
+            Progress = 0;
+            OnPropertyChanged(nameof(IsAnalyzing));
             Busy = false;
         }
     }
@@ -484,7 +561,9 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         SlotRows.Clear();
         FileRows.Clear();
-        if (SelectedGroup?.Group is not { } group)
+
+        // a group still being read has no decisions yet: it is shown once the whole folder is read
+        if (SelectedGroup?.Group is not { } group || IsAnalyzing)
         {
             return;
         }
@@ -942,6 +1021,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Stop()
     {
+        _analysisCancellation?.Cancel();
         _tmdbCancellation?.Cancel();
         if (_control is not null)
         {

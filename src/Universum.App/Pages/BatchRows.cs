@@ -20,6 +20,9 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     public string Signature => Group.Signature;
 
     public string State { get => _state; set => SetProperty(ref _state, value); }
+
+    /// <summary>A file was added while the folder is read.</summary>
+    public void Refresh() => OnPropertyChanged(nameof(Count));
 }
 
 /// <summary>One audio or subtitle position of a group: language and forced decisions for all its files.</summary>

@@ -42,6 +42,44 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task AnalysisShowsFilesAsTheyAreRead()
+    {
+        using var work = await SeriesFolderAsync();
+        var found = new List<string>();
+        var inspector = new MkvMergeInspector(await TestData.RequireMkvToolNixAsync(), new ProcessRunner());
+        var analysis = await BatchAnalyzer.AnalyzeAsync(work.Path, recursive: false, inspector, found: new SyncProgress<MediaFile>(f => { lock (found) { found.Add(f.Path); } }));
+        Assert.Equal(analysis.FileCount, found.Count, "every file read is reported at once");
+        Assert.Equal(null, BatchAnalyzer.WhyEmpty(work.Path, recursive: false));
+    }
+
+    [Test]
+    public void EmptyFolderSaysWhy()
+    {
+        using var work = new Work();
+        void Touch(params string[] parts)
+        {
+            var path = Path.Combine([work.Path, .. parts]);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+        }
+
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("žiadne video súbory", StringComparison.Ordinal), "an empty folder");
+        Touch("Film A.mp4");
+        Touch("Film B.mp4");
+        Touch("Film C.avi");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true) is { } other && other.Contains("len MKV", StringComparison.Ordinal) &&
+                    other.Contains("2 × MP4, 1 × AVI", StringComparison.Ordinal), "other formats: " + BatchAnalyzer.WhyEmpty(work.Path, true));
+        Touch("Sezóna 1", "Epizóda 1.mkv");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, false)!.Contains("zaškrtnite „aj podpriečinky“", StringComparison.Ordinal), "only in subfolders");
+        Assert.Equal(null, BatchAnalyzer.WhyEmpty(work.Path, true));
+        var results = Path.Combine(work.Path, "Sezóna 1");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true, [results])!.Contains("knižnici s výsledkami", StringComparison.Ordinal), "all MKV among the results");
+        Assert.True(BatchAnalyzer.WhyEmpty(results, true, [results])!.StartsWith("Tento priečinok je v knižnici s výsledkami", StringComparison.Ordinal), "the folder is among the results");
+        Assert.Equal(null, BatchAnalyzer.WhyEmpty(work.Path, true, [Path.Combine(work.Path, "Sezóna")]));
+        Assert.True(BatchAnalyzer.WhyEmpty(Path.Combine(work.Path, "nie je"), true)!.StartsWith("Priečinok neexistuje", StringComparison.Ordinal), "a missing folder");
+    }
+
+    [Test]
     public async Task GroupDecisionResolvesUndeterminedTracks()
     {
         using var work = await SeriesFolderAsync();
@@ -379,8 +417,22 @@ public sealed class BatchTests
         using var work = await SeriesFolderAsync();
         var output = Directory.CreateDirectory(Path.Combine(work.Path, "_výsledok", "Sezóna 1")).FullName;
         File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(output, "x.mkv"));
-        var analysis = await BatchAnalyzer.AnalyzeAsync(work.Path, recursive: true, await InspectorAsync(), excludeDirectory: Path.Combine(work.Path, "_výsledok"));
+        var analysis = await BatchAnalyzer.AnalyzeAsync(work.Path, recursive: true, await InspectorAsync(), excludeDirectories: [Path.Combine(work.Path, "_výsledok")]);
         Assert.Equal(5, analysis.FileCount, "results in the target folder are skipped");
+    }
+
+    [Test]
+    public async Task OriginalsInTheOutputFolderAreFound()
+    {
+        // the owner keeps the streams in the output folder (27. 10. 2026): only MOVIES and TVSHOWS hold results
+        using var work = await SeriesFolderAsync();
+        var layout = new LibraryLayout(work.Path);
+        layout.EnsureCreated();
+        File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(layout.Movies, "Výsledok (2026).mkv"));
+        File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(layout.Shows, "Výsledok S01E01.mkv"));
+        var analysis = await BatchAnalyzer.AnalyzeAsync(work.Path, recursive: true, await InspectorAsync(), excludeDirectories: layout.ResultFolders);
+        Assert.Equal(5, analysis.FileCount, "the originals beside MOVIES and TVSHOWS are found, the results are not");
+        Assert.True(BatchAnalyzer.FindFiles(layout.Root, true, layout.ResultFolders).Files.All(f => !f.Contains("Výsledok", StringComparison.Ordinal)), "results skipped");
     }
 
     [Test]

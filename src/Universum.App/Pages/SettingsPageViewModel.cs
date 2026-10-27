@@ -47,7 +47,8 @@ public sealed class SettingsPageViewModel : ObservableObject
         services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
-        SaveWeatherTownCommand = new AsyncRelayCommand(SaveWeatherTownAsync, () => WeatherTownInput.Trim().Length > 0);
+        FindWeatherTownCommand = new AsyncRelayCommand(FindWeatherTownAsync, () => WeatherTownInput.Trim().Length > 0);
+        UseWeatherChoiceCommand = new RelayCommand(UseWeatherChoice, () => SelectedWeatherChoice is not null);
         RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
         _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
         Load(services.Profile);
@@ -165,9 +166,32 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string TmdbAttribution => TmdbClient.Attribution;
 
-    public AsyncRelayCommand SaveWeatherTownCommand { get; }
+    /// <summary>Hľadať: the towns of this name; one is stored at once, several are offered to choose from.</summary>
+    public AsyncRelayCommand FindWeatherTownCommand { get; }
+
+    /// <summary>Stores the town chosen from the offered ones.</summary>
+    public RelayCommand UseWeatherChoiceCommand { get; }
 
     public RelayCommand RemoveWeatherTownCommand { get; }
+
+    /// <summary>Towns of the typed name (several places are called Valaská): district, region, country and height tell them apart.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<WeatherPlace> WeatherChoices { get; } = [];
+
+    public bool HasWeatherChoices => WeatherChoices.Count > 0;
+
+    public WeatherPlace? SelectedWeatherChoice
+    {
+        get => _selectedWeatherChoice;
+        set
+        {
+            if (SetProperty(ref _selectedWeatherChoice, value))
+            {
+                UseWeatherChoiceCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    private WeatherPlace? _selectedWeatherChoice;
 
     /// <summary>Town of the Dashboard weather, as typed.</summary>
     public string WeatherTownInput
@@ -177,7 +201,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         {
             if (SetProperty(ref _weatherTownInput, value))
             {
-                SaveWeatherTownCommand.NotifyCanExecuteChanged();
+                FindWeatherTownCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -185,26 +209,38 @@ public sealed class SettingsPageViewModel : ObservableObject
     public string WeatherStatus => _weatherStatus.Length > 0
         ? _weatherStatus
         : _services.Settings.WeatherPlace is { } place
-            ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Počasie pre {place.Display} ({place.Latitude:0.00}, {place.Longitude:0.00}).")
+            ? string.Create(System.Globalization.CultureInfo.CurrentCulture,
+                $"Počasie pre: {place.FullDisplay} (súradnice {place.Latitude:0.00}, {place.Longitude:0.00}).")
             : "Mesto nie je zadané – počasie sa nezisťuje a na Open-Meteo sa nič neposiela.";
 
     public string WeatherAttribution => OpenMeteo.Attribution;
 
-    /// <summary>Finds the town on Open-Meteo (only the typed name is sent) and stores it with its coordinates.</summary>
-    private async Task SaveWeatherTownAsync()
+    /// <summary>Looks the town up on Open-Meteo (only the typed name is sent): one match is stored, several are offered.</summary>
+    private async Task FindWeatherTownAsync()
     {
         var town = WeatherTownInput.Trim();
+        WeatherChoices.Clear();
+        SelectedWeatherChoice = null;
         try
         {
-            if (await _services.Weather.FindAsync(town) is { } place)
+            var found = await _services.Weather.SearchAsync(town);
+            if (found.Count == 0)
             {
-                _services.SetWeatherPlace(place);
-                WeatherTownInput = place.Name;
-                _weatherStatus = "";
+                _weatherStatus = $"Mesto „{town}“ Open-Meteo nenašlo – skúste iný zápis (napr. bez skratiek).";
+            }
+            else if (found.Count == 1)
+            {
+                Use(found[0]);
             }
             else
             {
-                _weatherStatus = $"Mesto „{town}“ Open-Meteo nenašlo – skúste iný zápis (napr. bez skratiek).";
+                foreach (var place in found)
+                {
+                    WeatherChoices.Add(place);
+                }
+
+                SelectedWeatherChoice = WeatherChoices[0];
+                _weatherStatus = $"Miest s týmto menom je viac ({found.Count}) – vyberte to správne a kliknite Použiť.";
             }
         }
         catch (WeatherException ex)
@@ -212,14 +248,38 @@ public sealed class SettingsPageViewModel : ObservableObject
             _weatherStatus = "Mesto sa neuložilo: " + ex.Message;
         }
 
+        OnPropertyChanged(nameof(HasWeatherChoices));
         OnPropertyChanged(nameof(WeatherStatus));
         RemoveWeatherTownCommand.NotifyCanExecuteChanged();
+    }
+
+    private void UseWeatherChoice()
+    {
+        if (SelectedWeatherChoice is { } place)
+        {
+            Use(place);
+            WeatherChoices.Clear();
+            SelectedWeatherChoice = null;
+            OnPropertyChanged(nameof(HasWeatherChoices));
+            OnPropertyChanged(nameof(WeatherStatus));
+            RemoveWeatherTownCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private void Use(WeatherPlace place)
+    {
+        _services.SetWeatherPlace(place);
+        WeatherTownInput = place.Name;
+        _weatherStatus = "";
     }
 
     private void RemoveWeatherTown()
     {
         _services.SetWeatherPlace(null);
         WeatherTownInput = "";
+        WeatherChoices.Clear();
+        SelectedWeatherChoice = null;
+        OnPropertyChanged(nameof(HasWeatherChoices));
         _weatherStatus = "";
         OnPropertyChanged(nameof(WeatherStatus));
         RemoveWeatherTownCommand.NotifyCanExecuteChanged();

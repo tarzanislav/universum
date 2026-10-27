@@ -1444,11 +1444,27 @@
                                        Text="Mesto sa vyhľadá na Open-Meteo (bez kľúča); posiela sa len zadané mesto a potom jeho súradnice, nič o vás. Bez mesta sa počasie nezisťuje." />
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Content="Nájsť a uložiť" Command="{Binding SaveWeatherTownCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Hľadať" Command="{Binding FindWeatherTownCommand}" IsDefault="False" Margin="8,0,8,0" Padding="12,5"
+                                            ToolTip="Nájde mestá s týmto menom; ak ich je viac, vyberiete to správne" />
                                     <Button Content="Odstrániť" Command="{Binding RemoveWeatherTownCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding WeatherTownInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Mesto, napr. Bratislava" />
+                                <TextBox Text="{Binding WeatherTownInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Mesto alebo obec, napr. Valaská">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding FindWeatherTownCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
                             </DockPanel>
+                            <!-- several places of the same name: district, region, country and height tell them apart -->
+                            <StackPanel Visibility="{Binding HasWeatherChoices, Converter={StaticResource BoolToVisibility}}" Margin="0,8,0,0">
+                                <ListBox ItemsSource="{Binding WeatherChoices}" SelectedItem="{Binding SelectedWeatherChoice}" MaxHeight="190"
+                                         DisplayMemberPath="FullDisplay" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding UseWeatherChoiceCommand}" />
+                                        <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding UseWeatherChoiceCommand}" />
+                                    </ListBox.InputBindings>
+                                </ListBox>
+                                <Button Content="Použiť vybrané miesto" Command="{Binding UseWeatherChoiceCommand}" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="12,5" />
+                            </StackPanel>
                             <TextBlock Text="{Binding WeatherStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding WeatherAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
                         </StackPanel>

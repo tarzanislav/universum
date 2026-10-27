@@ -110,6 +110,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
 
     public bool HasFindings => Findings.Count > 0;
 
+    /// <summary>The findings on one line (all of them in the tooltip).</summary>
+    public string FindingsText => string.Join("   •   ", Findings);
+
     /// <summary>The tab of this settings is the one shown.</summary>
     public bool IsCurrent { get => _isCurrent; set => SetProperty(ref _isCurrent, value); }
 
@@ -235,7 +238,20 @@ public sealed class MuxSettingsViewModel : ObservableObject
     /// <summary>Progress of this settings' last job (0–1).</summary>
     public double Progress { get => _progress; private set => SetProperty(ref _progress, value); }
 
-    public string ProgressText { get => _progressText; private set => SetProperty(ref _progressText, value); }
+    public string ProgressText
+    {
+        get => _progressText;
+        private set
+        {
+            if (SetProperty(ref _progressText, value))
+            {
+                OnPropertyChanged(nameof(HasProgress));
+            }
+        }
+    }
+
+    /// <summary>This settings has a job in the queue (its progress is shown).</summary>
+    public bool HasProgress => _progressText.Length > 0;
 
     public string Summary => Inputs.Count == 0
         ? "Pridajte súbory (MKV, MP4, AVI, zvuk, titulky SRT/ASS…) tlačidlom alebo ich sem pretiahnite myšou."
@@ -407,6 +423,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
 
         Problems = Inputs.Count == 0 ? "" : string.Join("\n", spec.Validate().Append(_useLibrary && Library.Placement is null ? Library.Description : "").Where(p => p.Length > 0));
         OnPropertyChanged(nameof(HasFindings));
+        OnPropertyChanged(nameof(FindingsText));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(IsUnprocessed));
         RefreshCommands();

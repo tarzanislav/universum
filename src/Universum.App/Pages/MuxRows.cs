@@ -227,8 +227,8 @@ public sealed class MuxTrackRow : ObservableObject
 
     public string SubtitleCharset { get => _subtitleCharset; set => Set(ref _subtitleCharset, value); }
 
-    /// <summary>True when a less common option is set (the list marks it, the advanced section opens for it).</summary>
-    public bool HasAdvanced => Options().IsEmpty is false;
+    /// <summary>True when a less common flag or option is set (the advanced section opens for it).</summary>
+    public bool HasAdvanced => FlagMarks.Length > 0 || Options().IsEmpty is false;
 
     public MuxTrack ToTrack(int source) =>
         new(source, Track.Id, Name.Length == 0 ? null : Name, Language.Tag, _flags) { Options = Options() };

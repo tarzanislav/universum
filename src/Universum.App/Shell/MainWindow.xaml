@@ -210,7 +210,7 @@
             </Grid>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:MultiplexerPageViewModel}">
-            <Grid Margin="24,16,24,10">
+            <Grid Margin="24,12,24,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -235,7 +235,8 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{Binding QueueStatus}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <ProgressBar Width="140" Height="6" Maximum="1" Value="{Binding QueueProgress, Mode=OneWay}" VerticalAlignment="Center" />
+                        <ProgressBar Width="140" Height="6" Maximum="1" Value="{Binding QueueProgress, Mode=OneWay}" VerticalAlignment="Center"
+                                     Visibility="{Binding IsQueueRunning, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </DockPanel>
             </Grid>
@@ -249,32 +250,35 @@
                 </Grid.RowDefinitions>
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="420" />
+                        <ColumnDefinition Width="1.5*" MinWidth="380" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="340" MinWidth="260" />
+                        <ColumnDefinition Width="*" MinWidth="250" MaxWidth="440" />
                     </Grid.ColumnDefinitions>
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="140" MinHeight="70" />
+                            <RowDefinition Height="104" MinHeight="56" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" MinHeight="120" />
+                            <RowDefinition Height="*" MinHeight="96" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <DockPanel Margin="0,0,0,4">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Informácie" Padding="10,3" Margin="0,0,6,0"
                                         Command="{Binding DataContext.ShowInfoCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
                                         ToolTip="Zobrazí vybraný zdrojový súbor (alebo súbor vybranej stopy) na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
-                                <Button Content="Odstrániť" Command="{Binding RemoveSourceCommand}" Padding="10,3" ToolTip="Odstráni vybraný zdrojový súbor (aj jeho stopy), časť alebo pripojený súbor" />
+                                <Button Content="Odstrániť" Command="{Binding RemoveSourceCommand}" Padding="10,3"
+                                        ToolTip="Odstráni vybraný zdrojový súbor (aj jeho stopy), časť alebo pripojený súbor" ToolTipService.ShowOnDisabled="True" />
                             </StackPanel>
                             <TextBlock Text="Zdrojové súbory" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <TextBlock Text="{Binding Summary}" ToolTip="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,8,0"
+                                       TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                         </DockPanel>
                         <DataGrid Grid.Row="1" ItemsSource="{Binding SourceRows}" SelectedItem="{Binding SelectedSource}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
                             <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="Názov súboru" Width="2.2*">
+                                <DataGridTemplateColumn Header="Názov súboru" Width="2*" MinWidth="140">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" ToolTip="{Binding Path}">
@@ -285,9 +289,9 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Kontajner" Binding="{Binding Container}" Width="90" />
-                                <DataGridTextColumn Header="Veľkosť" Binding="{Binding Size}" Width="75" />
-                                <DataGridTextColumn Header="Priečinok" Binding="{Binding Directory}" Width="2*">
+                                <DataGridTextColumn Header="Kontajner" Binding="{Binding Container}" Width="100" />
+                                <DataGridTextColumn Header="Veľkosť" Binding="{Binding Size}" Width="72" />
+                                <DataGridTextColumn Header="Priečinok" Binding="{Binding Directory}" Width="1.5*">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -299,13 +303,16 @@
                         </DataGrid>
                         <GridSplitter Grid.Row="2" Height="6" HorizontalAlignment="Stretch" Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
                                       ToolTip="Ťahaním zmeníte výšku zoznamov" />
-                        <WrapPanel Grid.Row="3" Margin="0,2,0,4">
-                            <TextBlock Text="Stopy vo výstupe (poradie zhora nadol)" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,0" />
-                            <Button Content="Pravidlá UNIVERSUM" Command="{Binding ApplyRulesCommand}" Padding="10,3" Margin="0,0,8,0"
-                                    ToolTip="Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM" />
-                            <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="9,3" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑)" />
-                            <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="9,3" ToolTip="Posunúť nižšie (Ctrl+↓)" />
-                        </WrapPanel>
+                        <DockPanel Grid.Row="3" Margin="0,0,0,4">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Pravidlá UNIVERSUM" Command="{Binding ApplyRulesCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveUpCommand}" Padding="9,5" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑)" />
+                                <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveDownCommand}" Padding="9,5" ToolTip="Posunúť nižšie (Ctrl+↓)" />
+                            </StackPanel>
+                            <TextBlock Text="Stopy vo výstupe" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       ToolTip="V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú" />
+                        </DockPanel>
                         <DataGrid Grid.Row="4" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
                             <DataGrid.InputBindings>
@@ -318,15 +325,25 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="Vziať" Width="52">
+                                <DataGridTemplateColumn Header="Vziať" Width="58">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" MinWidth="0" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="#" Binding="{Binding Position}" Width="32" />
-                                <DataGridTemplateColumn Header="Typ" Width="74">
+                                <DataGridTemplateColumn Header="#" Width="44">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" ToolTip="{Binding Source}" VerticalAlignment="Center">
+                                                <Border Width="8" Height="8" CornerRadius="2" Margin="0,0,5,0" VerticalAlignment="Center"
+                                                        Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
+                                                <TextBlock Text="{Binding Position}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Typ" Width="70">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Style="{StaticResource TypeChip}" Background="{Binding Kind, Converter={StaticResource TrackTypeBrush}, ConverterParameter=chip}">
@@ -335,77 +352,103 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="80" />
-                                <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display}" Width="110" />
-                                <DataGridTextColumn Header="Názov" Binding="{Binding Name}" Width="1.3*" />
-                                <DataGridCheckBoxColumn Header="Default" Binding="{Binding IsDefault, Mode=OneWay}" Width="60" />
-                                <DataGridCheckBoxColumn Header="Forced" Binding="{Binding IsForced, Mode=OneWay}" Width="58" />
-                                <DataGridTextColumn Header="Ďalšie" Binding="{Binding FlagMarks}" Width="0.8*" />
-                                <DataGridTemplateColumn Header="Zo súboru" Width="1.2*">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" ToolTip="{Binding Source}">
-                                                <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                        Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
-                                                <TextBlock Text="{Binding Source}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Codec}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display}" Width="110">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Názov" Binding="{Binding Name}" Width="*" MinWidth="70">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Name}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridCheckBoxColumn Header="Default" Binding="{Binding IsDefault, Mode=OneWay}" Width="62" />
+                                <DataGridCheckBoxColumn Header="Forced" Binding="{Binding IsForced, Mode=OneWay}" Width="60" />
+                                <DataGridTextColumn Header="Ďalšie" Binding="{Binding FlagMarks}" Width="0.6*" MinWidth="56">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding FlagMarks}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                             </DataGrid.Columns>
                         </DataGrid>
+                        <!-- what the rules would still change, on one line (all in the tooltip) -->
+                        <DockPanel Grid.Row="5" Margin="0,4,0,0" Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" Style="{StaticResource Icon}" Foreground="{DynamicResource SystemFillColorCautionBrush}" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding FindingsText}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                <TextBlock.ToolTip>
+                                    <ItemsControl ItemsSource="{Binding Findings}" />
+                                </TextBlock.ToolTip>
+                            </TextBlock>
+                        </DockPanel>
                     </Grid>
-                    <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeDirection="Columns"
+                    <GridSplitter Grid.Column="1" Width="10" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeDirection="Columns"
                                   ResizeBehavior="PreviousAndNext" ToolTip="Ťahaním zmeníte šírku panelov" />
-                    <!-- Properties: of the selected track, or of the selected source file -->
-                    <Border Grid.Column="2" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" CornerRadius="6" Padding="10,8">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <!-- Properties: of the selected track or source file; below them the output's title, chapters and attachments -->
+                    <Border Grid.Column="2" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" CornerRadius="6">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="10,8">
                             <StackPanel>
                                 <TextBlock Text="Vlastnosti" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                <TextBlock Style="{StaticResource Hint}" Visibility="{Binding ShowsNothing, Converter={StaticResource BoolToVisibility}}"
+                                <TextBlock Style="{StaticResource Hint}" Visibility="{Binding ShowsNothing, Converter={StaticResource BoolToVisibility}}" TextWrapping="Wrap"
                                            Text="Vyberte stopu alebo zdrojový súbor – jeho vlastnosti sa zobrazia tu." />
                                 <StackPanel DataContext="{Binding SelectedTrack}" Visibility="{Binding DataContext.ShowsTrack, ElementName=SettingsRoot, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                        <Border Style="{StaticResource TypeChip}" Background="{Binding Kind, Converter={StaticResource TrackTypeBrush}, ConverterParameter=chip}" Margin="0,0,8,0">
+                                    <DockPanel Margin="0,0,0,6">
+                                        <Border DockPanel.Dock="Left" Style="{StaticResource TypeChip}" Background="{Binding Kind, Converter={StaticResource TrackTypeBrush}, ConverterParameter=chip}" Margin="0,0,8,0">
                                             <TextBlock Text="{Binding Type}" Foreground="#1F1F1F" FontSize="12" />
                                         </Border>
-                                        <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                        <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Source}">
                                             <Run Text="{Binding Codec, Mode=OneWay}" /> <Run Text="{Binding Properties, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                         </TextBlock>
-                                    </StackPanel>
+                                    </DockPanel>
                                     <CheckBox Content="Vziať túto stopu do výstupu" IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" />
                                     <TextBlock Text="Názov stopy" Margin="0,2,0,2" />
                                     <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBlock Text="Jazyk" Margin="0,8,0,2" />
-                                    <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" />
+                                    <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" DisplayMemberPath="Display" HorizontalAlignment="Stretch" />
                                     <TextBlock Text="Príznaky" Margin="0,10,0,2" FontWeight="SemiBold" />
                                     <CheckBox Content="Predvolená stopa (Default)" IsChecked="{Binding IsDefault, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Stopa zapnutá (Enabled)" IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" />
+                                    <CheckBox Content="Zapnutá (Enabled)" IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" />
                                     <CheckBox Content="Vynútené zobrazenie (Forced)" IsChecked="{Binding IsForced, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Pre nepočujúcich (SDH)" IsChecked="{Binding IsHearingImpaired, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Pre nevidiacich (audio popis)" IsChecked="{Binding IsVisualImpaired, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Popis deja textom" IsChecked="{Binding IsTextDescriptions, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Pôvodný jazyk diela" IsChecked="{Binding IsOriginal, UpdateSourceTrigger=PropertyChanged}" />
-                                    <CheckBox Content="Komentár" IsChecked="{Binding IsCommentary, UpdateSourceTrigger=PropertyChanged}" />
-                                    <Expander Header="Rozšírené (časovanie, video, titulky)" Margin="0,10,0,0"
+                                    <Expander Header="Ďalšie príznaky a rozšírené vlastnosti" Margin="0,8,0,0"
                                               IsExpanded="{Binding DataContext.ShowAdvanced, ElementName=SettingsRoot}">
                                         <StackPanel Margin="0,6,0,0">
-                                            <TextBlock Text="Oneskorenie (ms, záporné = skôr)" Margin="0,0,0,2" />
+                                            <CheckBox Content="Pre nepočujúcich (SDH)" IsChecked="{Binding IsHearingImpaired, UpdateSourceTrigger=PropertyChanged}" />
+                                            <CheckBox Content="Pre nevidiacich (audio popis)" IsChecked="{Binding IsVisualImpaired, UpdateSourceTrigger=PropertyChanged}" />
+                                            <CheckBox Content="Popis deja textom" IsChecked="{Binding IsTextDescriptions, UpdateSourceTrigger=PropertyChanged}" />
+                                            <CheckBox Content="Pôvodný jazyk diela" IsChecked="{Binding IsOriginal, UpdateSourceTrigger=PropertyChanged}" />
+                                            <CheckBox Content="Komentár" IsChecked="{Binding IsCommentary, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBlock Text="Oneskorenie (ms, záporné = skôr)" Margin="0,10,0,2" />
                                             <TextBox Text="{Binding Delay, UpdateSourceTrigger=PropertyChanged}" />
-                                            <TextBlock Text="Predvolené trvanie / FPS (napr. 25p, 24000/1001p)" Margin="0,8,0,2" />
+                                            <TextBlock Text="Predvolené trvanie / FPS (napr. 25p, 24000/1001p)" Margin="0,8,0,2" TextWrapping="Wrap" />
                                             <TextBox Text="{Binding DefaultDuration, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBlock Text="Kompresia" Margin="0,8,0,2" />
-                                            <ComboBox ItemsSource="{Binding CompressionChoices}" SelectedItem="{Binding Compression}" DisplayMemberPath="Text" />
+                                            <ComboBox ItemsSource="{Binding CompressionChoices}" SelectedItem="{Binding Compression}" DisplayMemberPath="Text" HorizontalAlignment="Stretch" />
                                             <StackPanel Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                                                 <CheckBox Content="Opraviť časové údaje bitstreamu" IsChecked="{Binding FixBitstreamTiming, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
                                                 <TextBlock Text="Pomer strán obrazu (napr. 16/9)" Margin="0,8,0,2" />
                                                 <TextBox Text="{Binding AspectRatio, UpdateSourceTrigger=PropertyChanged}" />
-                                                <TextBlock Text="Orez v pixeloch (vľavo,hore,vpravo,dole)" Margin="0,8,0,2" />
+                                                <TextBlock Text="Orez v pixeloch (vľavo,hore,vpravo,dole)" Margin="0,8,0,2" TextWrapping="Wrap" />
                                                 <TextBox Text="{Binding Cropping, UpdateSourceTrigger=PropertyChanged}" />
                                             </StackPanel>
                                             <StackPanel Visibility="{Binding IsTextSubtitles, Converter={StaticResource BoolToVisibility}}">
-                                                <TextBlock Text="Kódovanie znakov titulkov (napr. cp1250)" Margin="0,8,0,2" />
-                                                <ComboBox IsEditable="True" Text="{Binding SubtitleCharset, UpdateSourceTrigger=LostFocus}">
+                                                <TextBlock Text="Kódovanie znakov titulkov" Margin="0,8,0,2" />
+                                                <ComboBox IsEditable="True" Text="{Binding SubtitleCharset, UpdateSourceTrigger=LostFocus}" HorizontalAlignment="Stretch"
+                                                          ToolTip="Prázdne = podľa súboru; pre staré české a slovenské titulky zvyčajne cp1250">
                                                     <ComboBoxItem Content="cp1250" />
                                                     <ComboBoxItem Content="iso-8859-2" />
                                                     <ComboBoxItem Content="utf-8" />
@@ -420,10 +463,10 @@
                                 </StackPanel>
                                 <StackPanel DataContext="{Binding SelectedSource}" Visibility="{Binding DataContext.ShowsSource, ElementName=SettingsRoot, Converter={StaticResource BoolToVisibility}}">
                                     <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                                    <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0">
+                                    <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" TextWrapping="Wrap">
                                         <Run Text="{Binding Role, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Container, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Size, Mode=OneWay}" />
                                     </TextBlock>
-                                    <TextBlock Style="{StaticResource Hint}" Text="{Binding Input.Details}" Margin="0,2,0,8" />
+                                    <TextBlock Style="{StaticResource Hint}" Text="{Binding Input.Details}" Margin="0,2,0,8" TextWrapping="Wrap" />
                                     <TextBlock Text="Zo súboru vziať aj" FontWeight="SemiBold" Margin="0,4,0,2" />
                                     <CheckBox Content="Kapitoly" IsChecked="{Binding Input.KeepChapters, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Input.HasChapters}" />
                                     <CheckBox Content="Prílohy (písma, obrázky)" IsChecked="{Binding Input.KeepAttachments, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Input.HasAttachments}" />
@@ -431,88 +474,72 @@
                                     <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
                                                Text="Pripojený súbor pokračuje stopami súboru, ku ktorému patrí (názvy, jazyky a príznaky má od neho); ďalšie časti sa čítajú ako jeden súbor." />
                                 </StackPanel>
+                                <Separator Margin="0,12,0,4" />
+                                <Expander Header="Výstup: názov, kapitoly, prílohy">
+                                    <StackPanel Margin="0,6,0,0">
+                                        <TextBlock Text="Názov (title) výstupného súboru" Margin="0,0,0,2" />
+                                        <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBlock Text="Kapitoly zo súboru (XML, OGM .txt, cue)" Margin="0,8,0,2" TextWrapping="Wrap" />
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,3" Margin="4,0,0,0" ToolTip="Bez súboru s kapitolami" />
+                                            <Button DockPanel.Dock="Right" Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="8,3" Margin="4,0,0,0" />
+                                            <TextBox Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}"
+                                                     ToolTip="Pridajú sa ku kapitolám zo zdrojov, pri ktorých sú zaškrtnuté" />
+                                        </DockPanel>
+                                        <TextBlock Text="Nové prílohy (písma, obrázky)" Margin="0,8,0,2" />
+                                        <ListBox ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="80" MinHeight="28" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="10,3" Margin="0,0,6,0" />
+                                            <Button Content="Odstrániť" Command="{Binding RemoveAttachmentCommand}" Padding="10,3" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
                 </Grid>
                 <!-- the output: title (TMDB), name by the rules, beside the source or in the library -->
-                <StackPanel Grid.Row="1" Margin="0,10,0,0">
+                <StackPanel Grid.Row="1" Margin="0,8,0,0">
                     <WrapPanel DataContext="{Binding Library}">
-                        <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="0" />
-                        <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,16,0" MinWidth="0" />
-                        <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                        <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="250" Margin="0,0,6,0"
+                        <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,10,4" MinWidth="0" />
+                        <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,16,4" MinWidth="0" />
+                        <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,4" />
+                        <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="0,0,6,4"
                                  ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj adresa TMDB (/movie/ = film, /tv/ = seriál)" />
-                        <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
-                        <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,12,0"
+                        <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,4" />
+                        <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,12,4"
                                   IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,12,4">
                             <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                            <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                            <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04 (špeciály S00E01)" />
                         </StackPanel>
-                        <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" TextWrapping="NoWrap">
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" TextWrapping="NoWrap" Margin="0,0,0,4">
                             <Run Text="{Binding Tmdb.Message, Mode=OneWay}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" />
                         </TextBlock>
                     </WrapPanel>
-                    <DockPanel Margin="0,8,0,0">
+                    <DockPanel>
                         <TextBlock DockPanel.Dock="Left" Text="Výstupný súbor:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Content="Vybrať…" Command="{Binding ChooseOutputCommand}" Padding="10,3" Margin="6,0,0,0" />
-                            <Button Content="Knižnica…" Command="{Binding Library.ChooseOutputDirectoryCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="{Binding Library.OutputDescription}" />
-                            <CheckBox Content="Do knižnice" IsChecked="{Binding UseLibrary}" IsEnabled="{Binding CanUseLibrary}" VerticalAlignment="Center" Margin="12,0,0,0"
-                                      ToolTip="Výsledok pôjde do výstupného priečinka (MOVIES / TVSHOWS) s názvom podľa pravidiel; cesta sa potom nedá upravovať. Priečinok sa nastavuje v Nastaveniach." ToolTipService.ShowOnDisabled="True" />
-                            <Button Content="Resetovať" Command="{Binding ResetOutputCommand}" Padding="10,3" Margin="10,0,0,0"
+                            <Button Content="Vybrať…" Command="{Binding ChooseOutputCommand}" Padding="10,3" Margin="6,0,0,0" ToolTipService.ShowOnDisabled="True"
+                                    ToolTip="Vybrať priečinok a meno výstupného súboru" />
+                            <CheckBox Content="Do knižnice" IsChecked="{Binding UseLibrary}" IsEnabled="{Binding CanUseLibrary}" VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="0"
+                                      ToolTip="Výsledok pôjde do knižnice (MOVIES / TVSHOWS) s názvom podľa pravidiel; cesta sa potom nedá upravovať." ToolTipService.ShowOnDisabled="True" />
+                            <Button Content="Knižnica…" Command="{Binding Library.ChooseOutputDirectoryCommand}" Padding="10,3" Margin="4,0,0,0" ToolTip="{Binding Library.OutputDescription}" />
+                            <Button Content="Resetovať" Command="{Binding ResetOutputCommand}" Padding="10,3" Margin="6,0,0,0"
                                     ToolTip="Späť na predvolený výstup: vedľa prvého zdroja, s názvom podľa pravidiel, ak je zadaný titul" />
                         </StackPanel>
                         <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding OutputEditable}" ToolTip="{Binding OutputPath}" />
                     </DockPanel>
-                    <TextBlock Text="{Binding OutputNote}" Style="{StaticResource Hint}" FontSize="12" Margin="0,3,0,0" />
-                    <Expander Header="Názov (title), kapitoly zo súboru, nové prílohy" Margin="0,6,0,0">
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Názov (title):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Column="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
-                            <TextBlock Grid.Row="1" Text="Kapitoly zo súboru:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,6" />
-                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6"
-                                     ToolTip="Kapitoly XML, OGM (.txt) alebo cue – pridajú sa ku kapitolám zo zdrojov, pri ktorých sú zaškrtnuté" />
-                            <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Margin="0,0,0,6">
-                                <Button Content="Vybrať…" Command="{Binding ChooseChaptersCommand}" Padding="10,3" Margin="0,0,6,0" />
-                                <Button Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,3" ToolTip="Bez súboru s kapitolami" />
-                            </StackPanel>
-                            <TextBlock Grid.Row="2" Text="Nové prílohy:" FontWeight="SemiBold" VerticalAlignment="Top" Margin="0,4,8,0" />
-                            <ListBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="64" MinHeight="28" Margin="0,0,8,0" />
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
-                                <Button Content="Pridať…" Command="{Binding AddAttachmentCommand}" Padding="10,3" Margin="0,0,6,0" />
-                                <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Padding="8,3" />
-                            </StackPanel>
-                        </Grid>
-                    </Expander>
-                    <ScrollViewer MaxHeight="60" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0" Visibility="{Binding HasFindings, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl ItemsSource="{Binding Findings}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding StringFormat='• {0}'}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
                     <DockPanel Margin="0,4,0,0">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"
+                                    Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <ProgressBar Width="160" Height="8" Maximum="1" Value="{Binding Progress, Mode=OneWay}" VerticalAlignment="Center" />
+                            <ProgressBar Width="140" Height="6" Maximum="1" Value="{Binding Progress, Mode=OneWay}" VerticalAlignment="Center" />
                         </StackPanel>
-                        <StackPanel Margin="0,0,12,0">
-                            <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                        <StackPanel>
+                            <TextBlock Text="{Binding OutputNote}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" MaxHeight="40" ToolTip="{Binding Problems}" />
+                            <TextBlock Text="{Binding Result}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Result}" />
                         </StackPanel>
                     </DockPanel>
                 </StackPanel>

@@ -132,6 +132,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     /// <summary>Overall progress of the running job (0–1) for the status line.</summary>
     public double QueueProgress => _services.Jobs.Running?.Progress ?? 0;
 
+    /// <summary>A job is running (its progress bar is shown).</summary>
+    public bool IsQueueRunning => _services.Jobs.Running is not null;
+
     /// <summary>Every file the multiplexer reads now, labelled by its settings (for the Information page).</summary>
     public IEnumerable<KnownFile> KnownFiles =>
         Settings.SelectMany(s => s.Files.Select(f => new KnownFile($"Zlučovanie – {s.ShortName}", Path.GetFileName(f), f)));
@@ -295,6 +298,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(QueueStatus));
         OnPropertyChanged(nameof(QueueProgress));
+        OnPropertyChanged(nameof(IsQueueRunning));
     }
 
     private MuxSettingsViewModel NewSettings()

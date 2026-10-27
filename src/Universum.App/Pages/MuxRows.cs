@@ -12,8 +12,12 @@ public sealed class MuxInputRow(MediaFile file, int number, Action changed) : Ob
     private bool _keepChapters = true;
     private bool _keepAttachments = true;
     private bool _keepTags = true;
+    private int _colorIndex = number - 1;
 
     public MediaFile File { get; } = file;
+
+    /// <summary>Colour of the file (the source list and its tracks); appended files get the next colours.</summary>
+    public int ColorIndex { get => _colorIndex; set => SetProperty(ref _colorIndex, value); }
 
     public int Number { get => _number; set => SetProperty(ref _number, value); }
 
@@ -55,7 +59,7 @@ public enum MuxSourceKind
 }
 
 /// <summary>A row of the source list (MKVToolNix GUI: Source files): name, container, size and folder.</summary>
-public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string path, string container)
+public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string path, string container, int colorIndex)
 {
     public MuxInputRow Input { get; } = input;
 
@@ -63,13 +67,16 @@ public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string p
 
     public string Path { get; } = path;
 
-    /// <summary>"Film.mkv", "  ( Film.part2.vob", "  + Film-2.mkv".</summary>
+    /// <summary>"Film.mkv"; under it "( Film.part2.vob )" and "+ Film-2.mkv" (shown indented as its children).</summary>
     public string Name => Kind switch
     {
-        MuxSourceKind.Part => "   ( " + System.IO.Path.GetFileName(Path),
-        MuxSourceKind.Appended => "   + " + System.IO.Path.GetFileName(Path),
+        MuxSourceKind.Part => "( " + System.IO.Path.GetFileName(Path) + " )",
+        MuxSourceKind.Appended => "+ " + System.IO.Path.GetFileName(Path),
         _ => System.IO.Path.GetFileName(Path),
     };
+
+    /// <summary>A part or an appended file: shown under its file, indented.</summary>
+    public bool IsChild => Kind != MuxSourceKind.File;
 
     public string Container { get; } = container;
 
@@ -77,8 +84,8 @@ public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string p
 
     public string Directory => System.IO.Path.GetDirectoryName(Path) ?? "";
 
-    /// <summary>Colour of the input this row belongs to (the same colour marks its tracks).</summary>
-    public int ColorIndex => (Input.Number - 1) % 6;
+    /// <summary>Colour of the file: an input and its parts share one, an appended file has its own (its tracks too).</summary>
+    public int ColorIndex { get; } = colorIndex;
 
     public string Role => Kind switch
     {
@@ -140,7 +147,22 @@ public sealed class MuxTrackRow : ObservableObject
     }
 
     /// <summary>Colour of the file the track comes from (the same as in the source list).</summary>
-    public int ColorIndex => (Input.Number - 1) % 6;
+    public int ColorIndex => Input.ColorIndex;
+
+    /// <summary>A track of an input (editable); the tracks of appended files are its children.</summary>
+    public bool IsMain => true;
+
+    /// <summary>The tracks of the appended files that continue this one (shown under it).</summary>
+    internal List<MuxAppendedTrackRow> Children { get; set; } = [];
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        foreach (var child in Children)
+        {
+            child.ParentChanged();
+        }
+    }
 
     public string Source => $"{Input.Number}: {Input.FileName}";
 
@@ -156,13 +178,7 @@ public sealed class MuxTrackRow : ObservableObject
     public bool IsTextSubtitles => Track.Type == TrackType.Subtitles && Track.IsTextSubtitles;
 
     /// <summary>Video size, audio channels and rate, subtitle kind.</summary>
-    public string Properties => Track.Type switch
-    {
-        TrackType.Video => Track.PixelDimensions ?? "",
-        TrackType.Audio => Track.AudioChannels is { } channels ? $"{channels} kan., {Track.AudioSamplingFrequency} Hz" : "",
-        TrackType.Subtitles => Track.IsTextSubtitles ? "textové" : "obrázkové",
-        _ => "",
-    };
+    public string Properties => new MuxTrackRowText(Track).Properties;
 
     public IReadOnlyList<LanguageChoice> LanguageChoices { get; }
 
@@ -290,6 +306,75 @@ public sealed class MuxTrackRow : ObservableObject
             _changed();
         }
     }
+}
+
+/// <summary>
+/// A track of an appended file under the track it continues (MKVToolNix GUI shows them as children): not editable –
+/// name, language and flags come from the main track; its file has its own colour.
+/// </summary>
+public sealed class MuxAppendedTrackRow(MuxTrackRow parent, MediaFile file, MediaTrack? track, int colorIndex) : ObservableObject
+{
+    public MuxTrackRow Parent { get; } = parent;
+
+    public MediaFile File { get; } = file;
+
+    /// <summary>The continuing track (the same ID); null when the appended file lacks it.</summary>
+    public MediaTrack? Track { get; } = track;
+
+    public string FileName => System.IO.Path.GetFileName(File.Path);
+
+    public bool IsMain => false;
+
+    /// <summary>The track is missing in the appended file or is of another type or codec (writing is then refused).</summary>
+    public bool IsMismatch => Track is null || Track.Type != Parent.Track.Type ||
+                              !string.Equals(Track.CodecId ?? Track.Codec, Parent.Track.CodecId ?? Parent.Track.Codec, StringComparison.Ordinal);
+
+    public int ColorIndex { get; } = colorIndex;
+
+    /// <summary>Taken with the main track (the box is greyed out; setting it does nothing).</summary>
+    public bool Include { get => Parent.Include; set { } }
+
+    public string Position => "";
+
+    public string Source => FileName;
+
+    public TrackType Kind => Parent.Kind;
+
+    public string Type => Parent.Type;
+
+    public string Codec => Track?.Codec ?? "chýba";
+
+    public LanguageChoice Language => Parent.Language;
+
+    public string Name => IsMismatch ? $"+ {FileName}: stopa {Parent.Track.Id} chýba alebo je iná" : "+ " + FileName;
+
+    public bool IsDefault => Parent.IsDefault;
+
+    public bool IsForced => Parent.IsForced;
+
+    public string FlagMarks => "";
+
+    public string Properties => Track is null ? "" : new MuxTrackRowText(Track).Properties;
+
+    /// <summary>What the row is, for its tooltip and the properties panel.</summary>
+    public string Explanation => IsMismatch
+        ? $"Súbor {FileName} nemá stopu {Parent.Track.Id} rovnakého typu a kodeku ako hlavný súbor – takto sa pripojiť nedá."
+        : $"Pripojená časť zo súboru {FileName}: pokračuje stopou {Parent.Position} ({Parent.Type}, {Parent.Language.Display}) zo súboru {Parent.Input.FileName}. " +
+          "Názov, jazyk a príznaky má od nej – upravte hlavnú stopu.";
+
+    internal void ParentChanged() => OnPropertyChanged(string.Empty);
+}
+
+/// <summary>Short properties of a track (video size, audio channels, subtitle kind).</summary>
+internal readonly record struct MuxTrackRowText(MediaTrack Track)
+{
+    public string Properties => Track.Type switch
+    {
+        TrackType.Video => Track.PixelDimensions ?? "",
+        TrackType.Audio => Track.AudioChannels is { } channels ? $"{channels} kan., {Track.AudioSamplingFrequency} Hz" : "",
+        TrackType.Subtitles => Track.IsTextSubtitles ? "textové" : "obrázkové",
+        _ => "",
+    };
 }
 
 /// <summary>Slovak names of track types.</summary>

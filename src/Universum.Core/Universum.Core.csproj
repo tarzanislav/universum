@@ -8,4 +8,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Universum.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Slovak calendar of names: data of name-day-calendar (MIT, Peter Knezek), see THIRD-PARTY-NOTICES.md -->
+    <EmbeddedResource Include="Calendar\sk-namedays.txt" LogicalName="Universum.Core.Calendar.sk-namedays.txt" />
+  </ItemGroup>
 </Project>

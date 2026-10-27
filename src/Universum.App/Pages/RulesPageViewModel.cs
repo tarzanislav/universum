@@ -170,6 +170,12 @@ public sealed class RulesPageViewModel : ObservableObject
 
     public async Task LoadAsync(string path)
     {
+        // a file being processed stays (its undo record belongs to it)
+        if (Busy)
+        {
+            return;
+        }
+
         Result = "";
         _undoRecord = null;
         _languages.Clear();

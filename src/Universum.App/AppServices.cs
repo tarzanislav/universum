@@ -9,6 +9,7 @@ using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
 using Universum.Core.Processes;
+using Universum.Core.Weather;
 using Universum.Platform.Windows;
 
 namespace Universum.App;
@@ -153,6 +154,25 @@ public sealed class AppServices
     /// <summary>Raised when the HISTRA token changes.</summary>
     public event Action? HistraChanged;
 
+    private OpenMeteo? _weather;
+
+    /// <summary>Weather of the Dashboard (Open-Meteo, no key; only the town and then its coordinates are sent).</summary>
+    public OpenMeteo Weather => WeatherForSelfTest ?? (_weather ??= new OpenMeteo(Http));
+
+    /// <summary>The self-test's stand-in weather service (invented answers, nothing goes to the internet).</summary>
+    public OpenMeteo? WeatherForSelfTest { get; set; }
+
+    /// <summary>Stores the town of the weather (null removes it: no weather is asked for).</summary>
+    public void SetWeatherPlace(WeatherPlace? place)
+    {
+        Settings.WeatherPlace = place;
+        Settings.Save();
+        WeatherChanged?.Invoke();
+    }
+
+    /// <summary>Raised when the town of the weather changes.</summary>
+    public event Action? WeatherChanged;
+
     /// <summary>The job queue (one for the whole program; jobs run one after another).</summary>
     public Universum.Core.Jobs.JobQueue Jobs { get; } = new();
 
@@ -252,6 +272,9 @@ public sealed class AppSettings
 
     /// <summary>Multiplexer: files with video always get new multiplex settings (with the remembered action).</summary>
     public bool MuxNewSettingsForVideo { get; set; }
+
+    /// <summary>Town of the Dashboard weather as Open-Meteo found it; null = no weather is asked for.</summary>
+    public WeatherPlace? WeatherPlace { get; set; }
 
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>

@@ -7,6 +7,7 @@ using Universum.App.Setup;
 using Universum.App.Updates;
 using Universum.Core.Updates;
 using Universum.Core.MkvToolNix;
+using Universum.Core.Shell;
 
 namespace Universum.App.Shell;
 
@@ -29,8 +30,10 @@ public sealed class MainViewModel : ObservableObject
         Chapters = new ChaptersPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
+        Dashboard = new DashboardPageViewModel(services, this);
         Tools =
         [
+            new("Dashboard", "\uE80F", Dashboard),
             new("Zlučovanie", "\uE71D", Mux),
             new("Informácie", "\uE946", Info),
             new("Single spracovanie", "\uE90F", Rules),
@@ -41,7 +44,7 @@ public sealed class MainViewModel : ObservableObject
             new("Výstup úloh", "\uE7C3", Output),
             new("Nastavenia", "\uE713", Settings),
         ];
-        _selectedTool = Tools[1];
+        _selectedTool = Tools[0];
         SetupCommand = new AsyncRelayCommand(SetupAsync);
         OpenMkvToolNixGuiCommand = new RelayCommand(OpenMkvToolNixGui, () => _services.CurrentMkvToolNix?.HasTool(MkvToolNixTool.Gui) == true);
         ShowUpdatesCommand = new AsyncRelayCommand(ShowUpdatesAsync);
@@ -108,6 +111,9 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Shows a page of the left menu.</summary>
+    public void Open(object page) => SelectedTool = Tools.First(t => t.Page == page);
+
     /// <summary>Opens the Information page with a file from another page.</summary>
     public async Task ShowInfoAsync(string path)
     {
@@ -116,16 +122,16 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Start-up: MKVToolNix status, a file or folder given on the command line (context menu of the Explorer), then (when
-    /// due) the update check.
+    /// Start-up: MKVToolNix status, the request of the command line (context menu of the Explorer), then (when due) the
+    /// update check.
     /// </summary>
-    public async Task StartAsync(string? path = null)
+    public async Task StartAsync(ShellRequest? request = null)
     {
+        // the own request is collected at once: files handed over by other starts meanwhile join it
+        var handling = request is { Paths.Count: > 0 } ? HandleAsync(request) : Task.CompletedTask;
         await RefreshStatusAsync();
-        if (path is not null)
-        {
-            await OpenPathAsync(path);
-        }
+        Dashboard.Shown();
+        await handling;
 
         try
         {
@@ -141,6 +147,8 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public IReadOnlyList<ToolItem> Tools { get; }
+
+    public DashboardPageViewModel Dashboard { get; }
 
     public InfoPageViewModel Info { get; }
 
@@ -169,6 +177,11 @@ public sealed class MainViewModel : ObservableObject
             {
                 // the files of the multiplexer and the batch, as they are now
                 Info.RefreshKnown();
+            }
+
+            if (value?.Page == Dashboard)
+            {
+                Dashboard.Shown();
             }
         }
     }
@@ -213,21 +226,136 @@ public sealed class MainViewModel : ObservableObject
         OpenMkvToolNixGuiCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>A folder opens in batch processing, a file in the UNIVERSUM rules.</summary>
-    public async Task OpenPathAsync(string path)
+    /// <summary>
+    /// A request from the Explorer's context menu. The Explorer starts UNIVERSUM once per selected file; the files of one
+    /// action are collected until none came for a moment and are then handled together, in a stable order (several
+    /// files to the multiplexer are asked about once, the film before its subtitles).
+    /// </summary>
+    public async Task HandleAsync(ShellRequest request)
     {
-        if (System.IO.Directory.Exists(path))
+        if (request.Paths.Count == 0)
         {
-            SelectedTool = Tools.First(t => t.Page == Batch);
-            Batch.Folder = path;
-            await Batch.AnalyzeAsync();
+            return;
         }
-        else if (System.IO.File.Exists(path))
+
+        if (!_pending.TryGetValue(request.Action, out var paths))
         {
-            SelectedTool = Tools.First(t => t.Page == Rules);
-            await Rules.LoadAsync(path);
+            _pending[request.Action] = paths = [];
+        }
+
+        paths.AddRange(request.Paths);
+        var ticket = ++_tickets;
+        _lastTicket[request.Action] = ticket;
+        await Task.Delay(CollectFor);
+
+        // a later file of the same action waits on: that one handles them all
+        if (_lastTicket[request.Action] != ticket)
+        {
+            return;
+        }
+
+        _pending.Remove(request.Action);
+        await HandleNowAsync(request.Action, ShellRequest.Ordered(paths));
+    }
+
+    /// <summary>How long the files of one action are collected after the last one came.</summary>
+    public TimeSpan CollectFor { get; set; } = TimeSpan.FromMilliseconds(700);
+
+    /// <summary>Tells the user something (a message box; the self-test reads it).</summary>
+    public Action<string> Notify { get; set; } = message =>
+        MessageBox.Show(Application.Current.MainWindow!, message, "UNIVERSUM", MessageBoxButton.OK, MessageBoxImage.Information);
+
+    private async Task HandleNowAsync(ShellAction action, IReadOnlyList<string> paths)
+    {
+        var existing = paths.Where(p => System.IO.File.Exists(p) || System.IO.Directory.Exists(p)).ToList();
+        if (existing.Count == 0)
+        {
+            Notify("Súbor alebo priečinok z Prieskumníka už neexistuje:\n" + string.Join("\n", paths));
+            return;
+        }
+
+        var first = existing[0];
+        switch (action)
+        {
+            case ShellAction.Multiplexer:
+                Open(Mux);
+                await Mux.AddFilesAsync(existing.Where(System.IO.File.Exists));
+                return;
+            case ShellAction.Batch:
+            case ShellAction.Open when System.IO.Directory.Exists(first):
+                if (BatchBusy())
+                {
+                    return;
+                }
+
+                Open(Batch);
+                if (System.IO.Directory.Exists(first))
+                {
+                    Batch.Folder = first;
+                    await Batch.AnalyzeAsync();
+                }
+                else
+                {
+                    // a file: its folder is analysed and the template made from it
+                    await Batch.TemplateFromFileAsync(first);
+                }
+
+                break;
+            case ShellAction.Info:
+                await ShowInfoAsync(first);
+                break;
+            default:
+                // Single spracovanie (and a file opened with UNIVERSUM): one file at a time
+                if (Rules.Busy)
+                {
+                    Open(Rules);
+                    Notify("V Single spracovaní sa práve spracúva súbor – po jeho dokončení ho otvorte znova.\n\nNeotvorený: " +
+                           System.IO.Path.GetFileName(first));
+                    return;
+                }
+
+                Open(Rules);
+                await Rules.LoadAsync(first);
+                break;
+        }
+
+        // the tools that take one file (or one folder) say which ones were left out (in batch processing the files of
+        // the analysed folder are all in it)
+        static string FolderOf(string path) => System.IO.Directory.Exists(path) ? path : System.IO.Path.GetDirectoryName(path) ?? path;
+        var batch = action == ShellAction.Batch || System.IO.Directory.Exists(first);
+        var left = existing.Skip(1)
+            .Where(p => !batch || !Universum.Core.IO.Paths.Same(FolderOf(p), FolderOf(first)))
+            .Select(p => System.IO.Path.GetFileName(p.TrimEnd('\\', '/')))
+            .ToList();
+        if (left.Count > 0)
+        {
+            Notify($"Otvorené: {System.IO.Path.GetFileName(first.TrimEnd('\\', '/'))}\n\n" +
+                   (action == ShellAction.Info ? "Informácie zobrazujú jeden súbor. " : batch
+                       ? "Hromadné spracovanie spracuje jeden priečinok naraz (súbory v ňom sa spracujú všetky). "
+                       : "Single spracovanie spracúva jeden súbor. Viac súborov naraz spracuje Hromadné spracovanie. ") +
+                   $"Neotvorené ({left.Count}):\n" + string.Join("\n", left.Take(10)) + (left.Count > 10 ? "\n…" : ""));
         }
     }
+
+    private readonly Dictionary<ShellAction, List<string>> _pending = [];
+    private readonly Dictionary<ShellAction, long> _lastTicket = [];
+    private long _tickets;
+
+    // the batch being analysed or processed is never replaced
+    private bool BatchBusy()
+    {
+        if (!Batch.Busy)
+        {
+            return false;
+        }
+
+        Open(Batch);
+        Notify("Hromadné spracovanie práve pracuje – nový priečinok otvorte po jeho skončení (alebo ho zastavte).");
+        return true;
+    }
+
+    /// <summary>A folder opens in batch processing, a file in Single spracovanie.</summary>
+    public Task OpenPathAsync(string path) => HandleNowAsync(ShellAction.Open, [path]);
 
     private async Task ShowUpdatesAsync()
     {

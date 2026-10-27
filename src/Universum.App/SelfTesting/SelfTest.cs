@@ -136,6 +136,8 @@ internal static class SelfTest
         await model.Info.LoadAsync(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"));
         Check(model.Info.Tracks.Count == 6, $"information page shows 6 tracks ({model.Info.Tracks.Count})");
         Check(model.Info.Error.Length == 0, "information page shows no error: " + model.Info.Error);
+        Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
+        model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 
         foreach (var tool in model.Tools)
@@ -143,6 +145,8 @@ internal static class SelfTest
             model.SelectedTool = tool;
             await Settle();
         }
+
+        await TestDashboardAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -240,6 +244,7 @@ internal static class SelfTest
         // "Otvoriť v UNIVERSUM" from the Explorer: a folder opens in batch processing
         await model.OpenPathAsync(Path.Combine(_outputDirectory, "batch"));
         Check(model.SelectedTool.Page == model.Batch && model.Batch.Groups.Count > 0, "a folder from the command line opens in batch processing");
+        await TestContextMenuAsync(model);
         window.Close();
 
         var setup = new MkvToolNixSetupWindow(new MkvToolNixSetupViewModel(services)) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
@@ -436,6 +441,43 @@ internal static class SelfTest
               appended.SourceRows[1].Kind == MuxSourceKind.Appended && appended.Spec().Validate().Count == 0,
             "mux: a file appended to the film – " + string.Join(" | ", appended.Spec().Validate()));
         Check(appended.IsUnprocessed && mux.Unprocessed.Count == 2, $"mux: two settings not yet in the queue ({mux.Unprocessed.Count})");
+
+        // the appended file as MKVToolNix GUI shows it: its own colour, its tracks under the tracks they continue, not editable
+        var main = appended.Inputs[0];
+        var children = appended.TrackRows.OfType<MuxAppendedTrackRow>().ToList();
+        Check(appended.TrackRows.Count == appended.Tracks.Count * 2 && children.Count == appended.Tracks.Count &&
+              appended.TrackRows[1] is MuxAppendedTrackRow { IsMain: false, IsMismatch: false } first && first.Parent == appended.Tracks[0],
+            $"mux: the appended file's tracks under the main tracks ({appended.TrackRows.Count} rows)");
+        Check(main.ColorIndex == 0 && appended.SourceRows[1].ColorIndex == 1 && children.All(c => c.ColorIndex == 1) &&
+              appended.Tracks.All(t => t.ColorIndex == 0) && appended.SourceRows[1].IsChild,
+            "mux: the main file green (colour 0), the appended one blue (colour 1)");
+        appended.SelectedTrackItem = children[0];
+        children[0].Include = false;
+        Check(appended.ShowsAppendedTrack && !appended.ShowsTrack && appended.Tracks[0].Include && appended.SelectMainTrackCommand.CanExecute(null),
+            "mux: a track of the appended file is not editable – " + children[0].Explanation);
+        await Screenshot(window, "mux-appended.png");
+        appended.SelectMainTrackCommand.Execute(null);
+        Check(appended.SelectedTrack == appended.Tracks[0] && appended.ShowsTrack, "mux: from the appended track to its main track");
+        appended.MoveDownCommand.Execute(null);
+        Check(appended.Tracks[1] == children[0].Parent && appended.TrackRows[2] == children[0].Parent && appended.TrackRows[3] == children[0] &&
+              appended.SelectedTrack == children[0].Parent,
+            "mux: a moved track takes the appended track along and stays selected");
+        appended.MoveUpCommand.Execute(null);
+
+        // the source list's menu: take every track of the file, name the output by it, append without being asked
+        appended.Tracks[1].Include = false;
+        appended.SelectedSource = appended.SourceRows[0];
+        appended.TakeAllTracksOfSourceCommand.Execute(null);
+        Check(appended.Tracks.All(t => t.Include), "mux menu: Vybrať všetky stopy zo súboru");
+        appended.OutputFromSourceCommand.Execute(null);
+        Check(appended.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "en-und-cz-forced (1).mkv") && appended.OutputNote == "Zadané ručne.",
+            "mux menu: the output named by the selected file, never over the source – " + appended.OutputPath);
+        appended.SelectedSource = appended.SourceRows[1];
+        appended.OutputFromSourceCommand.Execute(null);
+        Check(appended.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "film-časť-2.mkv"),
+            "mux menu: named by the appended file, in the output's folder – " + appended.OutputPath);
+        Check(appended.SourceInfoCommand.CanExecute(null) && appended.AppendFilesCommand.CanExecute(null) && appended.AddPartsCommand.CanExecute(null),
+            "mux menu: the commands of a selected file are available");
         await Screenshot(window, "mux-tabs.png");
 
         // closing asks; "no" keeps the settings
@@ -484,6 +526,26 @@ internal static class SelfTest
             Check(withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && !withFilm.StartCommand.CanExecute(null), "mux: a delay that is not a number stops writing");
             withFilm.Tracks[1].Delay = "250 ms";
             Check(!withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && withFilm.Spec().Tracks.Any(t => t.Options.DelayMs == 250), "mux: a delay in ms is taken – " + withFilm.Problems);
+
+            // menu: Pridať súbory… adds to these settings without asking; Pripojiť súbory… appends to the selected file
+            var extraSubtitles = Path.Combine(work, "doplnok.cz.srt");
+            File.Copy(srt, extraSubtitles, overwrite: true);
+            asked = null;
+            mux.PickFiles = _ => [extraSubtitles];
+            await withFilm.AddSourcesCommand.ExecuteAsync(null);
+            Check(asked is null && withFilm.Inputs.Count == 3 && withFilm.Inputs[2].File.Path == extraSubtitles, $"mux menu: Pridať súbory… ({withFilm.Inputs.Count} sources, not asked)");
+            var secondPart = Path.Combine(work, "film-časť-3.mkv");
+            File.Copy(film, secondPart, overwrite: true);
+            mux.PickFiles = _ => [secondPart];
+            withFilm.SelectedSource = withFilm.SourceRows[0];
+            await withFilm.AppendFilesCommand.ExecuteAsync(null);
+            Check(asked is null && withFilm.Inputs[0].Appended.Count == 1 && withFilm.SourceRows[1].Kind == MuxSourceKind.Appended &&
+                  withFilm.SourceRows[1].ColorIndex == 1 && withFilm.Inputs[1].ColorIndex == 2,
+                "mux menu: Pripojiť súbory… appends to the selected file (the next files get the next colours)");
+            mux.PickFiles = _ => null;
+            withFilm.RemoveAllSourcesCommand.Execute(null);
+            Check(withFilm.Inputs.Count == 0 && withFilm.Tracks.Count == 0 && withFilm.TrackRows.Count == 0 && withFilm.SourceRows.Count == 0 && !withFilm.IsUnprocessed,
+                "mux menu: Odstrániť všetky súbory");
         }
 
         // the add dialog itself (shown, not answered)
@@ -576,6 +638,129 @@ internal static class SelfTest
     }
 
     /// <summary>Stand-in TMDB and HISTRA: every search answers with the invented results set for each service.</summary>
+    /// <summary>
+    /// Dashboard: date and name day, the weather of the town from the settings (invented Open-Meteo answers – only the
+    /// town and its coordinates are asked for), the overview of the tools.
+    /// </summary>
+    private static async Task TestDashboardAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var dashboard = model.Dashboard;
+        model.Open(dashboard);
+        Check(dashboard.NameDayText.Length > 0 && dashboard.DateText.Length > 0, $"dashboard: {dashboard.DateText}, {dashboard.NameDayText}");
+        Check(!dashboard.HasPlace && dashboard.WeatherMessage.StartsWith("Zadajte mesto", StringComparison.Ordinal), "dashboard: no weather without a town");
+        var weather = new FakeWeather();
+        services.WeatherForSelfTest = new Universum.Core.Weather.OpenMeteo(new System.Net.Http.HttpClient(weather));
+        await Screenshot(window, "dashboard-no-town.png");
+
+        model.Settings.WeatherTownInput = "Nikde";
+        weather.Found = false;
+        await model.Settings.SaveWeatherTownCommand.ExecuteAsync(null);
+        Check(services.Settings.WeatherPlace is null && model.Settings.WeatherStatus.Contains("nenašlo", StringComparison.Ordinal), "settings: a town Open-Meteo does not know is not stored");
+        weather.Found = true;
+        model.Settings.WeatherTownInput = "Vymyslené Mesto";
+        await model.Settings.SaveWeatherTownCommand.ExecuteAsync(null);
+        Check(services.Settings.WeatherPlace is { Name: "Vymyslené Mesto", Latitude: 48.7 }, "settings: the town stored with its coordinates – " + model.Settings.WeatherStatus);
+
+        // a new town is read at once by the Dashboard
+        for (var i = 0; i < 50 && !dashboard.HasWeather; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(dashboard.HasWeather && dashboard.TemperatureText == "−3 °C" && dashboard.WeatherDescription == "Slabé sneženie" && dashboard.WeatherDays.Count == 3,
+            $"dashboard: weather {dashboard.TemperatureText}, {dashboard.WeatherDescription}, days {dashboard.WeatherDays.Count}");
+        Check(dashboard.WeatherDays[0].Label == "Dnes" && dashboard.WeatherDays[1].Label == "Zajtra" && dashboard.WeatherDays[1].Rain == "zrážky 40 %",
+            "dashboard: the days of the forecast – " + string.Join(", ", dashboard.WeatherDays.Select(d => $"{d.Label} {d.Temperatures} {d.Rain}")));
+        Check(weather.Requests.Count == 3 && weather.Requests.Take(2).All(r => r.StartsWith("https://geocoding-api.open-meteo.com/v1/search?", StringComparison.Ordinal)) &&
+              weather.Requests[2].StartsWith("https://api.open-meteo.com/v1/forecast?latitude=48.7&longitude=19.15&", StringComparison.Ordinal),
+            "dashboard: only the town, then its coordinates went to Open-Meteo – " + string.Join(" | ", weather.Requests));
+        weather.Fails = true;
+        await dashboard.RefreshWeatherAsync(force: true);
+        Check(dashboard.HasWeather && dashboard.WeatherMessage.Contains("zobrazené je počasie z", StringComparison.Ordinal), "dashboard: a failed reading keeps the last weather – " + dashboard.WeatherMessage);
+        weather.Fails = false;
+        await dashboard.RefreshWeatherAsync(force: true);
+        dashboard.RefreshStatus();
+        Check(dashboard.Queue.Text.Length > 0 && dashboard.Tools.Text.Contains("MKVToolNix", StringComparison.Ordinal) && dashboard.Status.Count == 6,
+            "dashboard: the overview – " + string.Join(" | ", dashboard.Status.Select(s => $"{s.Title}: {s.Text}")));
+        model.Open(dashboard);
+        await Screenshot(window, "dashboard.png");
+        dashboard.Library.OpenCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.Settings, "dashboard: a line of the overview opens its tool");
+    }
+
+    /// <summary>Open-Meteo with invented answers: one town, a cold day with light snow.</summary>
+    private sealed class FakeWeather : System.Net.Http.HttpMessageHandler
+    {
+        public bool Found { get; set; } = true;
+
+        public bool Fails { get; set; }
+
+        public List<string> Requests { get; } = [];
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request.RequestUri!.ToString());
+            if (Fails)
+            {
+                return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+            }
+
+            var today = DateTime.Now.Date;
+            var days = string.Join(",", Enumerable.Range(0, 3).Select(i => $"\"{today.AddDays(i):yyyy-MM-dd}\""));
+            var body = request.RequestUri.Host.StartsWith("geocoding", StringComparison.Ordinal)
+                ? Found ? """{"results":[{"name":"Vymyslené Mesto","latitude":48.7,"longitude":19.15,"country":"Slovensko"}]}""" : "{}"
+                : "{\"current\":{\"temperature_2m\":-2.6,\"apparent_temperature\":-6.4,\"weather_code\":71,\"wind_speed_10m\":11.8,\"is_day\":1}," +
+                  "\"daily\":{\"time\":[" + days + "],\"weather_code\":[71,3,1],\"temperature_2m_max\":[-0.4,2.4,4.9],\"temperature_2m_min\":[-5.2,-3.1,-1.0]," +
+                  "\"precipitation_probability_max\":[70,40,10]}}";
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json"),
+            });
+        }
+    }
+
+    /// <summary>
+    /// The Explorer's context menu: each selected file starts UNIVERSUM, which hands its command line to the running one
+    /// over the pipe; the running one opens the right tool.
+    /// </summary>
+    private static async Task TestContextMenuAsync(MainViewModel model)
+    {
+        var file = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv");
+        var request = Universum.Core.Shell.ShellRequest.Parse(["--informacie", file]);
+        await model.HandleAsync(request);
+        Check(model.SelectedTool.Page == model.Info && model.Info.File?.Path == file, "context menu: Informácie o súbore opens the Information page");
+
+        // two files selected for Single spracovanie: the Explorer starts two UNIVERSUMs, the second arrives later; they are
+        // collected until none came for a moment, handled once in a stable order, and the file left out is named
+        var menu = Path.Combine(_outputDirectory, "menu");
+        Directory.CreateDirectory(menu);
+        var first = Path.Combine(menu, "a-film.mkv");
+        var second = Path.Combine(menu, "b-film.mkv");
+        File.Copy(file, first, overwrite: true);
+        File.Copy(file, second, overwrite: true);
+        var notes = new List<string>();
+        var notify = model.Notify;
+        model.Notify = notes.Add;
+        var early = model.HandleAsync(Universum.Core.Shell.ShellRequest.Parse(["--single", second]));
+        await Task.Delay(400);
+        var late = model.HandleAsync(Universum.Core.Shell.ShellRequest.Parse(["--single", first]));
+        await Task.WhenAll(early, late);
+        model.Notify = notify;
+        Check(model.SelectedTool.Page == model.Rules && model.Rules.Plan?.Target.Source.Path == first && notes.Count == 1 &&
+              notes[0].Contains("Neotvorené (1):\nb-film.mkv", StringComparison.Ordinal),
+            $"context menu: files of one action handled once, in order, the rest named – {model.Rules.Plan?.Target.Source.Path} | {string.Join(" / ", notes)}");
+
+        using var instance = SingleInstance.TryAcquire();
+        Check(instance is not null, "single instance: the first UNIVERSUM owns the name");
+        Check(SingleInstance.TryAcquire() is null, "single instance: a second start sees the running one");
+        var received = new TaskCompletionSource<string[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        instance?.Listen(args => received.TrySetResult(args));
+        var sent = await Task.Run(() => SingleInstance.Forward(["--zlucovanie", file], TimeSpan.FromSeconds(5)));
+        var arrived = await Task.WhenAny(received.Task, Task.Delay(5000)) == received.Task ? received.Task.Result : [];
+        Check(sent && arrived.SequenceEqual(["--zlucovanie", file]), "single instance: the second start hands its files over the pipe – " + string.Join(" ", arrived));
+    }
+
     private sealed class FakeTitleServices : System.Net.Http.HttpMessageHandler
     {
         public string Tmdb { get; set; } = "";

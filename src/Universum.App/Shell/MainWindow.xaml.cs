@@ -15,6 +15,20 @@ public partial class MainWindow : Window
 
     public MainViewModel Model { get; }
 
+    /// <summary>Another start handed its request over: the window comes to the front.</summary>
+    public void BringToFront()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Focus();
+    }
+
     /// <summary>Closing asks when work would be lost (the self-test closes without asking).</summary>
     public static bool ConfirmOnClose { get; set; } = true;
 

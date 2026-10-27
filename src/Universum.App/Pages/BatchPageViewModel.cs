@@ -382,7 +382,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public async Task AnalyzeAsync()
     {
-        if (Folder is null)
+        // never while an analysis or a run is going on (a request from the Explorer, drag and drop)
+        if (Folder is null || Busy)
         {
             return;
         }
@@ -1012,6 +1013,27 @@ public sealed class BatchPageViewModel : ObservableObject
         if (new TemplateEditorWindow(model) { Owner = System.Windows.Application.Current.MainWindow }.ShowDialog() == true)
         {
             Template = model.ToTemplate();
+        }
+    }
+
+    /// <summary>
+    /// From the Explorer ("Pridať do Hromadného spracovania" on a file): the file's folder is analysed and the template is
+    /// made from the file's group, so files like it are processed like it.
+    /// </summary>
+    public async Task TemplateFromFileAsync(string path)
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        Folder = Path.GetDirectoryName(path);
+        await AnalyzeAsync();
+        if (Groups.FirstOrDefault(g => g.Group.Files.Any(f => Universum.Core.IO.Paths.Same(f.Path, path))) is { } group)
+        {
+            SelectedGroup = group;
+            TemplateFromGroup();
+            RunState = $"Šablóna je zo súboru {Path.GetFileName(path)} (skupina {group.Label}) – súbory ako on sa spracujú rovnako.";
         }
     }
 

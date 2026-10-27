@@ -4,8 +4,8 @@ namespace Universum.Core.Library.Histra;
 
 /// <summary>
 /// HISTRA (histra.net – tracking of watched movies and TV shows): the user's own token goes as a Bearer header with
-/// every API request ("Authorization: Bearer &lt;token&gt;"), the API lives at https://histra.net. Which requests
-/// UNIVERSUM makes is decided once the endpoints are described; until then nothing is sent to HISTRA.
+/// every API request ("Authorization: Bearer &lt;token&gt;"), the API lives at https://histra.net. UNIVERSUM only
+/// searches the catalog for film and series titles (<see cref="HistraCatalog"/>); nothing else is sent.
 /// </summary>
 public static class HistraApi
 {

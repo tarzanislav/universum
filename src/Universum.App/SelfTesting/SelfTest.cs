@@ -207,7 +207,10 @@ internal static class SelfTest
         Check(services.Histra is null, "settings: no HISTRA client while switched off");
         model.Settings.TmdbEnabled = false;
         model.Settings.HistraEnabled = true;
-        Check(model.Settings.SyncStatus == "Zapnutá je len HISTRA.", "settings: only HISTRA on");
+        Check(model.Settings.SyncStatus.StartsWith("Zapnutá je len HISTRA", StringComparison.Ordinal), "settings: only HISTRA on");
+        Check(services.Titles is { Tmdb: null, UsesHistra: true } && model.Rules.Tmdb.SearchCommand.CanExecute(null) &&
+              model.Rules.Tmdb.Tooltip.Contains("katalógu HISTRA", StringComparison.Ordinal),
+            "titles: without TMDB the title button searches the HISTRA catalog – " + model.Rules.Tmdb.Tooltip);
         model.Settings.TmdbEnabled = true;
         Check(!File.ReadAllText(Path.Combine(AppSettings.Directory, "settings.json")).Contains("hst_selftest", StringComparison.Ordinal), "settings hold no plain HISTRA token");
         Check(Application.GetResourceStream(new Uri("pack://application:,,,/Assets/tmdb-logo.png")) is { } logo && logo.Stream.Length > 1000, "TMDB logo bundled");

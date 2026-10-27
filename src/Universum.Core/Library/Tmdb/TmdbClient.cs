@@ -39,7 +39,7 @@ public static class TmdbSeasons
     }
 }
 
-public sealed class TmdbException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class TmdbException(string message, Exception? inner = null) : TitleServiceException(message, inner);
 
 /// <summary>
 /// Reads titles from the TMDB API (https://api.themoviedb.org/3) with the user's own key – an API key (v3) or an API

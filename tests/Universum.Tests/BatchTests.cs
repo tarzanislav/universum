@@ -636,7 +636,11 @@ public sealed class BatchTests
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("universum-batch-");
 
-        public string Path => _directory.FullName;
+        // the analysed folder's own name counts (a "Season 2" folder may be analysed): never the random temporary name
+        // ("universum-batch-s54k…" read as season 54 made a test fail now and then)
+        public Work() => Directory.CreateDirectory(Path);
+
+        public string Path => System.IO.Path.Combine(_directory.FullName, "Práca");
 
         public void Dispose() => _directory.Delete(recursive: true);
     }

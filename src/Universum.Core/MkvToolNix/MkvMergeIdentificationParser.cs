@@ -35,6 +35,18 @@ public static class MkvMergeIdentificationParser
         }
 
         var tracks = Array(root, "tracks").Select(t => ParseTrack(t, trackTags)).ToList();
+
+        // MP4, AVI, TS… carry no default flag: Matroska's "default unless said otherwise" would make every subtitle track
+        // default; as players do, only the first track of each type is the default one
+        if (String(container, "type") is { } type && type != "Matroska")
+        {
+            var seen = new HashSet<TrackType>();
+            tracks = Array(root, "tracks").Zip(tracks, (json, track) =>
+                    json.TryGetProperty("properties", out var p) && Bool(p, "default_track") is not null
+                        ? track
+                        : track with { Flags = track.Flags with { Default = seen.Add(track.Type) && track.Type != TrackType.Subtitles } })
+                .ToList();
+        }
         var duration = Long(containerProperties, "duration");
 
         return new MediaFile

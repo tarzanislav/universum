@@ -446,7 +446,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         {
             Title = title,
             Multiselect = true,
-            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mk3d;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.vob;*.webm;*.ogg;*.ogm;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.h264;*.h265;*.hevc;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
+            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mk3d;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.vob;*.webm;*.ogg;*.ogm;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.h264;*.h265;*.hevc;*.mpls;*.flv;*.rm;*.rmvb;*.3gp;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
         };
         return dialog.ShowDialog() == true ? dialog.FileNames : null;
     }

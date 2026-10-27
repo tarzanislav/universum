@@ -68,6 +68,11 @@ public sealed class BatchTests
         Touch("Film B.wmv");
         Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true) is { } unsupported && unsupported.Contains("nevie prečítať: 2 × WMV", StringComparison.Ordinal),
             "formats mkvmerge cannot read: " + BatchAnalyzer.WhyEmpty(work.Path, true));
+        Touch("DVD", "VTS_01_1.VOB");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("súbory DVD (VOB)", StringComparison.Ordinal), "DVD parts: " + BatchAnalyzer.WhyEmpty(work.Path, true));
+        Touch("Kamera", "PRIVATE", "AVCHD", "BDMV", "STREAM", "00000.MTS");
+        Assert.Sequence(["00000.MTS"], BatchAnalyzer.FindFiles(work.Path, true).Files.Select(Path.GetFileName)!, "camcorder clips are read");
+        File.Delete(Path.Combine(work.Path, "Kamera", "PRIVATE", "AVCHD", "BDMV", "STREAM", "00000.MTS"));
         Touch("Disk", "BDMV", "STREAM", "00001.m2ts");
         Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("kópia disku", StringComparison.Ordinal), "a disc structure is not split into pieces");
         Assert.Equal(0, BatchAnalyzer.FindFiles(work.Path, true).Files.Count, "nothing of the disc is analysed");

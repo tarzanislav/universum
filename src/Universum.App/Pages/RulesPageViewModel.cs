@@ -244,9 +244,9 @@ public sealed class RulesPageViewModel : ObservableObject
         Summary = _plan.Method switch
         {
             WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice.",
-            WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({_plan.Changes.Count} zmien) – trvá to pár sekúnd.",
-            _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({_plan.Changes.Count} zmien).",
-            _ => $"Mení sa poradie stôp – vznikne nový súbor ({_plan.Changes.Count} zmien).",
+            WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({ChangeCount(_plan.Changes.Count)}) – trvá to pár sekúnd.",
+            _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
+            _ => $"Mení sa poradie stôp – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
         } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
         UpdateTarget();
@@ -530,5 +530,13 @@ public sealed class RulesPageViewModel : ObservableObject
         RuleIssueKind.MissingIndex => "Video nemá index (pretáčanie môže byť pomalé alebo nefunkčné) – nový zápis ho vytvorí.",
         RuleIssueKind.ContainerWarnings => "mkvmerge pri čítaní hlási upozornenia: " + string.Join(" ", _file?.Warnings ?? []),
         _ => issue.Kind.ToString(),
+    };
+
+    // "1 zmena", "3 zmeny", "5 zmien"
+    private static string ChangeCount(int count) => count switch
+    {
+        1 => "1 zmena",
+        >= 2 and <= 4 => $"{count} zmeny",
+        _ => $"{count} zmien",
     };
 }

@@ -27,24 +27,31 @@ public static class BatchAnalyzer
     /// </summary>
     public static IReadOnlyList<string> VideoExtensions { get; } =
     [
-        ".mkv", ".mk3d", ".webm", ".mp4", ".m4v", ".mov", ".3gp", ".avi", ".divx", ".ts", ".m2ts", ".mts", ".mpg", ".mpeg",
+        ".mkv", ".mk3d", ".webm", ".mp4", ".m4v", ".mov", ".3gp", ".3g2", ".avi", ".divx", ".ts", ".m2ts", ".mts", ".mpg", ".mpeg",
         ".ogm", ".ogv", ".flv", ".rm", ".rmvb",
     ];
 
     private static readonly string[] Extensions = [.. VideoExtensions, FileProcessor.TemporaryExtension];
 
     /// <summary>Video formats mkvmerge cannot read (named when nothing else is found).</summary>
-    private static readonly string[] Unsupported = [".wmv", ".asf", ".3g2", ".vob", ".dvr-ms", ".wtv"];
+    private static readonly string[] Unsupported = [".wmv", ".asf", ".dvr-ms", ".wtv"];
 
-    // a disc copied as it is: its pieces are not films (Blu-ray clips, DVD sets) – they are joined in Zlučovanie
-    private static bool InDiscStructure(string path) =>
-        path.Split(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)
-            .Any(part => part.Equals("BDMV", StringComparison.OrdinalIgnoreCase) || part.Equals("VIDEO_TS", StringComparison.OrdinalIgnoreCase));
+    /// <summary>DVD parts: they belong together and are joined in Zlučovanie (named when nothing else is found).</summary>
+    private const string DvdPart = ".vob";
+
+    // a disc copied as it is: its pieces are not films (Blu-ray clips, DVD sets) – the film is put together in Zlučovanie;
+    // a camcorder's AVCHD folder (PRIVATE\AVCHD\BDMV\STREAM\*.MTS) holds separate clips and is read as usual
+    private static bool InDiscStructure(string path)
+    {
+        var parts = path.Split(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+        return !parts.Any(p => p.Equals("AVCHD", StringComparison.OrdinalIgnoreCase)) &&
+               parts.Any(p => p.Equals("BDMV", StringComparison.OrdinalIgnoreCase) || p.Equals("VIDEO_TS", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>Matroska files of the folder in natural order (Episode 2 before Episode 10).</summary>
     /// <param name="excludeDirectories">Folders to skip: where results are written (MOVIES and TVSHOWS of the library).</param>
     public static (IReadOnlyList<string> Files, IReadOnlyList<string> Leftovers) FindFiles(
-        string folder, bool recursive, IEnumerable<string>? excludeDirectories = null)
+        string folder, bool recursive, IEnumerable<string>? excludeDirectories = null, CancellationToken cancellationToken = default)
     {
         var excluded = Excluded(excludeDirectories);
         var all = Directory.EnumerateFiles(folder, "*", new EnumerationOptions
@@ -53,6 +60,7 @@ public static class BatchAnalyzer
                 IgnoreInaccessible = true,
                 AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
             })
+            .TakeWhile(_ => !cancellationToken.IsCancellationRequested)
             .Where(f => Extensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase) || FileProcessor.IsTemporaryFile(f))
             .Where(f => !IsInside(Path.GetFullPath(f), excluded) && !InDiscStructure(f))
             .Order(NaturalComparer.Instance)
@@ -75,7 +83,7 @@ public static class BatchAnalyzer
     /// Why a folder gives no file to process (Slovak, for the user): no video it can read, only in subfolders, only results
     /// in MOVIES / TVSHOWS, a disc structure; null when there are video files to read.
     /// </summary>
-    public static string? WhyEmpty(string folder, bool recursive, IEnumerable<string>? excludeDirectories = null)
+    public static string? WhyEmpty(string folder, bool recursive, IEnumerable<string>? excludeDirectories = null, CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(folder))
         {
@@ -94,23 +102,30 @@ public static class BatchAnalyzer
         }
 
         List<(string Path, string Extension, bool Top)> all;
+        bool videoBelow;
         try
         {
-            all = Directory.EnumerateFiles(folder, "*", new EnumerationOptions
+            IEnumerable<(string Path, string Extension, bool Top)> List(bool below) => Directory.EnumerateFiles(folder, "*", new EnumerationOptions
                 {
-                    RecurseSubdirectories = true,
+                    RecurseSubdirectories = below,
                     IgnoreInaccessible = true,
                     AttributesToSkip = FileAttributes.System | FileAttributes.Hidden,
                 })
+                .TakeWhile(_ => !cancellationToken.IsCancellationRequested)
                 .Where(f => !FileProcessor.IsTemporaryFile(f))
                 .Select(f => (Path: f, Extension: Path.GetExtension(f).ToLowerInvariant(), Top: string.Equals(Path.GetDirectoryName(f), folder, comparison)))
-                .Where(f => VideoExtensions.Contains(f.Extension) || Unsupported.Contains(f.Extension))
-                .ToList();
+                .Where(f => VideoExtensions.Contains(f.Extension) || Unsupported.Contains(f.Extension) || f.Extension == DvdPart);
+
+            // without subfolders only the folder is listed; below it the first video found is enough for the hint
+            all = List(recursive).ToList();
+            videoBelow = !recursive && List(below: true).Any(f => !f.Top && VideoExtensions.Contains(f.Extension) && !InLibrary(f.Path) && !InDiscStructure(f.Path));
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
             return "Do priečinka sa nedá pozrieť: " + ex.Message;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var video = all.Where(f => VideoExtensions.Contains(f.Extension)).ToList();
         bool Usable((string Path, string Extension, bool Top) f) => !InLibrary(f.Path) && !InDiscStructure(f.Path);
@@ -119,10 +134,9 @@ public static class BatchAnalyzer
             return null;
         }
 
-        if (!recursive && video.Any(f => !f.Top && Usable(f)))
+        if (videoBelow)
         {
-            return $"Priamo v priečinku nie sú video súbory, v podpriečinkoch je ich {video.Count(f => !f.Top && Usable(f))} – " +
-                   "zaškrtnite „aj podpriečinky“ a dajte Analyzovať znova.";
+            return "Priamo v priečinku nie sú video súbory, v podpriečinkoch áno – zaškrtnite „aj podpriečinky“ a dajte Analyzovať znova.";
         }
 
         var outsideDiscs = video.Where(f => !InDiscStructure(f.Path)).ToList();
@@ -134,14 +148,20 @@ public static class BatchAnalyzer
         if (all.Any(f => InDiscStructure(f.Path)))
         {
             return "V priečinku je kópia disku (BDMV alebo VIDEO_TS) – jej časti sa nespracúvajú jednotlivo. Film z disku " +
-                   "zložte v Zlučovaní (súbory pridajte ako ďalšie časti).";
+                   "zostavte v Zlučovaní: z Blu-ray pridajte súbor playlistu (BDMV\\PLAYLIST\\*.mpls), z DVD súbory VOB ako ďalšie časti.";
         }
 
-        var others = all.Where(f => Unsupported.Contains(f.Extension) && (recursive || f.Top)).GroupBy(f => f.Extension)
+        var where = recursive ? "V priečinku a jeho podpriečinkoch" : "V priečinku";
+        if (all.Any(f => f.Extension == DvdPart))
+        {
+            return $"{where} sú len súbory DVD (VOB) – ich časti patria k sebe, film z nich zostavte v Zlučovaní (pridajte ich ako ďalšie časti).";
+        }
+
+        var others = all.Where(f => Unsupported.Contains(f.Extension)).GroupBy(f => f.Extension)
             .OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} × {g.Key.TrimStart('.').ToUpperInvariant()}").ToList();
         return others.Count > 0
-            ? $"V priečinku{(recursive ? " ani v podpriečinkoch" : "")} sú len formáty, ktoré MKVToolNix nevie prečítať: {string.Join(", ", others)}."
-            : $"V priečinku{(recursive ? " ani v podpriečinkoch" : "")} nie sú žiadne video súbory (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…).";
+            ? $"{where} sú len formáty, ktoré MKVToolNix nevie prečítať: {string.Join(", ", others)}."
+            : $"{(recursive ? "V priečinku ani v jeho podpriečinkoch" : "V priečinku")} nie sú žiadne video súbory (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…).";
     }
 
     /// <summary>Reads the structure of every file (in parallel) and groups the files by structure.</summary>
@@ -156,7 +176,10 @@ public static class BatchAnalyzer
         IProgress<MediaFile>? found = null)
     {
         folder = Path.GetFullPath(folder);
-        var (files, leftovers) = FindFiles(folder, recursive, excludeDirectories);
+
+        // listing a big network folder takes a while: off the caller's thread, and it can be stopped
+        var (files, leftovers) = await Task.Run(() => FindFiles(folder, recursive, excludeDirectories, cancellationToken), cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var results = new (MediaFile? File, string? Error)[files.Count];
         var done = 0;
         await Parallel.ForEachAsync(

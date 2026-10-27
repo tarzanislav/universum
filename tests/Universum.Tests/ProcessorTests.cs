@@ -73,6 +73,10 @@ public sealed class ProcessorTests
             var before = await System.IO.File.ReadAllBytesAsync(original);
             var source = await inspector.InspectAsync(original);
             Assert.True(!source.IsMatroska && source.IsSupported && source.ContainerName == container, $"{file}: {source.ContainerType} ({source.ContainerName})");
+
+            // no default flags in these containers: the first video and audio are the default ones, subtitles are not
+            Assert.True(source.Tracks.GroupBy(t => t.Type).All(g => g.Count(t => t.Flags.Default) == (g.Key == TrackType.Subtitles ? 0 : 1) && (g.Key == TrackType.Subtitles || g.First().Flags.Default)),
+                $"{file}: default flags " + string.Join(", ", source.Tracks.Select(t => $"{t.Type} {t.Flags.Default}")));
             var target = UniversumRules.Apply(source, decisions: decisions);
             Assert.True(!target.IsBlocked, $"{file}: " + string.Join("; ", target.Issues.Select(x => x.ToString())));
             var plan = EditPlan.For(target);

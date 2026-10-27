@@ -96,6 +96,12 @@ public sealed class LibraryTargetPicker : ObservableObject
     /// <summary>The place, when title (and episode) are known and the library is set.</summary>
     public Placement? Placement => _placement;
 
+    /// <summary>The title as typed or chosen, when it can be used (also without a library: names beside the sources).</summary>
+    public TitleInfo? Title { get; private set; }
+
+    /// <summary>The episode of a series file as typed, or null.</summary>
+    public EpisodeNumber? Episode { get; private set; }
+
     /// <summary>Kind, title and episode guessed from a file's and its folders' names; the user can correct them.</summary>
     public void Guess(string path)
     {
@@ -123,6 +129,8 @@ public sealed class LibraryTargetPicker : ObservableObject
         var target = _target();
         var title = TitleGuess.Typed(_kind, TitleText);
         var episode = EpisodeNumber.TryParse(EpisodeText);
+        Title = title is { Problem: null } ? title : null;
+        Episode = _kind == MediaKind.Series ? episode : null;
         if (target is null)
         {
             Description = "";

@@ -36,6 +36,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private string? _typedTmdb;
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
+    private FileRow? _selectedFile;
     private BatchTemplate _template = BatchTemplate.RulesOnly;
     private string _summary = "Vyberte priečinok so súbormi MKV a dajte Analyzovať.";
     private string _simulation = "";
@@ -63,6 +64,7 @@ public sealed class BatchPageViewModel : ObservableObject
         StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
+        ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
@@ -155,6 +157,29 @@ public sealed class BatchPageViewModel : ObservableObject
     public ObservableCollection<SlotRow> SlotRows { get; } = [];
 
     public ObservableCollection<FileRow> FileRows { get; } = [];
+
+    /// <summary>The file selected in the group's file list.</summary>
+    public FileRow? SelectedFile
+    {
+        get => _selectedFile;
+        set
+        {
+            if (SetProperty(ref _selectedFile, value))
+            {
+                ShowInfoCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Opens the selected file on the Information page.</summary>
+    public RelayCommand ShowInfoCommand { get; }
+
+    /// <summary>The Information page should show this file.</summary>
+    public event Action<string>? InfoRequested;
+
+    /// <summary>The analysed files, by group (for the Information page).</summary>
+    public IEnumerable<KnownFile> KnownFiles =>
+        _items.Select(i => new KnownFile($"Hromadné spracovanie – skupina {i.Group.Label}", System.IO.Path.GetFileName(i.File.Path), i.File.Path));
 
     public IReadOnlyList<BatchItem> Items => _items;
 

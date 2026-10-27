@@ -52,6 +52,58 @@ public sealed class MainViewModel : ObservableObject
             SelectedTool = Tools.First(t => t.Page == Output);
         };
         _services.Updates.Checked += UpdateBadgeText;
+        Info.KnownSource = () => Mux.KnownFiles.Concat(Batch.KnownFiles);
+        Mux.InfoRequested += path => _ = ShowInfoAsync(path);
+        Batch.InfoRequested += path => _ = ShowInfoAsync(path);
+    }
+
+    /// <summary>
+    /// What closing the program would lose (MKVToolNix GUI asks the same): settings of the multiplexer not yet in the
+    /// queue, a running or waiting job, a running batch; null when nothing.
+    /// </summary>
+    public string? CloseWarning()
+    {
+        var lost = Mux.Unprocessed.Select(s => $"• Nastavenia zlučovania „{s.DisplayName}“ boli zmenené a nie sú vo fronte.").ToList();
+        if (_services.Jobs.Running is { } running)
+        {
+            lost.Add($"• Práve beží úloha {running.Id} ({running.Description}) – preruší sa.");
+        }
+
+        if (_services.Jobs.WaitingCount is > 0 and var waiting)
+        {
+            lost.Add($"• Vo fronte čaká úloh: {waiting} – nespracujú sa.");
+        }
+
+        if (Batch.IsRunning)
+        {
+            lost.Add("• Beží hromadné spracovanie – zastaví sa.");
+        }
+
+        return lost.Count == 0
+            ? null
+            : string.Join("\n", lost) + "\n\nNaozaj chcete UNIVERSUM zavrieť? Všetky zmeny sa stratia. Originálne súbory zostanú nedotknuté.";
+    }
+
+    /// <summary>Closing anyway: the queue stops and the running job is cancelled (its unfinished output is removed).</summary>
+    public void StopWork()
+    {
+        _services.Jobs.Stop();
+        if (_services.Jobs.Running is { } running)
+        {
+            _services.Jobs.Cancel(running);
+        }
+
+        if (Batch.IsRunning && Batch.StopCommand.CanExecute(null))
+        {
+            Batch.StopCommand.Execute(null);
+        }
+    }
+
+    /// <summary>Opens the Information page with a file from another page.</summary>
+    public async Task ShowInfoAsync(string path)
+    {
+        SelectedTool = Tools.First(t => t.Page == Info);
+        await Info.LoadAsync(path);
     }
 
     /// <summary>
@@ -99,7 +151,18 @@ public sealed class MainViewModel : ObservableObject
 
     public Jobs.JobOutputPageViewModel Output { get; }
 
-    public ToolItem SelectedTool { get => _selectedTool; set => SetProperty(ref _selectedTool, value); }
+    public ToolItem SelectedTool
+    {
+        get => _selectedTool;
+        set
+        {
+            if (SetProperty(ref _selectedTool, value) && value.Page == Info)
+            {
+                // the files of the multiplexer and the batch, as they are now
+                Info.RefreshKnown();
+            }
+        }
+    }
 
     public string MkvToolNixStatus { get => _mkvToolNixStatus; private set => SetProperty(ref _mkvToolNixStatus, value); }
 

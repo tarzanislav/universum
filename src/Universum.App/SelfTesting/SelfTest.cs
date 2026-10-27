@@ -128,6 +128,7 @@ internal static class SelfTest
     private static async Task TestWindowsAsync(AppServices services)
     {
         var model = new MainViewModel(services);
+        MainWindow.ConfirmOnClose = false;
         var window = new MainWindow(model) { Width = 1180, Height = 740, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
         window.Show();
         await model.RefreshStatusAsync();
@@ -333,30 +334,64 @@ internal static class SelfTest
         await Screenshot(window, "job-output.png");
     }
 
-    /// <summary>Multiplexer: a film and a subtitle file, a track left out, the rules over both, written into the library as a queue job.</summary>
+    /// <summary>
+    /// Multiplexer: a film and a subtitle file (asked how to add them), a track left out, the rules over both; the output
+    /// beside the source by default, then into the library as a queue job. Then tabs: new settings for each file,
+    /// an appended file, closing with a question, and the Information page with the files in work.
+    /// </summary>
     private static async Task TestMultiplexerAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
         var srt = Path.Combine(work, "titulky-sk.srt");
         File.WriteAllText(srt, "1\n00:00:00,500 --> 00:00:01,500\nVymyslený slovenský titulok.\n\n");
+        var film = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv");
         var mux = model.Mux;
+        MuxAddRequest? asked = null;
+        var answer = MuxAddAction.AddToCurrent;
+        mux.AskHowToAdd = request =>
+        {
+            asked = request;
+            return new MuxAddChoice(answer, answer is MuxAddAction.Append or MuxAddAction.AdditionalParts ? request.Sources[0] : null);
+        };
+        string? confirmed = null;
+        var confirm = false;
+        mux.Confirm = message =>
+        {
+            confirmed = message;
+            return confirm;
+        };
         model.SelectedTool = model.Tools.First(t => t.Page == mux);
-        await mux.AddFilesAsync([Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), srt]);
-        Check(mux.Inputs.Count == 2 && mux.Tracks.Count == 7, $"mux: two inputs, 7 tracks ({mux.Inputs.Count}, {mux.Tracks.Count}) {mux.Result}");
+        await mux.AddFilesAsync([film, srt]);
+        var set = mux.Current;
+        Check(asked is { Files.Count: 2 } && mux.Settings.Count == 1, $"mux: asked how to add two files ({asked?.Files.Count}), one settings ({mux.Settings.Count})");
+        Check(set.Inputs.Count == 2 && set.Tracks.Count == 7 && set.SourceRows.Count == 2, $"mux: two inputs, 7 tracks ({set.Inputs.Count}, {set.Tracks.Count}) {set.Result}");
+        Check(!set.UseLibrary && set.OutputEditable && set.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "en-und-cz-forced (1).mkv"),
+            "mux: the output is beside the source by default, as in MKVToolNix – " + set.OutputPath);
         LanguageChoice Lang(MuxTrackRow row, string code) => row.LanguageChoices.First(c => c.Tag.Primary == code);
-        mux.Tracks[2].Language = Lang(mux.Tracks[2], "cs");
-        mux.Tracks[3].Language = Lang(mux.Tracks[3], "cs");
-        mux.Tracks[6].Language = Lang(mux.Tracks[6], "sk");
-        mux.Tracks[5].Include = false;
-        mux.ApplyRules();
-        mux.Library.IsMovie = true;
-        mux.Library.TitleText = "Zlúčený film (2026)";
-        Check(mux.Findings.Count == 0, "mux: nothing to check after the rules – " + string.Join(" | ", mux.Findings));
-        Check(mux.StartCommand.CanExecute(null), "mux: ready to write – " + mux.Problems);
-        Check(mux.Library.Description.StartsWith(Path.Combine("MOVIES", "Zlúčený film (2026)", "Zlúčený film (2026) - CZ EN SK"), StringComparison.Ordinal) ||
-              mux.Library.Description.StartsWith(Path.Combine("MOVIES", "Zlúčený film (2026)", "Zlúčený film (2026) - CZ EN"), StringComparison.Ordinal),
-            "mux: name by the rules – " + mux.Library.Description);
+        set.Tracks[2].Language = Lang(set.Tracks[2], "cs");
+        set.Tracks[3].Language = Lang(set.Tracks[3], "cs");
+        set.Tracks[6].Language = Lang(set.Tracks[6], "sk");
+        set.Tracks[5].Include = false;
+        set.ApplyRules();
+        set.Library.IsMovie = true;
+        set.Library.TitleText = "Zlúčený film (2026)";
+        Check(set.Findings.Count == 0, "mux: nothing to check after the rules – " + string.Join(" | ", set.Findings));
+        Check(Path.GetDirectoryName(set.OutputPath) == Path.GetDirectoryName(film) &&
+              Path.GetFileName(set.OutputPath).StartsWith("Zlúčený film (2026) - CZ EN", StringComparison.Ordinal),
+            "mux: with a title the name follows the rules, still beside the source – " + set.OutputPath);
+        Check(set.CanUseLibrary, "mux: the library can be used");
+        set.UseLibrary = true;
+        Check(!set.OutputEditable && set.StartCommand.CanExecute(null), "mux: into the library, the path is greyed out, ready to write – " + set.Problems);
+        Check(set.Library.Description.StartsWith(Path.Combine("MOVIES", "Zlúčený film (2026)", "Zlúčený film (2026) - CZ EN"), StringComparison.Ordinal),
+            "mux: name by the rules – " + set.Library.Description);
+        set.SelectedTrack = set.Tracks.First(t => t.Kind == TrackType.Audio);
+        set.ShowAdvanced = true;
+        Check(set.ShowsTrack && !set.ShowsSource, "mux: the properties show the selected track");
         await Screenshot(window, "mux.png");
-        mux.StartCommand.Execute(null);
+        set.SelectedSource = set.SourceRows[0];
+        Check(set.ShowsSource && set.SelectedTrack is null, "mux: the properties show the selected source file");
+        await Screenshot(window, "mux-source.png");
+        set.StartCommand.Execute(null);
+        Check(!set.IsUnprocessed, "mux: in the queue, nothing unprocessed");
         var job = (Core.Jobs.MuxJob)services.Jobs.Jobs[^1];
         for (var i = 0; i < 300 && !job.IsFinished; i++)
         {
@@ -372,7 +407,63 @@ internal static class SelfTest
                 "mux: written into the library in the rules' order – " + output + " " + string.Join(",", written.Tracks.Select(t => t.Language.Primary)));
         }
 
-        Check(mux.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal), "mux: page shows the outcome – " + mux.Result);
+        Check(set.Result.StartsWith($"Úloha {job.Id}", StringComparison.Ordinal) && set.Progress >= 1, $"mux: the tab shows the outcome and 100 % – {set.Result} {set.Progress:P0}");
+        Check(mux.QueueStatus.Contains("dokončené", StringComparison.Ordinal), "mux: the status line shows the queue – " + mux.QueueStatus);
+
+        // tabs: new settings for each file (the subtitles get their own)
+        mux.NewSettingsCommand.Execute(null);
+        Check(mux.Settings.Count == 2 && mux.Current != set && mux.Current.Inputs.Count == 0, "mux: new empty settings as a second tab");
+        answer = MuxAddAction.NewSettingsForEach;
+        asked = null;
+        var copy = Path.Combine(work, "film-časť-2.mkv");
+        File.Copy(film, copy, overwrite: true);
+        await mux.AddFilesAsync([film, srt]);
+        Check(asked is not null && mux.Settings.Count == 3 && mux.Settings[1].Inputs.Count == 1 && mux.Settings[2].Inputs.Count == 1,
+            $"mux: new settings for each file – {mux.Settings.Count} tabs");
+
+        // a file appended to the film (it continues its tracks)
+        mux.Current = mux.Settings[1];
+        answer = MuxAddAction.Append;
+        await mux.AddFilesAsync([copy]);
+        var appended = mux.Settings[1];
+        Check(appended.Inputs.Count == 1 && appended.Inputs[0].Appended.Count == 1 && appended.SourceRows.Count == 2 &&
+              appended.SourceRows[1].Kind == MuxSourceKind.Appended && appended.Spec().Validate().Count == 0,
+            "mux: a file appended to the film – " + string.Join(" | ", appended.Spec().Validate()));
+        Check(appended.IsUnprocessed && mux.Unprocessed.Count == 2, $"mux: two settings not yet in the queue ({mux.Unprocessed.Count})");
+        await Screenshot(window, "mux-tabs.png");
+
+        // closing asks; "no" keeps the settings
+        mux.CloseSettingsCommand.Execute(appended);
+        Check(confirmed?.Contains("boli zmenené", StringComparison.Ordinal) == true && mux.Settings.Contains(appended), "mux: closing changed settings asks first – " + confirmed);
+
+        // the Information page lists the files in work and shows the chosen one
+        appended.SelectedSource = appended.SourceRows[1];
+        mux.ShowInfoCommand.Execute(null);
+        for (var i = 0; i < 100 && model.Info.Tracks.Count == 0; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(model.SelectedTool.Page == model.Info && model.Info.KnownFiles.Count >= 3 && model.Info.Tracks.Count > 0 &&
+              model.Info.SelectedKnown?.Path == copy,
+            $"info: the multiplexer's files are listed and the chosen one is shown ({model.Info.KnownFiles.Count}, {model.Info.Tracks.Count})");
+        await Screenshot(window, "info-files.png");
+
+        // the add dialog itself (shown, not answered)
+        var dialog = new MuxAddFilesWindow(new MuxAddFilesModel(new MuxAddRequest([film, srt], appended.Inputs.ToList()))) { Owner = window };
+        dialog.Show();
+        await Screenshot(dialog, "mux-add-files.png");
+        dialog.Close();
+
+        // done: the extra tabs are closed ("yes" to the question)
+        confirm = true;
+        foreach (var extra in mux.Settings.Where(s => s != set).ToList())
+        {
+            mux.CloseSettingsCommand.Execute(extra);
+        }
+
+        Check(mux.Settings.Count == 1 && mux.Unprocessed.Count == 0, $"mux: closed after the question ({mux.Settings.Count})");
+        model.SelectedTool = model.Tools.First(t => t.Page == mux);
     }
 
     /// <summary>Chapter editor: read, rename, add; the result is a library copy (original unchanged); a library file edited again can be undone.</summary>

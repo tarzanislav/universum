@@ -8,10 +8,19 @@ using Universum.Core.MkvToolNix;
 
 namespace Universum.App.Pages;
 
-/// <summary>Information tool: structure of one file (tracks, chapters, tags, attachments).</summary>
+/// <summary>A file another page works with, offered on the Information page.</summary>
+/// <param name="Group">Where it comes from: "Zlučovanie – Film.mkv", "Hromadné spracovanie – Seriál".</param>
+public sealed record KnownFile(string Group, string Name, string Path);
+
+/// <summary>
+/// Information tool: structure of one file (tracks, chapters, tags, attachments). The files added in the multiplexer
+/// and analysed in the batch are listed beside it, so each can be looked at with one click.
+/// </summary>
 public sealed class InfoPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
+    private KnownFile? _selectedKnown;
+    private bool _selecting;
     private string _fileName = "";
     private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
     private string _error = "";
@@ -23,6 +32,41 @@ public sealed class InfoPageViewModel : ObservableObject
     }
 
     public AsyncRelayCommand OpenCommand { get; }
+
+    /// <summary>Gives the files the other pages work with now (set by the main window).</summary>
+    public Func<IEnumerable<KnownFile>> KnownSource { get; set; } = () => [];
+
+    /// <summary>Files from the multiplexer and the batch.</summary>
+    public ObservableCollection<KnownFile> KnownFiles { get; } = [];
+
+    public bool HasKnownFiles => KnownFiles.Count > 0;
+
+    /// <summary>Choosing a known file shows it.</summary>
+    public KnownFile? SelectedKnown
+    {
+        get => _selectedKnown;
+        set
+        {
+            if (SetProperty(ref _selectedKnown, value) && value is not null && !_selecting)
+            {
+                _ = LoadAsync(value.Path);
+            }
+        }
+    }
+
+    /// <summary>Reads the known files again (when the page is opened).</summary>
+    public void RefreshKnown()
+    {
+        var path = _selectedKnown?.Path ?? File?.Path;
+        KnownFiles.Clear();
+        foreach (var known in KnownSource().DistinctBy(k => k.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            KnownFiles.Add(known);
+        }
+
+        Select(path);
+        OnPropertyChanged(nameof(HasKnownFiles));
+    }
 
     public ObservableCollection<TrackRow> Tracks { get; } = [];
 
@@ -40,6 +84,7 @@ public sealed class InfoPageViewModel : ObservableObject
         Tracks.Clear();
         File = null;
         FileName = Path.GetFileName(path);
+        Select(path);
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
@@ -68,6 +113,20 @@ public sealed class InfoPageViewModel : ObservableObject
         catch (Exception ex) when (ex is MkvToolNixException or IOException or Core.Processes.ProcessStartException or TimeoutException)
         {
             Error = ex.Message;
+        }
+    }
+
+    // marks the known file shown without loading it again
+    private void Select(string? path)
+    {
+        _selecting = true;
+        try
+        {
+            SelectedKnown = path is null ? null : KnownFiles.FirstOrDefault(k => Core.IO.Paths.Same(k.Path, path));
+        }
+        finally
+        {
+            _selecting = false;
         }
     }
 

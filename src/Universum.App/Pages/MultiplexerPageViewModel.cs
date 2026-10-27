@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
@@ -7,136 +8,171 @@ using Universum.App.Jobs;
 using Universum.Core.Jobs;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
-using Universum.Core.Muxing;
 using Universum.Core.Processes;
-using Universum.Core.Rules;
 
 namespace Universum.App.Pages;
 
+/// <summary>What to do with files added to the multiplexer (MKVToolNix GUI: "Adding multiple files").</summary>
+public enum MuxAddAction
+{
+    /// <summary>Add as new source files to the current multiplex settings.</summary>
+    AddToCurrent,
+
+    /// <summary>Create new multiplex settings and add all files to them.</summary>
+    NewSettingsForAll,
+
+    /// <summary>Create new multiplex settings for each file.</summary>
+    NewSettingsForEach,
+
+    /// <summary>Append to an existing source file (mkvmerge "+").</summary>
+    Append,
+
+    /// <summary>Add as additional parts to an existing source file (mkvmerge "( a b )").</summary>
+    AdditionalParts,
+}
+
+/// <summary>The files to add and the sources of the current settings they could be appended to.</summary>
+public sealed record MuxAddRequest(IReadOnlyList<string> Files, IReadOnlyList<MuxInputRow> Sources);
+
+/// <param name="Target">The source to append to or to add parts to.</param>
+/// <param name="NewForVideo">Files with video always get new multiplex settings.</param>
+/// <param name="Remember">Use this action from now on without asking (only the first three actions).</param>
+public sealed record MuxAddChoice(MuxAddAction Action, MuxInputRow? Target = null, bool NewForVideo = false, bool Remember = false);
+
 /// <summary>
-/// Multiplexer (MKVToolNix GUI: Multiplexer): input files, the tracks taken from them with their names, languages and
-/// flags in the output order, title, chapters, attachments and the output file. The UNIVERSUM rules fill the tracks in
-/// with one click; the Check panel points out what is worth a second look. Writing runs as a job in the queue; the
-/// inputs are only read and an existing file is never overwritten.
+/// Multiplexer (MKVToolNix GUI: Multiplexer): several multiplex settings side by side as tabs, each one output file.
+/// Files are added to the current settings, to new settings, appended or added as parts – asked when it is not
+/// obvious. Closing settings or the program with changes not yet in the queue asks first.
 /// </summary>
 public sealed class MultiplexerPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
-    private MuxInputRow? _selectedInput;
-    private MuxTrackRow? _selectedTrack;
-    private string? _selectedAttachment;
-    private string _title = "";
-    private string _chaptersFile = "";
-    private string _problems = "";
-    private string _result = "";
-    private bool _loading;
+    private MuxSettingsViewModel _current;
+    private string _message = "";
 
     public MultiplexerPageViewModel(AppServices services)
     {
         _services = services;
-        Library = new LibraryTargetPicker(services, LibraryTarget);
-        Library.Changed += RefreshCommands;
+        _current = new MuxSettingsViewModel(services) { IsCurrent = true };
+        Settings.Add(_current);
         AddFilesCommand = new AsyncRelayCommand(AddFilesAsync);
-        RemoveInputCommand = new RelayCommand(RemoveInput, () => _selectedInput is not null);
-        ClearCommand = new RelayCommand(Clear, () => Inputs.Count > 0);
-        MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
-        MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
-        ApplyRulesCommand = new RelayCommand(ApplyRules, () => Tracks.Any(t => t.Include));
-        ChooseChaptersCommand = new RelayCommand(ChooseChapters);
-        ClearChaptersCommand = new RelayCommand(() => ChaptersFile = "", () => ChaptersFile.Length > 0);
-        AddAttachmentCommand = new RelayCommand(AddAttachments);
-        RemoveAttachmentCommand = new RelayCommand(() => Attachments.Remove(_selectedAttachment!), () => _selectedAttachment is not null);
-        StartCommand = new RelayCommand(() => Enqueue(start: true), CanWrite);
-        QueueCommand = new RelayCommand(() => Enqueue(start: false), CanWrite);
-        Attachments.CollectionChanged += (_, _) => Recalculate();
+        NewSettingsCommand = new RelayCommand(() => Current = NewSettings());
+        CloseSettingsCommand = new RelayCommand<MuxSettingsViewModel>(s => Close(s!), s => s is not null);
+        SelectSettingsCommand = new RelayCommand<MuxSettingsViewModel>(s => Current = s!, s => s is not null);
+        ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(SelectedFile()!), () => SelectedFile() is not null);
+        services.Jobs.Changed += () => JobRow.OnUi(QueueChanged);
+        services.Jobs.JobChanged += _ => JobRow.OnUi(QueueChanged);
+        Watch(_current);
     }
+
+    /// <summary>Asks what to do with added files (the dialog; the self-test answers itself).</summary>
+    public Func<MuxAddRequest, MuxAddChoice?> AskHowToAdd { get; set; } = MuxAddFilesWindow.Ask;
+
+    /// <summary>Asks before something is lost (true = go on); the self-test answers itself.</summary>
+    public Func<string, bool> Confirm { get; set; } = message =>
+        MessageBox.Show(Application.Current.MainWindow!, message, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+
+    /// <summary>The Information page should show this file.</summary>
+    public event Action<string>? InfoRequested;
 
     public AsyncRelayCommand AddFilesCommand { get; }
 
-    public RelayCommand RemoveInputCommand { get; }
+    public RelayCommand NewSettingsCommand { get; }
 
-    public RelayCommand ClearCommand { get; }
+    public RelayCommand<MuxSettingsViewModel> CloseSettingsCommand { get; }
 
-    public RelayCommand MoveUpCommand { get; }
+    public RelayCommand<MuxSettingsViewModel> SelectSettingsCommand { get; }
 
-    public RelayCommand MoveDownCommand { get; }
+    /// <summary>Opens the selected source file on the Information page.</summary>
+    public RelayCommand ShowInfoCommand { get; }
 
-    public RelayCommand ApplyRulesCommand { get; }
+    /// <summary>The tabs: one multiplex settings each.</summary>
+    public ObservableCollection<MuxSettingsViewModel> Settings { get; } = [];
 
-    /// <summary>Where the output goes in the library (title, episode, name by the rules).</summary>
-    public LibraryTargetPicker Library { get; }
-
-    public RelayCommand ChooseChaptersCommand { get; }
-
-    public RelayCommand ClearChaptersCommand { get; }
-
-    public RelayCommand AddAttachmentCommand { get; }
-
-    public RelayCommand RemoveAttachmentCommand { get; }
-
-    /// <summary>Adds the job and starts the queue.</summary>
-    public RelayCommand StartCommand { get; }
-
-    /// <summary>Adds the job only.</summary>
-    public RelayCommand QueueCommand { get; }
-
-    public ObservableCollection<MuxInputRow> Inputs { get; } = [];
-
-    /// <summary>All tracks of all inputs, in output order (tracks not taken stay in the list, unticked).</summary>
-    public ObservableCollection<MuxTrackRow> Tracks { get; } = [];
-
-    public ObservableCollection<string> Attachments { get; } = [];
-
-    public ObservableCollection<string> Findings { get; } = [];
-
-    public bool HasFindings => Findings.Count > 0;
-
-    public MuxInputRow? SelectedInput { get => _selectedInput; set { if (SetProperty(ref _selectedInput, value)) { RefreshCommands(); } } }
-
-    public MuxTrackRow? SelectedTrack { get => _selectedTrack; set { if (SetProperty(ref _selectedTrack, value)) { RefreshCommands(); } } }
-
-    public string? SelectedAttachment { get => _selectedAttachment; set { if (SetProperty(ref _selectedAttachment, value)) { RefreshCommands(); } } }
-
-    public string Title { get => _title; set { if (SetProperty(ref _title, value)) { Recalculate(); } } }
-
-    public string ChaptersFile { get => _chaptersFile; set { if (SetProperty(ref _chaptersFile, value)) { Recalculate(); } } }
-
-    /// <summary>What still stops writing (from the spec's validation).</summary>
-    public string Problems { get => _problems; private set => SetProperty(ref _problems, value); }
-
-    public string Result { get => _result; private set => SetProperty(ref _result, value); }
-
-    public string Summary => Inputs.Count == 0
-        ? "Pridajte súbory (MKV, MP4, AVI, zvuk, titulky SRT/ASS…) tlačidlom alebo ich sem pretiahnite myšou."
-        : $"Vstupy: {Inputs.Count}, vybrané stopy: {Tracks.Count(t => t.Include)} z {Tracks.Count}.";
-
-    /// <summary>The spec the page describes now.</summary>
-    public MuxSpec Spec()
+    public MuxSettingsViewModel Current
     {
-        var sources = Inputs.Select(i => i.ToSource()).ToList();
-        var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
-        return new MuxSpec(sources, tracks, "")
+        get => _current;
+        set
         {
-            Placement = Library.Placement,
-            Title = Title.Length == 0 ? null : Title,
-            ChaptersFile = ChaptersFile.Length == 0 ? null : ChaptersFile,
-            Attachments = Attachments.Select(a => new MuxAttachment(a)).ToList(),
-        };
+            if (value is null || ReferenceEquals(_current, value))
+            {
+                return;
+            }
+
+            _current.IsCurrent = false;
+            _current = value;
+            _current.IsCurrent = true;
+            OnPropertyChanged();
+            ShowInfoCommand.NotifyCanExecuteChanged();
+        }
     }
 
-    /// <summary>Adds input files (also by drag and drop and from the self-test).</summary>
+    /// <summary>What happened with the last added files (unreadable files).</summary>
+    public string Message { get => _message; private set => SetProperty(ref _message, value); }
+
+    /// <summary>Settings with files that were not put into the queue yet.</summary>
+    public IReadOnlyList<MuxSettingsViewModel> Unprocessed => Settings.Where(s => s.IsUnprocessed).ToList();
+
+    /// <summary>The queue as the status line shows it: "Fronta: 1 beží (45 %), 2 čakajú · hotové 3".</summary>
+    public string QueueStatus
+    {
+        get
+        {
+            var jobs = _services.Jobs.Jobs;
+            var running = _services.Jobs.Running;
+            var waiting = jobs.Count(j => j.Status == JobStatus.Waiting);
+            var done = jobs.Count(j => j.IsFinished);
+            return jobs.Count == 0
+                ? "Fronta úloh je prázdna."
+                : $"Fronta: {(running is null ? "nič nebeží" : $"beží úloha {running.Id} ({running.Progress:P0})")}, čaká {waiting}, dokončené {done}" +
+                  (jobs.Any(j => j.Status == JobStatus.Failed) ? $", s chybou {jobs.Count(j => j.Status == JobStatus.Failed)}" : "") + ".";
+        }
+    }
+
+    /// <summary>Overall progress of the running job (0–1) for the status line.</summary>
+    public double QueueProgress => _services.Jobs.Running?.Progress ?? 0;
+
+    /// <summary>Every file the multiplexer reads now, labelled by its settings (for the Information page).</summary>
+    public IEnumerable<KnownFile> KnownFiles =>
+        Settings.SelectMany(s => s.Files.Select(f => new KnownFile($"Zlučovanie – {s.ShortName}", Path.GetFileName(f), f)));
+
+    /// <summary>
+    /// Adds files (button, drag and drop, self-test): with several files, or when the current settings already have
+    /// sources, asks what to do – add, new settings for all or for each, append, additional parts.
+    /// </summary>
     public async Task AddFilesAsync(IEnumerable<string> paths)
     {
+        var list = paths.ToList();
+        if (list.Count == 0)
+        {
+            return;
+        }
+
+        var choice = Decide(list);
+        if (choice is null || (choice.Action is MuxAddAction.Append or MuxAddAction.AdditionalParts && choice.Target is null))
+        {
+            return;
+        }
+
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Result = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Message = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            return;
+        }
+
+        // additional parts are read as one with their file: they are not inspected on their own
+        if (choice.Action == MuxAddAction.AdditionalParts && choice.Target is { } owner)
+        {
+            _current.AddParts(owner, list);
+            Message = "";
             return;
         }
 
         var inspector = new MkvMergeInspector(installation, _services.Runner);
         var problems = new List<string>();
-        foreach (var path in paths)
+        var files = new List<MediaFile>();
+        foreach (var path in list)
         {
             try
             {
@@ -147,12 +183,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
                     continue;
                 }
 
-                var input = new MuxInputRow(file, Inputs.Count + 1, Recalculate);
-                Inputs.Add(input);
-                foreach (var track in file.Tracks)
-                {
-                    Tracks.Add(new MuxTrackRow(input, track, LanguageChoice.Common, Recalculate));
-                }
+                files.Add(file);
             }
             catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException)
             {
@@ -160,259 +191,140 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             }
         }
 
-        if (Library.TitleText.Length == 0 && Inputs.Count > 0)
-        {
-            Library.Guess(Inputs[0].File.Path);
-        }
-
-        if (Title.Length == 0 && Inputs.FirstOrDefault()?.File.Title is { Length: > 0 } title)
-        {
-            _title = title;
-            OnPropertyChanged(nameof(Title));
-        }
-
-        Result = string.Join("\n", problems);
-        Recalculate();
+        Distribute(files, choice);
+        Message = string.Join("\n", problems);
     }
 
-    /// <summary>Fills names, languages, flags and the order in by the UNIVERSUM rules (for the tracks taken).</summary>
-    public void ApplyRules()
+    /// <summary>Closes settings; with changes not yet in the queue it asks first. One empty settings always stays.</summary>
+    public void Close(MuxSettingsViewModel settings)
     {
-        var taken = Tracks.Where(t => t.Include).ToList();
-        if (taken.Count == 0)
+        if (settings.IsUnprocessed &&
+            !Confirm($"Nastavenia zlučovania „{settings.DisplayName}“ boli zmenené. Naozaj ich chcete zavrieť? Všetky zmeny sa stratia."))
         {
             return;
         }
 
-        var sources = Inputs.Select(i => i.ToSource()).ToList();
-        var ruled = MuxRules.Apply(sources, taken.Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList(), _services.Profile);
-        _loading = true;
-        try
+        var index = Settings.IndexOf(settings);
+        Settings.Remove(settings);
+        if (Settings.Count == 0)
         {
-            var ordered = ruled.Select(r => taken.First(t => Inputs.IndexOf(t.Input) == r.Source && t.Track.Id == r.TrackId)).ToList();
-            foreach (var (row, track) in ordered.Zip(ruled))
-            {
-                row.Take(track);
-            }
-
-            var rest = Tracks.Where(t => !t.Include).ToList();
-            Tracks.Clear();
-            foreach (var row in ordered.Concat(rest))
-            {
-                Tracks.Add(row);
-            }
-
-            foreach (var input in Inputs)
-            {
-                input.KeepTags = !_services.Profile.RemoveTags && input.KeepTags;
-            }
-        }
-        finally
-        {
-            _loading = false;
+            NewSettings();
         }
 
-        Recalculate();
-        Result = taken.Any(t => t.Language.Tag.IsUndetermined && t.Track.Type is TrackType.Audio or TrackType.Subtitles)
-            ? "Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova."
-            : "Pravidlá UNIVERSUM sú použité – skontrolujte a spustite.";
+        if (ReferenceEquals(_current, settings))
+        {
+            _current = Settings[Math.Min(index, Settings.Count - 1)];
+            _current.IsCurrent = true;
+            OnPropertyChanged(nameof(Current));
+            ShowInfoCommand.NotifyCanExecuteChanged();
+        }
     }
 
-    private void Recalculate()
+    private MuxAddChoice? Decide(List<string> paths)
     {
-        if (_loading)
+        if (paths.Count == 1 && _current.Inputs.Count == 0)
         {
+            return new MuxAddChoice(MuxAddAction.AddToCurrent);
+        }
+
+        if (_services.Settings.MuxAddAction is { } remembered && Enum.TryParse<MuxAddAction>(remembered, out var action) && action <= MuxAddAction.NewSettingsForEach)
+        {
+            return new MuxAddChoice(action, NewForVideo: _services.Settings.MuxNewSettingsForVideo);
+        }
+
+        var choice = AskHowToAdd(new MuxAddRequest(paths, _current.Inputs.ToList()));
+        if (choice is { Remember: true, Action: <= MuxAddAction.NewSettingsForEach })
+        {
+            _services.Settings.MuxAddAction = choice.Action.ToString();
+            _services.Settings.MuxNewSettingsForVideo = choice.NewForVideo;
+            _services.Settings.Save();
+        }
+
+        return choice;
+    }
+
+    private void Distribute(List<MediaFile> files, MuxAddChoice choice)
+    {
+        if (choice.Action == MuxAddAction.Append && choice.Target is { } target)
+        {
+            _current.Append(target, files);
             return;
         }
 
-        var position = 1;
-        foreach (var track in Tracks)
+        MuxSettingsViewModel? shared = null;
+        MuxSettingsViewModel? lastVideo = null;
+        var first = true;
+        foreach (var file in files)
         {
-            track.Position = track.Include ? position++ : 0;
-        }
-
-        Library?.Update();
-        Findings.Clear();
-        var spec = Spec();
-        if (spec.Tracks.Count > 0)
-        {
-            foreach (var finding in MuxRules.Check(spec.Sources, spec.Tracks, _services.Profile))
+            MuxSettingsViewModel destination;
+            if (choice.NewForVideo && file.TracksOf(TrackType.Video).Any())
             {
-                Findings.Add(Describe(finding, spec));
+                destination = first && _current.Inputs.Count == 0 ? _current : NewSettings();
+                lastVideo = destination;
             }
-        }
-
-        Problems = Inputs.Count == 0 ? "" : string.Join("\n", spec.Validate().Append(Library!.Placement is null ? Library.Description : "").Where(p => p.Length > 0));
-        OnPropertyChanged(nameof(HasFindings));
-        OnPropertyChanged(nameof(Summary));
-        RefreshCommands();
-    }
-
-    private static string Describe(CheckFinding finding, MuxSpec spec)
-    {
-        var where = finding.TrackId is { } index ? $"Stopa {index + 1}: " : "";
-        var kind = finding.Type switch
-        {
-            TrackType.Video => "videa",
-            TrackType.Audio => "zvuku",
-            TrackType.Subtitles => "titulkov",
-            _ => "stôp",
-        };
-        return finding.Kind switch
-        {
-            CheckKind.UndeterminedLanguage => where + "neurčený jazyk (und).",
-            CheckKind.SeveralDefaults => $"Viac stôp {kind} má Default – prehrávač vyberie ktorúkoľvek.",
-            CheckKind.NoneEnabled => $"Žiadna stopa {kind} nie je zapnutá (Enabled).",
-            CheckKind.ForcedWithoutDefault => where + "forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí.",
-            CheckKind.TagsRemain => "Výsledok si ponechá tagy zo vstupov.",
-            CheckKind.OrderNotPreferred => $"Poradie {kind} nie je CZ → SK → ostatné (komentáre na koniec).",
-            _ => finding.Kind.ToString(),
-        };
-    }
-
-    private bool CanMove(int step)
-    {
-        if (_selectedTrack is null)
-        {
-            return false;
-        }
-
-        var index = Tracks.IndexOf(_selectedTrack) + step;
-        return index >= 0 && index < Tracks.Count;
-    }
-
-    /// <summary>Moves the selected track in the output order (also Ctrl+↑/↓).</summary>
-    public void Move(int step)
-    {
-        if (_selectedTrack is not { } row || !CanMove(step))
-        {
-            return;
-        }
-
-        var index = Tracks.IndexOf(row);
-        Tracks.Move(index, index + step);
-        SelectedTrack = row;
-        Recalculate();
-    }
-
-    private bool CanWrite() => Inputs.Count > 0 && Library.Placement is not null && Spec().Validate().Count == 0;
-
-    /// <summary>The output as one target state (its tracks give the name in the library); null with no track taken.</summary>
-    private TargetState? LibraryTarget()
-    {
-        var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
-        return tracks.Count == 0 ? null : MuxRules.Target(Inputs.Select(i => i.ToSource()).ToList(), tracks);
-    }
-
-    private void Enqueue(bool start)
-    {
-        var spec = Spec();
-        if (spec.Validate().Count > 0 || _services.CurrentMkvToolNix is not { } installation)
-        {
-            return;
-        }
-
-        var job = new MuxJob($"Zlučovanie: {Path.GetFileName(spec.Placement?.Directory ?? "")} ({spec.Tracks.Count} stôp)", new Multiplexer(installation, _services.Runner), spec);
-        job.Changed += changed =>
-        {
-            if (changed.IsFinished)
+            else if (lastVideo is not null)
             {
-                JobRow.OnUi(() =>
+                // subtitles or audio after a film go with that film
+                destination = lastVideo;
+            }
+            else
+            {
+                destination = choice.Action switch
                 {
-                    Result = $"Úloha {changed.Id}: {changed.Outcome}";
-                    Recalculate();
-                });
+                    MuxAddAction.NewSettingsForAll => shared ??= _current.Inputs.Count == 0 ? _current : NewSettings(),
+                    MuxAddAction.NewSettingsForEach => first && _current.Inputs.Count == 0 ? _current : NewSettings(),
+                    _ => _current,
+                };
+            }
+
+            destination.AddFiles([file]);
+            first = false;
+        }
+
+        // the settings the files went to last are shown
+        if (Settings.LastOrDefault(s => s.Inputs.Count > 0 && files.Any(f => s.Inputs.Any(i => i.File == f))) is { } shown)
+        {
+            Current = shown;
+        }
+    }
+
+    /// <summary>The selected source file, or the file of the selected track.</summary>
+    private string? SelectedFile() => _current.SelectedSource?.Path ?? _current.SelectedTrack?.Input.File.Path;
+
+    private void QueueChanged()
+    {
+        OnPropertyChanged(nameof(QueueStatus));
+        OnPropertyChanged(nameof(QueueProgress));
+    }
+
+    private MuxSettingsViewModel NewSettings()
+    {
+        var settings = new MuxSettingsViewModel(_services);
+        Settings.Add(settings);
+        Watch(settings);
+        return settings;
+    }
+
+    // the Information button follows the selected source of the current settings
+    private void Watch(MuxSettingsViewModel settings) =>
+        settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MuxSettingsViewModel.SelectedSource) or nameof(MuxSettingsViewModel.SelectedTrack))
+            {
+                ShowInfoCommand.NotifyCanExecuteChanged();
             }
         };
-        _services.Jobs.Add(job, start || _services.Settings.AutoStartQueue);
-        Result = $"Pridané do fronty ako úloha {job.Id}" + (start || _services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
-    }
 
     private async Task AddFilesAsync()
     {
         var dialog = new OpenFileDialog
         {
             Multiselect = true,
-            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mpg;*.webm;*.ogg;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
+            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mpg;*.vob;*.webm;*.ogg;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
         };
         if (dialog.ShowDialog() == true)
         {
             await AddFilesAsync(dialog.FileNames);
         }
-    }
-
-    private void RemoveInput()
-    {
-        if (_selectedInput is not { } input)
-        {
-            return;
-        }
-
-        foreach (var track in Tracks.Where(t => t.Input == input).ToList())
-        {
-            Tracks.Remove(track);
-        }
-
-        Inputs.Remove(input);
-        for (var i = 0; i < Inputs.Count; i++)
-        {
-            Inputs[i].Number = i + 1;
-        }
-
-        foreach (var track in Tracks)
-        {
-            track.RefreshSource();
-        }
-
-        SelectedInput = null;
-        Recalculate();
-    }
-
-    private void Clear()
-    {
-        Tracks.Clear();
-        Inputs.Clear();
-        Attachments.Clear();
-        Library.TitleText = "";
-        _title = "";
-        _chaptersFile = "";
-        OnPropertyChanged(nameof(Title));
-        OnPropertyChanged(nameof(ChaptersFile));
-        Result = "";
-        Recalculate();
-    }
-
-    private void ChooseChapters()
-    {
-        var dialog = new OpenFileDialog { Filter = "Kapitoly (*.xml;*.txt;*.cue)|*.xml;*.txt;*.cue|Všetky súbory|*.*" };
-        if (dialog.ShowDialog() == true)
-        {
-            ChaptersFile = dialog.FileName;
-        }
-    }
-
-    private void AddAttachments()
-    {
-        var dialog = new OpenFileDialog { Multiselect = true, Filter = "Písma a obrázky|*.ttf;*.otf;*.ttc;*.jpg;*.jpeg;*.png|Všetky súbory|*.*" };
-        if (dialog.ShowDialog() == true)
-        {
-            foreach (var file in dialog.FileNames.Where(f => !Attachments.Contains(f)))
-            {
-                Attachments.Add(file);
-            }
-        }
-    }
-
-    private void RefreshCommands()
-    {
-        RemoveInputCommand.NotifyCanExecuteChanged();
-        ClearCommand.NotifyCanExecuteChanged();
-        MoveUpCommand.NotifyCanExecuteChanged();
-        MoveDownCommand.NotifyCanExecuteChanged();
-        ApplyRulesCommand.NotifyCanExecuteChanged();
-        ClearChaptersCommand?.NotifyCanExecuteChanged();
-        RemoveAttachmentCommand?.NotifyCanExecuteChanged();
-        StartCommand?.NotifyCanExecuteChanged();
-        QueueCommand?.NotifyCanExecuteChanged();
     }
 }

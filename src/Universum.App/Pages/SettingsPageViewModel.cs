@@ -56,6 +56,33 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     private RelayCommand? _showUpdates;
 
+    /// <summary>Multiplexer: ask what to do when several files are added (unticked = the remembered action is used).</summary>
+    public bool MuxAskWhenAdding
+    {
+        get => _services.Settings.MuxAddAction is null;
+        set
+        {
+            if (value)
+            {
+                _services.Settings.MuxAddAction = null;
+                _services.Settings.MuxNewSettingsForVideo = false;
+                _services.Settings.Save();
+            }
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MuxAddNote));
+        }
+    }
+
+    /// <summary>The remembered action, if any.</summary>
+    public string MuxAddNote => _services.Settings.MuxAddAction switch
+    {
+        null => "Pri pridaní viacerých súborov sa Zlučovanie opýta, čo s nimi.",
+        nameof(MuxAddAction.AddToCurrent) => "Zapamätané: pridať do aktuálnych nastavení zlučovania.",
+        nameof(MuxAddAction.NewSettingsForAll) => "Zapamätané: nové nastavenia zlučovania pre všetky súbory.",
+        _ => "Zapamätané: nové nastavenia zlučovania pre každý súbor.",
+    } + (_services.Settings.MuxAddAction is not null && _services.Settings.MuxNewSettingsForVideo ? " Súbory s videom vždy do nových nastavení." : "");
+
     /// <summary>Check for updates at start and then once a day.</summary>
     public bool AutoCheckUpdates
     {

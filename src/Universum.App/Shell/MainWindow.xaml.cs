@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 
@@ -13,6 +14,26 @@ public partial class MainWindow : Window
     }
 
     public MainViewModel Model { get; }
+
+    /// <summary>Closing asks when work would be lost (the self-test closes without asking).</summary>
+    public static bool ConfirmOnClose { get; set; } = true;
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel || !ConfirmOnClose || Model.CloseWarning() is not { } warning)
+        {
+            return;
+        }
+
+        if (MessageBox.Show(this, warning, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        Model.StopWork();
+    }
 
     private void OnDragOver(object sender, DragEventArgs e)
     {

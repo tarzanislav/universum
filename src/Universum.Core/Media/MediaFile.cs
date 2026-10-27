@@ -39,16 +39,13 @@ public sealed record MediaFile
     /// </summary>
     public bool IsMatroska => ContainerType == "Matroska";
 
-    /// <summary>"MP4", "AVI", "TS" – the container as people call it (for messages).</summary>
-    public string ContainerName => ContainerType switch
-    {
-        "Matroska" => "MKV",
-        "QuickTime/MP4" => System.IO.Path.GetExtension(Path).Equals(".mov", StringComparison.OrdinalIgnoreCase) ? "MOV" : "MP4",
-        "MPEG transport stream" => System.IO.Path.GetExtension(Path).TrimStart('.').ToUpperInvariant() is { Length: > 0 } ts ? ts : "TS",
-        "MPEG program stream" => "MPEG",
-        "" => System.IO.Path.GetExtension(Path).TrimStart('.').ToUpperInvariant(),
-        var other => other,
-    };
+    /// <summary>
+    /// "MKV", "MP4", "AVI", "TS", "M2TS" – the container as people call it (for messages). Taken from the extension: the
+    /// container type mkvmerge reports changes between versions ("QuickTime/MP4" in 82, "MP4/QuickTime" in 103).
+    /// </summary>
+    public string ContainerName => IsMatroska
+        ? "MKV"
+        : System.IO.Path.GetExtension(Path).TrimStart('.').ToUpperInvariant() is { Length: > 0 } extension ? extension : ContainerType;
 
     public bool HasChapters => ChapterEntries > 0;
 

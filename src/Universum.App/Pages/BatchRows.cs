@@ -189,7 +189,8 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
     }
 
     /// <summary>The suggested title waits for this file's own confirmation (HISTRA did not confirm it).</summary>
-    public bool IsUnverified => page.UnverifiedNote(Item.File.Path) is not null && page.Library?.TitleFor(Item.File.Path) is null;
+    public bool IsUnverified =>
+        page.Library is { Kind: MediaKind.Movie } library && library.TitleFor(Item.File.Path) is null && page.UnverifiedNote(Item.File.Path) is not null;
 
     /// <summary>Confirms the suggested title HISTRA did not confirm.</summary>
     public CommunityToolkit.Mvvm.Input.RelayCommand ConfirmCommand => _confirm ??= new(() => page.ConfirmTitle(Item.File.Path));

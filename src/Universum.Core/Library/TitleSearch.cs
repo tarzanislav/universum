@@ -24,6 +24,15 @@ public enum TitleCheck
 
     /// <summary>HISTRA found another title of this name (and year): the title waits for the user's confirmation.</summary>
     Different,
+
+    /// <summary>HISTRA is set up but could not be asked: the title is not checked and waits for the user's confirmation.</summary>
+    Unavailable,
+}
+
+public static class TitleChecks
+{
+    /// <summary>The title waits for the user's confirmation before anything is named by it.</summary>
+    public static bool NeedsConfirmation(this TitleCheck check) => check is TitleCheck.NotFound or TitleCheck.Different or TitleCheck.Unavailable;
 }
 
 /// <param name="Source">"TMDB" or "HISTRA" – where the titles come from.</param>
@@ -33,8 +42,17 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
     /// <summary>What HISTRA found for the same name (the check of TMDB's titles); null when HISTRA was not asked.</summary>
     public IReadOnlyList<TmdbTitle>? HistraTitles { get; init; }
 
-    /// <summary>HISTRA was searched as well and nothing was found anywhere.</summary>
-    public bool FoundNowhere => Titles.Count == 0 && Source == "HISTRA";
+    /// <summary>HISTRA is set up but could not be asked to check TMDB's titles.</summary>
+    public bool HistraUnavailable { get; init; }
+
+    /// <summary>The HISTRA catalog was searched (by name).</summary>
+    public bool HistraSearched { get; init; }
+
+    /// <summary>Why TMDB could not be used (a refused key, no answer); null when it was used or is not set up.</summary>
+    public string? TmdbProblem { get; init; }
+
+    /// <summary>The HISTRA catalog was searched as well and nothing was found anywhere.</summary>
+    public bool FoundNowhere => Titles.Count == 0 && Source == "HISTRA" && HistraSearched;
 
     /// <summary>How HISTRA confirms a title of these results.</summary>
     public TitleCheck Check(TmdbTitle title)
@@ -46,7 +64,7 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
 
         if (HistraTitles is null)
         {
-            return TitleCheck.NotChecked;
+            return HistraUnavailable ? TitleCheck.Unavailable : TitleCheck.NotChecked;
         }
 
         if (HistraTitles.Any(h => h.Kind == title.Kind && h.Id == title.Id))
@@ -75,7 +93,8 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
 
     /// <summary>
     /// The title meant by a name (and year): the only exact match; among several exact matches the only one HISTRA
-    /// confirms, or the only one in HISTRA's own catalog. Null when it cannot be told – the user chooses.
+    /// confirms, or the only one in HISTRA's own catalog; with no exact match the only title of the year that HISTRA
+    /// has in its own catalog. Null when it cannot be told – the user chooses.
     /// </summary>
     public TmdbTitle? Best(string name, int? year)
     {
@@ -90,21 +109,28 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
         }
 
         var wanted = Words.Normalize(name);
-        var exact = Titles.Where(t => (Words.Normalize(t.Title) == wanted || Words.Normalize(t.OriginalTitle) == wanted) && (year is null || t.Year == year)).ToList();
-        if (exact.Count < 2)
+        var ofYear = Titles.Where(t => year is null || t.Year == year).ToList();
+        var exact = ofYear.Where(t => Words.Normalize(t.Title) == wanted || Words.Normalize(t.OriginalTitle) == wanted).ToList();
+        if (exact.Count == 1)
         {
-            return null;
+            return null; // the exact match is of another year than asked: ExactMatch decided
         }
 
-        var confirmed = Source == "HISTRA" ? exact : exact.Where(t => Check(t) == TitleCheck.Confirmed).ToList();
-        if (confirmed.Count == 1)
+        var candidates = exact.Count > 1 ? exact : ofYear;
+        var confirmed = Source == "HISTRA" ? candidates : candidates.Where(t => Check(t) == TitleCheck.Confirmed).ToList();
+        if (exact.Count > 1 && confirmed.Count == 1)
         {
             return confirmed[0];
         }
 
-        var inCatalog = confirmed.Where(t => (Source == "HISTRA" ? t : HistraTitles!.First(h => h.Kind == t.Kind && h.Id == t.Id)).HistraId is not null).ToList();
+        // HISTRA's own catalog (not only titles it passes on from TMDB) tells which one is meant
+        var inCatalog = confirmed.Where(t => InHistraCatalog(t)).ToList();
         return inCatalog.Count == 1 ? inCatalog[0] : null;
     }
+
+    /// <summary>The title is in HISTRA's own catalog (not only passed on from TMDB).</summary>
+    public bool InHistraCatalog(TmdbTitle title) =>
+        title.HistraId is not null || HistraTitles?.Any(h => h.Kind == title.Kind && h.Id == title.Id && h.HistraId is not null) == true;
 }
 
 /// <summary>
@@ -178,7 +204,7 @@ public sealed class TitleSearch
                 if (found.Count > 0 || _histra is null)
                 {
                     // an ID or address: HISTRA is asked by the title's name
-                    return await CheckedAsync(new TitleResults(found, "TMDB"), kind, typed?.Name ?? found.FirstOrDefault()?.Title, cancellationToken).ConfigureAwait(false);
+                    return await CheckedAsync(new TitleResults(found, "TMDB"), typed?.Name ?? found.FirstOrDefault()?.Title, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (TmdbException ex) when (_histra is not null)
@@ -190,7 +216,10 @@ public sealed class TitleSearch
         if (TitleGuess.ParseTmdb(text) is not null)
         {
             return new TitleResults([], "HISTRA", tmdbProblem?.Message ??
-                (_tmdb is null ? "ID alebo adresu TMDB načíta len TMDB (kľúč v Nastaveniach) – v katalógu HISTRA hľadajte Názov (rok)." : "TMDB taký titul nepozná."));
+                (_tmdb is null ? "ID alebo adresu TMDB načíta len TMDB (kľúč v Nastaveniach) – v katalógu HISTRA hľadajte Názov (rok)." : "TMDB taký titul nepozná."))
+            {
+                TmdbProblem = tmdbProblem?.Message,
+            };
         }
 
         if (typed is null)
@@ -206,7 +235,7 @@ public sealed class TitleSearch
             results = byId;
         }
 
-        return new TitleResults(results, "HISTRA", Why(tmdbProblem));
+        return new TitleResults(results, "HISTRA", Why(tmdbProblem)) { HistraSearched = true, TmdbProblem = tmdbProblem?.Message };
     }
 
     /// <summary>Titles matching a guessed name and year (the batch refines its suggestions with them), checked in HISTRA.</summary>
@@ -220,7 +249,7 @@ public sealed class TitleSearch
                 var found = await _tmdb.SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false);
                 if (found.Count > 0 || _histra is null)
                 {
-                    return await CheckedAsync(new TitleResults(found, "TMDB"), kind, name, cancellationToken).ConfigureAwait(false);
+                    return await CheckedAsync(new TitleResults(found, "TMDB"), name, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (TmdbException ex) when (_histra is not null)
@@ -229,27 +258,44 @@ public sealed class TitleSearch
             }
         }
 
-        return new TitleResults(await _histra!.SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false), "HISTRA", Why(tmdbProblem));
+        return new TitleResults(await _histra!.SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false), "HISTRA", Why(tmdbProblem))
+        {
+            HistraSearched = true,
+            TmdbProblem = tmdbProblem?.Message,
+        };
     }
+
+    /// <summary>
+    /// How HISTRA confirms one TMDB title (read by its ID or address): its name is searched in HISTRA and the TMDB ID
+    /// compared; <see cref="TitleCheck.NotChecked"/> without HISTRA.
+    /// </summary>
+    public async Task<TitleResults> CheckAsync(TmdbTitle title, CancellationToken cancellationToken = default) =>
+        await CheckedAsync(new TitleResults([title], "TMDB"), title.Title, cancellationToken).ConfigureAwait(false);
 
     /// <summary>Saves the TMDB cache (HISTRA answers are kept only for the session).</summary>
     public void SaveCache() => _tmdb?.SaveCache();
 
-    // TMDB's titles with what HISTRA finds for the same name (all years: the TMDB ID decides)
-    private async Task<TitleResults> CheckedAsync(TitleResults found, MediaKind kind, string? name, CancellationToken cancellationToken)
+    // TMDB's titles with what HISTRA finds for the same name (all years: the TMDB ID decides), in the catalog of the
+    // titles' kind (a film's address typed where a series is expected is checked among films)
+    private async Task<TitleResults> CheckedAsync(TitleResults found, string? name, CancellationToken cancellationToken)
     {
-        if (_histra is null || found.Titles.Count == 0 || string.IsNullOrWhiteSpace(name))
+        if (_histra is null || found.Titles.Count == 0)
         {
             return found;
         }
 
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return found with { HistraUnavailable = true, Note = "Titul nemá názov na overenie v HISTRA." };
+        }
+
         try
         {
-            return found with { HistraTitles = await _histra.SearchAsync(kind, name, null, cancellationToken).ConfigureAwait(false) };
+            return found with { HistraTitles = await _histra.SearchAsync(found.Titles[0].Kind, name, null, cancellationToken).ConfigureAwait(false) };
         }
         catch (HistraException ex)
         {
-            return found with { Note = $"HISTRA sa nedala opýtať ({ex.Message}) – titul nie je overený." };
+            return found with { HistraUnavailable = true, Note = $"HISTRA sa nedala opýtať ({ex.Message}) – titul nie je overený." };
         }
     }
 

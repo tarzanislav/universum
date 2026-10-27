@@ -1120,7 +1120,10 @@
                                 <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
+                                <Button Content="Potvrdiť seriál" Command="{Binding ConfirmSeriesCommand}" Padding="10,3" Margin="0,0,12,0"
+                                        Visibility="{Binding SeriesNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
+                                        ToolTip="HISTRA tento seriál nepotvrdila – potvrďte ho, ak je správny (alebo zadajte iný)" />
                             </StackPanel>
                             <Button Content="Spresniť názvy" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
                                     Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}"

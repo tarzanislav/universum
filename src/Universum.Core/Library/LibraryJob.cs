@@ -270,7 +270,11 @@ public sealed class LibraryJob(LibraryLayout layout)
     public void ConfirmSuggestions()
     {
         KindConfirmed = true;
-        Series ??= SeriesSuggestion;
+        if (!SeriesUnverified)
+        {
+            Series ??= SeriesSuggestion;
+        }
+
         foreach (var (path, title) in MovieSuggestions)
         {
             // a title HISTRA did not confirm is confirmed for its file alone (ConfirmTitle)
@@ -294,6 +298,16 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// for the user's confirmation of each file, not for "accept suggestions".
     /// </summary>
     public HashSet<string> UnverifiedTitles { get; } = new(Paths.Comparer);
+
+    /// <summary>The suggested series HISTRA did not confirm: it waits for <see cref="ConfirmSeries"/>, not for "accept suggestions".</summary>
+    public bool SeriesUnverified { get; set; }
+
+    /// <summary>Confirms the suggested series (also one HISTRA did not confirm).</summary>
+    public void ConfirmSeries()
+    {
+        Series ??= SeriesSuggestion;
+        SeriesUnverified = false;
+    }
 
     /// <summary>Confirms the suggested title of one film (also one HISTRA did not confirm).</summary>
     public void ConfirmTitle(string path)

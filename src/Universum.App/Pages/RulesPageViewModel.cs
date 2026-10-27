@@ -136,10 +136,11 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             if (SetProperty(ref _titleText, value))
             {
-                // typed by the user: the title chosen on TMDB no longer applies, nothing waits for confirmation
+                // typed by the user: the title chosen on TMDB no longer applies; a title typed by the user is the user's
+                // decision (the text that waited for confirmation waits again)
                 _tmdbTitle = null;
                 TitleNote = "";
-                Tmdb.ClearConfirmation();
+                Tmdb.TextEdited(value);
                 if (UseTmdbAddress(value))
                 {
                     return;

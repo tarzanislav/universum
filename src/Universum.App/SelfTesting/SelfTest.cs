@@ -557,6 +557,18 @@ internal static class SelfTest
         rules.TitleText = "Neexistujúci vlak (2021)";
         Check(!rules.Tmdb.NeedsConfirmation && rules.Target.StartsWith(Path.Combine("MOVIES", "Neexistujúci vlak (2021)"), StringComparison.Ordinal),
             "titles: a typed title needs no confirmation – " + rules.Target);
+        rules.TitleText = "Neexistujúci vlak (2020)";
+        Check(rules.Tmdb.NeedsConfirmation && rules.Target == rules.Tmdb.Warning, "titles: the text that waited waits again when typed back");
+
+        // HISTRA set up but not reachable: TMDB's title is not checked and waits for confirmation
+        fake.Tmdb = """{"id":9003,"title":"Vymyslený vlak 3","original_title":"Vymyslený vlak 3","release_date":"2023-03-01"}""";
+        fake.HistraStatus = System.Net.HttpStatusCode.Unauthorized;
+        services.TitlesForSelfTest = Fresh();
+        rules.TitleText = "Vymyslený vlak 3 (2023)";
+        await rules.Tmdb.SearchAsync();
+        Check(rules.Tmdb.NeedsConfirmation && rules.Tmdb.Check == TitleCheck.Unavailable && rules.Tmdb.Warning.Contains("nedala opýtať", StringComparison.Ordinal),
+            "titles: HISTRA not reachable – waits for confirmation: " + rules.Tmdb.Warning);
+        fake.HistraStatus = System.Net.HttpStatusCode.OK;
 
         services.TitlesForSelfTest = null;
         rules.Tmdb.Refresh();
@@ -570,13 +582,16 @@ internal static class SelfTest
 
         public string Histra { get; set; } = "";
 
+        public System.Net.HttpStatusCode HistraStatus { get; set; } = System.Net.HttpStatusCode.OK;
+
         public List<string> Requests { get; } = [];
 
         protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(request.RequestUri!.ToString());
-            var results = request.RequestUri.Host == "histra.net" ? Histra : Tmdb;
-            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            var histra = request.RequestUri.Host == "histra.net";
+            var results = histra ? Histra : Tmdb;
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(histra ? HistraStatus : System.Net.HttpStatusCode.OK)
             {
                 RequestMessage = request,
                 Content = new System.Net.Http.StringContent("{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),

@@ -27,6 +27,8 @@ public sealed class TmdbPicker : ObservableObject
     private bool _needsConfirmation;
     private string _message = "";
     private string _warning = "";
+    private string? _pendingText;
+    private int _version;
 
     public TmdbPicker(AppServices services, Func<MediaKind> kind, Func<string> text, Action<TmdbTitle> chosen)
     {
@@ -78,15 +80,16 @@ public sealed class TmdbPicker : ObservableObject
         {
             if (SetProperty(ref _selected, value) && value is not null)
             {
-                Judge(value);
+                var version = ++_version;
                 if (value is { Kind: MediaKind.Series, Seasons.Count: 0 } && _services.Tmdb is { } tmdb)
                 {
-                    // a search result has no seasons: the details do, for the check that the episode exists
-                    _ = ChooseWithSeasonsAsync(tmdb, value);
+                    // a search result has no seasons: the details do, for the check that the episode exists; until they
+                    // come the page keeps what it has (also a title waiting for confirmation)
+                    _ = ChooseWithSeasonsAsync(tmdb, value, version);
                 }
                 else
                 {
-                    _chosen(value);
+                    Apply(value, value);
                     if (value is { Kind: MediaKind.Series, Seasons.Count: 0 } && !NeedsConfirmation)
                     {
                         Message = Join(Message, "Bez kľúča TMDB sa neoverí, či sezóna a epizóda existujú.");
@@ -96,11 +99,45 @@ public sealed class TmdbPicker : ObservableObject
         }
     }
 
-    /// <summary>The user typed a title or another file was opened: nothing waits for confirmation.</summary>
+    /// <summary>
+    /// Another file was opened: a search or a selection still running is forgotten and nothing waits for confirmation.
+    /// </summary>
     public void ClearConfirmation()
     {
+        _version++;
+        _pendingText = null;
+        _selected = null;
+        OnPropertyChanged(nameof(Selected));
+        Results.Clear();
+        OnPropertyChanged(nameof(HasResults));
+        Unblock();
+    }
+
+    /// <summary>
+    /// The user edited the title field: a title typed by the user is the user's decision – but the very text that
+    /// waited for confirmation waits again. A search or a selection still running is forgotten.
+    /// </summary>
+    public void TextEdited(string text)
+    {
+        _version++;
+        if (_pendingText is not null && string.Equals(text.Trim(), _pendingText, StringComparison.Ordinal))
+        {
+            if (!NeedsConfirmation)
+            {
+                Message = "⚠ " + Warning;
+                NeedsConfirmation = true;
+                ConfirmationChanged?.Invoke();
+            }
+
+            return;
+        }
+
+        Unblock();
+    }
+
+    private void Unblock()
+    {
         Check = TitleCheck.NotChecked;
-        Warning = "";
         if (NeedsConfirmation)
         {
             NeedsConfirmation = false;
@@ -123,13 +160,14 @@ public sealed class TmdbPicker : ObservableObject
             return;
         }
 
+        // what waits for confirmation keeps waiting until the new result decides
+        var version = ++_version;
         _busy = true;
         SearchCommand.NotifyCanExecuteChanged();
         Results.Clear();
         _selected = null;
         _found = null;
         OnPropertyChanged(nameof(Selected));
-        ClearConfirmation();
         var text = _text();
         Message = titles.Tmdb is not null ? "Hľadám na TMDB…" : "Hľadám v katalógu HISTRA…";
         void OnWaiting(TimeSpan delay) => Message = $"Služba žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…";
@@ -137,32 +175,48 @@ public sealed class TmdbPicker : ObservableObject
         try
         {
             var found = await titles.FindAsync(_kind(), text);
-            _found = found;
             TrySaveCache(titles);
+            if (version != _version)
+            {
+                // another file was opened, the text edited or a newer search started meanwhile: this result is not for it
+                return;
+            }
+
+            _found = found;
             var results = found.Titles;
+            var typed = TitleGuess.Typed(_kind(), text);
+            var best = results.Count == 1 ? results[0] : typed is null ? null : found.Best(typed.Name, typed.Year);
             foreach (var result in results.Take(12))
             {
                 Results.Add(result);
             }
 
+            if (best is not null && !Results.Contains(best))
+            {
+                Results.Insert(0, best);
+            }
+
             var fromTmdb = found.Source == "TMDB";
-            var typed = TitleGuess.Typed(_kind(), text);
-            var best = results.Count == 1 ? results[0] : typed is null ? null : found.Best(typed.Name, typed.Year);
+            var many = $"{(fromTmdb ? "TMDB našlo" : "Katalóg HISTRA našiel")} {results.Count} titulov";
+            var byName = typed is not null && best is not null && ReferenceEquals(TmdbClient.ExactMatch(results, typed.Name, typed.Year), best);
             Message = results.Count switch
             {
                 0 when found.FoundNowhere => "",
                 0 when found.Note.Length > 0 => found.Note,
                 0 => fromTmdb ? "TMDB nič nenašlo – skúste iný názov alebo zadajte ID." : "Katalóg HISTRA nič nenašiel – skúste iný názov alebo rok.",
                 1 => found.Note,
-                _ when best is not null => Join($"{(fromTmdb ? "TMDB našlo" : "Katalóg HISTRA našiel")} {results.Count} titulov, vybraný je ten, ktorý potvrdzuje HISTRA.", found.Note),
-                _ => Join($"{(fromTmdb ? "TMDB našlo" : "Katalóg HISTRA našiel")} {results.Count} titulov – vyberte správny.", found.Note),
+                _ when best is not null && byName => Join(many + ", vybraný je ten s presným názvom a rokom.", found.Note),
+                _ when best is not null => Join(many + ", vybraný je ten, ktorý potvrdzuje katalóg HISTRA.", found.Note),
+                _ => Join(many + " – vyberte správny.", found.Note),
             };
 
             // found nowhere: the suggestion in the field (from the file's name, or typed) waits for confirmation
             if (found.FoundNowhere && text.Trim().Length > 0)
             {
-                Wait($"{(titles.Tmdb is not null ? "TMDB ani HISTRA titul nenašli" : "Katalóg HISTRA titul nenašiel")} – ponechaný je návrh „{text.Trim()}“. " +
-                     "Skontrolujte ho a potvrďte (alebo ho opravte).");
+                var nobody = found.TmdbProblem is { } problem ? problem + " Katalóg HISTRA titul nenašiel"
+                    : titles.Tmdb is not null ? "TMDB ani HISTRA titul nenašli"
+                    : "Katalóg HISTRA titul nenašiel";
+                Wait($"{nobody} – ponechaný je návrh „{text.Trim()}“. Skontrolujte ho a potvrďte (alebo ho opravte).", text.Trim());
             }
 
             if (best is not null)
@@ -207,19 +261,23 @@ public sealed class TmdbPicker : ObservableObject
         TitleCheck.NotFound => "HISTRA tento titul nenašla – skontrolujte ho a potvrďte.",
         TitleCheck.Different when found.Alternative(title) is { } other => $"HISTRA našla iný titul: {other.Display} (TMDB {other.Id}) – skontrolujte a potvrďte.",
         TitleCheck.Different => "HISTRA našla iný titul – skontrolujte a potvrďte.",
+        TitleCheck.Unavailable => (found.Note.Length > 0 ? found.Note : "HISTRA sa nedala opýtať – titul nie je overený.") + " Skontrolujte ho a potvrďte.",
         _ => "",
     };
 
-    private void Judge(TmdbTitle title)
+    // the chosen title goes to the page – after its check: waiting for confirmation, or confirmed
+    private void Apply(TmdbTitle judged, TmdbTitle chosen)
     {
-        Check = _found?.Check(title) ?? TitleCheck.NotChecked;
-        var description = _found is null ? "" : Describe(_found, title);
-        if (Check is TitleCheck.NotFound or TitleCheck.Different)
+        Check = _found?.Check(judged) ?? TitleCheck.NotChecked;
+        var description = _found is null ? "" : Describe(_found, judged);
+        if (Check.NeedsConfirmation())
         {
-            Wait($"Titul z TMDB {title.Display} (TMDB {title.Id}): {description}");
+            var (text, _) = TitleText(chosen);
+            Wait($"Titul z TMDB {judged.Display} (TMDB {judged.Id}): {description}", text);
         }
         else
         {
+            _pendingText = null;
             Warning = "";
             if (NeedsConfirmation)
             {
@@ -227,15 +285,24 @@ public sealed class TmdbPicker : ObservableObject
                 ConfirmationChanged?.Invoke();
             }
 
-            if (Check == TitleCheck.Confirmed)
+            if (Message.StartsWith('⚠'))
+            {
+                Message = "";
+            }
+
+            if (description.Length > 0)
             {
                 Message = Join(_found?.Note ?? "", description);
             }
         }
+
+        _chosen(chosen);
     }
 
-    private void Wait(string warning)
+    // the title (as the field will hold it) waits for confirmation
+    private void Wait(string warning, string text)
     {
+        _pendingText = text;
         Warning = warning;
         Message = "⚠ " + warning;
         NeedsConfirmation = true;
@@ -249,31 +316,33 @@ public sealed class TmdbPicker : ObservableObject
             return;
         }
 
+        _pendingText = null;
         NeedsConfirmation = false;
         Warning = "";
         Message = "Titul je potvrdený.";
         ConfirmationChanged?.Invoke();
     }
 
-    private async Task ChooseWithSeasonsAsync(TmdbClient tmdb, TmdbTitle title)
+    private async Task ChooseWithSeasonsAsync(TmdbClient tmdb, TmdbTitle title, int version)
     {
         var chosen = title;
-        var before = Message;
+        var problem = "";
         try
         {
             Message = "Načítavam sezóny z TMDB…";
             chosen = await tmdb.GetAsync(MediaKind.Series, title.Id) ?? title;
             TrySaveCache(tmdb);
-            Message = before;
         }
         catch (TmdbException ex)
         {
-            Message = Join(before, "Sezóny seriálu sa nenačítali (epizódy sa nedajú overiť): " + ex.Message);
+            problem = "Sezóny seriálu sa nenačítali (epizódy sa nedajú overiť): " + ex.Message;
         }
 
-        if (ReferenceEquals(_selected, title))
+        // the text edited, another file opened or another title chosen meanwhile: this one is not applied
+        if (version == _version && ReferenceEquals(_selected, title))
         {
-            _chosen(chosen);
+            Apply(title, chosen);
+            Message = Join(Message, problem);
         }
     }
 

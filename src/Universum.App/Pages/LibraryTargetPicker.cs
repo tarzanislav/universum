@@ -75,8 +75,8 @@ public sealed class LibraryTargetPicker : ObservableObject
                 _tmdbTitle = null;
                 TitleNote = "";
 
-                // a title typed by the user is the user's decision: nothing waits for confirmation
-                Tmdb.ClearConfirmation();
+                // a title typed by the user is the user's decision (the text that waited for confirmation waits again)
+                Tmdb.TextEdited(value);
                 if (UseTmdbAddress(value))
                 {
                     return;

@@ -1,5 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Data;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Pages;
@@ -31,19 +34,30 @@ public sealed class MainViewModel : ObservableObject
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
+        Mega = new PlaceholderPageViewModel(
+            "MEGAspracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
+
+        // the left rail: Dashboard on its own, then three framed groups, each with its own tint (owner's order, 27. 10.)
+        var multiplexing = new ToolGroup("MULTIPLEXING", Color.FromRgb(0x4A, 0x7B, 0xD9));
+        var templates = new ToolGroup("ŠABLÓNY (TEMPLATE)", Color.FromRgb(0x3E, 0xA8, 0x5F));
+        var statistics = new ToolGroup("ŠTATISTIKA", Color.FromRgb(0xD9, 0x8B, 0x2B));
         Tools =
         [
             new("Dashboard", "\uE80F", Dashboard),
-            new("Zlučovanie", "\uE71D", Mux),
-            new("Informácie", "\uE946", Info),
-            new("Single spracovanie", "\uE90F", Rules),
-            new("Úprava hlavičky", "\uE70F", HeaderEditor),
-            new("Kapitoly", "\uE8FD", Chapters),
-            new("Hromadné spracovanie", "\uE8B7", Batch),
-            new("Fronta úloh", "\uE823", Queue),
-            new("Výstup úloh", "\uE7C3", Output),
-            new("Nastavenia", "\uE713", Settings),
+            new("Zlučovanie", "\uE71D", Mux, multiplexing),
+            new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
+            new("Kapitoly", "\uE8FD", Chapters, multiplexing),
+            new("Informácie", "\uE946", Info, multiplexing),
+            new("Single spracovanie", "\uE90F", Rules, templates),
+            new("Hromadné spracovanie", "\uE8B7", Batch, templates),
+            new("MEGAspracovanie", "\uE945", Mega, templates),
+            new("Fronta úloh", "\uE823", Queue, statistics),
+            new("Výstup úloh", "\uE7C3", Output, statistics),
+            new("Nastavenia", "\uE713", Settings, statistics),
         ];
+        var view = new ListCollectionView(Tools.ToList());
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ToolItem.Group)));
+        ToolsView = view;
         _selectedTool = Tools[0];
         SetupCommand = new AsyncRelayCommand(SetupAsync);
         OpenMkvToolNixGuiCommand = new RelayCommand(OpenMkvToolNixGui, () => _services.CurrentMkvToolNix?.HasTool(MkvToolNixTool.Gui) == true);
@@ -147,6 +161,12 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public IReadOnlyList<ToolItem> Tools { get; }
+
+    /// <summary>The tools as the left rail shows them: grouped (Multiplexing, Šablóny, Štatistika).</summary>
+    public ICollectionView ToolsView { get; }
+
+    /// <summary>MEGAspracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
+    public PlaceholderPageViewModel Mega { get; }
 
     public DashboardPageViewModel Dashboard { get; }
 

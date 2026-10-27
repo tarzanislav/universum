@@ -137,6 +137,11 @@ internal static class SelfTest
         Check(model.Info.Tracks.Count == 6, $"information page shows 6 tracks ({model.Info.Tracks.Count})");
         Check(model.Info.Error.Length == 0, "information page shows no error: " + model.Info.Error);
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
+        Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
+                  .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
+              "-: Dashboard | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGAspracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
+            "left rail: Dashboard, then the groups Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 

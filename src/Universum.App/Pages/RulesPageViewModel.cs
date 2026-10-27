@@ -433,7 +433,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var job = new FileJob($"Pravidlá UNIVERSUM: {Path.GetFileName(_plan.Target.Source.Path)} → {Path.GetFileName(_placement.Directory)}",
+        var job = new FileJob($"Single spracovanie: {Path.GetFileName(_plan.Target.Source.Path)} → {Path.GetFileName(_placement.Directory)}",
             _services.Processor(installation), _plan, _placement, new OutputOptions(handling));
         job.Finished += (_, result) => JobRow.OnUi(() =>
         {

@@ -216,7 +216,7 @@ public sealed class TmdbPicker : ObservableObject
         var description = _found is null ? "" : Describe(_found, title);
         if (Check is TitleCheck.NotFound or TitleCheck.Different)
         {
-            Wait($"Titul z TMDB {title.Display}: {description}");
+            Wait($"Titul z TMDB {title.Display} (TMDB {title.Id}): {description}");
         }
         else
         {

@@ -37,6 +37,19 @@ public sealed class TrackRow(MediaTrack track)
 
     public bool IsForced => Track.Flags.Forced;
 
+    /// <summary>For the colours of the track types.</summary>
+    public TrackType Kind => Track.Type;
+
+    /// <summary>The less common flags: "nepočujúci, komentár".</summary>
+    public string FlagMarks => string.Join(", ", new[]
+    {
+        Track.Flags.HearingImpaired ? "nepočujúci" : null,
+        Track.Flags.VisualImpaired ? "nevidiaci" : null,
+        Track.Flags.TextDescriptions ? "popis textom" : null,
+        Track.Flags.Original ? "pôvodný" : null,
+        Track.Flags.Commentary ? "komentár" : null,
+    }.OfType<string>());
+
     public string Properties => Track.Type switch
     {
         TrackType.Video => Track.PixelDimensions ?? "",

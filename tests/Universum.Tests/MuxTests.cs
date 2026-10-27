@@ -34,6 +34,109 @@ public sealed class MuxTests
     }
 
     [Test]
+    public void AppendedFilesAndPartsGetTheirOwnFileIds()
+    {
+        var film = Film("a.mkv");
+        var second = Film("b.mkv");
+        var other = Film("c.mkv");
+        var spec = new MuxSpec(
+            [new MuxSource(film, KeepChapters: false) { Appended = [second], AdditionalParts = ["a2.mkv"] }, new MuxSource(other)],
+            [
+                new MuxTrack(0, 0, null, LanguageTag.Undetermined, new TrackFlags()),
+                new MuxTrack(1, 2, null, LanguageTag.FromCode("cs"), new TrackFlags(HearingImpaired: true, Commentary: true))
+                {
+                    Options = new MuxTrackOptions { DelayMs = -120, DefaultDuration = "25p" },
+                },
+            ],
+            "out.mkv");
+        var arguments = MuxArguments.Build(spec, "tmp.mkv").ToList();
+        var text = string.Join(" ", arguments);
+        Assert.Sequence([0, 2], spec.FileIds(), "the appended file takes ID 1");
+        Assert.True(text.Contains("( a.mkv a2.mkv )", StringComparison.Ordinal), "parts read as one: " + text);
+        Assert.True(text.Contains("--no-chapters --no-attachments --no-global-tags --no-track-tags + b.mkv", StringComparison.Ordinal), "appended: " + text);
+        Assert.True(text.Contains("--hearing-impaired-flag 2:1", StringComparison.Ordinal) && text.Contains("--commentary-flag 2:1", StringComparison.Ordinal) &&
+                    text.Contains("--sync 2:-120", StringComparison.Ordinal) && text.Contains("--default-duration 2:25p", StringComparison.Ordinal), "flags and options");
+        Assert.True(text.EndsWith("--track-order 0:0,2:2", StringComparison.Ordinal), "order with file IDs: " + text);
+
+        var broken = new MuxTrack(0, 0, null, LanguageTag.Undetermined, new TrackFlags()) { Options = new MuxTrackOptions { DefaultDuration = "fast", Cropping = "1,2" } };
+        Assert.True(new MuxSpec([new MuxSource(film)], [broken], "x.mkv").Validate().Count(p => p.StartsWith("Stopa 1", StringComparison.Ordinal)) == 2, "options checked");
+        var audioOnly = new MediaFile { Path = "d.mka", Tracks = [new MediaTrack { Id = 0, Type = TrackType.Audio, CodecId = "A_AC3" }] };
+        Assert.True(new MuxSpec([new MuxSource(film) { Appended = [audioOnly] }], [new MuxTrack(0, 0, null, LanguageTag.Undetermined, new TrackFlags())], "x.mkv")
+            .Validate().Any(p => p.Contains("nedá pripojiť", StringComparison.Ordinal)), "an appended file must continue the same tracks");
+    }
+
+    [Test]
+    public async Task AppendedFileContinuesTheTracksAndFlagsAreWritten()
+    {
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-mux-append-");
+        try
+        {
+            var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+            var first = Path.Combine(work.FullName, "Časť 1.mkv");
+            var second = Path.Combine(work.FullName, "Časť 2.mkv");
+            File.Copy(TestData.Media("cz-only.mkv"), first);
+            File.Copy(TestData.Media("cz-only.mkv"), second);
+            var a = await inspector.InspectAsync(first);
+            var b = await inspector.InspectAsync(second);
+            var output = Path.Combine(work.FullName, "Celé.mkv");
+            var tracks = a.Tracks.Select(t => new MuxTrack(0, t.Id, null, t.Language, t.Flags with
+            {
+                HearingImpaired = t.Type == TrackType.Subtitles,
+                Original = t.Type == TrackType.Audio,
+                TextDescriptions = t.Type == TrackType.Subtitles,
+            })).ToList();
+            var spec = new MuxSpec([new MuxSource(a) { Appended = [b] }], tracks, output);
+            var result = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(spec);
+            Assert.Equal(MuxStatus.Done, result.Status, string.Join("; ", result.Messages));
+            var written = await inspector.InspectAsync(output);
+            Assert.Equal(a.Tracks.Count, written.Tracks.Count, "same tracks");
+            Assert.True(written.Duration > a.Duration * 1.9, $"twice as long: {written.Duration} vs {a.Duration}");
+            Assert.True(written.Tracks.Single(t => t.Type == TrackType.Subtitles).Flags is { HearingImpaired: true, TextDescriptions: true }, "subtitle flags");
+            Assert.True(written.Tracks.Single(t => t.Type == TrackType.Audio).Flags.Original, "original language flag");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task AppendedSubtitlesAreReadWithTheirCharacterSet()
+    {
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-mux-charset-");
+        try
+        {
+            // invented Slovak subtitles in cp1250 ("Žltý kôň"); without the character set for the appended part
+            // mkvmerge drops its entries and the result is half as long
+            byte[] Cp1250(string start, string end, string tail) =>
+                [.. System.Text.Encoding.ASCII.GetBytes($"1\r\n{start} --> {end}\r\n"), 0x8E, (byte)'l', (byte)'t', 0xFD, (byte)' ', (byte)'k', 0xF4, 0xF2,
+                 .. System.Text.Encoding.ASCII.GetBytes(tail + "\r\n\r\n")];
+            var first = Path.Combine(work.FullName, "CD1.srt");
+            var second = Path.Combine(work.FullName, "CD2.srt");
+            File.WriteAllBytes(first, Cp1250("00:00:01,000", "00:00:02,000", ""));
+            File.WriteAllBytes(second, Cp1250("00:00:01,000", "00:00:03,000", " 2"));
+            var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+            var a = await inspector.InspectAsync(first);
+            var b = await inspector.InspectAsync(second);
+            var output = Path.Combine(work.FullName, "Titulky.mkv");
+            var track = new MuxTrack(0, 0, null, LanguageTag.FromCode("sk"), new TrackFlags()) { Options = new MuxTrackOptions { SubtitleCharset = "cp1250" } };
+            var spec = new MuxSpec([new MuxSource(a) { Appended = [b] }], [track], output);
+            var arguments = MuxArguments.Build(spec, output);
+            Assert.Equal(2, arguments.Count(x => x == "--sub-charset"), "the character set is given for both parts: " + string.Join(" ", arguments));
+            var result = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(spec);
+            Assert.Equal(MuxStatus.Done, result.Status, string.Join("; ", result.Messages));
+            var written = await inspector.InspectAsync(output);
+            Assert.True(written.Duration > TimeSpan.FromSeconds(3.5), $"both parts' entries are kept: {written.Duration}");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public void SpecProblemsAreReportedBeforeAnythingRuns()
     {
         var film = Film(Path.Combine(Path.GetTempPath(), "film.mkv"));

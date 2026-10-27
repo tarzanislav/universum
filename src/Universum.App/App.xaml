@@ -9,6 +9,16 @@
             <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
             <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <local:TrackTypeBrushConverter x:Key="TrackTypeBrush" />
+            <local:FileColorConverter x:Key="FileColor" />
+
+            <!-- the type of a track as a pastel label (the same colours on every page) -->
+            <Style x:Key="TypeChip" TargetType="Border">
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="Padding" Value="6,1" />
+                <Setter Property="HorizontalAlignment" Value="Left" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
 
             <Style x:Key="Icon" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource IconFont}" />

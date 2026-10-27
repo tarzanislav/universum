@@ -8,4 +8,5 @@ public sealed record TrackFlags(
     bool HearingImpaired = false,
     bool VisualImpaired = false,
     bool Commentary = false,
-    bool Original = false);
+    bool Original = false,
+    bool TextDescriptions = false);

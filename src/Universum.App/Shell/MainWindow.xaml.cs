@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 
@@ -13,6 +14,37 @@ public partial class MainWindow : Window
     }
 
     public MainViewModel Model { get; }
+
+    /// <summary>Closing asks when work would be lost (the self-test closes without asking).</summary>
+    public static bool ConfirmOnClose { get; set; } = true;
+
+    private bool _stopping;
+    private bool _stopped;
+
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel || _stopped || !ConfirmOnClose || Model.CloseWarning() is not { } warning)
+        {
+            return;
+        }
+
+        // the window stays until the answer – and, when work runs, until it has stopped
+        e.Cancel = true;
+        if (_stopping || MessageBox.Show(this, warning, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        _stopping = true;
+        IsEnabled = false;
+        Title = "UNIVERSUM – zastavujem prácu…";
+        await Model.StopWorkAsync(TimeSpan.FromSeconds(20));
+        _stopped = true;
+
+        // not from inside this Closing (WPF refuses Close() while the window is closing): after it has returned
+        _ = Dispatcher.BeginInvoke(new Action(Close));
+    }
 
     private void OnDragOver(object sender, DragEventArgs e)
     {

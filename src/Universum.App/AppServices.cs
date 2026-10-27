@@ -228,6 +228,12 @@ public sealed class AppSettings
 
     public bool BatchRecursive { get; set; } = true;
 
+    /// <summary>Multiplexer: what to do with several added files without asking (null = ask).</summary>
+    public string? MuxAddAction { get; set; }
+
+    /// <summary>Multiplexer: files with video always get new multiplex settings (with the remembered action).</summary>
+    public bool MuxNewSettingsForVideo { get; set; }
+
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>
         Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom

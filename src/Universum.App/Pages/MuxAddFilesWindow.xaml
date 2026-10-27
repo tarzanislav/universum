@@ -1,0 +1,36 @@
+<Window x:Class="Universum.App.Pages.MuxAddFilesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UNIVERSUM – pridávanie súborov" Width="640" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="20">
+        <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+        <TextBlock Text="Čo sa má so súbormi urobiť?" Margin="0,10,0,6" />
+        <RadioButton IsChecked="{Binding AddToCurrent}" GroupName="add" Margin="0,3">
+            <TextBlock Text="Pridať ako nové zdrojové súbory do aktuálnych nastavení zlučovania" TextWrapping="Wrap" />
+        </RadioButton>
+        <RadioButton IsChecked="{Binding NewForAll}" GroupName="add" Margin="0,3">
+            <TextBlock Text="Vytvoriť nové nastavenia zlučovania a pridať ich do nich" TextWrapping="Wrap" />
+        </RadioButton>
+        <RadioButton IsChecked="{Binding NewForEach}" GroupName="add" Margin="0,3">
+            <TextBlock Text="Vytvoriť nové nastavenia zlučovania pre každý súbor" TextWrapping="Wrap" />
+        </RadioButton>
+        <RadioButton IsChecked="{Binding Append}" IsEnabled="{Binding HasSources}" GroupName="add" Margin="0,3">
+            <TextBlock Text="Pripojiť k existujúcemu zdrojovému súboru (pokračovanie, napr. 2. časť epizódy)" TextWrapping="Wrap" />
+        </RadioButton>
+        <RadioButton IsChecked="{Binding Parts}" IsEnabled="{Binding HasSources}" GroupName="add" Margin="0,3">
+            <TextBlock Text="Pridať ako ďalšie časti existujúceho zdrojového súboru (napr. VOB rozdelený na časti)" TextWrapping="Wrap" />
+        </RadioButton>
+        <TextBlock Style="{StaticResource Hint}" Margin="0,8,0,4" FontSize="12"
+                   Text="Pri pripojení alebo pridaní častí vyberte zdrojový súbor, ku ktorému sa súbory pridajú:" />
+        <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding Target}" DisplayMemberPath="FileName" IsEnabled="{Binding NeedsTarget}" />
+        <CheckBox Content="Súbory s videom vždy do nových nastavení zlučovania" IsChecked="{Binding NewForVideo}" Margin="0,12,0,0"
+                  ToolTip="Každý súbor s videom dostane vlastné nastavenia; titulky a zvuk za ním pôjdu k nemu" />
+        <Separator Margin="0,10" />
+        <CheckBox Content="Vždy použiť túto voľbu a nepýtať sa (zmeníte v Nastaveniach)" IsChecked="{Binding Remember}" IsEnabled="{Binding CanRemember}" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="OK" IsDefault="True" Click="OnOk" MinWidth="90" Padding="12,5" Margin="0,0,8,0" IsEnabled="{Binding CanConfirm}" />
+            <Button Content="Zrušiť" IsCancel="True" MinWidth="90" Padding="12,5" />
+        </StackPanel>
+    </StackPanel>
+</Window>

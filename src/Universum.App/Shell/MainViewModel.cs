@@ -30,8 +30,10 @@ public sealed class MainViewModel : ObservableObject
         Chapters = new ChaptersPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
+        Dashboard = new DashboardPageViewModel(services, this);
         Tools =
         [
+            new("Dashboard", "\uE80F", Dashboard),
             new("Zlučovanie", "\uE71D", Mux),
             new("Informácie", "\uE946", Info),
             new("Single spracovanie", "\uE90F", Rules),
@@ -42,7 +44,7 @@ public sealed class MainViewModel : ObservableObject
             new("Výstup úloh", "\uE7C3", Output),
             new("Nastavenia", "\uE713", Settings),
         ];
-        _selectedTool = Tools[1];
+        _selectedTool = Tools[0];
         SetupCommand = new AsyncRelayCommand(SetupAsync);
         OpenMkvToolNixGuiCommand = new RelayCommand(OpenMkvToolNixGui, () => _services.CurrentMkvToolNix?.HasTool(MkvToolNixTool.Gui) == true);
         ShowUpdatesCommand = new AsyncRelayCommand(ShowUpdatesAsync);
@@ -109,6 +111,9 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Shows a page of the left menu.</summary>
+    public void Open(object page) => SelectedTool = Tools.First(t => t.Page == page);
+
     /// <summary>Opens the Information page with a file from another page.</summary>
     public async Task ShowInfoAsync(string path)
     {
@@ -123,6 +128,7 @@ public sealed class MainViewModel : ObservableObject
     public async Task StartAsync(ShellRequest? request = null)
     {
         await RefreshStatusAsync();
+        Dashboard.Shown();
         if (request is { Paths.Count: > 0 })
         {
             await HandleAsync(request);
@@ -142,6 +148,8 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public IReadOnlyList<ToolItem> Tools { get; }
+
+    public DashboardPageViewModel Dashboard { get; }
 
     public InfoPageViewModel Info { get; }
 
@@ -170,6 +178,11 @@ public sealed class MainViewModel : ObservableObject
             {
                 // the files of the multiplexer and the batch, as they are now
                 Info.RefreshKnown();
+            }
+
+            if (value?.Page == Dashboard)
+            {
+                Dashboard.Shown();
             }
         }
     }
@@ -214,7 +227,6 @@ public sealed class MainViewModel : ObservableObject
         OpenMkvToolNixGuiCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>A folder opens in batch processing, a file in the UNIVERSUM rules.</summary>
     /// <summary>
     /// A request from the Explorer's context menu. The Explorer starts UNIVERSUM once per selected file; the files of one
     /// action arriving within a moment are handled together (several files to the multiplexer are asked about once).
@@ -277,6 +289,7 @@ public sealed class MainViewModel : ObservableObject
 
     private readonly Dictionary<ShellAction, List<string>> _pending = [];
 
+    /// <summary>A folder opens in batch processing, a file in Single spracovanie.</summary>
     public async Task OpenPathAsync(string path)
     {
         if (System.IO.Directory.Exists(path))

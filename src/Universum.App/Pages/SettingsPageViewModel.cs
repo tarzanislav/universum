@@ -7,6 +7,7 @@ using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.Rules;
+using Universum.Core.Weather;
 
 namespace Universum.App.Pages;
 
@@ -28,6 +29,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private string _tmdbStatus = "";
     private string _histraTokenInput = "";
     private string _histraStatus = "";
+    private string _weatherTownInput = "";
+    private string _weatherStatus = "";
 
     public SettingsPageViewModel(AppServices services)
     {
@@ -44,6 +47,9 @@ public sealed class SettingsPageViewModel : ObservableObject
         services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
+        SaveWeatherTownCommand = new AsyncRelayCommand(SaveWeatherTownAsync, () => WeatherTownInput.Trim().Length > 0);
+        RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
+        _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
         Load(services.Profile);
     }
 
@@ -158,6 +164,67 @@ public sealed class SettingsPageViewModel : ObservableObject
         : "TMDB ani HISTRA sa nepripájajú – názvy sa zadávajú ručne.";
 
     public string TmdbAttribution => TmdbClient.Attribution;
+
+    public AsyncRelayCommand SaveWeatherTownCommand { get; }
+
+    public RelayCommand RemoveWeatherTownCommand { get; }
+
+    /// <summary>Town of the Dashboard weather, as typed.</summary>
+    public string WeatherTownInput
+    {
+        get => _weatherTownInput;
+        set
+        {
+            if (SetProperty(ref _weatherTownInput, value))
+            {
+                SaveWeatherTownCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string WeatherStatus => _weatherStatus.Length > 0
+        ? _weatherStatus
+        : _services.Settings.WeatherPlace is { } place
+            ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Počasie pre {place.Display} ({place.Latitude:0.00}, {place.Longitude:0.00}).")
+            : "Mesto nie je zadané – počasie sa nezisťuje a na Open-Meteo sa nič neposiela.";
+
+    public string WeatherAttribution => OpenMeteo.Attribution;
+
+    /// <summary>Finds the town on Open-Meteo (only the typed name is sent) and stores it with its coordinates.</summary>
+    private async Task SaveWeatherTownAsync()
+    {
+        var town = WeatherTownInput.Trim();
+        try
+        {
+            if (await _services.Weather.FindAsync(town) is { } place)
+            {
+                _services.SetWeatherPlace(place);
+                WeatherTownInput = place.Name;
+                _weatherStatus = "";
+            }
+            else
+            {
+                _weatherStatus = $"Mesto „{town}“ Open-Meteo nenašlo – skúste iný zápis (napr. bez skratiek).";
+            }
+        }
+        catch (WeatherException ex)
+        {
+            _weatherStatus = "Mesto sa neuložilo: " + ex.Message;
+        }
+
+        OnPropertyChanged(nameof(WeatherStatus));
+        RemoveWeatherTownCommand.NotifyCanExecuteChanged();
+    }
+
+    private void RemoveWeatherTown()
+    {
+        _services.SetWeatherPlace(null);
+        WeatherTownInput = "";
+        _weatherStatus = "";
+        OnPropertyChanged(nameof(WeatherStatus));
+        RemoveWeatherTownCommand.NotifyCanExecuteChanged();
+    }
+
 
     public RelayCommand SaveHistraTokenCommand { get; }
 

@@ -1152,6 +1152,161 @@
                 </Border>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:DashboardPageViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="32,24" MaxWidth="1100" HorizontalAlignment="Left">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="Dashboard" />
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,16">
+                        <Run Text="{Binding Greeting, Mode=OneWay}" /><Run Text=" – prehľad dňa a toho, čo UNIVERSUM práve robí." />
+                    </TextBlock>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="300" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="1.3*" MinWidth="380" />
+                        </Grid.ColumnDefinitions>
+                        <!-- today: time, date, name day -->
+                        <Border Style="{StaticResource Card}" Padding="20,16">
+                            <StackPanel>
+                                <TextBlock Text="Dnes" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding TimeText}" FontSize="46" FontWeight="Light" Margin="0,2,0,0" />
+                                <TextBlock Text="{Binding DateText}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding NameDayText}" FontSize="16" Margin="0,10,0,0" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock Text="{Binding TomorrowText}" Style="{StaticResource Hint}" Margin="0,2,0,0" />
+                                <TextBlock Text="{Binding DayInfo}" Style="{StaticResource Hint}" FontSize="12" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <!-- weather of the town in the settings (Open-Meteo, named below) -->
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,16">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <Button DockPanel.Dock="Right" Content="Obnoviť" Command="{Binding RefreshWeatherCommand}" Padding="10,3"
+                                            Visibility="{Binding HasPlace, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock VerticalAlignment="Center">
+                                        <Run Text="Počasie" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding PlaceText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </TextBlock>
+                                </DockPanel>
+                                <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                                    <TextBlock DockPanel.Dock="Right" FontSize="11.5" VerticalAlignment="Bottom">
+                                        <Hyperlink Command="{Binding OpenWeatherSiteCommand}" ToolTip="https://open-meteo.com – údaje pod licenciou CC BY 4.0">
+                                            <Run Text="{Binding WeatherAttribution, Mode=OneWay}" />
+                                        </Hyperlink>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding WeatherMessage}" Style="{StaticResource Hint}" FontSize="12" Margin="0,0,12,0" />
+                                </DockPanel>
+                                <StackPanel>
+                                    <Button Content="Nastaviť mesto…" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Left" Padding="12,5" Margin="0,12,0,0"
+                                            Visibility="{Binding HasPlace, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <StackPanel Visibility="{Binding HasWeather, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <TextBlock Text="{Binding WeatherSymbol}" FontFamily="Segoe UI Symbol" FontSize="44" VerticalAlignment="Center" Margin="0,0,14,0"
+                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                            <TextBlock Text="{Binding TemperatureText}" FontSize="44" FontWeight="Light" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding WeatherDescription}" FontSize="16" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding WeatherDetail}" Style="{StaticResource Hint}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding WeatherDays}" Margin="0,12,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <UniformGrid Rows="1" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="10,2" ToolTip="{Binding Description}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                <TextBlock Text="{Binding Symbol}" FontFamily="Segoe UI Symbol" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Temperatures}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Rain}" Style="{StaticResource Hint}" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                    <!-- what the tools are doing now -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14">
+                        <StackPanel>
+                            <TextBlock Text="UNIVERSUM teraz" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <ItemsControl ItemsSource="{Binding Status}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="30" />
+                                                <ColumnDefinition Width="200" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Text}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Attention}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <Button Grid.Column="3" Content="Otvoriť" Command="{Binding OpenCommand}" Padding="10,2" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <!-- quick starts -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14">
+                        <StackPanel>
+                            <TextBlock Text="Rýchle akcie" FontWeight="SemiBold" Margin="0,0,0,8" />
+                            <WrapPanel>
+                                <Button Command="{Binding AddToMuxCommand}" Margin="0,0,8,8" Padding="12,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE71D;" Margin="0,0,8,0" />
+                                        <TextBlock Text="Pridať súbory do Zlučovania…" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding BatchFolderCommand}" Margin="0,0,8,8" Padding="12,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Margin="0,0,8,0" />
+                                        <TextBlock Text="Hromadné spracovanie priečinka…" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding SingleFileCommand}" Margin="0,0,8,8" Padding="12,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE90F;" Margin="0,0,8,0" />
+                                        <TextBlock Text="Single spracovanie súboru…" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding InfoFileCommand}" Margin="0,0,8,8" Padding="12,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Margin="0,0,8,0" />
+                                        <TextBlock Text="Informácie o súbore…" />
+                                    </StackPanel>
+                                </Button>
+                            </WrapPanel>
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,2,0,0"
+                                       Text="Súbory sa dajú poslať aj z Prieskumníka: pravé tlačidlo → UNIVERSUM (vo Windows 11 pod „Zobraziť ďalšie možnosti“)." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:SettingsPageViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="32,24" MaxWidth="760" HorizontalAlignment="Left">
@@ -1211,6 +1366,22 @@
                                       ToolTip="Vypnutím sa na HISTRA nič neposiela; uložený token ostáva." />
                             <TextBlock Text="{Binding HistraStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="Počasie na Dashboarde" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="Mesto sa vyhľadá na Open-Meteo (bez kľúča); posiela sa len zadané mesto a potom jeho súradnice, nič o vás. Bez mesta sa počasie nezisťuje." />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Nájsť a uložiť" Command="{Binding SaveWeatherTownCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveWeatherTownCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <TextBox Text="{Binding WeatherTownInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Mesto, napr. Bratislava" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding WeatherStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding WeatherAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}">

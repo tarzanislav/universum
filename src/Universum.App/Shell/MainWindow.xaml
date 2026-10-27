@@ -250,9 +250,9 @@
                 </Grid.RowDefinitions>
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.5*" MinWidth="380" />
+                        <ColumnDefinition Width="2*" MinWidth="400" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" MinWidth="250" MaxWidth="440" />
+                        <ColumnDefinition Width="*" MinWidth="250" MaxWidth="420" />
                     </Grid.ColumnDefinitions>
                     <Grid>
                         <Grid.RowDefinitions>
@@ -289,8 +289,8 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Kontajner" Binding="{Binding Container}" Width="100" />
-                                <DataGridTextColumn Header="Veľkosť" Binding="{Binding Size}" Width="72" />
+                                <DataGridTextColumn Header="Kontajner" Binding="{Binding Container}" Width="100" MinWidth="70" />
+                                <DataGridTextColumn Header="Veľkosť" Binding="{Binding Size}" Width="72" MinWidth="64" />
                                 <DataGridTextColumn Header="Priečinok" Binding="{Binding Directory}" Width="1.5*">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
@@ -325,25 +325,20 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="Vziať" Width="58">
+                                <DataGridTemplateColumn Header="Vziať" Width="84" MinWidth="84">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" MinWidth="0" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="#" Width="44">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" ToolTip="{Binding Source}" VerticalAlignment="Center">
-                                                <Border Width="8" Height="8" CornerRadius="2" Margin="0,0,5,0" VerticalAlignment="Center"
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" MinWidth="0" Margin="0,0,2,0"
+                                                          ToolTip="Vziať túto stopu do výstupu" />
+                                                <Border Width="8" Height="8" CornerRadius="2" Margin="0,0,5,0" VerticalAlignment="Center" ToolTip="{Binding Source}"
                                                         Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
-                                                <TextBlock Text="{Binding Position}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Position}" VerticalAlignment="Center" ToolTip="Poradie vo výstupe" />
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="Typ" Width="70">
+                                <DataGridTemplateColumn Header="Typ" Width="78" MinWidth="78">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Style="{StaticResource TypeChip}" Background="{Binding Kind, Converter={StaticResource TrackTypeBrush}, ConverterParameter=chip}">
@@ -352,7 +347,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="90">
+                                <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="86" MinWidth="60">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -360,7 +355,7 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display}" Width="110">
+                                <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display}" Width="110" MinWidth="80">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
@@ -375,8 +370,8 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridCheckBoxColumn Header="Default" Binding="{Binding IsDefault, Mode=OneWay}" Width="62" />
-                                <DataGridCheckBoxColumn Header="Forced" Binding="{Binding IsForced, Mode=OneWay}" Width="60" />
+                                <DataGridCheckBoxColumn Header="Default" Binding="{Binding IsDefault, Mode=OneWay}" Width="66" MinWidth="66" />
+                                <DataGridCheckBoxColumn Header="Forced" Binding="{Binding IsForced, Mode=OneWay}" Width="64" MinWidth="64" />
                                 <DataGridTextColumn Header="Ďalšie" Binding="{Binding FlagMarks}" Width="0.6*" MinWidth="56">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">

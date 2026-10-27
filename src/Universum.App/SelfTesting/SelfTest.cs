@@ -731,6 +731,26 @@ internal static class SelfTest
         await model.HandleAsync(request);
         Check(model.SelectedTool.Page == model.Info && model.Info.File?.Path == file, "context menu: Informácie o súbore opens the Information page");
 
+        // two files selected for Single spracovanie: the Explorer starts two UNIVERSUMs, the second arrives later; they are
+        // collected until none came for a moment, handled once in a stable order, and the file left out is named
+        var menu = Path.Combine(_outputDirectory, "menu");
+        Directory.CreateDirectory(menu);
+        var first = Path.Combine(menu, "a-film.mkv");
+        var second = Path.Combine(menu, "b-film.mkv");
+        File.Copy(file, first, overwrite: true);
+        File.Copy(file, second, overwrite: true);
+        var notes = new List<string>();
+        var notify = model.Notify;
+        model.Notify = notes.Add;
+        var early = model.HandleAsync(Universum.Core.Shell.ShellRequest.Parse(["--single", second]));
+        await Task.Delay(400);
+        var late = model.HandleAsync(Universum.Core.Shell.ShellRequest.Parse(["--single", first]));
+        await Task.WhenAll(early, late);
+        model.Notify = notify;
+        Check(model.SelectedTool.Page == model.Rules && model.Rules.Plan?.Target.Source.Path == first && notes.Count == 1 &&
+              notes[0].Contains("Neotvorené (1):\nb-film.mkv", StringComparison.Ordinal),
+            $"context menu: files of one action handled once, in order, the rest named – {model.Rules.Plan?.Target.Source.Path} | {string.Join(" / ", notes)}");
+
         using var instance = SingleInstance.TryAcquire();
         Check(instance is not null, "single instance: the first UNIVERSUM owns the name");
         Check(SingleInstance.TryAcquire() is null, "single instance: a second start sees the running one");

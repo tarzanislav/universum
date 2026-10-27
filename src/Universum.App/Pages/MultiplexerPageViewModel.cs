@@ -214,6 +214,12 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         // additional parts are read as one with their file: they are not inspected on their own
         if (choice.Action == MuxAddAction.AdditionalParts && choice.Target is { } owner)
         {
+            if (!target.Inputs.Contains(owner))
+            {
+                Message = TargetGone;
+                return;
+            }
+
             target.AddParts(owner, list);
             Message = "";
             return;
@@ -245,6 +251,10 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         {
             problems.Insert(0, "Nastavenia, do ktorých sa mali súbory pridať, boli medzitým zatvorené – súbory sa nepridali.");
         }
+        else if (choice.Target is { } appendTo && !target.Inputs.Contains(appendTo))
+        {
+            problems.Insert(0, TargetGone);
+        }
         else
         {
             Distribute(target, files, choice);
@@ -252,6 +262,8 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
         Message = string.Join("\n", problems);
     }
+
+    private const string TargetGone = "Súbor, ku ktorému sa mali súbory pripojiť, bol medzitým odstránený – súbory sa nepridali.";
 
     /// <summary>Closes settings; with changes not yet in the queue it asks first. One empty settings always stays.</summary>
     public void Close(MuxSettingsViewModel settings)

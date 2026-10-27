@@ -31,6 +31,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private string _outputPath = "";
     private string _typedPath = "";
     private bool _outputEdited;
+    private bool _titleFromSource;
     private bool _recalculating;
     private (bool, string, string) _libraryInput;
 
@@ -250,7 +251,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
 
     public string? SelectedAttachment { get => _selectedAttachment; set { if (SetProperty(ref _selectedAttachment, value)) { RefreshCommands(); } } }
 
-    public string Title { get => _title; set { if (SetProperty(ref _title, value)) { Changed(); } } }
+    public string Title { get => _title; set { if (SetProperty(ref _title, value)) { _titleFromSource = false; Changed(); } } }
 
     public string ChaptersFile { get => _chaptersFile; set { if (SetProperty(ref _chaptersFile, value)) { Changed(); } } }
 
@@ -384,6 +385,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
         if (Title.Length == 0 && Inputs.FirstOrDefault()?.File.Title is { Length: > 0 } title)
         {
             _title = title;
+            _titleFromSource = true;
             OnPropertyChanged(nameof(Title));
         }
 
@@ -790,6 +792,26 @@ public sealed class MuxSettingsViewModel : ObservableObject
         _selectedTrackItem = null;
         Tracks.Clear();
         Inputs.Clear();
+
+        // what came from the old files goes with them; what the user typed stays
+        if (_titleFromSource)
+        {
+            _title = "";
+            _titleFromSource = false;
+            OnPropertyChanged(nameof(Title));
+        }
+
+        _loading = true;
+        try
+        {
+            Library.ForgetGuess();
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        _libraryInput = LibraryInput();
         OnPropertyChanged(nameof(SelectedTrackItem));
         OnPropertyChanged(nameof(SelectedTrack));
         OnPropertyChanged(nameof(SelectedAppendedTrack));

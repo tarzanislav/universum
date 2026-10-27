@@ -30,6 +30,8 @@ def menu(root_key, items):
         f'Root: HKA; Subkey: "{key}"; ValueType: string; ValueName: "MUIVerb"; ValueData: "UNIVERSUM"',
         f'Root: HKA; Subkey: "{key}"; ValueType: string; ValueName: "Icon"; ValueData: "{{app}}\\{{#AppExe}}"',
         f'Root: HKA; Subkey: "{key}"; ValueType: string; ValueName: "SubCommands"; ValueData: ""',
+        # also on the submenu itself: with more than 15 selected files Explorer would hide it otherwise
+        f'Root: HKA; Subkey: "{key}"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"',
     ]
     for name, text, icon, switch in items:
         item = key + "\\shell\\" + name

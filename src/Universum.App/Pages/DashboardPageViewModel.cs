@@ -50,6 +50,8 @@ public sealed class DashboardPageViewModel : ObservableObject
     private int _weatherVersion;
     private int _ticks;
     private (int Movies, int Shows)? _libraryCounts;
+    private bool _counting;
+    private bool _countAgain;
 
     public DashboardPageViewModel(AppServices services, Shell.MainViewModel main)
     {
@@ -58,29 +60,11 @@ public sealed class DashboardPageViewModel : ObservableObject
         RefreshWeatherCommand = new AsyncRelayCommand(() => RefreshWeatherAsync(force: true), () => !_weatherLoading && Place is not null);
         OpenSettingsCommand = new RelayCommand(() => _main.Open(_main.Settings));
         OpenWeatherSiteCommand = new RelayCommand(() => OpenInBrowser(OpenMeteo.Website));
-        AddToMuxCommand = new AsyncRelayCommand(async () =>
-        {
-            _main.Open(_main.Mux);
-            await _main.Mux.AddFilesCommand.ExecuteAsync(null);
-        });
-        BatchFolderCommand = new RelayCommand(() =>
-        {
-            _main.Open(_main.Batch);
-            if (_main.Batch.ChooseFolderCommand.CanExecute(null))
-            {
-                _main.Batch.ChooseFolderCommand.Execute(null);
-            }
-        });
-        SingleFileCommand = new AsyncRelayCommand(async () =>
-        {
-            _main.Open(_main.Rules);
-            await _main.Rules.OpenCommand.ExecuteAsync(null);
-        });
-        InfoFileCommand = new AsyncRelayCommand(async () =>
-        {
-            _main.Open(_main.Info);
-            await _main.Info.OpenCommand.ExecuteAsync(null);
-        });
+        // the tool opens; its own command runs only when the tool can take it now (not while it is working)
+        AddToMuxCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Mux, _main.Mux.AddFilesCommand));
+        BatchFolderCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Batch, _main.Batch.ChooseFolderCommand));
+        SingleFileCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Rules, _main.Rules.OpenCommand));
+        InfoFileCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Info, _main.Info.OpenCommand));
 
         Queue = new("", "Fronta úloh", () => _main.Open(_main.Queue));
         Mux = new("", "Zlučovanie", () => _main.Open(_main.Mux));
@@ -101,7 +85,15 @@ public sealed class DashboardPageViewModel : ObservableObject
             _ = RefreshWeatherAsync(force: true);
         };
         services.LibraryChanged += () => _ = CountLibraryAsync();
-        services.Jobs.Changed += () => _ = CountLibraryAsync();
+
+        // the library is counted again when a job ended (job events come from other threads)
+        services.Jobs.JobChanged += job =>
+        {
+            if (job.IsFinished)
+            {
+                Jobs.JobRow.OnUi(() => _ = CountLibraryAsync());
+            }
+        };
 
         _clock = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => Tick(), Dispatcher.CurrentDispatcher);
         _clock.Start();
@@ -132,8 +124,14 @@ public sealed class DashboardPageViewModel : ObservableObject
         var names => "Zajtra majú meniny " + string.Join(", ", names),
     };
 
-    public string DayInfo =>
-        $"{ISOWeek.GetWeekOfYear(_now)}. týždeň · {_now.DayOfYear}. deň roka · do konca roka {(new DateTime(_now.Year, 12, 31) - _now.Date).Days} dní";
+    public string DayInfo => $"{ISOWeek.GetWeekOfYear(_now)}. týždeň · {_now.DayOfYear}. deň roka · " +
+                             (new DateTime(_now.Year, 12, 31) - _now.Date).Days switch
+                             {
+                                 0 => "posledný deň roka",
+                                 1 => "do konca roka 1 deň",
+                                 var left and < 5 => $"do konca roka {left} dni",
+                                 var left => $"do konca roka {left} dní",
+                             };
 
     private DateOnly Today => DateOnly.FromDateTime(_now);
 
@@ -161,7 +159,8 @@ public sealed class DashboardPageViewModel : ObservableObject
             w.Wind is { } wind ? $"vietor {Whole(wind)} km/h" : null,
         }.OfType<string>());
 
-    public IReadOnlyList<WeatherDayRow> WeatherDays => _weather?.Days.Select(day => new WeatherDayRow(
+    // days already over (a forecast read before midnight) are not shown
+    public IReadOnlyList<WeatherDayRow> WeatherDays => _weather?.Days.Where(day => day.Date >= Today).Select(day => new WeatherDayRow(
         DayLabel(day.Date),
         OpenMeteo.Symbol(day.Code),
         $"{Whole(day.Max)}° / {Whole(day.Min)}°",
@@ -202,7 +201,7 @@ public sealed class DashboardPageViewModel : ObservableObject
 
     public AsyncRelayCommand AddToMuxCommand { get; }
 
-    public RelayCommand BatchFolderCommand { get; }
+    public AsyncRelayCommand BatchFolderCommand { get; }
 
     public AsyncRelayCommand SingleFileCommand { get; }
 
@@ -308,6 +307,9 @@ public sealed class DashboardPageViewModel : ObservableObject
             OnPropertyChanged(nameof(TomorrowText));
             OnPropertyChanged(nameof(DayInfo));
             OnPropertyChanged(nameof(WeatherDays));
+
+            // a new day: the forecast for it
+            _ = RefreshWeatherAsync(force: true);
         }
 
         // the overview every 5 seconds, the weather every half hour (only with a town)
@@ -322,16 +324,32 @@ public sealed class DashboardPageViewModel : ObservableObject
         }
     }
 
+    // one count at a time (on the UI thread); a request during a count counts once more afterwards
     private async Task CountLibraryAsync()
     {
-        if (_services.Library is not { } library)
+        if (_counting)
         {
-            _libraryCounts = null;
-            RefreshStatus();
+            _countAgain = true;
             return;
         }
 
-        _libraryCounts = await Task.Run(() => (Count(library.Movies), Count(library.Shows)));
+        _counting = true;
+        try
+        {
+            do
+            {
+                _countAgain = false;
+                _libraryCounts = _services.Library is { } library
+                    ? await Task.Run(() => (Count(library.Movies), Count(library.Shows)))
+                    : null;
+            }
+            while (_countAgain);
+        }
+        finally
+        {
+            _counting = false;
+        }
+
         RefreshStatus();
 
         static int Count(string folder)
@@ -344,6 +362,24 @@ public sealed class DashboardPageViewModel : ObservableObject
             {
                 return 0;
             }
+        }
+    }
+
+    private async Task OpenAndRunAsync(object page, System.Windows.Input.ICommand command)
+    {
+        _main.Open(page);
+        if (!command.CanExecute(null))
+        {
+            return;
+        }
+
+        if (command is IAsyncRelayCommand asynchronous)
+        {
+            await asynchronous.ExecuteAsync(null);
+        }
+        else
+        {
+            command.Execute(null);
         }
     }
 

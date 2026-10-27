@@ -26,5 +26,9 @@ public sealed class TextTests
         Assert.Equal(Universum.Core.Shell.ShellAction.Open, plain.Action);
         Assert.True(Universum.Core.Shell.ShellRequest.Parse(["--informacie"]).Paths.Count == 0, "no path");
         Assert.Equal(Universum.Core.Shell.ShellAction.Single, Universum.Core.Shell.ShellRequest.Parse(["--SINGLE", "a.mkv"]).Action);
+
+        // the Explorer hands selected files over in any order: video first, then audio and subtitles, each by name
+        var ordered = Universum.Core.Shell.ShellRequest.Ordered([@"D:\F\Film 2.cz.srt", @"D:\F\Film 2.mkv", @"D:\F\zvuk.ac3", @"D:\F\Film 10.mkv", @"D:\F\Film 2.MKV"]);
+        Assert.Equal(@"D:\F\Film 10.mkv|D:\F\Film 2.mkv|D:\F\zvuk.ac3|D:\F\Film 2.cz.srt", string.Join("|", ordered));
     }
 }

@@ -26,6 +26,9 @@ public sealed class LibraryTargetPicker : ObservableObject
     private TmdbTitle? _tmdbTitle;
     private Placement? _placement;
 
+    // the title was typed or chosen by the user (not only guessed from a file's name)
+    private bool _titleByUser;
+
     /// <param name="target">The result as it will be (its tracks give the name: languages, quality, codec).</param>
     public LibraryTargetPicker(AppServices services, Func<TargetState?> target)
     {
@@ -73,6 +76,7 @@ public sealed class LibraryTargetPicker : ObservableObject
             if (SetProperty(ref _titleText, value))
             {
                 _tmdbTitle = null;
+                _titleByUser = true;
                 TitleNote = "";
 
                 // a title typed by the user is the user's decision (the text that waited for confirmation waits again)
@@ -125,11 +129,35 @@ public sealed class LibraryTargetPicker : ObservableObject
         _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
         _episodeNote = EpisodeNote(guess.Episode);
         _tmdbTitle = null;
+        _titleByUser = false;
         TitleNote = "";
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
         OnPropertyChanged(nameof(IsSeries));
+        OnPropertyChanged(nameof(TitleText));
+        OnPropertyChanged(nameof(EpisodeText));
+        Update();
+    }
+
+    /// <summary>
+    /// The files are gone: a title only guessed from their names is forgotten (the next file is guessed again); a title
+    /// typed or chosen by the user stays.
+    /// </summary>
+    public void ForgetGuess()
+    {
+        if (_titleByUser)
+        {
+            return;
+        }
+
+        _titleText = "";
+        _episodeText = "";
+        _episodeNote = "";
+        _tmdbTitle = null;
+        TitleNote = "";
+        Tmdb.ClearConfirmation();
+        Tmdb.Refresh();
         OnPropertyChanged(nameof(TitleText));
         OnPropertyChanged(nameof(EpisodeText));
         Update();
@@ -259,6 +287,7 @@ public sealed class LibraryTargetPicker : ObservableObject
     private void ChooseTmdbTitle(TmdbTitle title)
     {
         _tmdbTitle = title;
+        _titleByUser = true;
         if (title.Kind != _kind)
         {
             _kind = title.Kind;

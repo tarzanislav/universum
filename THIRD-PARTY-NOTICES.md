@@ -5,7 +5,8 @@ UNIVERSUM (licencia v súbore LICENSE) obsahuje alebo používa nasledujúce die
 ## Slovenský kalendár mien – name-day-calendar
 
 Mená v kalendári Dashboardu pochádzajú zo súboru `data/countries/SK.yaml` projektu
-https://github.com/peterknezek/name-day-calendar (prevedené do `src/Universum.Core/Calendar/sk-namedays.txt`).
+https://github.com/peterknezek/name-day-calendar (prevedené do `src/Universum.Core/Calendar/sk-namedays.txt`;
+opravený preklep „Akexia“ → „Alexia“ 9. 1.).
 
 ```
 MIT License

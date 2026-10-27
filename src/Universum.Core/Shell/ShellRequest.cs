@@ -53,6 +53,33 @@ public sealed record ShellRequest(ShellAction Action, IReadOnlyList<string> Path
         return new ShellRequest(action, paths);
     }
 
+    /// <summary>
+    /// Selected files in a stable order (the Explorer hands them over in any order): folders and video first, then
+    /// audio, then subtitles, each by name – the film is the first input of the multiplexer, never its subtitles.
+    /// </summary>
+    public static IReadOnlyList<string> Ordered(IEnumerable<string> paths) =>
+        paths.Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(Rank)
+            .ThenBy(p => Path.GetFileName(p.TrimEnd('\\', '/')), StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static readonly HashSet<string> Audio = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mka", ".m4a", ".ogg", ".opus", ".flac", ".ac3", ".eac3", ".dts", ".aac", ".mp3", ".wav",
+    };
+
+    private static readonly HashSet<string> Subtitles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mks", ".srt", ".ass", ".ssa", ".vtt", ".sup", ".idx", ".sub",
+    };
+
+    private static int Rank(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return Subtitles.Contains(extension) ? 2 : Audio.Contains(extension) ? 1 : 0;
+    }
+
     // "C:\" arrives as C:" because of the backslash before the closing quote
     private static string Clean(string arg)
     {

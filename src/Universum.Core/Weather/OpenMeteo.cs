@@ -37,6 +37,9 @@ public sealed class OpenMeteo(HttpClient http)
 
     private const int MaxResponseBytes = 1 << 20;
 
+    /// <summary>How long one answer may take (headers and body).</summary>
+    public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(20);
+
     /// <summary>The town as Open-Meteo finds it (the first, most populous match); null when it finds none.</summary>
     public async Task<WeatherPlace?> FindAsync(string town, CancellationToken cancellationToken = default)
     {
@@ -146,43 +149,57 @@ public sealed class OpenMeteo(HttpClient http)
 
     private async Task<JsonDocument> GetAsync(string address, CancellationToken cancellationToken)
     {
+        // the whole answer (headers and body) within the time limit; a body is read at most to the size limit
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(Timeout);
         using var request = new HttpRequestMessage(HttpMethod.Get, address);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        HttpResponseMessage response;
+        byte[] body;
         try
         {
-            response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new WeatherException("Počasie nie je dostupné: " + ex.Message, ex);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new WeatherException("Služba počasia neodpovedá.", ex);
-        }
-
-        using (response)
-        {
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, limit.Token).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 throw new WeatherException($"Služba počasia odpovedala chybou {(int)response.StatusCode}.");
             }
 
-            var body = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-            if (body.Length > MaxResponseBytes)
+            if (response.Content.Headers.ContentLength > MaxResponseBytes)
             {
                 throw new WeatherException("Odpoveď služby počasia je neprimerane veľká.");
             }
 
-            try
+            await using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
+            using var buffer = new MemoryStream();
+            var chunk = new byte[16 * 1024];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, limit.Token).ConfigureAwait(false)) > 0)
             {
-                return JsonDocument.Parse(body);
+                if (buffer.Length + read > MaxResponseBytes)
+                {
+                    throw new WeatherException("Odpoveď služby počasia je neprimerane veľká.");
+                }
+
+                buffer.Write(chunk, 0, read);
             }
-            catch (JsonException ex)
-            {
-                throw new WeatherException("Služba počasia poslala nečitateľnú odpoveď.", ex);
-            }
+
+            body = buffer.ToArray();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            throw new WeatherException("Počasie nie je dostupné: " + ex.Message, ex);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new WeatherException("Služba počasia neodpovedá.", ex);
+        }
+
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException ex)
+        {
+            throw new WeatherException("Služba počasia poslala nečitateľnú odpoveď.", ex);
         }
     }
 

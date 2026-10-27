@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 
@@ -13,7 +15,11 @@ namespace Universum.App.Shell;
 public sealed class SingleInstance : IDisposable
 {
     private static readonly string MutexName = @"Local\UNIVERSUM-3F7A2C91-instance";
-    private static readonly string PipeName = "UNIVERSUM-3F7A2C91-" + Environment.UserName.Replace('\\', '-');
+
+    // pipe names are seen by the whole computer: the user's SID and the session (as the Local\ mutex) make it this
+    // user's UNIVERSUM in this session – another user with the same name, or the same user on a second desktop, has its own
+    private static readonly string PipeName =
+        $"UNIVERSUM-3F7A2C91-{WindowsIdentity.GetCurrent().User?.Value ?? Environment.UserName.Replace('\\', '-')}-{Process.GetCurrentProcess().SessionId}";
     private readonly Mutex _mutex;
     private readonly CancellationTokenSource _stop = new();
 
@@ -22,14 +28,23 @@ public sealed class SingleInstance : IDisposable
     /// <summary>This process is the first UNIVERSUM of the user; null when another one runs.</summary>
     public static SingleInstance? TryAcquire()
     {
-        var mutex = new Mutex(initiallyOwned: true, MutexName, out var created);
-        if (created)
+        Mutex mutex;
+        try
         {
-            return new SingleInstance(mutex);
+            mutex = new Mutex(initiallyOwned: true, MutexName, out var created);
+            if (!created)
+            {
+                mutex.Dispose();
+                return null;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // the running UNIVERSUM was started as administrator: its name is not open to this one
+            return null;
         }
 
-        mutex.Dispose();
-        return null;
+        return new SingleInstance(mutex);
     }
 
     /// <summary>Hands the command line to the running UNIVERSUM; false when it does not answer (this one then starts itself).</summary>
@@ -75,7 +90,15 @@ public sealed class SingleInstance : IDisposable
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
-                // a broken connection: wait for the next one
+                // a broken connection, or the name is taken: wait a moment, then the next one (never a busy loop)
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), _stop.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }
     });

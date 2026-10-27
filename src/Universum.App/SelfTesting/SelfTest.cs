@@ -441,6 +441,43 @@ internal static class SelfTest
               appended.SourceRows[1].Kind == MuxSourceKind.Appended && appended.Spec().Validate().Count == 0,
             "mux: a file appended to the film – " + string.Join(" | ", appended.Spec().Validate()));
         Check(appended.IsUnprocessed && mux.Unprocessed.Count == 2, $"mux: two settings not yet in the queue ({mux.Unprocessed.Count})");
+
+        // the appended file as MKVToolNix GUI shows it: its own colour, its tracks under the tracks they continue, not editable
+        var main = appended.Inputs[0];
+        var children = appended.TrackRows.OfType<MuxAppendedTrackRow>().ToList();
+        Check(appended.TrackRows.Count == appended.Tracks.Count * 2 && children.Count == appended.Tracks.Count &&
+              appended.TrackRows[1] is MuxAppendedTrackRow { IsMain: false, IsMismatch: false } first && first.Parent == appended.Tracks[0],
+            $"mux: the appended file's tracks under the main tracks ({appended.TrackRows.Count} rows)");
+        Check(main.ColorIndex == 0 && appended.SourceRows[1].ColorIndex == 1 && children.All(c => c.ColorIndex == 1) &&
+              appended.Tracks.All(t => t.ColorIndex == 0) && appended.SourceRows[1].IsChild,
+            "mux: the main file green (colour 0), the appended one blue (colour 1)");
+        appended.SelectedTrackItem = children[0];
+        children[0].Include = false;
+        Check(appended.ShowsAppendedTrack && !appended.ShowsTrack && appended.Tracks[0].Include && appended.SelectMainTrackCommand.CanExecute(null),
+            "mux: a track of the appended file is not editable – " + children[0].Explanation);
+        await Screenshot(window, "mux-appended.png");
+        appended.SelectMainTrackCommand.Execute(null);
+        Check(appended.SelectedTrack == appended.Tracks[0] && appended.ShowsTrack, "mux: from the appended track to its main track");
+        appended.MoveDownCommand.Execute(null);
+        Check(appended.Tracks[1] == children[0].Parent && appended.TrackRows[2] == children[0].Parent && appended.TrackRows[3] == children[0] &&
+              appended.SelectedTrack == children[0].Parent,
+            "mux: a moved track takes the appended track along and stays selected");
+        appended.MoveUpCommand.Execute(null);
+
+        // the source list's menu: take every track of the file, name the output by it, append without being asked
+        appended.Tracks[1].Include = false;
+        appended.SelectedSource = appended.SourceRows[0];
+        appended.TakeAllTracksOfSourceCommand.Execute(null);
+        Check(appended.Tracks.All(t => t.Include), "mux menu: Vybrať všetky stopy zo súboru");
+        appended.OutputFromSourceCommand.Execute(null);
+        Check(appended.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "en-und-cz-forced (1).mkv") && appended.OutputNote == "Zadané ručne.",
+            "mux menu: the output named by the selected file, never over the source – " + appended.OutputPath);
+        appended.SelectedSource = appended.SourceRows[1];
+        appended.OutputFromSourceCommand.Execute(null);
+        Check(appended.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "film-časť-2.mkv"),
+            "mux menu: named by the appended file, in the output's folder – " + appended.OutputPath);
+        Check(appended.SourceInfoCommand.CanExecute(null) && appended.AppendFilesCommand.CanExecute(null) && appended.AddPartsCommand.CanExecute(null),
+            "mux menu: the commands of a selected file are available");
         await Screenshot(window, "mux-tabs.png");
 
         // closing asks; "no" keeps the settings
@@ -489,6 +526,26 @@ internal static class SelfTest
             Check(withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && !withFilm.StartCommand.CanExecute(null), "mux: a delay that is not a number stops writing");
             withFilm.Tracks[1].Delay = "250 ms";
             Check(!withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && withFilm.Spec().Tracks.Any(t => t.Options.DelayMs == 250), "mux: a delay in ms is taken – " + withFilm.Problems);
+
+            // menu: Pridať súbory… adds to these settings without asking; Pripojiť súbory… appends to the selected file
+            var extraSubtitles = Path.Combine(work, "doplnok.cz.srt");
+            File.Copy(srt, extraSubtitles, overwrite: true);
+            asked = null;
+            mux.PickFiles = _ => [extraSubtitles];
+            await withFilm.AddSourcesCommand.ExecuteAsync(null);
+            Check(asked is null && withFilm.Inputs.Count == 3 && withFilm.Inputs[2].File.Path == extraSubtitles, $"mux menu: Pridať súbory… ({withFilm.Inputs.Count} sources, not asked)");
+            var secondPart = Path.Combine(work, "film-časť-3.mkv");
+            File.Copy(film, secondPart, overwrite: true);
+            mux.PickFiles = _ => [secondPart];
+            withFilm.SelectedSource = withFilm.SourceRows[0];
+            await withFilm.AppendFilesCommand.ExecuteAsync(null);
+            Check(asked is null && withFilm.Inputs[0].Appended.Count == 1 && withFilm.SourceRows[1].Kind == MuxSourceKind.Appended &&
+                  withFilm.SourceRows[1].ColorIndex == 1 && withFilm.Inputs[1].ColorIndex == 2,
+                "mux menu: Pripojiť súbory… appends to the selected file (the next files get the next colours)");
+            mux.PickFiles = _ => null;
+            withFilm.RemoveAllSourcesCommand.Execute(null);
+            Check(withFilm.Inputs.Count == 0 && withFilm.Tracks.Count == 0 && withFilm.TrackRows.Count == 0 && withFilm.SourceRows.Count == 0 && !withFilm.IsUnprocessed,
+                "mux menu: Odstrániť všetky súbory");
         }
 
         // the add dialog itself (shown, not answered)

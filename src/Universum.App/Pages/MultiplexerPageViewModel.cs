@@ -55,7 +55,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     {
         _services = services;
         _current = new MuxSettingsViewModel(services) { IsCurrent = true };
-        _current.ReservedOutputs = Reserved(_current);
+        Prepare(_current);
         Settings.Add(_current);
         AddFilesCommand = new AsyncRelayCommand(AddFilesAsync);
         NewSettingsCommand = new RelayCommand(() => Current = NewSettings());
@@ -64,8 +64,10 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(SelectedFile()!), () => SelectedFile() is not null);
         services.Jobs.Changed += () => JobRow.OnUi(QueueChanged);
         services.Jobs.JobChanged += _ => JobRow.OnUi(QueueChanged);
-        Watch(_current);
     }
+
+    /// <summary>Picks files to add (the open dialog with this title; the self-test answers itself); null = cancelled.</summary>
+    public Func<string, IReadOnlyList<string>?> PickFiles { get; set; } = PickWithDialog;
 
     /// <summary>Asks what to do with added files (the dialog; the self-test answers itself).</summary>
     public Func<MuxAddRequest, MuxAddChoice?> AskHowToAdd { get; set; } = MuxAddFilesWindow.Ask;
@@ -157,7 +159,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         await _adding.WaitAsync();
         try
         {
-            await AddAsync(list);
+            await AddAsync(list, _current, null);
         }
         finally
         {
@@ -165,11 +167,38 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         }
     }
 
-    private async Task AddAsync(List<string> list)
+    /// <summary>
+    /// The source list's menu: picks files and adds them to these settings as asked – as sources, appended to a file or
+    /// as its further parts (nothing else is asked).
+    /// </summary>
+    public async Task AddPickedAsync(MuxSettingsViewModel settings, MuxAddAction action, MuxInputRow? to)
+    {
+        var title = action switch
+        {
+            MuxAddAction.Append => $"Pripojiť súbory k {to?.FileName}",
+            MuxAddAction.AdditionalParts => $"Pridať ďalšie časti súboru {to?.FileName}",
+            _ => "Pridať súbory",
+        };
+        if (PickFiles(title) is not { Count: > 0 } picked)
+        {
+            return;
+        }
+
+        await _adding.WaitAsync();
+        try
+        {
+            await AddAsync(picked.ToList(), settings, new MuxAddChoice(action, to));
+        }
+        finally
+        {
+            _adding.Release();
+        }
+    }
+
+    private async Task AddAsync(List<string> list, MuxSettingsViewModel target, MuxAddChoice? preset)
     {
         // the settings the files were meant for, even if another tab is chosen while they are read
-        var target = _current;
-        var choice = Decide(list);
+        var choice = preset ?? Decide(list);
         if (choice is null || (choice.Action is MuxAddAction.Append or MuxAddAction.AdditionalParts && choice.Target is null))
         {
             return;
@@ -347,8 +376,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private static bool BelongsTo(string stem, string film) =>
         stem.StartsWith(film, StringComparison.OrdinalIgnoreCase) && (stem.Length == film.Length || !char.IsLetterOrDigit(stem[film.Length]));
 
-    /// <summary>The selected source file, or the file of the selected track.</summary>
-    private string? SelectedFile() => _current.SelectedSource?.Path ?? _current.SelectedTrack?.Input.File.Path;
+    /// <summary>The selected source file, or the file of the selected track (of an appended file: that file).</summary>
+    private string? SelectedFile() =>
+        _current.SelectedSource?.Path ?? _current.SelectedTrack?.Input.File.Path ?? _current.SelectedAppendedTrack?.File.Path;
 
     private void QueueChanged()
     {
@@ -360,10 +390,18 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private MuxSettingsViewModel NewSettings()
     {
         var settings = new MuxSettingsViewModel(_services);
-        settings.ReservedOutputs = Reserved(settings);
+        Prepare(settings);
         Settings.Add(settings);
-        Watch(settings);
         return settings;
+    }
+
+    // what new settings need from the page: names already taken, the source list's menu, the Information page
+    private void Prepare(MuxSettingsViewModel settings)
+    {
+        settings.ReservedOutputs = Reserved(settings);
+        settings.AddRequested = (action, to) => AddPickedAsync(settings, action, to);
+        settings.InfoRequested = path => InfoRequested?.Invoke(path);
+        Watch(settings);
     }
 
     // the outputs of the other tabs and of multiplex jobs not finished yet: a default name never repeats them
@@ -376,7 +414,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private void Watch(MuxSettingsViewModel settings) =>
         settings.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(MuxSettingsViewModel.SelectedSource) or nameof(MuxSettingsViewModel.SelectedTrack))
+            if (e.PropertyName is nameof(MuxSettingsViewModel.SelectedSource) or nameof(MuxSettingsViewModel.SelectedTrackItem))
             {
                 ShowInfoCommand.NotifyCanExecuteChanged();
             }
@@ -384,14 +422,20 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     private async Task AddFilesAsync()
     {
+        if (PickFiles("Pridať súbory") is { Count: > 0 } picked)
+        {
+            await AddFilesAsync(picked);
+        }
+    }
+
+    private static IReadOnlyList<string>? PickWithDialog(string title)
+    {
         var dialog = new OpenFileDialog
         {
+            Title = title,
             Multiselect = true,
-            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mpg;*.vob;*.webm;*.ogg;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
+            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mk3d;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.vob;*.webm;*.ogg;*.ogm;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.h264;*.h265;*.hevc;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
         };
-        if (dialog.ShowDialog() == true)
-        {
-            await AddFilesAsync(dialog.FileNames);
-        }
+        return dialog.ShowDialog() == true ? dialog.FileNames : null;
     }
 }

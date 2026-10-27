@@ -279,14 +279,56 @@
                         </DockPanel>
                         <DataGrid Grid.Row="1" ItemsSource="{Binding SourceRows}" SelectedItem="{Binding SelectedSource}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                            <!-- right click (MKVToolNix GUI: the menu of Source files) -->
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Pridať súbory…" Command="{Binding AddSourcesCommand}" />
+                                    <MenuItem Header="Pripojiť súbory…" Command="{Binding AppendFilesCommand}"
+                                              ToolTip="Pripojí súbory na koniec vybraného súboru – pokračujú jeho stopami (napr. 2. časť filmu)" />
+                                    <MenuItem Header="Pridať súbory ako ďalšie časti…" Command="{Binding AddPartsCommand}"
+                                              ToolTip="Súbory sa prečítajú ako jeden s vybraným súborom (napr. VTS_01_1.VOB, VTS_01_2.VOB)" />
+                                    <Separator />
+                                    <MenuItem Header="Odstrániť súbor" Command="{Binding RemoveSourceCommand}" />
+                                    <MenuItem Header="Odstrániť všetky súbory" Command="{Binding RemoveAllSourcesCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Nastaviť názov výstupného súboru podľa vybraného súboru" Command="{Binding OutputFromSourceCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Informácie o súbore" Command="{Binding SourceInfoCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Vybrať všetky stopy zo súboru" Command="{Binding TakeAllTracksOfSourceCommand}"
+                                              ToolTip="Zaškrtne všetky stopy vybraného súboru" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Názov súboru" Width="2*" MinWidth="140">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
+                                            <!-- parts and appended files indented under their file, each file in its own colour -->
                                             <StackPanel Orientation="Horizontal" ToolTip="{Binding Path}">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsChild}" Value="True">
+                                                                <Setter Property="Margin" Value="18,0,0,0" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
                                                 <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,6,0" VerticalAlignment="Center"
                                                         Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
-                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsChild}" Value="True">
+                                                                    <Setter Property="FontWeight" Value="Normal" />
+                                                                    <Setter Property="FontStyle" Value="Italic" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -315,7 +357,7 @@
                             <TextBlock Text="Stopy vo výstupe" FontWeight="SemiBold" VerticalAlignment="Center"
                                        ToolTip="V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú" />
                         </DockPanel>
-                        <DataGrid Grid.Row="4" ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}" AutoGenerateColumns="False" IsReadOnly="True"
+                        <DataGrid Grid.Row="4" ItemsSource="{Binding TrackRows}" SelectedItem="{Binding SelectedTrackItem}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
                             <DataGrid.InputBindings>
                                 <KeyBinding Key="Up" Modifiers="Control" Command="{Binding MoveUpCommand}" />
@@ -324,6 +366,14 @@
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                     <Setter Property="Background" Value="{Binding Kind, Converter={StaticResource TrackTypeBrush}}" />
+                                    <Style.Triggers>
+                                        <!-- the tracks of an appended file: under the track they continue, not editable -->
+                                        <DataTrigger Binding="{Binding IsMain}" Value="False">
+                                            <Setter Property="FontStyle" Value="Italic" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Setter Property="ToolTip" Value="{Binding Explanation}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
@@ -332,7 +382,7 @@
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" MinWidth="0" Margin="0,0,2,0"
-                                                          ToolTip="Vziať túto stopu do výstupu" />
+                                                          IsEnabled="{Binding IsMain}" ToolTip="Vziať túto stopu do výstupu" />
                                                 <Border Width="8" Height="8" CornerRadius="2" Margin="0,0,5,0" VerticalAlignment="Center" ToolTip="{Binding Source}"
                                                         Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
                                                 <TextBlock Text="{Binding Position}" VerticalAlignment="Center" ToolTip="Poradie vo výstupe" />
@@ -458,6 +508,25 @@
                                         <Run Text="Zo súboru" /> <Run Text="{Binding Source, Mode=OneWay}" /><Run Text=", ID stopy" /> <Run Text="{Binding Track.Id, Mode=OneWay}" />
                                     </TextBlock>
                                 </StackPanel>
+                                <!-- a track of an appended file: what it continues; the main track is the one edited -->
+                                <StackPanel DataContext="{Binding SelectedAppendedTrack}" Visibility="{Binding DataContext.ShowsAppendedTrack, ElementName=SettingsRoot, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel Margin="0,0,0,6">
+                                        <Border DockPanel.Dock="Left" Style="{StaticResource TypeChip}" Background="{Binding Kind, Converter={StaticResource TrackTypeBrush}, ConverterParameter=chip}" Margin="0,0,8,0">
+                                            <TextBlock Text="{Binding Type}" Foreground="#1F1F1F" FontSize="12" />
+                                        </Border>
+                                        <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                            <Run Text="{Binding Codec, Mode=OneWay}" /> <Run Text="{Binding Properties, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </TextBlock>
+                                    </DockPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
+                                        <TextBlock Text="Pripojená časť" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding FileName}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    <TextBlock Text="{Binding Explanation}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,6,0,8" />
+                                    <Button Content="Upraviť hlavnú stopu" Command="{Binding DataContext.SelectMainTrackCommand, ElementName=SettingsRoot}" HorizontalAlignment="Left" Padding="10,3" />
+                                </StackPanel>
                                 <StackPanel DataContext="{Binding SelectedSource}" Visibility="{Binding DataContext.ShowsSource, ElementName=SettingsRoot, Converter={StaticResource BoolToVisibility}}">
                                     <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontWeight="SemiBold" />
                                     <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0" TextWrapping="Wrap">
@@ -469,7 +538,7 @@
                                     <CheckBox Content="Prílohy (písma, obrázky)" IsChecked="{Binding Input.KeepAttachments, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Input.HasAttachments}" />
                                     <CheckBox Content="Tagy" IsChecked="{Binding Input.KeepTags, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Input.HasTags}" />
                                     <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
-                                               Text="Pripojený súbor pokračuje stopami súboru, ku ktorému patrí (názvy, jazyky a príznaky má od neho); ďalšie časti sa čítajú ako jeden súbor." />
+                                               Text="Pripojený súbor pokračuje stopami súboru, ku ktorému patrí (názvy, jazyky a príznaky má od neho); ďalšie časti sa čítajú ako jeden súbor. Pravým tlačidlom na súbore otvoríte ďalšie možnosti." />
                                 </StackPanel>
                                 <Separator Margin="0,12,0,4" />
                                 <Expander Header="Výstup: názov, kapitoly, prílohy">

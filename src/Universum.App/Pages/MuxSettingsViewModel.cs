@@ -22,7 +22,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private static int _created;
     private readonly AppServices _services;
     private MuxSourceRow? _selectedSource;
-    private MuxTrackRow? _selectedTrack;
+    private object? _selectedTrackItem;
     private string? _selectedAttachment;
     private string _title = "";
     private string _chaptersFile = "";
@@ -70,6 +70,17 @@ public sealed class MuxSettingsViewModel : ObservableObject
             }
         };
         RemoveSourceCommand = new RelayCommand(RemoveSource, () => _selectedSource is not null);
+        AddSourcesCommand = new AsyncRelayCommand(() => AddRequested?.Invoke(MuxAddAction.AddToCurrent, null) ?? Task.CompletedTask);
+        AppendFilesCommand = new AsyncRelayCommand(
+            () => AddRequested?.Invoke(MuxAddAction.Append, _selectedSource?.Input) ?? Task.CompletedTask, () => _selectedSource is not null);
+        AddPartsCommand = new AsyncRelayCommand(
+            () => AddRequested?.Invoke(MuxAddAction.AdditionalParts, _selectedSource?.Input) ?? Task.CompletedTask, () => _selectedSource is not null);
+        RemoveAllSourcesCommand = new RelayCommand(RemoveAllSources, () => Inputs.Count > 0);
+        OutputFromSourceCommand = new RelayCommand(OutputFromSource, () => _selectedSource is not null && !UseLibrary);
+        SourceInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedSource!.Path), () => _selectedSource is not null);
+        TakeAllTracksOfSourceCommand = new RelayCommand(TakeAllTracksOfSource, () => _selectedSource is not null);
+        SelectMainTrackCommand = new RelayCommand(() => SelectedTrack = SelectedAppendedTrack?.Parent, () => SelectedAppendedTrack is not null);
+        Tracks.CollectionChanged += (_, _) => SyncTrackRows();
         MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
         MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
         ApplyRulesCommand = new RelayCommand(ApplyRules, () => Tracks.Any(t => t.Include));
@@ -91,6 +102,38 @@ public sealed class MuxSettingsViewModel : ObservableObject
     public int Number { get; }
 
     public RelayCommand RemoveSourceCommand { get; }
+
+    /// <summary>Asks the page to pick files and add them with this action (to the given source for append and parts).</summary>
+    public Func<MuxAddAction, MuxInputRow?, Task>? AddRequested { get; set; }
+
+    /// <summary>Asks the page to show a file on the Information page.</summary>
+    public Action<string>? InfoRequested { get; set; }
+
+    // the source list's menu (MKVToolNix GUI: the context menu of Source files)
+
+    /// <summary>Pridať súbory… – as new sources of these settings, without asking.</summary>
+    public AsyncRelayCommand AddSourcesCommand { get; }
+
+    /// <summary>Pripojiť súbory… – appended to the selected file (mkvmerge "+").</summary>
+    public AsyncRelayCommand AppendFilesCommand { get; }
+
+    /// <summary>Pridať súbory ako ďalšie časti… – read as one file with the selected one (mkvmerge "( a b )").</summary>
+    public AsyncRelayCommand AddPartsCommand { get; }
+
+    /// <summary>Odstrániť všetky súbory.</summary>
+    public RelayCommand RemoveAllSourcesCommand { get; }
+
+    /// <summary>Nastaviť názov výstupného súboru podľa vybraného súboru.</summary>
+    public RelayCommand OutputFromSourceCommand { get; }
+
+    /// <summary>Informácie o súbore – the selected file on the Information page.</summary>
+    public RelayCommand SourceInfoCommand { get; }
+
+    /// <summary>Vybrať všetky stopy zo súboru – every track of the selected file is taken.</summary>
+    public RelayCommand TakeAllTracksOfSourceCommand { get; }
+
+    /// <summary>From a track of an appended file to the main track it continues (that one is edited).</summary>
+    public RelayCommand SelectMainTrackCommand { get; }
 
     public RelayCommand MoveUpCommand { get; }
 
@@ -128,6 +171,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
     /// <summary>All tracks of all inputs, in output order (tracks not taken stay in the list, unticked).</summary>
     public ObservableCollection<MuxTrackRow> Tracks { get; } = [];
 
+    /// <summary>The track list as shown: each track, under it the tracks of the appended files that continue it.</summary>
+    public ObservableCollection<object> TrackRows { get; } = [];
+
     public ObservableCollection<string> Attachments { get; } = [];
 
     public ObservableCollection<string> Findings { get; } = [];
@@ -155,7 +201,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
             {
                 if (value is not null)
                 {
-                    SelectedTrack = null;
+                    SelectedTrackItem = null;
                 }
 
                 OnPropertiesShown();
@@ -163,30 +209,41 @@ public sealed class MuxSettingsViewModel : ObservableObject
         }
     }
 
-    public MuxTrackRow? SelectedTrack
+    /// <summary>The row selected in the track list: a track, or a track of an appended file.</summary>
+    public object? SelectedTrackItem
     {
-        get => _selectedTrack;
+        get => _selectedTrackItem;
         set
         {
-            if (SetProperty(ref _selectedTrack, value))
+            if (SetProperty(ref _selectedTrackItem, value))
             {
                 if (value is not null)
                 {
                     SelectedSource = null;
                 }
 
+                OnPropertyChanged(nameof(SelectedTrack));
+                OnPropertyChanged(nameof(SelectedAppendedTrack));
                 OnPropertiesShown();
             }
         }
     }
 
+    public MuxTrackRow? SelectedTrack { get => _selectedTrackItem as MuxTrackRow; set => SelectedTrackItem = value; }
+
+    /// <summary>A track of an appended file is selected (its main track is the one edited).</summary>
+    public MuxAppendedTrackRow? SelectedAppendedTrack => _selectedTrackItem as MuxAppendedTrackRow;
+
     /// <summary>The properties panel shows the selected track.</summary>
-    public bool ShowsTrack => _selectedTrack is not null;
+    public bool ShowsTrack => SelectedTrack is not null;
+
+    /// <summary>The properties panel explains the selected track of an appended file.</summary>
+    public bool ShowsAppendedTrack => SelectedAppendedTrack is not null;
 
     /// <summary>The properties panel shows the selected source file.</summary>
-    public bool ShowsSource => _selectedTrack is null && _selectedSource is not null;
+    public bool ShowsSource => _selectedTrackItem is null && _selectedSource is not null;
 
-    public bool ShowsNothing => _selectedTrack is null && _selectedSource is null;
+    public bool ShowsNothing => _selectedTrackItem is null && _selectedSource is null;
 
     /// <summary>The advanced track properties (timestamps, video, subtitles) are shown.</summary>
     public bool ShowAdvanced { get => _showAdvanced; set => SetProperty(ref _showAdvanced, value); }
@@ -400,7 +457,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     /// <summary>Moves the selected track in the output order (also Ctrl+↑/↓).</summary>
     public void Move(int step)
     {
-        if (_selectedTrack is not { } row || !CanMove(step))
+        if (SelectedTrack is not { } row || !CanMove(step))
         {
             return;
         }
@@ -639,23 +696,135 @@ public sealed class MuxSettingsViewModel : ObservableObject
     {
         var selected = _selectedSource?.Path;
         SourceRows.Clear();
+
+        // a colour for each file in order (MKVToolNix GUI: the first green, the file appended to it blue…); parts share
+        // the colour of their file, which they are read as one with
+        var color = 0;
+        var colors = new Dictionary<MediaFile, int>();
         foreach (var input in Inputs)
         {
-            SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.File, input.File.Path, input.File.ContainerType ?? ""));
+            input.ColorIndex = color++;
+            SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.File, input.File.Path, input.File.ContainerType ?? "", input.ColorIndex));
             foreach (var part in input.Parts)
             {
-                SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.Part, part, input.File.ContainerType ?? ""));
+                SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.Part, part, input.File.ContainerType ?? "", input.ColorIndex));
             }
 
             foreach (var appended in input.Appended)
             {
-                SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.Appended, appended.Path, appended.ContainerType ?? ""));
+                colors[appended] = color;
+                SourceRows.Add(new MuxSourceRow(input, MuxSourceKind.Appended, appended.Path, appended.ContainerType ?? "", color++));
             }
         }
 
+        // the tracks of the appended files, under the tracks they continue (the same ID)
+        foreach (var track in Tracks)
+        {
+            track.Children = track.Input.Appended
+                .Select(file => new MuxAppendedTrackRow(track, file, file.Tracks.FirstOrDefault(t => t.Id == track.Track.Id), colors[file]))
+                .ToList();
+            track.RefreshSource();
+        }
+
+        SyncTrackRows();
         _selectedSource = SourceRows.FirstOrDefault(r => r.Path == selected);
         OnPropertyChanged(nameof(SelectedSource));
         OnPropertiesShown();
+    }
+
+    /// <summary>
+    /// The shown track list follows the tracks: rows are moved, not replaced, so the selection and the keyboard focus
+    /// stay (Ctrl+↑/↓ moves a track again and again).
+    /// </summary>
+    private void SyncTrackRows()
+    {
+        var wanted = Tracks.SelectMany(t => t.Children.Prepend<object>(t)).ToList();
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            if (i < TrackRows.Count && ReferenceEquals(TrackRows[i], wanted[i]))
+            {
+                continue;
+            }
+
+            var at = -1;
+            for (var j = i + 1; j < TrackRows.Count; j++)
+            {
+                if (ReferenceEquals(TrackRows[j], wanted[i]))
+                {
+                    at = j;
+                    break;
+                }
+            }
+
+            if (at >= 0)
+            {
+                TrackRows.Move(at, i);
+            }
+            else
+            {
+                TrackRows.Insert(i, wanted[i]);
+            }
+        }
+
+        while (TrackRows.Count > wanted.Count)
+        {
+            TrackRows.RemoveAt(TrackRows.Count - 1);
+        }
+
+        if (_selectedTrackItem is not null && !TrackRows.Contains(_selectedTrackItem))
+        {
+            SelectedTrackItem = null;
+        }
+    }
+
+    private void RemoveAllSources()
+    {
+        _selectedSource = null;
+        _selectedTrackItem = null;
+        Tracks.Clear();
+        Inputs.Clear();
+        OnPropertyChanged(nameof(SelectedTrackItem));
+        OnPropertyChanged(nameof(SelectedTrack));
+        OnPropertyChanged(nameof(SelectedAppendedTrack));
+        RefreshSources();
+        Changed();
+    }
+
+    /// <summary>
+    /// As MKVToolNix GUI: the output gets the selected file's name (in the output's folder, or beside that file), never
+    /// the name of an existing file or of a source – then with " (1)", " (2)"…
+    /// </summary>
+    private void OutputFromSource()
+    {
+        if (_selectedSource is not { } row || UseLibrary)
+        {
+            return;
+        }
+
+        var folder = Path.GetDirectoryName(OutputPath) is { Length: > 0 } current ? current : Path.GetDirectoryName(row.Path) ?? "";
+        var name = Path.GetFileNameWithoutExtension(row.Path);
+        var extension = Path.GetExtension(OutputPath) is { Length: > 0 } ext ? ext : ".mkv";
+        var taken = Files.Concat(ReservedOutputs()).ToList();
+        var candidate = Path.Combine(folder, name + extension);
+        for (var number = 1; File.Exists(candidate) || taken.Any(t => SamePath(t, candidate)); number++)
+        {
+            candidate = Path.Combine(folder, $"{name} ({number}){extension}");
+        }
+
+        OutputPath = candidate;
+    }
+
+    private void TakeAllTracksOfSource()
+    {
+        if (_selectedSource is not { } row)
+        {
+            return;
+        }
+
+        foreach (var track in Tracks.Where(t => t.Input == row.Input))
+        {
+            track.Include = true;
+        }
     }
 
     private void RemoveSource()
@@ -723,12 +892,12 @@ public sealed class MuxSettingsViewModel : ObservableObject
 
     private bool CanMove(int step)
     {
-        if (_selectedTrack is null)
+        if (SelectedTrack is not { } selected)
         {
             return false;
         }
 
-        var index = Tracks.IndexOf(_selectedTrack) + step;
+        var index = Tracks.IndexOf(selected) + step;
         return index >= 0 && index < Tracks.Count;
     }
 
@@ -802,9 +971,10 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private void OnPropertiesShown()
     {
         OnPropertyChanged(nameof(ShowsTrack));
+        OnPropertyChanged(nameof(ShowsAppendedTrack));
         OnPropertyChanged(nameof(ShowsSource));
         OnPropertyChanged(nameof(ShowsNothing));
-        if (_selectedTrack?.HasAdvanced == true)
+        if (SelectedTrack?.HasAdvanced == true)
         {
             ShowAdvanced = true;
         }
@@ -815,6 +985,13 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private void RefreshCommands()
     {
         RemoveSourceCommand?.NotifyCanExecuteChanged();
+        AppendFilesCommand?.NotifyCanExecuteChanged();
+        AddPartsCommand?.NotifyCanExecuteChanged();
+        RemoveAllSourcesCommand?.NotifyCanExecuteChanged();
+        OutputFromSourceCommand?.NotifyCanExecuteChanged();
+        SourceInfoCommand?.NotifyCanExecuteChanged();
+        TakeAllTracksOfSourceCommand?.NotifyCanExecuteChanged();
+        SelectMainTrackCommand?.NotifyCanExecuteChanged();
         MoveUpCommand?.NotifyCanExecuteChanged();
         MoveDownCommand?.NotifyCanExecuteChanged();
         ApplyRulesCommand?.NotifyCanExecuteChanged();

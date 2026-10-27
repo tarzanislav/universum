@@ -897,7 +897,7 @@ internal static class SelfTest
             var kept = Path.Combine(library, "Na spracovanie");
             Directory.CreateDirectory(kept);
             File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(kept, "Pôvodný film.mkv"), overwrite: true);
-            File.WriteAllBytes(Path.Combine(kept, "Iný film.mp4"), []);
+            File.WriteAllBytes(Path.Combine(kept, "Iný film.wmv"), []);
             batch.Folder = library;
             batch.Recursive = true;
             await batch.AnalyzeAsync();
@@ -906,10 +906,21 @@ internal static class SelfTest
             File.Delete(Path.Combine(kept, "Pôvodný film.mkv"));
             batch.Folder = kept;
             await batch.AnalyzeAsync();
-            Check(batch.Groups.Count == 0 && batch.SummaryIsWarning && batch.Summary.Contains("len MKV", StringComparison.Ordinal) &&
-                  batch.Summary.Contains("1 × MP4", StringComparison.Ordinal),
-                "batch: a folder without MKV says why – " + batch.Summary);
-            await Screenshot(window, "batch-no-mkv.png");
+            Check(batch.Groups.Count == 0 && batch.SummaryIsWarning && batch.Summary.Contains("nevie prečítať: 1 × WMV", StringComparison.Ordinal),
+                "batch: a folder without readable video says why – " + batch.Summary);
+            await Screenshot(window, "batch-no-video.png");
+
+            // owner, 27. 10.: MP4, AVI, TS and others are processed too – as a new MKV
+            foreach (var name in new[] { "en-cz.mp4", "sk-en.ts", "und.avi" })
+            {
+                File.Copy(Path.Combine(media, name), Path.Combine(kept, name), overwrite: true);
+            }
+
+            await batch.AnalyzeAsync();
+            Check(batch.Analysis is { FileCount: 3 } && batch.Items.All(i => !i.File.IsMatroska && i.Status is Core.Batch.BatchStatus.Remux or Core.Batch.BatchStatus.NeedsReview),
+                "batch: MP4, TS and AVI are analysed and planned as a new MKV – " + batch.Summary + " | " +
+                string.Join(", ", batch.Items.Select(i => $"{Path.GetFileName(i.File.Path)} {i.Status}")));
+            await Screenshot(window, "batch-other-formats.png");
             Directory.Delete(kept, recursive: true);
         }
 

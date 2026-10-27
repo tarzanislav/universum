@@ -25,8 +25,18 @@ public static class TargetVerifier
             var actual = result.Tracks[i];
             var where = $"track {i + 1}";
             Check(problems, actual.Type == expected.Type, $"{where}: type {actual.Type}, expected {expected.Type}");
-            // compare the codec family only: mkvmerge may modernise IDs such as A_AC3/BSID9 -> A_AC3
-            Check(problems, CodecFamily(actual.CodecId) == CodecFamily(expected.Source.CodecId), $"{where}: codec {actual.CodecId}, expected {expected.Source.CodecId}");
+            if (source.IsMatroska)
+            {
+                // compare the codec family only: mkvmerge may modernise IDs such as A_AC3/BSID9 -> A_AC3
+                Check(problems, CodecFamily(actual.CodecId) == CodecFamily(expected.Source.CodecId), $"{where}: codec {actual.CodecId}, expected {expected.Source.CodecId}");
+            }
+            else if (actual.Type != TrackType.Subtitles)
+            {
+                // from another container there are no Matroska codec IDs to compare: video and audio keep their codec;
+                // subtitles may be converted (MP4 timed text becomes SRT), their type is checked above
+                Check(problems, string.Equals(actual.Codec, expected.Source.Codec, StringComparison.OrdinalIgnoreCase),
+                    $"{where}: codec {actual.Codec}, expected {expected.Source.Codec}");
+            }
             Check(problems, (actual.Name ?? "") == (expected.Name ?? ""), $"{where}: name '{actual.Name}', expected '{expected.Name}'");
             Check(problems, expected.Language.IsUndetermined || actual.Language.Primary == expected.Language.Primary,
                 $"{where}: language {actual.Language}, expected {expected.Language}");

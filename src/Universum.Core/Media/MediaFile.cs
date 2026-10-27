@@ -33,6 +33,23 @@ public sealed record MediaFile
     /// <summary>Version of the backend's identification format (mkvmerge JSON schema).</summary>
     public int? IdentificationFormatVersion { get; init; }
 
+    /// <summary>
+    /// Matroska (also WebM): its header can be edited in place. Any other container (MP4, AVI, TS…) is always written
+    /// as a new MKV by mkvmerge.
+    /// </summary>
+    public bool IsMatroska => ContainerType == "Matroska";
+
+    /// <summary>"MP4", "AVI", "TS" – the container as people call it (for messages).</summary>
+    public string ContainerName => ContainerType switch
+    {
+        "Matroska" => "MKV",
+        "QuickTime/MP4" => System.IO.Path.GetExtension(Path).Equals(".mov", StringComparison.OrdinalIgnoreCase) ? "MOV" : "MP4",
+        "MPEG transport stream" => System.IO.Path.GetExtension(Path).TrimStart('.').ToUpperInvariant() is { Length: > 0 } ts ? ts : "TS",
+        "MPEG program stream" => "MPEG",
+        "" => System.IO.Path.GetExtension(Path).TrimStart('.').ToUpperInvariant(),
+        var other => other,
+    };
+
     public bool HasChapters => ChapterEntries > 0;
 
     public bool HasTags => GlobalTagEntries > 0 || Tracks.Any(t => t.TagEntries > 0);

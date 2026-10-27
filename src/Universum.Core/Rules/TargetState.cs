@@ -35,10 +35,17 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
 
     public bool TagsChanged => RemoveTags && Source.HasTags;
 
-    public bool HasChanges => OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || Removed.Count > 0 || Tracks.Any(t => t.HasChanges);
+    /// <summary>
+    /// The file is not Matroska (MP4, AVI, TS…): the result is always a new MKV written by mkvmerge – never a header edit
+    /// and never the file copied as it is (owner, 27. 10. 2026: batch processing converts every video format it can).
+    /// </summary>
+    public bool ContainerChanged => !Source.IsMatroska;
 
-    /// <summary>A new file must be written (order, removed tracks, index repair); otherwise a header edit is enough.</summary>
-    public bool NeedsRewrite => OrderChanged || RepairIndex;
+    public bool HasChanges => ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || Removed.Count > 0 ||
+                              Tracks.Any(t => t.HasChanges);
+
+    /// <summary>A new file must be written (another container, order, removed tracks, index repair); otherwise a header edit is enough.</summary>
+    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex;
 
     public bool IsBlocked => Issues.Any(i => i.IsBlocking);
 

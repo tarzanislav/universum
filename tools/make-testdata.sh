@@ -60,4 +60,16 @@ mkvmerge -q "${common[@]}" -o "$out/sk-cz-mixed.mkv" \
   --language 0:slo "$work/s-sk.srt" \
   --language 0:cze "$work/s-cz.srt"
 
+# Other containers for batch processing (owner, 27. 10. 2026: MP4, AVI, TS and others are converted to MKV).
+# MP4: English AAC, Czech AC-3, Czech timed-text subtitles.
+ffmpeg -loglevel error -y -fflags +genpts -r 10 -i "$work/v.h264" -i "$work/a-en.aac" -i "$work/a-cz.ac3" -i "$work/s-cz.srt" \
+  -map 0 -map 1 -map 2 -map 3 -c:v copy -c:a copy -c:s mov_text \
+  -metadata:s:a:0 language=eng -metadata:s:a:1 language=ces -metadata:s:s:0 language=ces "$out/en-cz.mp4"
+# AVI: no language tags at all (the languages must be chosen), MP3 audio.
+ffmpeg -loglevel error -y -fflags +genpts -r 10 -i "$work/v.h264" -i "$work/a-en.aac" \
+  -map 0 -map 1 -c:v copy -c:a libmp3lame -b:a 32k -ar 32000 "$out/und.avi"
+# MPEG transport stream (a TV recording): Slovak AC-3 first, English AAC.
+ffmpeg -loglevel error -y -fflags +genpts -r 10 -i "$work/v.h264" -i "$work/a-sk.ac3" -i "$work/a-en.aac" \
+  -map 0 -map 1 -map 2 -c copy -metadata:s:a:0 language=slk -metadata:s:a:1 language=eng "$out/sk-en.ts"
+
 ls -l "$out"

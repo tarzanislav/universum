@@ -42,7 +42,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private readonly Dictionary<string, string> _unverifiedNotes = new(Universum.Core.IO.Paths.Comparer);
     private string _seriesNote = "";
     private BatchTemplate _template = BatchTemplate.RulesOnly;
-    private string _summary = "Vyberte priečinok so súbormi MKV a dajte Analyzovať.";
+    private string _summary = "Vyberte priečinok s video súbormi (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…) a dajte Analyzovať – čo nie je MKV, uloží sa ako nový MKV.";
     private string _simulation = "";
     private string _runState = "";
     private double _progress;
@@ -420,7 +420,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Groups.Clear();
         SelectedGroup = null;
         SummaryIsWarning = false;
-        Summary = "Hľadám súbory MKV…";
+        Summary = "Hľadám video súbory…";
         Progress = 0;
         OnPropertyChanged(nameof(IsAnalyzing));
         RefreshCommands();

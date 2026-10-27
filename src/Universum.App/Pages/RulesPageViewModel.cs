@@ -245,6 +245,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice.",
             WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({_plan.Changes.Count} zmien) – trvá to pár sekúnd.",
+            _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({_plan.Changes.Count} zmien).",
             _ => $"Mení sa poradie stôp – vznikne nový súbor ({_plan.Changes.Count} zmien).",
         } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
@@ -479,7 +480,9 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private async Task OpenAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Súbory Matroska (*.mkv)|*.mkv|Všetky súbory|*.*" };
+        // every video format MKVToolNix reads; anything other than MKV becomes a new MKV
+        var patterns = string.Join(";", Universum.Core.Batch.BatchAnalyzer.VideoExtensions.Select(e => "*" + e));
+        var dialog = new OpenFileDialog { Filter = $"Video (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|Všetky súbory|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

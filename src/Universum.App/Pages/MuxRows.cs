@@ -227,6 +227,9 @@ public sealed class MuxTrackRow : ObservableObject
 
     public string SubtitleCharset { get => _subtitleCharset; set => Set(ref _subtitleCharset, value); }
 
+    /// <summary>A delay that is not a whole number of milliseconds ("1,5", "abc"); writing waits until it is fixed.</summary>
+    public bool HasInvalidDelay => _delay.Trim().Length > 0 && ParseDelay(_delay) is null;
+
     /// <summary>True when a less common flag or option is set (the advanced section opens for it).</summary>
     public bool HasAdvanced => FlagMarks.Length > 0 || Options().IsEmpty is false;
 
@@ -244,7 +247,7 @@ public sealed class MuxTrackRow : ObservableObject
 
     private MuxTrackOptions Options() => new()
     {
-        DelayMs = int.TryParse(_delay.Trim(), System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var ms) ? ms : null,
+        DelayMs = ParseDelay(_delay),
         DefaultDuration = Empty(_defaultDuration),
         FixBitstreamTiming = _fixBitstreamTiming,
         Compression = _compression,
@@ -254,6 +257,18 @@ public sealed class MuxTrackRow : ObservableObject
     };
 
     private static string? Empty(string text) => text.Trim().Length == 0 ? null : text.Trim();
+
+    // "-120", "+40", "250 ms"
+    private static int? ParseDelay(string text)
+    {
+        var value = text.Trim();
+        if (value.EndsWith("ms", StringComparison.OrdinalIgnoreCase))
+        {
+            value = value[..^2].TrimEnd();
+        }
+
+        return int.TryParse(value, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var ms) ? ms : null;
+    }
 
     private void SetFlags(TrackFlags flags)
     {

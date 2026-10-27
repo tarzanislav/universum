@@ -123,6 +123,9 @@ public sealed record MuxAttachment(string Path, string? Description = null);
 /// </summary>
 public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<MuxTrack> Tracks, string OutputPath)
 {
+    /// <summary>The problem reported when there is neither an output file nor a placement.</summary>
+    public const string MissingOutput = "Zadajte výstupný súbor.";
+
     public static IReadOnlyList<string> OutputExtensions { get; } = [".mkv", ".mka", ".mks", ".webm"];
 
     /// <summary>Segment title; null or empty = none (mkvmerge may take the first input's title).</summary>
@@ -235,7 +238,7 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
 
         if (string.IsNullOrWhiteSpace(OutputPath))
         {
-            problems.Add("Zadajte výstupný súbor.");
+            problems.Add(MissingOutput);
             return problems;
         }
 

@@ -21,6 +21,7 @@ public sealed class InfoPageViewModel : ObservableObject
     private readonly AppServices _services;
     private KnownFile? _selectedKnown;
     private bool _selecting;
+    private int _load;
     private string _fileName = "";
     private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
     private string _error = "";
@@ -80,12 +81,19 @@ public sealed class InfoPageViewModel : ObservableObject
 
     public async Task LoadAsync(string path)
     {
+        // a later choice wins: an earlier file that is read more slowly does not show over it
+        var load = ++_load;
         Error = "";
         Tracks.Clear();
         File = null;
         FileName = Path.GetFileName(path);
         Select(path);
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
+        if (load != _load)
+        {
+            return;
+        }
+
         if (installation is null)
         {
             Error = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
@@ -95,7 +103,13 @@ public sealed class InfoPageViewModel : ObservableObject
         try
         {
             var file = await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path);
+            if (load != _load)
+            {
+                return;
+            }
+
             File = file;
+            Tracks.Clear();
             foreach (var track in file.Tracks)
             {
                 Tracks.Add(new TrackRow(track));
@@ -112,7 +126,10 @@ public sealed class InfoPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or Core.Processes.ProcessStartException or TimeoutException)
         {
-            Error = ex.Message;
+            if (load == _load)
+            {
+                Error = ex.Message;
+            }
         }
     }
 

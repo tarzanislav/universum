@@ -11,7 +11,10 @@ public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec 
 
     protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
     {
-        context.Log(JobSeverity.Info, $"Zlučovanie: {Spec.Sources.Count} vstup(y), {Spec.Tracks.Count} stôp → {Spec.OutputPath}");
+        var output = Spec.Placement is { } placement
+            ? Path.Combine(placement.Directory, placement.Prefix) + " … (názov podľa pravidiel, veľkosť sa doplní po zápise)"
+            : Spec.OutputPath;
+        context.Log(JobSeverity.Info, $"Zlučovanie: {Spec.Sources.Count} vstup(y), {Spec.Tracks.Count} stôp → {output}");
         var result = await multiplexer.MuxAsync(Spec, new Reporter(context), cancellationToken);
         Result = result;
         foreach (var message in result.Messages)

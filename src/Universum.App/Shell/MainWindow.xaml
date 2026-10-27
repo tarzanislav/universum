@@ -442,7 +442,7 @@
                                             </StackPanel>
                                             <StackPanel Visibility="{Binding IsTextSubtitles, Converter={StaticResource BoolToVisibility}}">
                                                 <TextBlock Text="Kódovanie znakov titulkov" Margin="0,8,0,2" />
-                                                <ComboBox IsEditable="True" Text="{Binding SubtitleCharset, UpdateSourceTrigger=LostFocus}" HorizontalAlignment="Stretch"
+                                                <ComboBox IsEditable="True" Text="{Binding SubtitleCharset, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch"
                                                           ToolTip="Prázdne = podľa súboru; pre staré české a slovenské titulky zvyčajne cp1250">
                                                     <ComboBoxItem Content="cp1250" />
                                                     <ComboBoxItem Content="iso-8859-2" />
@@ -523,7 +523,7 @@
                             <Button Content="Resetovať" Command="{Binding ResetOutputCommand}" Padding="10,3" Margin="6,0,0,0"
                                     ToolTip="Späť na predvolený výstup: vedľa prvého zdroja, s názvom podľa pravidiel, ak je zadaný titul" />
                         </StackPanel>
-                        <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding OutputEditable}" ToolTip="{Binding OutputPath}" />
+                        <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding OutputEditable}" ToolTip="{Binding OutputPath}" />
                     </DockPanel>
                     <DockPanel Margin="0,4,0,0">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"

@@ -186,7 +186,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string OutputDescription => _services.Library is { } library
         ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
-        : "Nie je nastavený. Bez neho UNIVERSUM nič nespracuje.";
+        : "Nie je nastavený. Bez neho pracuje len Zlučovanie (výstup vedľa zdroja); ostatné nástroje zapisujú do knižnice.";
 
     /// <summary>Upper limits of SMALL, BIG and BluRay for films in GB, e.g. "2; 14; 30".</summary>
     public string MovieSizes { get => _movieSizes; set => SetProperty(ref _movieSizes, value); }

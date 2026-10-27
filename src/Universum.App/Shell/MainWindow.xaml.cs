@@ -18,21 +18,30 @@ public partial class MainWindow : Window
     /// <summary>Closing asks when work would be lost (the self-test closes without asking).</summary>
     public static bool ConfirmOnClose { get; set; } = true;
 
-    protected override void OnClosing(CancelEventArgs e)
+    private bool _stopping;
+    private bool _stopped;
+
+    protected override async void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
-        if (e.Cancel || !ConfirmOnClose || Model.CloseWarning() is not { } warning)
+        if (e.Cancel || _stopped || !ConfirmOnClose || Model.CloseWarning() is not { } warning)
         {
             return;
         }
 
-        if (MessageBox.Show(this, warning, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+        // the window stays until the answer – and, when work runs, until it has stopped
+        e.Cancel = true;
+        if (_stopping || MessageBox.Show(this, warning, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel) != MessageBoxResult.OK)
         {
-            e.Cancel = true;
             return;
         }
 
-        Model.StopWork();
+        _stopping = true;
+        IsEnabled = false;
+        Title = "UNIVERSUM – zastavujem prácu…";
+        await Model.StopWorkAsync(TimeSpan.FromSeconds(20));
+        _stopped = true;
+        Close();
     }
 
     private void OnDragOver(object sender, DragEventArgs e)

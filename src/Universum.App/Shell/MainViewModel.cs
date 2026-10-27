@@ -84,8 +84,11 @@ public sealed class MainViewModel : ObservableObject
             : string.Join("\n", lost) + "\n\nNaozaj chcete UNIVERSUM zavrieť? Všetky zmeny sa stratia. Originálne súbory zostanú nedotknuté.";
     }
 
-    /// <summary>Closing anyway: the queue stops and the running job is cancelled (its unfinished output is removed).</summary>
-    public void StopWork()
+    /// <summary>
+    /// Closing anyway: the queue stops, the running job and the batch are cancelled, and closing waits (at most
+    /// <paramref name="limit"/>) until they ended – mkvmerge is stopped and its unfinished output removed.
+    /// </summary>
+    public async Task StopWorkAsync(TimeSpan limit)
     {
         _services.Jobs.Stop();
         if (_services.Jobs.Running is { } running)
@@ -96,6 +99,12 @@ public sealed class MainViewModel : ObservableObject
         if (Batch.IsRunning && Batch.StopCommand.CanExecute(null))
         {
             Batch.StopCommand.Execute(null);
+        }
+
+        var until = DateTime.UtcNow + limit;
+        while ((_services.Jobs.Running is not null || Batch.IsRunning) && DateTime.UtcNow < until)
+        {
+            await Task.Delay(100);
         }
     }
 
@@ -156,7 +165,7 @@ public sealed class MainViewModel : ObservableObject
         get => _selectedTool;
         set
         {
-            if (SetProperty(ref _selectedTool, value) && value.Page == Info)
+            if (SetProperty(ref _selectedTool, value) && value?.Page == Info)
             {
                 // the files of the multiplexer and the batch, as they are now
                 Info.RefreshKnown();

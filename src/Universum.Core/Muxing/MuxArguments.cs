@@ -43,13 +43,20 @@ public static class MuxArguments
 
             AddFile(arguments, source.File.Path, source.AdditionalParts);
 
-            // appended files: the same tracks (same IDs), names and flags come from the file they continue
+            // appended files: the same tracks (same IDs), names and flags come from the file they continue; how a file
+            // is read (character set, frame rate, timing fix, compression) is set for each file, or mkvmerge reads the
+            // appended one differently (cp1250 subtitles without their character set lose all their entries)
             foreach (var appended in source.Appended)
             {
                 SelectTracks(arguments, appended, chosen);
                 if (!source.KeepChapters)
                 {
                     arguments.Add("--no-chapters");
+                }
+
+                foreach (var track in chosen)
+                {
+                    ReadingOptions(arguments, track, source.File.Tracks.First(t => t.Id == track.TrackId).Type);
                 }
 
                 arguments.AddRange(["--no-attachments", "--no-global-tags", "--no-track-tags", "+"]);
@@ -119,21 +126,7 @@ public static class MuxArguments
             arguments.AddRange(["--sync", $"{id}:{delay.ToString(CultureInfo.InvariantCulture)}"]);
         }
 
-        if (!string.IsNullOrEmpty(options.DefaultDuration))
-        {
-            arguments.AddRange(["--default-duration", $"{id}:{options.DefaultDuration}"]);
-        }
-
-        if (options.FixBitstreamTiming && source.Type == TrackType.Video)
-        {
-            arguments.AddRange(["--fix-bitstream-timing-information", $"{id}:1"]);
-        }
-
-        if (options.Compression != MuxCompression.Automatic)
-        {
-            arguments.AddRange(["--compression", $"{id}:{(options.Compression == MuxCompression.Zlib ? "zlib" : "none")}"]);
-        }
-
+        ReadingOptions(arguments, track, source.Type);
         if (!string.IsNullOrEmpty(options.AspectRatio) && source.Type == TrackType.Video)
         {
             arguments.AddRange(["--aspect-ratio", $"{id}:{options.AspectRatio}"]);
@@ -144,7 +137,29 @@ public static class MuxArguments
             arguments.AddRange(["--cropping", $"{id}:{options.Cropping}"]);
         }
 
-        if (!string.IsNullOrEmpty(options.SubtitleCharset) && source.Type == TrackType.Subtitles)
+    }
+
+    /// <summary>How mkvmerge reads the track of a file: given for the file and again for each file appended to it.</summary>
+    private static void ReadingOptions(List<string> arguments, MuxTrack track, TrackType type)
+    {
+        var id = track.TrackId.ToString(CultureInfo.InvariantCulture);
+        var options = track.Options;
+        if (!string.IsNullOrEmpty(options.DefaultDuration))
+        {
+            arguments.AddRange(["--default-duration", $"{id}:{options.DefaultDuration}"]);
+        }
+
+        if (options.FixBitstreamTiming && type == TrackType.Video)
+        {
+            arguments.AddRange(["--fix-bitstream-timing-information", $"{id}:1"]);
+        }
+
+        if (options.Compression != MuxCompression.Automatic)
+        {
+            arguments.AddRange(["--compression", $"{id}:{(options.Compression == MuxCompression.Zlib ? "zlib" : "none")}"]);
+        }
+
+        if (!string.IsNullOrEmpty(options.SubtitleCharset) && type == TrackType.Subtitles)
         {
             arguments.AddRange(["--sub-charset", $"{id}:{options.SubtitleCharset}"]);
         }

@@ -29,7 +29,10 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private string _problems = "";
     private string _result = "";
     private string _outputPath = "";
+    private string _typedPath = "";
     private bool _outputEdited;
+    private bool _recalculating;
+    private (bool, string, string) _libraryInput;
     private bool _useLibrary;
     private bool _showAdvanced;
     private bool _loading;
@@ -43,10 +46,25 @@ public sealed class MuxSettingsViewModel : ObservableObject
         _services = services;
         Number = Interlocked.Increment(ref _created);
         Library = new LibraryTargetPicker(services, LibraryTarget);
+        _libraryInput = LibraryInput();
         Library.Changed += () =>
         {
-            UpdateOutput();
-            RefreshCommands();
+            if (_recalculating)
+            {
+                UpdateOutput();
+                RefreshCommands();
+            }
+            else if (LibraryInput() != _libraryInput)
+            {
+                // the kind, title or episode changed (typed or chosen on TMDB): a change of the settings
+                _libraryInput = LibraryInput();
+                Changed();
+            }
+            else
+            {
+                // the library folder or TMDB changed: the output follows, the settings are not changed by it
+                Recalculate();
+            }
         };
         RemoveSourceCommand = new RelayCommand(RemoveSource, () => _selectedSource is not null);
         MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
@@ -62,6 +80,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
         QueueCommand = new RelayCommand(() => Enqueue(start: false), CanWrite);
         Attachments.CollectionChanged += (_, _) => Changed();
     }
+
+    /// <summary>Output files of the other settings and of jobs not yet finished (a default name avoids them).</summary>
+    public Func<IEnumerable<string>> ReservedOutputs { get; set; } = () => [];
 
     /// <summary>Number of the settings in this session ("Bez názvu 2").</summary>
     public int Number { get; }
@@ -185,8 +206,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
             if (SetProperty(ref _useLibrary, value))
             {
                 OnPropertyChanged(nameof(OutputEditable));
-                UpdateOutput();
-                Recalculate();
+                Changed();
             }
         }
     }
@@ -202,13 +222,14 @@ public sealed class MuxSettingsViewModel : ObservableObject
         get => _outputPath;
         set
         {
-            if (SetProperty(ref _outputPath, value))
+            if (!_useLibrary && SetProperty(ref _outputPath, value))
             {
                 _outputEdited = true;
+                _typedPath = value;
                 OnPropertyChanged(nameof(OutputNote));
                 OnPropertyChanged(nameof(DisplayName));
                 OnPropertyChanged(nameof(ShortName));
-                Recalculate();
+                Changed();
             }
         }
     }
@@ -327,6 +348,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
         Changed();
     }
 
+    /// <summary>The settings were closed: they stop following the library and TMDB.</summary>
+    public void Detach() => Library.Detach();
+
     /// <summary>Fills names, languages, flags and the order in by the UNIVERSUM rules (for the tracks taken).</summary>
     public void ApplyRules()
     {
@@ -403,14 +427,23 @@ public sealed class MuxSettingsViewModel : ObservableObject
             return;
         }
 
-        var position = 1;
-        foreach (var track in Tracks)
+        _recalculating = true;
+        try
         {
-            track.Position = track.Include ? position++ : 0;
+            var position = 1;
+            foreach (var track in Tracks)
+            {
+                track.Position = track.Include ? position++ : 0;
+            }
+
+            Library.Update();
+            UpdateOutput();
+        }
+        finally
+        {
+            _recalculating = false;
         }
 
-        Library.Update();
-        UpdateOutput();
         Findings.Clear();
         var spec = Spec();
         if (spec.Tracks.Count > 0)
@@ -421,12 +454,33 @@ public sealed class MuxSettingsViewModel : ObservableObject
             }
         }
 
-        Problems = Inputs.Count == 0 ? "" : string.Join("\n", spec.Validate().Append(_useLibrary && Library.Placement is null ? Library.Description : "").Where(p => p.Length > 0));
+        Problems = string.Join("\n", ProblemList(spec));
         OnPropertyChanged(nameof(HasFindings));
         OnPropertyChanged(nameof(FindingsText));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(IsUnprocessed));
         RefreshCommands();
+    }
+
+    /// <summary>What stops writing: the spec's problems, the library's question, a delay that is not a number.</summary>
+    private List<string> ProblemList(MuxSpec spec)
+    {
+        if (Inputs.Count == 0)
+        {
+            return [];
+        }
+
+        var problems = spec.Validate().ToList();
+        if (_useLibrary && Library.Placement is null)
+        {
+            // the output box is greyed out: what is missing is the title (or the episode), not a file name
+            problems.Remove(MuxSpec.MissingOutput);
+            problems.Add(Library.Description);
+        }
+
+        problems.AddRange(Tracks.Where(t => t.Include && t.HasInvalidDelay)
+            .Select(t => $"Stopa {t.Position}: oneskorenie zadajte v celých milisekundách, napr. -120."));
+        return problems.Where(p => p.Length > 0).ToList();
     }
 
     /// <summary>The output: library place, typed path, rules name beside the first source, or "name (1).mkv" there.</summary>
@@ -439,7 +493,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
 
         if (_outputEdited)
         {
-            return (_outputPath, null);
+            return (_typedPath, null);
         }
 
         return AutoPlacement() is { } placement ? ("", placement) : (DefaultPath(), null);
@@ -466,30 +520,53 @@ public sealed class MuxSettingsViewModel : ObservableObject
         }
 
         var name = Path.GetFileNameWithoutExtension(Inputs[0].File.Path);
-        var inputs = Files.ToList();
+        var taken = Files.Concat(ReservedOutputs()).ToList();
         for (var number = 1; ; number++)
         {
             var candidate = Path.Combine(folder, $"{name} ({number}).mkv");
-            if (!File.Exists(candidate) && !inputs.Any(i => Core.IO.Paths.Same(i, candidate)))
+            if (!File.Exists(candidate) && !taken.Any(i => i.Length > 0 && Core.IO.Paths.Same(i, candidate)))
             {
                 return candidate;
             }
         }
     }
 
+    /// <summary>The name a placement will get, as far as it can be told before writing: the first one not taken.</summary>
+    private string FreeName(Placement placement, long estimate)
+    {
+        var taken = ReservedOutputs().ToList();
+        for (var number = 1; number < 100; number++)
+        {
+            var candidate = placement.PathFor(estimate, number);
+            if (!File.Exists(candidate) && !taken.Any(t => t.Length > 0 && Core.IO.Paths.Same(t, candidate)))
+            {
+                return candidate;
+            }
+        }
+
+        return placement.PathFor(estimate);
+    }
+
     /// <summary>Shows the output as it will be (the size class of a rules name is estimated from the sources).</summary>
     private void UpdateOutput()
     {
-        if (!_outputEdited)
+        if (_useLibrary || !_outputEdited)
         {
+            // the library place, or the default beside the source (a typed path stays as typed)
             var estimate = Files.Where(File.Exists).Sum(f => new FileInfo(f).Length);
             var (path, placement) = Output();
-            var shown = placement?.PathFor(estimate) ?? path;
+            var shown = placement is null ? path : FreeName(placement, estimate);
             if (_outputPath != shown)
             {
                 _outputPath = shown;
                 OnPropertyChanged(nameof(OutputPath));
             }
+        }
+        else if (_outputPath != _typedPath)
+        {
+            // back from the library: the typed path again
+            _outputPath = _typedPath;
+            OnPropertyChanged(nameof(OutputPath));
         }
 
         OnPropertyChanged(nameof(OutputNote));
@@ -501,6 +578,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private void ResetOutput()
     {
         _outputEdited = false;
+        _typedPath = "";
         if (_useLibrary)
         {
             _useLibrary = false;
@@ -508,8 +586,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
             OnPropertyChanged(nameof(OutputEditable));
         }
 
-        UpdateOutput();
-        Recalculate();
+        Changed();
     }
 
     private void ChooseOutput()
@@ -624,7 +701,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
         return index >= 0 && index < Tracks.Count;
     }
 
-    private bool CanWrite() => Inputs.Count > 0 && (!_useLibrary || Library.Placement is not null) && Spec().Validate().Count == 0;
+    private bool CanWrite() => Inputs.Count > 0 && ProblemList(Spec()).Count == 0;
+
+    private (bool, string, string) LibraryInput() => (Library.IsSeries, Library.TitleText, Library.EpisodeText);
 
     /// <summary>The output as one target state (its tracks give the name by the rules); null with no track taken.</summary>
     private TargetState? LibraryTarget()
@@ -636,7 +715,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private void Enqueue(bool start)
     {
         var spec = Spec();
-        if (spec.Validate().Count > 0 || _services.CurrentMkvToolNix is not { } installation)
+        if (ProblemList(spec).Count > 0 || _services.CurrentMkvToolNix is not { } installation)
         {
             return;
         }
@@ -658,12 +737,14 @@ public sealed class MuxSettingsViewModel : ObservableObject
             }
         });
         var starts = start || _services.Settings.AutoStartQueue;
-        _services.Jobs.Add(job, starts);
+
+        // shown before the job is added: a job that starts (or fails) at once reports over it
         Progress = 0;
         ProgressText = "čaká vo fronte";
         IsModified = false;
         OnPropertyChanged(nameof(IsUnprocessed));
         Result = $"Pridané do fronty ako úloha {job.Id}" + (starts ? "." : " – frontu spustíte na stránke Fronta úloh.");
+        _services.Jobs.Add(job, starts);
     }
 
     private void ChooseChapters()

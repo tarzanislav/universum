@@ -49,11 +49,13 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private readonly AppServices _services;
     private MuxSettingsViewModel _current;
     private string _message = "";
+    private bool _adding;
 
     public MultiplexerPageViewModel(AppServices services)
     {
         _services = services;
         _current = new MuxSettingsViewModel(services) { IsCurrent = true };
+        _current.ReservedOutputs = Reserved(_current);
         Settings.Add(_current);
         AddFilesCommand = new AsyncRelayCommand(AddFilesAsync);
         NewSettingsCommand = new RelayCommand(() => Current = NewSettings());
@@ -151,6 +153,27 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             return;
         }
 
+        if (_adding)
+        {
+            Message = "Počkajte, kým sa pridajú predchádzajúce súbory.";
+            return;
+        }
+
+        _adding = true;
+        try
+        {
+            await AddAsync(list);
+        }
+        finally
+        {
+            _adding = false;
+        }
+    }
+
+    private async Task AddAsync(List<string> list)
+    {
+        // the settings the files were meant for, even if another tab is chosen while they are read
+        var target = _current;
         var choice = Decide(list);
         if (choice is null || (choice.Action is MuxAddAction.Append or MuxAddAction.AdditionalParts && choice.Target is null))
         {
@@ -167,7 +190,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         // additional parts are read as one with their file: they are not inspected on their own
         if (choice.Action == MuxAddAction.AdditionalParts && choice.Target is { } owner)
         {
-            _current.AddParts(owner, list);
+            target.AddParts(owner, list);
             Message = "";
             return;
         }
@@ -194,7 +217,11 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             }
         }
 
-        Distribute(files, choice);
+        if (Settings.Contains(target))
+        {
+            Distribute(target, files, choice);
+        }
+
         Message = string.Join("\n", problems);
     }
 
@@ -209,6 +236,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
         var index = Settings.IndexOf(settings);
         Settings.Remove(settings);
+        settings.Detach();
         if (Settings.Count == 0)
         {
             NewSettings();
@@ -246,50 +274,75 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         return choice;
     }
 
-    private void Distribute(List<MediaFile> files, MuxAddChoice choice)
+    private void Distribute(MuxSettingsViewModel target, List<MediaFile> files, MuxAddChoice choice)
     {
-        if (choice.Action == MuxAddAction.Append && choice.Target is { } target)
+        if (choice.Action == MuxAddAction.Append && choice.Target is { } appendTo)
         {
-            _current.Append(target, files);
+            target.Append(appendTo, files);
             return;
         }
 
-        MuxSettingsViewModel? shared = null;
-        MuxSettingsViewModel? lastVideo = null;
-        var first = true;
-        foreach (var file in files)
+        var placed = new List<(MediaFile File, MuxSettingsViewModel Settings)>();
+        var fresh = target.Inputs.Count == 0;
+        MuxSettingsViewModel Next()
         {
-            MuxSettingsViewModel destination;
-            if (choice.NewForVideo && file.TracksOf(TrackType.Video).Any())
+            // the first new settings may be the empty current one
+            if (fresh)
             {
-                destination = first && _current.Inputs.Count == 0 ? _current : NewSettings();
-                lastVideo = destination;
-            }
-            else if (lastVideo is not null)
-            {
-                // subtitles or audio after a film go with that film
-                destination = lastVideo;
-            }
-            else
-            {
-                destination = choice.Action switch
-                {
-                    MuxAddAction.NewSettingsForAll => shared ??= _current.Inputs.Count == 0 ? _current : NewSettings(),
-                    MuxAddAction.NewSettingsForEach => first && _current.Inputs.Count == 0 ? _current : NewSettings(),
-                    _ => _current,
-                };
+                fresh = false;
+                return target;
             }
 
-            destination.AddFiles([file]);
-            first = false;
+            return NewSettings();
+        }
+
+        if (choice.NewForVideo && files.Any(HasVideo))
+        {
+            // each file with video gets its own settings; subtitles and audio go to the film whose name they start with
+            // ("Film.cz.srt" → "Film.mkv"), otherwise to the first film – the order in which they were picked does not matter
+            var films = files.Where(HasVideo).Select(f => (File: f, Settings: Next())).ToList();
+            foreach (var (film, settings) in films)
+            {
+                settings.AddFiles([film]);
+                placed.Add((film, settings));
+            }
+
+            foreach (var file in files.Where(f => !HasVideo(f)))
+            {
+                var stem = Path.GetFileNameWithoutExtension(file.Path);
+                var owner = films
+                    .Where(f => stem.StartsWith(Path.GetFileNameWithoutExtension(f.File.Path), StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(f => Path.GetFileNameWithoutExtension(f.File.Path).Length)
+                    .Select(f => f.Settings)
+                    .FirstOrDefault() ?? films[0].Settings;
+                owner.AddFiles([file]);
+                placed.Add((file, owner));
+            }
+        }
+        else
+        {
+            MuxSettingsViewModel? shared = null;
+            foreach (var file in files)
+            {
+                var destination = choice.Action switch
+                {
+                    MuxAddAction.NewSettingsForAll => shared ??= Next(),
+                    MuxAddAction.NewSettingsForEach => Next(),
+                    _ => target,
+                };
+                destination.AddFiles([file]);
+                placed.Add((file, destination));
+            }
         }
 
         // the settings the files went to last are shown
-        if (Settings.LastOrDefault(s => s.Inputs.Count > 0 && files.Any(f => s.Inputs.Any(i => i.File == f))) is { } shown)
+        if (placed.Count > 0)
         {
-            Current = shown;
+            Current = placed[^1].Settings;
         }
     }
+
+    private static bool HasVideo(MediaFile file) => file.TracksOf(TrackType.Video).Any();
 
     /// <summary>The selected source file, or the file of the selected track.</summary>
     private string? SelectedFile() => _current.SelectedSource?.Path ?? _current.SelectedTrack?.Input.File.Path;
@@ -304,10 +357,17 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private MuxSettingsViewModel NewSettings()
     {
         var settings = new MuxSettingsViewModel(_services);
+        settings.ReservedOutputs = Reserved(settings);
         Settings.Add(settings);
         Watch(settings);
         return settings;
     }
+
+    // the outputs of the other tabs and of multiplex jobs not finished yet: a default name never repeats them
+    private Func<IEnumerable<string>> Reserved(MuxSettingsViewModel self) => () =>
+        Settings.Where(s => !ReferenceEquals(s, self)).Select(s => s.OutputPath)
+            .Concat(_services.Jobs.Jobs.OfType<MuxJob>().Where(j => !j.IsFinished).Select(j => j.Spec.OutputPath))
+            .Where(p => p.Length > 0);
 
     // the Information button follows the selected source of the current settings
     private void Watch(MuxSettingsViewModel settings) =>

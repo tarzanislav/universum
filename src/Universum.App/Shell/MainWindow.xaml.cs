@@ -41,7 +41,9 @@ public partial class MainWindow : Window
         Title = "UNIVERSUM – zastavujem prácu…";
         await Model.StopWorkAsync(TimeSpan.FromSeconds(20));
         _stopped = true;
-        Close();
+
+        // not from inside this Closing (WPF refuses Close() while the window is closing): after it has returned
+        _ = Dispatcher.BeginInvoke(new Action(Close));
     }
 
     private void OnDragOver(object sender, DragEventArgs e)

@@ -49,7 +49,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private readonly AppServices _services;
     private MuxSettingsViewModel _current;
     private string _message = "";
-    private bool _adding;
+    private readonly SemaphoreSlim _adding = new(1, 1);
 
     public MultiplexerPageViewModel(AppServices services)
     {
@@ -153,20 +153,15 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             return;
         }
 
-        if (_adding)
-        {
-            Message = "Počkajte, kým sa pridajú predchádzajúce súbory.";
-            return;
-        }
-
-        _adding = true;
+        // files added while others are still being read wait for them (and are then asked about on their own)
+        await _adding.WaitAsync();
         try
         {
             await AddAsync(list);
         }
         finally
         {
-            _adding = false;
+            _adding.Release();
         }
     }
 
@@ -217,7 +212,11 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             }
         }
 
-        if (Settings.Contains(target))
+        if (!Settings.Contains(target))
+        {
+            problems.Insert(0, "Nastavenia, do ktorých sa mali súbory pridať, boli medzitým zatvorené – súbory sa nepridali.");
+        }
+        else
         {
             Distribute(target, files, choice);
         }
@@ -311,7 +310,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             {
                 var stem = Path.GetFileNameWithoutExtension(file.Path);
                 var owner = films
-                    .Where(f => stem.StartsWith(Path.GetFileNameWithoutExtension(f.File.Path), StringComparison.OrdinalIgnoreCase))
+                    .Where(f => BelongsTo(stem, Path.GetFileNameWithoutExtension(f.File.Path)))
                     .OrderByDescending(f => Path.GetFileNameWithoutExtension(f.File.Path).Length)
                     .Select(f => f.Settings)
                     .FirstOrDefault() ?? films[0].Settings;
@@ -344,6 +343,10 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     private static bool HasVideo(MediaFile file) => file.TracksOf(TrackType.Video).Any();
 
+    // "Film 1.cz" belongs to "Film 1", "Film 11" does not
+    private static bool BelongsTo(string stem, string film) =>
+        stem.StartsWith(film, StringComparison.OrdinalIgnoreCase) && (stem.Length == film.Length || !char.IsLetterOrDigit(stem[film.Length]));
+
     /// <summary>The selected source file, or the file of the selected track.</summary>
     private string? SelectedFile() => _current.SelectedSource?.Path ?? _current.SelectedTrack?.Input.File.Path;
 
@@ -367,7 +370,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     private Func<IEnumerable<string>> Reserved(MuxSettingsViewModel self) => () =>
         Settings.Where(s => !ReferenceEquals(s, self)).Select(s => s.OutputPath)
             .Concat(_services.Jobs.Jobs.OfType<MuxJob>().Where(j => !j.IsFinished).Select(j => j.Spec.OutputPath))
-            .Where(p => p.Length > 0);
+            .Where(p => !string.IsNullOrWhiteSpace(p));
 
     // the Information button follows the selected source of the current settings
     private void Watch(MuxSettingsViewModel settings) =>

@@ -191,6 +191,8 @@ public sealed class MainViewModel : ObservableObject
         Batch.IsRunning ? "Beží hromadné spracovanie – aktualizovať sa dá po jeho skončení."
         : _services.Jobs.Running is not null ? "Beží fronta úloh – aktualizovať sa dá po jej dokončení (alebo ju zastavte)."
         : Rules.Busy ? "Spracúva sa súbor – aktualizovať sa dá po jeho dokončení."
+        : _services.Jobs.WaitingCount > 0 ? "Vo fronte čakajú úlohy – aktualizovať sa dá, keď sa spracujú (alebo ich z fronty odstráňte)."
+        : Mux.Unprocessed.Count > 0 ? "V Zlučovaní sú zmenené nastavenia, ktoré nie sú vo fronte – pridajte ich do fronty alebo zavrite, potom aktualizujte."
         : null;
 
     /// <summary>Opens the update window (also used by the self-test).</summary>

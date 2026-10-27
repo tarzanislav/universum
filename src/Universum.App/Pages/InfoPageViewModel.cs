@@ -84,6 +84,7 @@ public sealed class InfoPageViewModel : ObservableObject
         // a later choice wins: an earlier file that is read more slowly does not show over it
         var load = ++_load;
         Error = "";
+        Summary = "Načítavam…";
         Tracks.Clear();
         File = null;
         FileName = Path.GetFileName(path);

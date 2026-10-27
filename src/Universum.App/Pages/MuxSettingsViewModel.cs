@@ -33,6 +33,9 @@ public sealed class MuxSettingsViewModel : ObservableObject
     private bool _outputEdited;
     private bool _recalculating;
     private (bool, string, string) _libraryInput;
+
+    // the output as last shown (a default name is taken as shown, even if another tab freed a lower number since)
+    private (string Path, Placement? Placement) _output = ("", null);
     private bool _useLibrary;
     private bool _showAdvanced;
     private bool _loading;
@@ -286,7 +289,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
     {
         var sources = Inputs.Select(i => i.ToSource()).ToList();
         var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
-        var (path, placement) = Output();
+        var (path, placement) = _output;
         return new MuxSpec(sources, tracks, path)
         {
             Placement = placement,
@@ -524,10 +527,23 @@ public sealed class MuxSettingsViewModel : ObservableObject
         for (var number = 1; ; number++)
         {
             var candidate = Path.Combine(folder, $"{name} ({number}).mkv");
-            if (!File.Exists(candidate) && !taken.Any(i => i.Length > 0 && Core.IO.Paths.Same(i, candidate)))
+            if (!File.Exists(candidate) && !taken.Any(i => SamePath(i, candidate)))
             {
                 return candidate;
             }
+        }
+    }
+
+    // a path typed in another tab may be anything ("   ", "a|b"): it is then simply not the same
+    private static bool SamePath(string a, string b)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(a) && Core.IO.Paths.Same(a, b);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
         }
     }
 
@@ -538,7 +554,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
         for (var number = 1; number < 100; number++)
         {
             var candidate = placement.PathFor(estimate, number);
-            if (!File.Exists(candidate) && !taken.Any(t => t.Length > 0 && Core.IO.Paths.Same(t, candidate)))
+            if (!File.Exists(candidate) && !taken.Any(t => SamePath(t, candidate)))
             {
                 return candidate;
             }
@@ -554,7 +570,8 @@ public sealed class MuxSettingsViewModel : ObservableObject
         {
             // the library place, or the default beside the source (a typed path stays as typed)
             var estimate = Files.Where(File.Exists).Sum(f => new FileInfo(f).Length);
-            var (path, placement) = Output();
+            _output = Output();
+            var (path, placement) = _output;
             var shown = placement is null ? path : FreeName(placement, estimate);
             if (_outputPath != shown)
             {
@@ -562,11 +579,15 @@ public sealed class MuxSettingsViewModel : ObservableObject
                 OnPropertyChanged(nameof(OutputPath));
             }
         }
-        else if (_outputPath != _typedPath)
+        else
         {
-            // back from the library: the typed path again
-            _outputPath = _typedPath;
-            OnPropertyChanged(nameof(OutputPath));
+            _output = Output();
+            if (_outputPath != _typedPath)
+            {
+                // back from the library: the typed path again
+                _outputPath = _typedPath;
+                OnPropertyChanged(nameof(OutputPath));
+            }
         }
 
         OnPropertyChanged(nameof(OutputNote));

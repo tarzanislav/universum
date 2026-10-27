@@ -33,7 +33,7 @@ public sealed class MainViewModel : ObservableObject
         [
             new("Zlučovanie", "\uE71D", Mux),
             new("Informácie", "\uE946", Info),
-            new("Pravidlá UNIVERSUM", "\uE90F", Rules),
+            new("Single spracovanie", "\uE90F", Rules),
             new("Úprava hlavičky", "\uE70F", HeaderEditor),
             new("Kapitoly", "\uE8FD", Chapters),
             new("Hromadné spracovanie", "\uE8B7", Batch),

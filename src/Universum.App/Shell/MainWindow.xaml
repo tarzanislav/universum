@@ -97,7 +97,7 @@
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Otvoriť súbor…" Command="{Binding OpenCommand}" Padding="16,6" />
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Pravidlá UNIVERSUM" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Single spracovanie" />
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                     </StackPanel>
                 </DockPanel>

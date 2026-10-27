@@ -347,10 +347,11 @@ internal static class SelfTest
         var mux = model.Mux;
         MuxAddRequest? asked = null;
         var answer = MuxAddAction.AddToCurrent;
+        var newForVideo = false;
         mux.AskHowToAdd = request =>
         {
             asked = request;
-            return new MuxAddChoice(answer, answer is MuxAddAction.Append or MuxAddAction.AdditionalParts ? request.Sources[0] : null);
+            return new MuxAddChoice(answer, answer is MuxAddAction.Append or MuxAddAction.AdditionalParts ? request.Sources[0] : null, newForVideo);
         };
         string? confirmed = null;
         var confirm = false;
@@ -448,6 +449,37 @@ internal static class SelfTest
               model.Info.SelectedKnown?.Path == copy,
             $"info: the multiplexer's files are listed and the chosen one is shown ({model.Info.KnownFiles.Count}, {model.Info.Tracks.Count})");
         await Screenshot(window, "info-files.png");
+
+        // "video always into new settings": the subtitles go with their film even when picked first
+        mux.NewSettingsCommand.Execute(null);
+        var subtitlesOfCopy = Path.Combine(work, "film-časť-2.cz.srt");
+        File.Copy(srt, subtitlesOfCopy, overwrite: true);
+        answer = MuxAddAction.NewSettingsForEach;
+        newForVideo = true;
+        var before = mux.Settings.Count;
+        await mux.AddFilesAsync([subtitlesOfCopy, copy]);
+        var withFilm = mux.Settings.FirstOrDefault(s => s.Inputs.Any(i => i.File.Path == copy) && s.Inputs.Count == 2);
+        Check(mux.Settings.Count == before && withFilm is not null && withFilm.Inputs[0].File.Path == copy,
+            $"mux: the subtitles go with their film whatever the order ({mux.Settings.Count} tabs, {withFilm?.Inputs.Count} inputs)");
+        newForVideo = false;
+
+        // a typed output stays; the library replaces it while ticked; a delay must be a number
+        if (withFilm is not null)
+        {
+            var typed = Path.Combine(work, "ručne pomenovaný.mkv");
+            withFilm.OutputPath = typed;
+            Check(withFilm.OutputNote == "Zadané ručne." && withFilm.StartCommand.CanExecute(null), "mux: a typed output path – " + withFilm.Problems);
+            withFilm.UseLibrary = true;
+            Check(withFilm.OutputPath != typed && !withFilm.Problems.Contains(Core.Muxing.MuxSpec.MissingOutput, StringComparison.Ordinal) &&
+                  withFilm.Problems.Length > 0 && !withFilm.StartCommand.CanExecute(null),
+                "mux: into the library without a title asks for the title – " + withFilm.Problems);
+            withFilm.UseLibrary = false;
+            Check(withFilm.OutputPath == typed, "mux: unticking the library returns the typed path – " + withFilm.OutputPath);
+            withFilm.Tracks[1].Delay = "1,5";
+            Check(withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && !withFilm.StartCommand.CanExecute(null), "mux: a delay that is not a number stops writing");
+            withFilm.Tracks[1].Delay = "250 ms";
+            Check(!withFilm.Problems.Contains("oneskorenie", StringComparison.Ordinal) && withFilm.Spec().Tracks.Any(t => t.Options.DelayMs == 250), "mux: a delay in ms is taken – " + withFilm.Problems);
+        }
 
         // the add dialog itself (shown, not answered)
         var dialog = new MuxAddFilesWindow(new MuxAddFilesModel(new MuxAddRequest([film, srt], appended.Inputs.ToList()))) { Owner = window };

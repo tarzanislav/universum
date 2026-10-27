@@ -140,6 +140,7 @@ public sealed class HistraTests
         Assert.True(server.Requests[0] == "https://histra.net/api/v1/catalog/movies/search?q=Vymyslený vlak", "only the name is sent (English titles): " + server.Requests[0]);
         Assert.Equal("Bearer hst_test-0123456789", server.Authorization);
         Assert.Equal(2019, all[0].Year);
+        Assert.True(all.Single(t => t.Id == 9002).HistraId == 12 && all[0].HistraId is null, "HISTRA's own catalog number; 0 = only passed on from TMDB");
         Assert.Equal(null, all[1].Year);
 
         var ofYear = await catalog.SearchAsync(MediaKind.Movie, "vymysleny VLAK", 2019);
@@ -187,6 +188,120 @@ public sealed class HistraTests
         // TMDB alone reports its problem as before
         var refusedAlone = await MessageOfTitles(() => new TitleSearch(tmdb, null).FindAsync(MediaKind.Movie, "Vymyslený vlak (2019)"));
         Assert.True(refusedAlone?.Contains("Kľúč TMDB", StringComparison.Ordinal) == true, "without HISTRA the TMDB problem is shown");
+    }
+
+    [Test]
+    public async Task HistraChecksWhatTmdbFound()
+    {
+        // TMDB's answer (search/movie) and HISTRA's answer for the same name are invented
+        (TitleSearch Search, Server Server) Setup(string tmdbResults, string histraResults)
+        {
+            var server = new Server();
+            server.Answers["/3/search/movie"] = (HttpStatusCode.OK, "{\"results\":[" + tmdbResults + "]}");
+            server.Answers["/api/v1/catalog/movies/search"] = (HttpStatusCode.OK, "{\"results\":[" + histraResults + "]}");
+            var tmdb = new TmdbClient(server.Http, "abc123", pacer: new RequestPacer(100));
+            return (new TitleSearch(tmdb, new HistraCatalog(new HistraClient(server.Http, "hst_test-0123456789", new RequestPacer(100)))), server);
+        }
+
+        const string train2019 = """{"id":9001,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-05-30"}""";
+        const string otherTrain2019 = """{"id":9500,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-02-01"}""";
+        const string histraTrain = """{"id":77,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-05-30","external_ids":{"tmdb":"9001"}}""";
+        const string histraOther = """{"id":0,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-02-01","external_ids":{"tmdb":"9500"}}""";
+
+        // the same TMDB ID in HISTRA: confirmed; only the name went to HISTRA
+        var (same, server) = Setup(train2019, histraTrain);
+        var confirmed = await same.FindAsync(MediaKind.Movie, "Vymyslený vlak (2019)");
+        Assert.True(confirmed is { Source: "TMDB", Titles: [{ Id: 9001 }] } && confirmed.Check(confirmed.Titles[0]) == TitleCheck.Confirmed, "confirmed by HISTRA");
+        Assert.True(server.Requests.Single(r => r.Contains("histra.net", StringComparison.Ordinal)) == "https://histra.net/api/v1/catalog/movies/search?q=Vymyslený vlak",
+            "HISTRA gets only the name: " + string.Join(" | ", server.Requests));
+
+        // HISTRA knows another title of the name and year: TMDB's waits for the user
+        var (other, _) = Setup(otherTrain2019, histraTrain);
+        var different = await other.FindAsync(MediaKind.Movie, "Vymyslený vlak (2019)");
+        Assert.Equal(TitleCheck.Different, different.Check(different.Titles[0]));
+        Assert.Equal(9001, different.Alternative(different.Titles[0])?.Id);
+
+        // HISTRA finds nothing: waits for the user too
+        var (nothing, _) = Setup(train2019, "");
+        var notFound = await nothing.SearchAsync(MediaKind.Movie, "Vymyslený vlak", 2019);
+        Assert.Equal(TitleCheck.NotFound, notFound.Check(notFound.Titles[0]));
+
+        // two titles of the same name and year on TMDB: the one HISTRA confirms is the one meant
+        var (two, _) = Setup(train2019 + "," + otherTrain2019, histraTrain);
+        var both = await two.SearchAsync(MediaKind.Movie, "Vymyslený vlak", 2019);
+        Assert.Equal(9001, both.Best("Vymyslený vlak", 2019)?.Id, "chosen by HISTRA");
+        // HISTRA has both: the one in its own catalog
+        var (twoInHistra, _) = Setup(train2019 + "," + otherTrain2019, histraTrain + "," + histraOther);
+        var catalog = await twoInHistra.SearchAsync(MediaKind.Movie, "Vymyslený vlak", 2019);
+        Assert.Equal(9001, catalog.Best("Vymyslený vlak", 2019)?.Id, "chosen by HISTRA's own catalog");
+        // without HISTRA nothing can be told
+        Assert.Equal(null, (both with { HistraTitles = null }).Best("Vymyslený vlak", 2019));
+
+        // HISTRA cannot be asked: TMDB's title stands, not checked, with a note
+        var (refused, refusedServer) = Setup(train2019, histraTrain);
+        refusedServer.Answers["/api/v1/catalog/movies/search"] = (HttpStatusCode.Unauthorized, "");
+        var unchecked_ = await refused.FindAsync(MediaKind.Movie, "Vymyslený vlak (2019)");
+        Assert.True(unchecked_.Check(unchecked_.Titles[0]) == TitleCheck.Unavailable && unchecked_.Check(unchecked_.Titles[0]).NeedsConfirmation() &&
+                    unchecked_.Note.Contains("nedala opýtať", StringComparison.Ordinal), "HISTRA set up but not reachable: waits for confirmation – " + unchecked_.Note);
+        Assert.True(!TitleCheck.NotChecked.NeedsConfirmation() && !TitleCheck.Confirmed.NeedsConfirmation(), "without HISTRA, or confirmed: no wait");
+
+        // nothing anywhere
+        var (none, _) = Setup("", "");
+        var nowhere = await none.FindAsync(MediaKind.Movie, "Neexistujúci film (2019)");
+        Assert.True(nowhere.FoundNowhere, "found nowhere");
+
+        // an address TMDB does not know: HISTRA was not searched, so it is not "found nowhere"
+        var unknown = await none.FindAsync(MediaKind.Movie, "https://www.themoviedb.org/movie/424242");
+        Assert.True(unknown.Titles.Count == 0 && !unknown.FoundNowhere, "an unknown address is not found nowhere: " + unknown.Note);
+
+        // no exact name (typed differently): the only title of the year in HISTRA's own catalog is meant
+        var (loose, _) = Setup(
+            """{"id":9001,"title":"The Invented Train","original_title":"The Invented Train","release_date":"2019-05-30"},""" +
+            """{"id":9600,"title":"Invented Train Story","original_title":"Invented Train Story","release_date":"2019-01-01"}""",
+            """{"id":77,"title":"The Invented Train","original_title":"The Invented Train","release_date":"2019-05-30","external_ids":{"tmdb":"9001"}},""" +
+            """{"id":0,"title":"Invented Train Story","original_title":"Invented Train Story","release_date":"2019-01-01","external_ids":{"tmdb":"9600"}}""");
+        var looseResults = await loose.SearchAsync(MediaKind.Movie, "Invented Train", 2019);
+        Assert.Equal(9001, looseResults.Best("Invented Train", 2019)?.Id, "the one in HISTRA's own catalog");
+    }
+
+    [Test]
+    public async Task FilmAddressWhereASeriesIsExpectedIsCheckedAmongFilms()
+    {
+        var server = new Server();
+        server.Answers["/3/movie/9001"] = (HttpStatusCode.OK, """{"id":9001,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-05-30"}""");
+        server.Answers["/api/v1/catalog/movies/search"] = (HttpStatusCode.OK,
+            """{"results":[{"id":"77","title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-05-30","external_ids":{"tmdb":"9001"}}]}""");
+        var search = new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: new RequestPacer(100)),
+            new HistraCatalog(new HistraClient(server.Http, "hst_test-0123456789", new RequestPacer(100))));
+        var found = await search.FindAsync(MediaKind.Series, "https://www.themoviedb.org/movie/9001");
+        Assert.True(found.Titles is [{ Kind: MediaKind.Movie, Id: 9001 }] && found.Check(found.Titles[0]) == TitleCheck.Confirmed,
+            "checked in the films catalog: " + string.Join(" | ", server.Requests));
+        Assert.True(found.HistraTitles is [{ HistraId: null }], "an \"id\" that is not a number is ignored, not a crash");
+        var checkedAlone = await search.CheckAsync(found.Titles[0]);
+        Assert.Equal(TitleCheck.Confirmed, checkedAlone.Check(found.Titles[0]));
+    }
+
+    [Test]
+    public void TitlesHistraDidNotConfirmWaitForTheirOwnConfirmation()
+    {
+        var job = new LibraryJob(new LibraryLayout(Path.Combine(Path.GetTempPath(), "universum-unverified")));
+        var confirmed = new TitleInfo(MediaKind.Movie, "Vymyslený vlak", 2019, 9001);
+        var doubtful = new TitleInfo(MediaKind.Movie, "Iný vlak", 2020, 9500);
+        job.MovieSuggestions["a.mkv"] = confirmed;
+        job.MovieSuggestions["b.mkv"] = doubtful;
+        job.UnverifiedTitles.Add("b.mkv");
+        job.ConfirmSuggestions();
+        Assert.True(job.Movies.ContainsKey("a.mkv") && !job.Movies.ContainsKey("b.mkv"), "accept suggestions skips the unconfirmed film");
+        job.ConfirmTitle("b.mkv");
+        Assert.True(job.Movies["b.mkv"] == doubtful && job.UnverifiedTitles.Count == 0, "confirmed for its file");
+
+        var series = new LibraryJob(new LibraryLayout(Path.Combine(Path.GetTempPath(), "universum-unverified"))) { Kind = MediaKind.Series };
+        series.SeriesSuggestion = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2008, 9100);
+        series.SeriesUnverified = true;
+        series.ConfirmSuggestions();
+        Assert.True(series.Series is null, "an unconfirmed series is not accepted with the suggestions");
+        series.ConfirmSeries();
+        Assert.True(series.Series?.TmdbId == 9100 && !series.SeriesUnverified, "the series confirmed on its own");
     }
 
     private static async Task<string?> MessageOfTitles(Func<Task> action)

@@ -77,7 +77,10 @@ public sealed class AppServices
     /// searching is used); null when neither is set up and switched on.
     /// </summary>
     public TitleSearch? Titles =>
-        Tmdb is null && Histra is null ? null : _titles ??= new TitleSearch(Tmdb, Histra is { } histra ? new HistraCatalog(histra) : null);
+        TitlesForSelfTest ?? (Tmdb is null && Histra is null ? null : _titles ??= new TitleSearch(Tmdb, Histra is { } histra ? new HistraCatalog(histra) : null));
+
+    /// <summary>The self-test's stand-in TMDB and HISTRA (invented answers, nothing goes to the internet).</summary>
+    public TitleSearch? TitlesForSelfTest { get; set; }
 
     /// <summary>Raised when TMDB or HISTRA was set up, switched on or off (title lookup may change).</summary>
     public event Action? TitlesChanged;

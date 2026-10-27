@@ -474,11 +474,21 @@ public sealed class MuxSettingsViewModel : ObservableObject
         }
 
         var problems = spec.Validate().ToList();
+
+        // a title HISTRA did not confirm (or found nowhere) waits for the user before anything is named by it
+        if (Library.Tmdb.NeedsConfirmation)
+        {
+            problems.Add(Library.Tmdb.Warning + " Potvrďte ho tlačidlom Potvrdiť titul.");
+        }
+
         if (_useLibrary && Library.Placement is null)
         {
             // the output box is greyed out: what is missing is the title (or the episode), not a file name
             problems.Remove(MuxSpec.MissingOutput);
-            problems.Add(Library.Description);
+            if (!Library.Tmdb.NeedsConfirmation)
+            {
+                problems.Add(Library.Description);
+            }
         }
 
         problems.AddRange(Tracks.Where(t => t.Include && t.HasInvalidDelay)

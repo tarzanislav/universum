@@ -37,6 +37,8 @@ public sealed class BatchPageViewModel : ObservableObject
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
     private FileRow? _selectedFile;
+    private readonly Dictionary<string, string> _unverifiedNotes = new(Universum.Core.IO.Paths.Comparer);
+    private string _seriesNote = "";
     private BatchTemplate _template = BatchTemplate.RulesOnly;
     private string _summary = "Vyberte priečinok so súbormi MKV a dajte Analyzovať.";
     private string _simulation = "";
@@ -69,6 +71,11 @@ public sealed class BatchPageViewModel : ObservableObject
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
         ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
+        ConfirmSeriesCommand = new RelayCommand(() =>
+        {
+            _library?.ConfirmSeries();
+            OnLibraryChanged();
+        }, () => !Busy && SeriesNeedsConfirmation);
         AnswerSpecialsCommand = new RelayCommand(AnswerSpecials, () => !Busy && HasSpecialsQuestions);
         Tmdb = new TmdbPicker(services, () => MediaKind.Series,
             () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? ""), ChooseTmdbSeries);
@@ -300,7 +307,15 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    public string SeriesSuggestion => _library is { Series: null, SeriesSuggestion: { } suggestion } ? "návrh: " + suggestion.FolderName : "";
+    public string SeriesSuggestion => _library is { Series: null, SeriesSuggestion: { } suggestion } library
+        ? "návrh: " + suggestion.FolderName + (library.SeriesUnverified ? " ⚠ " + _seriesNote : "")
+        : "";
+
+    /// <summary>The suggested series waits for its own confirmation (HISTRA did not confirm it).</summary>
+    public bool SeriesNeedsConfirmation => _library is { Series: null, SeriesUnverified: true, SeriesSuggestion: not null };
+
+    /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
+    public RelayCommand ConfirmSeriesCommand { get; }
 
     /// <summary>Sets the naming of one file: a film title ("Creep (2004)") or an episode ("S01E04"); also used by the self-test.</summary>
     public void SetNaming(string path, string text)
@@ -456,6 +471,8 @@ public sealed class BatchPageViewModel : ObservableObject
                      $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(SeriesSuggestion));
+        OnPropertyChanged(nameof(SeriesNeedsConfirmation));
+        ConfirmSeriesCommand?.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(KindNote));
         OnPropertyChanged(nameof(KindNeedsConfirmation));
         OnPropertyChanged(nameof(HasSpecialsQuestions));
@@ -606,7 +623,22 @@ public sealed class BatchPageViewModel : ObservableObject
                 var (title, note) = TmdbPicker.TitleText(film);
                 if (TitleGuess.Typed(MediaKind.Movie, title) is { } info)
                 {
-                    _library.Movies[path] = info;
+                    // checked in HISTRA as everywhere: a title it does not confirm waits at the file for confirmation
+                    var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
+                    if (check is not null && check.Check(film).NeedsConfirmation())
+                    {
+                        _library.Movies.Remove(path);
+                        _library.MovieSuggestions[path] = info;
+                        _library.UnverifiedTitles.Add(path);
+                        _unverifiedNotes[path] = TmdbPicker.Describe(check, film);
+                        note = (note.Length > 0 ? note + " " : "") + "⚠ " + _unverifiedNotes[path];
+                    }
+                    else
+                    {
+                        _library.Movies[path] = info;
+                        _library.UnverifiedTitles.Remove(path);
+                        _unverifiedNotes.Remove(path);
+                    }
                 }
 
                 RunState = note;
@@ -617,7 +649,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 RunState = $"TMDB nepozná film {reference.Id}.";
             }
         }
-        catch (TmdbException ex)
+        catch (TitleServiceException ex)
         {
             RunState = ex.Message;
         }
@@ -633,23 +665,50 @@ public sealed class BatchPageViewModel : ObservableObject
         var (text, note) = TmdbPicker.TitleText(title);
         if (title.Kind == MediaKind.Movie)
         {
-            // a film's address in the series field: the folder holds this film (all files are its versions)
+            // a film's address in the series field: the folder holds this film (all files are its versions); a title HISTRA
+            // did not confirm is only suggested and waits at each file for confirmation
             _library.Kind = MediaKind.Movie;
             if (TitleGuess.Typed(MediaKind.Movie, text) is { } film && _analysis is not null)
             {
                 foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
                 {
-                    _library.Movies[file.Path] = film;
+                    if (Tmdb.NeedsConfirmation)
+                    {
+                        _library.Movies.Remove(file.Path);
+                        _library.MovieSuggestions[file.Path] = film;
+                        _library.UnverifiedTitles.Add(file.Path);
+                        _unverifiedNotes[file.Path] = Tmdb.Warning;
+                    }
+                    else
+                    {
+                        _library.Movies[file.Path] = film;
+                    }
                 }
             }
 
-            RunState = (note.Length > 0 ? note + " " : "") + "Adresa TMDB je film (/movie/): druh je filmy a všetky súbory dostali tento názov (verzie jedného filmu) – pri súboroch ho môžete zmeniť.";
+            RunState = (note.Length > 0 ? note + " " : "") + (Tmdb.NeedsConfirmation ? "⚠ " + Tmdb.Warning + " " : "") +
+                       "Adresa TMDB je film (/movie/): druh je filmy a všetky súbory dostali tento názov (verzie jedného filmu) – pri súboroch ho môžete zmeniť.";
             OnLibraryChanged();
             return;
         }
 
         _library.Kind = MediaKind.Series;
-        _library.Series = TitleGuess.Typed(MediaKind.Series, text);
+        var chosen = TitleGuess.Typed(MediaKind.Series, text);
+        if (Tmdb.NeedsConfirmation && chosen is not null)
+        {
+            // HISTRA did not confirm TMDB's series: it is only suggested and waits for "Potvrdiť seriál"
+            _library.Series = null;
+            _library.SeriesSuggestion = chosen;
+            _library.SeriesUnverified = true;
+            _seriesNote = Tmdb.Warning;
+            _library.SeriesOnTmdb = title.Seasons.Count > 0 ? (chosen, title.Seasons) : null;
+            RunState = (note.Length > 0 ? note + " " : "") + "⚠ " + Tmdb.Warning + " Ak je správny, dajte Potvrdiť seriál.";
+            OnLibraryChanged();
+            return;
+        }
+
+        _library.SeriesUnverified = false;
+        _library.Series = chosen;
         // seasons and episode counts: every episode is checked against them (specification 13.5)
         _library.SeriesOnTmdb = _library.Series is { } series && title.Seasons.Count > 0 ? (series, title.Seasons) : null;
         RunState = note;
@@ -668,7 +727,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        var service = titles.Tmdb is null ? "HISTRA" : titles.UsesHistra ? "TMDB / HISTRA" : "TMDB";
+        var service = titles.Tmdb is null ? "HISTRA" : titles.UsesHistra ? "TMDB + HISTRA" : "TMDB";
 
         var pending = _analysis.Groups.SelectMany(g => g.Files)
             .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path))
@@ -680,7 +739,8 @@ public sealed class BatchPageViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
         void OnWaiting(TimeSpan delay) => RunState = $"{service} žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s a pokračujem…";
         titles.Waiting += OnWaiting;
-        int asked = 0, found = 0;
+        int asked = 0, found = 0, unverified = 0, nowhere = 0;
+        var problem = "";
         try
         {
             foreach (var (path, guess) in pending)
@@ -688,14 +748,43 @@ public sealed class BatchPageViewModel : ObservableObject
                 asked++;
                 RunState = $"{service} {asked} / {pending.Count} ({questions} rôznych názvov)…";
                 var results = await titles.SearchAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
-                if (TmdbClient.ExactMatch(results.Titles, guess.Name, guess.Year) is { } match && match.ToTitleInfo() is { } info)
+                if (results.Best(guess.Name, guess.Year) is { } match && match.ToTitleInfo() is { } info)
                 {
                     _library.MovieSuggestions[path] = info;
                     found++;
+
+                    // HISTRA found nothing, another title, or could not be asked: the file waits for its own confirmation
+                    if (results.Check(match).NeedsConfirmation())
+                    {
+                        if (results.Check(match) == TitleCheck.Unavailable && problem.Length == 0)
+                        {
+                            problem = results.Note;
+                        }
+
+                        _library.UnverifiedTitles.Add(path);
+                        _unverifiedNotes[path] = TmdbPicker.Describe(results, match);
+                        unverified++;
+                    }
+                    else
+                    {
+                        _library.UnverifiedTitles.Remove(path);
+                        _unverifiedNotes.Remove(path);
+                    }
+                }
+                else if (results.FoundNowhere)
+                {
+                    // found nowhere: the suggestion from the file's name stays and waits at the file for confirmation
+                    _library.UnverifiedTitles.Add(path);
+                    _unverifiedNotes[path] = (results.TmdbProblem is { } refused ? refused + " " : "") +
+                                             (titles.Tmdb is null ? "Katalóg HISTRA titul nenašiel" : "TMDB ani HISTRA titul nenašli") + " – návrh je z mena súboru.";
+                    nowhere++;
                 }
             }
 
-            RunState = $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých – skontrolujte ich a dajte Prijať návrhy názvov.";
+            RunState = $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
+                       (unverified > 0 ? $", {unverified} HISTRA nepotvrdila (⚠ pri súbore – potvrďte ich jednotlivo)" : "") +
+                       (nowhere > 0 ? $", {nowhere} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)" : "") +
+                       " – skontrolujte ich a dajte Prijať návrhy názvov." + (problem.Length > 0 ? " " + problem : "");
         }
         catch (OperationCanceledException)
         {
@@ -715,6 +804,23 @@ public sealed class BatchPageViewModel : ObservableObject
             Replan();
         }
     }
+
+    /// <summary>Confirms the suggested title of one film HISTRA did not confirm (the ⚠ button at the file).</summary>
+    public void ConfirmTitle(string path)
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        _library.ConfirmTitle(path);
+        _unverifiedNotes.Remove(path);
+        Replan();
+    }
+
+    /// <summary>Why HISTRA did not confirm a file's suggested title; null when it did (or was not asked).</summary>
+    public string? UnverifiedNote(string path) =>
+        _library?.UnverifiedTitles.Contains(path) == true ? _unverifiedNotes.GetValueOrDefault(path) ?? "HISTRA titul nepotvrdila." : null;
 
     private void ConfirmTitles()
     {
@@ -983,7 +1089,7 @@ public sealed class BatchPageViewModel : ObservableObject
                      ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
-                     AnswerSpecialsCommand,
+                     AnswerSpecialsCommand, ConfirmSeriesCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

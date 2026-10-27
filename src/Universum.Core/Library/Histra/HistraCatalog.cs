@@ -83,7 +83,9 @@ public sealed class HistraCatalog(HistraClient client)
 
             var date = Text(result, kind == MediaKind.Movie ? "release_date" : "first_air_date");
             int? year = date is { Length: >= 4 } && int.TryParse(date.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var y) ? y : null;
-            titles.Add(new TmdbTitle(kind, id, string.IsNullOrWhiteSpace(title) ? original : title, original, null, year, []));
+            // "id" is the title's number in HISTRA's own catalog; 0 for a title HISTRA only passes on from TMDB
+            int? histraId = result.TryGetProperty("id", out var own) && own.ValueKind == JsonValueKind.Number && own.TryGetInt32(out var number) && number > 0 ? number : null;
+            titles.Add(new TmdbTitle(kind, id, string.IsNullOrWhiteSpace(title) ? original : title, original, null, year, []) { HistraId = histraId });
         }
 
         return titles;

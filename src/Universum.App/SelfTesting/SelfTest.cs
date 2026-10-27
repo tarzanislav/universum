@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using Universum.App.Pages;
 using Universum.App.Setup;
 using Universum.App.Shell;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Platform.Windows;
@@ -178,6 +179,7 @@ internal static class SelfTest
         await model.Rules.ApplyCommand.ExecuteAsync(null);
         Check(model.Rules.Result.StartsWith("Rovnaký stream", StringComparison.Ordinal), "rules: the same stream is not written twice – " + model.Rules.Result);
 
+        await TestTitleSyncAsync(model, window, services);
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
@@ -499,6 +501,102 @@ internal static class SelfTest
 
         Check(mux.Settings.Count == 1 && mux.Unprocessed.Count == 0, $"mux: closed after the question ({mux.Settings.Count})");
         model.SelectedTool = model.Tools.First(t => t.Page == mux);
+    }
+
+    /// <summary>
+    /// TMDB checked in HISTRA (synchronisation, 27. 10. 2026) on the rules page, with invented answers of both services
+    /// (nothing goes to the internet): another title in HISTRA waits for confirmation; the same title is confirmed; a name
+    /// found nowhere waits as a suggestion; a typed title is the user's decision. Only the name goes to HISTRA.
+    /// </summary>
+    private static async Task TestTitleSyncAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var fake = new FakeTitleServices();
+        var http = new System.Net.Http.HttpClient(fake);
+        TitleSearch Fresh() => new(
+            new Core.Library.Tmdb.TmdbClient(http, "selftest-key", pacer: new RequestPacer(100)),
+            new Core.Library.Histra.HistraCatalog(new Core.Library.Histra.HistraClient(http, "hst_selftest-0123456789", new RequestPacer(100))));
+        var rules = model.Rules;
+        model.SelectedTool = model.Tools.First(t => t.Page == rules);
+        rules.IsMovie = true;
+
+        // TMDB finds one title, HISTRA another of the same name and year: the title waits for confirmation
+        fake.Tmdb = """{"id":9500,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-02-01"}""";
+        fake.Histra = """{"id":77,"title":"Vymyslený vlak","original_title":"Vymyslený vlak","release_date":"2019-05-30","external_ids":{"tmdb":"9001"}}""";
+        services.TitlesForSelfTest = Fresh();
+        rules.Tmdb.Refresh();
+        rules.TitleText = "Vymyslený vlak (2019)";
+        await rules.Tmdb.SearchAsync();
+        Check(rules.Tmdb.NeedsConfirmation && rules.Tmdb.Check == TitleCheck.Different && rules.Target == rules.Tmdb.Warning &&
+              rules.Tmdb.Warning.Contains("9001", StringComparison.Ordinal) && !rules.ApplyCommand.CanExecute(null),
+            "titles: HISTRA found another title – waits for confirmation: " + rules.Target);
+        await Screenshot(window, "title-unconfirmed.png");
+        rules.Tmdb.ConfirmCommand.Execute(null);
+        Check(!rules.Tmdb.NeedsConfirmation && rules.Target.StartsWith(Path.Combine("MOVIES", "Vymyslený vlak (2019)"), StringComparison.Ordinal),
+            "titles: confirmed by the user – " + rules.Target);
+        Check(fake.Requests.Where(r => r.Contains("histra.net", StringComparison.Ordinal)).All(r => r == "https://histra.net/api/v1/catalog/movies/search?q=Vymyslený vlak"),
+            "titles: only the name goes to HISTRA – " + string.Join(" | ", fake.Requests));
+
+        // the same title in HISTRA: confirmed
+        fake.Tmdb = """{"id":9002,"title":"Vymyslený vlak 2","original_title":"Vymyslený vlak 2","release_date":"2021-03-01"}""";
+        fake.Histra = """{"id":12,"title":"Vymyslený vlak 2","original_title":"Vymyslený vlak 2","release_date":"2021-03-01","external_ids":{"tmdb":"9002"}}""";
+        services.TitlesForSelfTest = Fresh();
+        rules.TitleText = "Vymyslený vlak 2 (2021)";
+        await rules.Tmdb.SearchAsync();
+        Check(!rules.Tmdb.NeedsConfirmation && rules.Tmdb.Check == TitleCheck.Confirmed && rules.Tmdb.Message.Contains("potvrdila", StringComparison.Ordinal) &&
+              rules.Target.StartsWith(Path.Combine("MOVIES", "Vymyslený vlak 2 (2021)"), StringComparison.Ordinal),
+            "titles: HISTRA confirmed the title – " + rules.Tmdb.Message);
+
+        // found nowhere: the suggestion waits; a title typed by the user is the user's decision
+        fake.Tmdb = "";
+        fake.Histra = "";
+        services.TitlesForSelfTest = Fresh();
+        rules.TitleText = "Neexistujúci vlak (2020)";
+        await rules.Tmdb.SearchAsync();
+        Check(rules.Tmdb.NeedsConfirmation && rules.Tmdb.Warning.Contains("nenašli", StringComparison.Ordinal) && rules.Target == rules.Tmdb.Warning,
+            "titles: found nowhere – the suggestion waits: " + rules.Tmdb.Warning);
+        rules.TitleText = "Neexistujúci vlak (2021)";
+        Check(!rules.Tmdb.NeedsConfirmation && rules.Target.StartsWith(Path.Combine("MOVIES", "Neexistujúci vlak (2021)"), StringComparison.Ordinal),
+            "titles: a typed title needs no confirmation – " + rules.Target);
+        rules.TitleText = "Neexistujúci vlak (2020)";
+        Check(rules.Tmdb.NeedsConfirmation && rules.Target == rules.Tmdb.Warning, "titles: the text that waited waits again when typed back");
+
+        // HISTRA set up but not reachable: TMDB's title is not checked and waits for confirmation
+        fake.Tmdb = """{"id":9003,"title":"Vymyslený vlak 3","original_title":"Vymyslený vlak 3","release_date":"2023-03-01"}""";
+        fake.HistraStatus = System.Net.HttpStatusCode.Unauthorized;
+        services.TitlesForSelfTest = Fresh();
+        rules.TitleText = "Vymyslený vlak 3 (2023)";
+        await rules.Tmdb.SearchAsync();
+        Check(rules.Tmdb.NeedsConfirmation && rules.Tmdb.Check == TitleCheck.Unavailable && rules.Tmdb.Warning.Contains("nedala opýtať", StringComparison.Ordinal),
+            "titles: HISTRA not reachable – waits for confirmation: " + rules.Tmdb.Warning);
+        fake.HistraStatus = System.Net.HttpStatusCode.OK;
+
+        services.TitlesForSelfTest = null;
+        rules.Tmdb.Refresh();
+        rules.TitleText = "Vymyslený film: Návrat (2026)";
+    }
+
+    /// <summary>Stand-in TMDB and HISTRA: every search answers with the invented results set for each service.</summary>
+    private sealed class FakeTitleServices : System.Net.Http.HttpMessageHandler
+    {
+        public string Tmdb { get; set; } = "";
+
+        public string Histra { get; set; } = "";
+
+        public System.Net.HttpStatusCode HistraStatus { get; set; } = System.Net.HttpStatusCode.OK;
+
+        public List<string> Requests { get; } = [];
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request.RequestUri!.ToString());
+            var histra = request.RequestUri.Host == "histra.net";
+            var results = histra ? Histra : Tmdb;
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(histra ? HistraStatus : System.Net.HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new System.Net.Http.StringContent("{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),
+            });
+        }
     }
 
     /// <summary>Chapter editor: read, rename, add; the result is a library copy (original unchanged); a library file edited again can be undone.</summary>

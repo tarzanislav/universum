@@ -50,6 +50,7 @@ public sealed class RulesPageViewModel : ObservableObject
         QueueCommand = new RelayCommand(Enqueue, CanApply);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
+        Tmdb.ConfirmationChanged += UpdateTarget;
         services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += () =>
         {
@@ -135,9 +136,11 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             if (SetProperty(ref _titleText, value))
             {
-                // typed by the user: the title chosen on TMDB no longer applies
+                // typed by the user: the title chosen on TMDB no longer applies; a title typed by the user is the user's
+                // decision (the text that waited for confirmation waits again)
                 _tmdbTitle = null;
                 TitleNote = "";
+                Tmdb.TextEdited(value);
                 if (UseTmdbAddress(value))
                 {
                     return;
@@ -253,6 +256,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _episodeNote = LibraryTargetPicker.EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
+        Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
         OnPropertyChanged(nameof(IsSeries));
@@ -282,6 +286,10 @@ public sealed class RulesPageViewModel : ObservableObject
         else if (title.Problem is { } problem)
         {
             Target = $"Názov titulu: {problem} – napr. Creep (2004).";
+        }
+        else if (Tmdb.NeedsConfirmation)
+        {
+            Target = Tmdb.Warning;
         }
         else if (_kind == MediaKind.Series && episode is null)
         {

@@ -61,6 +61,7 @@ public sealed class AppServices
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private TmdbClient? _tmdb;
+    private TitleSearch? _titles;
 
     /// <summary>The user's TMDB key (UNIVERSUM_TMDB_KEY wins over the settings); null when none is set.</summary>
     public string? TmdbKey =>
@@ -71,13 +72,25 @@ public sealed class AppServices
     /// <summary>TMDB client with the user's key; null without a key or with connecting switched off (the key stays).</summary>
     public TmdbClient? Tmdb => _tmdb ??= Settings.TmdbEnabled && TmdbKey is { } key ? new TmdbClient(Http, key, AppSettings.TmdbCacheFile) : null;
 
+    /// <summary>
+    /// Title lookup: TMDB with the key; the HISTRA catalog without it, or when TMDB finds nothing (from HISTRA only
+    /// searching is used); null when neither is set up and switched on.
+    /// </summary>
+    public TitleSearch? Titles =>
+        Tmdb is null && Histra is null ? null : _titles ??= new TitleSearch(Tmdb, Histra is { } histra ? new HistraCatalog(histra) : null);
+
+    /// <summary>Raised when TMDB or HISTRA was set up, switched on or off (title lookup may change).</summary>
+    public event Action? TitlesChanged;
+
     /// <summary>Switches connecting to TMDB on or off; the stored key is kept either way.</summary>
     public void SetTmdbEnabled(bool enabled)
     {
         Settings.TmdbEnabled = enabled;
         Settings.Save();
         _tmdb = null;
+        _titles = null;
         TmdbChanged?.Invoke();
+        TitlesChanged?.Invoke();
     }
 
     /// <summary>Stores the TMDB key protected for the current Windows user (null removes it).</summary>
@@ -86,7 +99,9 @@ public sealed class AppServices
         Settings.TmdbKeyProtected = string.IsNullOrWhiteSpace(key) ? null : UserSecret.Protect(key.Trim());
         Settings.Save();
         _tmdb = null;
+        _titles = null;
         TmdbChanged?.Invoke();
+        TitlesChanged?.Invoke();
     }
 
     /// <summary>Raised when the TMDB key changes.</summary>
@@ -107,10 +122,7 @@ public sealed class AppServices
     public HistraClient? Histra =>
         HistraActive && HistraToken is { } token && HistraApi.IsValidToken(token) ? (_histra ??= new HistraClient(Http, token)) : null;
 
-    /// <summary>
-    /// TMDB and HISTRA both switched on: the two are to be kept in sync (what is synchronised is decided with the HISTRA
-    /// API description; until then nothing is sent).
-    /// </summary>
+    /// <summary>TMDB and HISTRA both switched on: titles are looked up on TMDB, what it does not find in the HISTRA catalog.</summary>
     public bool SyncActive => Tmdb is not null && HistraActive;
 
     /// <summary>Switches connecting to HISTRA on or off; the stored token is kept either way.</summary>
@@ -119,7 +131,9 @@ public sealed class AppServices
         Settings.HistraEnabled = enabled;
         Settings.Save();
         _histra = null;
+        _titles = null;
         HistraChanged?.Invoke();
+        TitlesChanged?.Invoke();
     }
 
     /// <summary>Stores the HISTRA token protected for the current Windows user (null removes it).</summary>
@@ -128,7 +142,9 @@ public sealed class AppServices
         Settings.HistraTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
         Settings.Save();
         _histra = null;
+        _titles = null;
         HistraChanged?.Invoke();
+        TitlesChanged?.Invoke();
     }
 
     /// <summary>Raised when the HISTRA token changes.</summary>

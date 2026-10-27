@@ -6,14 +6,13 @@ using System.Text.Json;
 namespace Universum.Core.Library.Histra;
 
 /// <summary>A HISTRA problem the user can act on; the message is ready to show.</summary>
-public sealed class HistraException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class HistraException(string message, Exception? inner = null) : TitleServiceException(message, inner);
 
 /// <summary>
 /// Talks to the HISTRA API (https://histra.net) with the user's token as a Bearer header. Requests go only to
 /// histra.net over HTTPS, one at a time through <see cref="RequestPacer.Histra"/> (2 per second); "too many requests"
 /// (429) and passing server errors are waited out and retried as with TMDB; answers are limited to
-/// <see cref="MaxResponseBytes"/>. The HISTRA endpoints (what is read and written – the synchronisation with TMDB) are
-/// added on top of <see cref="SendAsync"/> once the API is described.
+/// <see cref="MaxResponseBytes"/>. UNIVERSUM uses HISTRA only to search its catalog (<see cref="HistraCatalog"/>).
 /// </summary>
 public sealed class HistraClient
 {

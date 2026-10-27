@@ -50,7 +50,7 @@ public sealed class RulesPageViewModel : ObservableObject
         QueueCommand = new RelayCommand(Enqueue, CanApply);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
-        services.TmdbChanged += Tmdb.Refresh;
+        services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += () =>
         {
             OnPropertyChanged(nameof(OutputDescription));

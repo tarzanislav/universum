@@ -33,14 +33,14 @@ public sealed class LibraryTargetPicker : ObservableObject
         _target = target;
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
-        services.TmdbChanged += Tmdb.Refresh;
+        services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += OnLibraryChanged;
     }
 
     /// <summary>The picker is no longer used (its multiplex settings were closed): it stops following the settings.</summary>
     public void Detach()
     {
-        _services.TmdbChanged -= Tmdb.Refresh;
+        _services.TitlesChanged -= Tmdb.Refresh;
         _services.LibraryChanged -= OnLibraryChanged;
     }
 

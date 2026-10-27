@@ -8,8 +8,9 @@ using Universum.Core.Library.Tmdb;
 namespace Universum.App.Pages;
 
 /// <summary>
-/// Looks up the text of a title field on TMDB (an ID or address, or "Name (Year)") and offers the results; the chosen
-/// result is handed back to the page. Without a TMDB key in the settings the button is disabled.
+/// Looks up the text of a title field on TMDB (an ID or address, or "Name (Year)") – without a TMDB key, or when TMDB
+/// finds nothing, in the HISTRA catalog – and offers the results; the chosen result is handed back to the page.
+/// Without TMDB and HISTRA in the settings the button is disabled.
 /// </summary>
 public sealed class TmdbPicker : ObservableObject
 {
@@ -28,7 +29,7 @@ public sealed class TmdbPicker : ObservableObject
         _kind = kind;
         _text = text;
         _chosen = chosen;
-        SearchCommand = new AsyncRelayCommand(SearchAsync, () => !_busy && _services.Tmdb is not null);
+        SearchCommand = new AsyncRelayCommand(SearchAsync, () => !_busy && _services.Titles is not null);
     }
 
     public AsyncRelayCommand SearchCommand { get; }
@@ -42,8 +43,10 @@ public sealed class TmdbPicker : ObservableObject
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
     public string Tooltip =>
-        _services.Tmdb is not null ? "Nájde titul na TMDB podľa ID, adresy alebo názvu a roku"
-        : _services.TmdbKey is null ? "Vyhľadávanie na TMDB: zadajte svoj kľúč TMDB v Nastaveniach"
+        _services.Tmdb is not null
+            ? "Nájde titul na TMDB podľa ID, adresy alebo názvu a roku" + (_services.Histra is not null ? " (čo TMDB nenájde, hľadá v katalógu HISTRA)" : "")
+        : _services.Histra is not null ? "Nájde titul v katalógu HISTRA podľa názvu a roku (ID a adresy TMDB načíta len TMDB s kľúčom)"
+        : _services.TmdbKey is null ? "Vyhľadávanie titulov: zadajte v Nastaveniach kľúč TMDB alebo token HISTRA"
         : "Pripájanie k TMDB je vypnuté v Nastaveniach";
 
     public TmdbTitle? Selected
@@ -61,6 +64,10 @@ public sealed class TmdbPicker : ObservableObject
                 else
                 {
                     _chosen(value);
+                    if (value is { Kind: MediaKind.Series, Seasons.Count: 0 })
+                    {
+                        Message = "Bez kľúča TMDB sa neoverí, či sezóna a epizóda existujú.";
+                    }
                 }
             }
         }
@@ -96,7 +103,7 @@ public sealed class TmdbPicker : ObservableObject
 
     public async Task SearchAsync()
     {
-        if (_services.Tmdb is not { } tmdb)
+        if (_services.Titles is not { } titles)
         {
             return;
         }
@@ -106,36 +113,40 @@ public sealed class TmdbPicker : ObservableObject
         Results.Clear();
         _selected = null;
         OnPropertyChanged(nameof(Selected));
-        Message = "Hľadám na TMDB…";
-        void OnWaiting(TimeSpan delay) => Message = $"TMDB žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…";
-        tmdb.Waiting += OnWaiting;
+        Message = titles.Tmdb is not null ? "Hľadám na TMDB…" : "Hľadám v katalógu HISTRA…";
+        void OnWaiting(TimeSpan delay) => Message = $"Služba žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…";
+        titles.Waiting += OnWaiting;
         try
         {
-            var results = await tmdb.FindAsync(_kind(), _text());
-            TrySaveCache(tmdb);
+            var found = await titles.FindAsync(_kind(), _text());
+            TrySaveCache(titles);
+            var results = found.Titles;
             foreach (var result in results.Take(12))
             {
                 Results.Add(result);
             }
 
+            var fromTmdb = found.Source == "TMDB";
+            var note = found.Note.Length > 0 ? " " + found.Note : "";
             Message = results.Count switch
             {
-                0 => "TMDB nič nenašlo – skúste iný názov alebo zadajte ID.",
-                1 => "",
-                _ => $"TMDB našlo {results.Count} titulov – vyberte správny.",
+                0 when found.Note.Length > 0 => found.Note,
+                0 => fromTmdb ? "TMDB nič nenašlo – skúste iný názov alebo zadajte ID." : "Katalóg HISTRA nič nenašiel – skúste iný názov alebo rok.",
+                1 => found.Note,
+                _ => (fromTmdb ? $"TMDB našlo {results.Count} titulov" : $"Katalóg HISTRA našiel {results.Count} titulov") + " – vyberte správny." + note,
             };
             if (results.Count == 1)
             {
                 Selected = results[0];
             }
         }
-        catch (TmdbException ex)
+        catch (TitleServiceException ex)
         {
             Message = ex.Message;
         }
         finally
         {
-            tmdb.Waiting -= OnWaiting;
+            titles.Waiting -= OnWaiting;
             _busy = false;
             SearchCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(HasResults));
@@ -155,11 +166,15 @@ public sealed class TmdbPicker : ObservableObject
         return ($"{year}[tmdbid-{title.Id}]", "TMDB nemá anglický názov – napíšte ho pred rok.");
     }
 
-    internal static void TrySaveCache(TmdbClient tmdb)
+    internal static void TrySaveCache(TmdbClient tmdb) => TrySave(tmdb.SaveCache);
+
+    internal static void TrySaveCache(TitleSearch titles) => TrySave(titles.SaveCache);
+
+    private static void TrySave(Action save)
     {
         try
         {
-            tmdb.SaveCache();
+            save();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

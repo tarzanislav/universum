@@ -152,7 +152,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>What happens with TMDB and HISTRA together.</summary>
     public string SyncStatus =>
-        _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – názvy sa hľadajú na TMDB, a čo TMDB nenájde, v katalógu HISTRA."
+        _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – názvy sa hľadajú na TMDB a overujú v katalógu HISTRA (čo TMDB nenájde, hľadá sa v HISTRA); titul, ktorý HISTRA nepotvrdí, čaká na vaše potvrdenie."
         : _services.Tmdb is not null ? "Zapnuté je len TMDB."
         : _services.HistraActive ? "Zapnutá je len HISTRA – názvy sa hľadajú v jej katalógu (podľa názvu a roku; ID a adresy TMDB a epizódy overí len TMDB)."
         : "TMDB ani HISTRA sa nepripájajú – názvy sa zadávajú ručne.";

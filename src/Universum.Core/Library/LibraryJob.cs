@@ -273,7 +273,11 @@ public sealed class LibraryJob(LibraryLayout layout)
         Series ??= SeriesSuggestion;
         foreach (var (path, title) in MovieSuggestions)
         {
-            Movies.TryAdd(path, title);
+            // a title HISTRA did not confirm is confirmed for its file alone (ConfirmTitle)
+            if (!UnverifiedTitles.Contains(path))
+            {
+                Movies.TryAdd(path, title);
+            }
         }
 
         foreach (var (path, number) in EpisodeSuggestions)
@@ -283,6 +287,23 @@ public sealed class LibraryJob(LibraryLayout layout)
                 Episodes.TryAdd(path, number);
             }
         }
+    }
+
+    /// <summary>
+    /// Films whose suggested title TMDB found but HISTRA did not confirm (it found nothing, or another title): they wait
+    /// for the user's confirmation of each file, not for "accept suggestions".
+    /// </summary>
+    public HashSet<string> UnverifiedTitles { get; } = new(Paths.Comparer);
+
+    /// <summary>Confirms the suggested title of one film (also one HISTRA did not confirm).</summary>
+    public void ConfirmTitle(string path)
+    {
+        if (MovieSuggestions.TryGetValue(path, out var title))
+        {
+            Movies[path] = title;
+        }
+
+        UnverifiedTitles.Remove(path);
     }
 
     /// <summary>Unanswered questions Season 00 or a regular season.</summary>

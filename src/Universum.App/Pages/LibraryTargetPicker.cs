@@ -32,6 +32,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         _services = services;
         _target = target;
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
+        Tmdb.ConfirmationChanged += Update;
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
         services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += OnLibraryChanged;
@@ -73,6 +74,9 @@ public sealed class LibraryTargetPicker : ObservableObject
             {
                 _tmdbTitle = null;
                 TitleNote = "";
+
+                // a title typed by the user is the user's decision: nothing waits for confirmation
+                Tmdb.ClearConfirmation();
                 if (UseTmdbAddress(value))
                 {
                     return;
@@ -122,6 +126,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         _episodeNote = EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         TitleNote = "";
+        Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
         OnPropertyChanged(nameof(IsSeries));
@@ -138,7 +143,8 @@ public sealed class LibraryTargetPicker : ObservableObject
         var target = _target();
         var title = TitleGuess.Typed(_kind, TitleText);
         var episode = EpisodeNumber.TryParse(EpisodeText);
-        Title = title is { Problem: null } ? title : null;
+        // a title waiting for confirmation (HISTRA did not confirm it, or it was found nowhere) names nothing yet
+        Title = title is { Problem: null } && !Tmdb.NeedsConfirmation ? title : null;
         Episode = _kind == MediaKind.Series ? episode : null;
         if (target is null)
         {
@@ -155,6 +161,10 @@ public sealed class LibraryTargetPicker : ObservableObject
         else if (title.Problem is { } problem)
         {
             Description = $"Názov titulu: {problem} – napr. Creep (2004).";
+        }
+        else if (Tmdb.NeedsConfirmation)
+        {
+            Description = Tmdb.Warning;
         }
         else if (_kind == MediaKind.Series && episode is null)
         {

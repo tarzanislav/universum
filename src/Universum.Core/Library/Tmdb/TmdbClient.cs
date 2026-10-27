@@ -12,6 +12,9 @@ namespace Universum.Core.Library.Tmdb;
 public sealed record TmdbTitle(
     MediaKind Kind, int Id, string Title, string OriginalTitle, string? OriginalLanguage, int? Year, IReadOnlyList<TmdbSeason> Seasons)
 {
+    /// <summary>The title's number in the HISTRA catalog, for a result from HISTRA's own catalog (not one it only passed on from TMDB).</summary>
+    public int? HistraId { get; init; }
+
     /// <summary>The library title by the specification: original title in Latin script, otherwise English title + ID.</summary>
     public TitleInfo? ToTitleInfo() => TitleInfo.FromTmdb(Kind, Id, OriginalTitle, Title, Year);
 

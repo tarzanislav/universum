@@ -141,6 +141,8 @@ public sealed class SlotRow : ObservableObject
 /// <summary>One file of the selected group with its simulated result.</summary>
 public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged, BatchPageViewModel page) : ObservableObject
 {
+    private CommunityToolkit.Mvvm.Input.RelayCommand? _confirm;
+
     public BatchItem Item { get; private set; } = item;
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
@@ -180,9 +182,17 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
                 return library.EpisodeFor(Item.File.Path) is ({ } number, true) ? "návrh: " + number.Tag : "";
             }
 
-            return library.SuggestedTitleFor(Item.File.Path) is { } title ? "návrh: " + title.FolderName : "";
+            return library.SuggestedTitleFor(Item.File.Path) is { } title
+                ? "návrh: " + title.FolderName + (page.UnverifiedNote(Item.File.Path) is { } why ? " ⚠ " + why : "")
+                : "";
         }
     }
+
+    /// <summary>The suggested title waits for this file's own confirmation (HISTRA did not confirm it).</summary>
+    public bool IsUnverified => page.UnverifiedNote(Item.File.Path) is not null && page.Library?.TitleFor(Item.File.Path) is null;
+
+    /// <summary>Confirms the suggested title HISTRA did not confirm.</summary>
+    public CommunityToolkit.Mvvm.Input.RelayCommand ConfirmCommand => _confirm ??= new(() => page.ConfirmTitle(Item.File.Path));
 
     /// <summary>Planned place in the library, relative to the output folder.</summary>
     public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";

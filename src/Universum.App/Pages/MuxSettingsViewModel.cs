@@ -282,16 +282,23 @@ public sealed class MuxSettingsViewModel : ObservableObject
         get => _outputPath;
         set
         {
-            if (!_useLibrary && SetProperty(ref _outputPath, value))
+            if (!_useLibrary && _outputPath != value)
             {
-                _outputEdited = true;
-                _typedPath = value;
-                OnPropertyChanged(nameof(OutputNote));
-                OnPropertyChanged(nameof(DisplayName));
-                OnPropertyChanged(nameof(ShortName));
-                Changed();
+                TypeOutput(value);
             }
         }
+    }
+
+    // a path chosen by the user (typed, from the dialog or from a source's name) stays until Reset
+    private void TypeOutput(string path)
+    {
+        SetProperty(ref _outputPath, path, nameof(OutputPath));
+        _outputEdited = true;
+        _typedPath = path;
+        OnPropertyChanged(nameof(OutputNote));
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(ShortName));
+        Changed();
     }
 
     /// <summary>How the output name came about.</summary>
@@ -811,7 +818,8 @@ public sealed class MuxSettingsViewModel : ObservableObject
             candidate = Path.Combine(folder, $"{name} ({number}){extension}");
         }
 
-        OutputPath = candidate;
+        // chosen even when it is the name shown already: it no longer follows the sources and the title
+        TypeOutput(candidate);
     }
 
     private void TakeAllTracksOfSource()

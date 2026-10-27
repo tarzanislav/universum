@@ -67,11 +67,11 @@ public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string p
 
     public string Path { get; } = path;
 
-    /// <summary>"Film.mkv"; under it "↳ ( Film.part2.vob )" and "↳ + Film-2.mkv" (shown indented as its children).</summary>
+    /// <summary>"Film.mkv"; under it "( Film.part2.vob )" and "+ Film-2.mkv" (shown indented as its children).</summary>
     public string Name => Kind switch
     {
-        MuxSourceKind.Part => "↳ ( " + System.IO.Path.GetFileName(Path) + " )",
-        MuxSourceKind.Appended => "↳ + " + System.IO.Path.GetFileName(Path),
+        MuxSourceKind.Part => "( " + System.IO.Path.GetFileName(Path) + " )",
+        MuxSourceKind.Appended => "+ " + System.IO.Path.GetFileName(Path),
         _ => System.IO.Path.GetFileName(Path),
     };
 
@@ -346,7 +346,7 @@ public sealed class MuxAppendedTrackRow(MuxTrackRow parent, MediaFile file, Medi
 
     public LanguageChoice Language => Parent.Language;
 
-    public string Name => IsMismatch ? $"↳ {FileName}: stopa {Parent.Track.Id} chýba alebo je iná" : "↳ " + FileName;
+    public string Name => IsMismatch ? $"+ {FileName}: stopa {Parent.Track.Id} chýba alebo je iná" : "+ " + FileName;
 
     public bool IsDefault => Parent.IsDefault;
 

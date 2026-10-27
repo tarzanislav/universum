@@ -150,7 +150,8 @@ public sealed class InfoPageViewModel : ObservableObject
 
     private async Task OpenAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Súbory Matroska (*.mkv;*.mka;*.mks;*.webm)|*.mkv;*.mka;*.mks;*.webm|Všetky súbory|*.*" };
+        var patterns = string.Join(";", Universum.Core.Batch.BatchAnalyzer.VideoExtensions.Concat([".mka", ".mks"]).Select(e => "*" + e));
+        var dialog = new OpenFileDialog { Filter = $"Video a Matroska (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|Všetky súbory|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

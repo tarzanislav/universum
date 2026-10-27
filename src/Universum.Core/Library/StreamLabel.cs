@@ -127,6 +127,9 @@ public static class StreamLabel
             _ when name.Contains("AVC", StringComparison.Ordinal) || name.Contains("H.264", StringComparison.Ordinal) => "H264",
             _ when name.Contains("HEVC", StringComparison.Ordinal) || name.Contains("H.265", StringComparison.Ordinal) => "HEVC",
             _ when name.Contains("VC-1", StringComparison.Ordinal) || name.Contains("VC1", StringComparison.Ordinal) => "VC1",
+
+            // TS and MPG files have no Matroska codec ID: "MPEG-1/2" is (almost always) MPEG-2, named as in an MKV
+            _ when name.Contains("MPEG-1/2", StringComparison.Ordinal) => "MPEG2",
             _ when name.Contains("MPEG-4", StringComparison.Ordinal) || name.Contains("XVID", StringComparison.Ordinal) || name.Contains("DIVX", StringComparison.Ordinal) => "MPEG4",
             _ => new string(name.Where(char.IsAsciiLetterOrDigit).ToArray()),
         };

@@ -13,6 +13,9 @@ public enum ChangeKind
     Tags,
     Title,
     Chapters,
+
+    /// <summary>MP4, AVI, TS… become MKV.</summary>
+    Container,
 }
 
 /// <summary>One visible difference between the file and the target, for previews and reports.</summary>

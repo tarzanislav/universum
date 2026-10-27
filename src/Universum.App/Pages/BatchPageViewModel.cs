@@ -42,7 +42,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private readonly Dictionary<string, string> _unverifiedNotes = new(Universum.Core.IO.Paths.Comparer);
     private string _seriesNote = "";
     private BatchTemplate _template = BatchTemplate.RulesOnly;
-    private string _summary = "Vyberte priečinok so súbormi MKV a dajte Analyzovať.";
+    private string _summary = "Vyberte priečinok s video súbormi (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…) a dajte Analyzovať – čo nie je MKV, uloží sa ako nový MKV.";
     private string _simulation = "";
     private string _runState = "";
     private double _progress;
@@ -411,16 +411,24 @@ public sealed class BatchPageViewModel : ObservableObject
         Busy = true;
         _results = [];
 
+        // nothing of a previous folder stays ready to run while (or if) this one is read
+        _analysis = null;
+        _items = [];
+        _library = null;
+        SlotRows.Clear();
+        FileRows.Clear();
+
         // the groups grow while the folder is read (a group is final once the whole folder is read)
         var recursive = Recursive;
         var skipped = _services.Library?.ResultFolders;
+        var libraryAtStart = _services.Library?.Root;
         using var cancellation = new CancellationTokenSource();
         _analysisCancellation = cancellation;
         var live = new Dictionary<string, GroupRow>(StringComparer.Ordinal);
         Groups.Clear();
         SelectedGroup = null;
         SummaryIsWarning = false;
-        Summary = "Hľadám súbory MKV…";
+        Summary = "Hľadám video súbory…";
         Progress = 0;
         OnPropertyChanged(nameof(IsAnalyzing));
         RefreshCommands();
@@ -456,6 +464,15 @@ public sealed class BatchPageViewModel : ObservableObject
                     row.Group.Files.Add(file);
                     row.Refresh();
                 }));
+
+            // nothing to process: why (no video, only in subfolders, only results…) – still stoppable
+            string? why = null;
+            if (_analysis.FileCount == 0 && _analysis.Failed.Count == 0)
+            {
+                Summary = "Zisťujem, prečo sa nič nenašlo…";
+                why = await Task.Run(() => BatchAnalyzer.WhyEmpty(folder, recursive, skipped, cancellation.Token), cancellation.Token);
+            }
+
             _analysisCancellation = null;
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
@@ -482,14 +499,21 @@ public sealed class BatchPageViewModel : ObservableObject
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
 
-            // nothing to process: say why (no MKV, only in subfolders, only results in MOVIES / TVSHOWS…)
-            if (_analysis.FileCount == 0 && _analysis.Failed.Count == 0 &&
-                await Task.Run(() => BatchAnalyzer.WhyEmpty(folder, recursive, skipped)) is { } why)
+            // the reason first; the counts and the warnings about leftovers and interrupted moves stay
+            if (why is not null)
             {
-                Summary = why;
+                Summary = why + " · " + Summary;
             }
 
-            SummaryIsWarning = _analysis.FileCount == 0 || _analysis.Failed.Count > 0;
+            // the output folder was changed while the folder was read: its MOVIES / TVSHOWS were not left out
+            if (_services.Library?.Root != libraryAtStart)
+            {
+                _needsAnalysis = true;
+                Summary += " Výstupný priečinok sa počas analýzy zmenil – analyzujte priečinok znova.";
+                RefreshCommands();
+            }
+
+            SummaryIsWarning = _analysis.FileCount == 0 || _analysis.Failed.Count > 0 || _needsAnalysis;
         }
         catch (OperationCanceledException)
         {
@@ -501,6 +525,9 @@ public sealed class BatchPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            _analysis = null;
+            _items = [];
+            _library = null;
             Groups.Clear();
             Summary = ex.Message;
             SummaryIsWarning = true;
@@ -1021,7 +1048,13 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Stop()
     {
-        _analysisCancellation?.Cancel();
+        // an analysis only stops reading (a finished run's control is not touched)
+        if (_analysisCancellation is { } analysis)
+        {
+            analysis.Cancel();
+            return;
+        }
+
         _tmdbCancellation?.Cancel();
         if (_control is not null)
         {

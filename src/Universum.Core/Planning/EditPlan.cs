@@ -14,6 +14,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
     private static List<PlannedChange> ListChanges(TargetState target)
     {
         var changes = new List<PlannedChange>();
+        if (target.ContainerChanged)
+        {
+            changes.Add(new PlannedChange(null, ChangeKind.Container, target.Source.ContainerName, "MKV"));
+        }
+
         var sourcePositions = target.Source.Tracks.Select((t, i) => (t.Id, i)).ToDictionary(x => x.Id, x => x.i);
         for (var position = 0; position < target.Tracks.Count; position++)
         {

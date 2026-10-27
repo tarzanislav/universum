@@ -201,7 +201,10 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
     /// <summary>Planned place in the library, relative to the output folder.</summary>
     public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
 
-    public string Status => Texts.Status(Item.Status);
+    /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container.</summary>
+    public string Status => Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
+        ? $"nový MKV z {Item.File.ContainerName}"
+        : Texts.Status(Item.Status);
 
     public string Reasons => string.Join("; ", Item.Reasons.Select(Texts.Reason));
 

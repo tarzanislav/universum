@@ -55,6 +55,50 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task OtherContainersBecomeMkv()
+    {
+        // owner, 27. 10. 2026: batch processing converts MP4, AVI, TS and other formats – always as a new MKV
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var cases = new (string File, TrackDecisions? Decisions, string Container, string[] Tracks)[]
+        {
+            ("en-cz.mp4", null, "MP4", ["video", "audio cs", "audio en", "subtitles cs"]),
+            ("sk-en.ts", null, "TS", ["video", "audio sk", "audio en"]),
+            ("und.avi", new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [1] = LanguageTag.FromCode("cs") } }, "AVI", ["video", "audio cs"]),
+        };
+        for (var i = 0; i < cases.Length; i++)
+        {
+            var (file, decisions, container, tracks) = cases[i];
+            var original = work.Copy(file);
+            var before = await System.IO.File.ReadAllBytesAsync(original);
+            var source = await inspector.InspectAsync(original);
+            Assert.True(!source.IsMatroska && source.IsSupported && source.ContainerName == container, $"{file}: {source.ContainerType} ({source.ContainerName})");
+
+            // no default flags in these containers: the first video and audio are the default ones, subtitles are not
+            Assert.True(source.Tracks.GroupBy(t => t.Type).All(g => g.Count(t => t.Flags.Default) == (g.Key == TrackType.Subtitles ? 0 : 1) && (g.Key == TrackType.Subtitles || g.First().Flags.Default)),
+                $"{file}: default flags " + string.Join(", ", source.Tracks.Select(t => $"{t.Type} {t.Flags.Default}")));
+            var target = UniversumRules.Apply(source, decisions: decisions);
+            Assert.True(!target.IsBlocked, $"{file}: " + string.Join("; ", target.Issues.Select(x => x.ToString())));
+            var plan = EditPlan.For(target);
+            Assert.Equal(WriteMethod.Remux, plan.Method, file + ": always a new MKV, never a header edit or a copy");
+            Assert.True(plan.Changes.Any(c => c is { Kind: ChangeKind.Container, After: "MKV" } && c.Before == container), file + ": the conversion is listed");
+
+            var placement = work.Layout.Place(target, new TitleInfo(MediaKind.Movie, "Prevedený film " + (i + 1), 2026), null, RuleProfile.Default);
+            var result = await processor.ProcessAsync(plan, placement, Keep);
+            Assert.Equal(ProcessingStatus.Done, result.Status, $"{file}: " + string.Join("; ", result.Messages));
+            Assert.True(result.OutputPath!.EndsWith(".mkv", StringComparison.Ordinal), file + ": " + result.OutputPath);
+            var written = await inspector.InspectAsync(result.OutputPath);
+            Assert.True(written.IsMatroska, file + ": the result is Matroska");
+            Assert.Sequence(tracks, written.Tracks.Select(t => t.Type == TrackType.Video ? "video" : $"{t.Type.ToString().ToLowerInvariant()} {t.Language.Primary}"), file + ": result tracks");
+            var after = await System.IO.File.ReadAllBytesAsync(original);
+            Assert.True(before.AsSpan().SequenceEqual(after), file + ": original untouched");
+
+            // the result is Matroska: a second run finds nothing to do
+            Assert.Equal(WriteMethod.None, EditPlan.For(UniversumRules.Apply(written)).Method, file + ": second run changes nothing");
+        }
+    }
+
+    [Test]
     public async Task RemuxReplacingTheOriginalUsesTheRecycleBin()
     {
         using var work = new WorkFolder();

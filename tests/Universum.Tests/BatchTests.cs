@@ -64,19 +64,45 @@ public sealed class BatchTests
         }
 
         Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("žiadne video súbory", StringComparison.Ordinal), "an empty folder");
-        Touch("Film A.mp4");
-        Touch("Film B.mp4");
-        Touch("Film C.avi");
-        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true) is { } other && other.Contains("len MKV", StringComparison.Ordinal) &&
-                    other.Contains("2 × MP4, 1 × AVI", StringComparison.Ordinal), "other formats: " + BatchAnalyzer.WhyEmpty(work.Path, true));
-        Touch("Sezóna 1", "Epizóda 1.mkv");
+        Touch("Film A.wmv");
+        Touch("Film B.wmv");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true) is { } unsupported && unsupported.Contains("nevie prečítať: 2 × WMV", StringComparison.Ordinal),
+            "formats mkvmerge cannot read: " + BatchAnalyzer.WhyEmpty(work.Path, true));
+        Touch("DVD", "VTS_01_1.VOB");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("súbory DVD (VOB)", StringComparison.Ordinal), "DVD parts: " + BatchAnalyzer.WhyEmpty(work.Path, true));
+        Touch("Kamera", "PRIVATE", "AVCHD", "BDMV", "STREAM", "00000.MTS");
+        Assert.Sequence(["00000.MTS"], BatchAnalyzer.FindFiles(work.Path, true).Files.Select(Path.GetFileName)!, "camcorder clips are read");
+        File.Delete(Path.Combine(work.Path, "Kamera", "PRIVATE", "AVCHD", "BDMV", "STREAM", "00000.MTS"));
+        Touch("Disk", "BDMV", "STREAM", "00001.m2ts");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true)!.Contains("kópia disku", StringComparison.Ordinal), "a disc structure is not split into pieces");
+        Assert.Equal(0, BatchAnalyzer.FindFiles(work.Path, true).Files.Count, "nothing of the disc is analysed");
+        Touch("Sezóna 1", "Epizóda 1.mp4");
         Assert.True(BatchAnalyzer.WhyEmpty(work.Path, false)!.Contains("zaškrtnite „aj podpriečinky“", StringComparison.Ordinal), "only in subfolders");
         Assert.Equal(null, BatchAnalyzer.WhyEmpty(work.Path, true));
+        Assert.Sequence(["Epizóda 1.mp4"], BatchAnalyzer.FindFiles(work.Path, true).Files.Select(Path.GetFileName)!, "MP4 is analysed");
         var results = Path.Combine(work.Path, "Sezóna 1");
-        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true, [results])!.Contains("knižnici s výsledkami", StringComparison.Ordinal), "all MKV among the results");
+        Assert.True(BatchAnalyzer.WhyEmpty(work.Path, true, [results])!.Contains("knižnici s výsledkami", StringComparison.Ordinal), "all video among the results");
         Assert.True(BatchAnalyzer.WhyEmpty(results, true, [results])!.StartsWith("Tento priečinok je v knižnici s výsledkami", StringComparison.Ordinal), "the folder is among the results");
         Assert.Equal(null, BatchAnalyzer.WhyEmpty(work.Path, true, [Path.Combine(work.Path, "Sezóna")]));
         Assert.True(BatchAnalyzer.WhyEmpty(Path.Combine(work.Path, "nie je"), true)!.StartsWith("Priečinok neexistuje", StringComparison.Ordinal), "a missing folder");
+    }
+
+    [Test]
+    public async Task OtherFormatsAreAnalysed()
+    {
+        using var work = new Work();
+        foreach (var name in new[] { "en-cz.mp4", "sk-en.ts", "und.avi", "cz-only.mkv" })
+        {
+            File.Copy(TestData.Media(name), Path.Combine(work.Path, name));
+        }
+
+        File.WriteAllBytes(Path.Combine(work.Path, "poškodený.mp4"), [1, 2, 3]);
+        var analysis = await AnalyzeAsync(work.Path);
+        Assert.Equal(4, analysis.FileCount, "MKV, MP4, TS and AVI are read: " + string.Join("; ", analysis.Failed.Select(f => f.Path + " " + f.Error)));
+        Assert.True(analysis.Failed.Count == 1 && analysis.Failed[0].Path.EndsWith("poškodený.mp4", StringComparison.Ordinal), "a broken file is named");
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, RuleProfile.Default);
+        Assert.True(items.Where(i => !i.File.IsMatroska).All(i => i.Status is BatchStatus.Remux or BatchStatus.NeedsReview),
+            "other containers are always written as a new MKV: " + string.Join(", ", items.Select(i => $"{Path.GetFileName(i.File.Path)} {i.Status}")));
     }
 
     [Test]
@@ -610,7 +636,11 @@ public sealed class BatchTests
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("universum-batch-");
 
-        public string Path => _directory.FullName;
+        // the analysed folder's own name counts (a "Season 2" folder may be analysed): never the random temporary name
+        // ("universum-batch-s54k…" read as season 54 made a test fail now and then)
+        public Work() => Directory.CreateDirectory(Path);
+
+        public string Path => System.IO.Path.Combine(_directory.FullName, "Práca");
 
         public void Dispose() => _directory.Delete(recursive: true);
     }

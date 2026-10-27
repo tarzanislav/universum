@@ -143,6 +143,12 @@ public sealed record LibraryLayout(string Root)
 
     public string Shows => Path.Combine(Root, LibraryNames.ShowsFolder);
 
+    /// <summary>
+    /// Where results are written (MOVIES and TVSHOWS): batch processing skips them. Other folders of the output folder
+    /// may hold originals (owner's report, 27. 10. 2026: streams kept in the output folder were not found).
+    /// </summary>
+    public IReadOnlyList<string> ResultFolders => [Movies, Shows];
+
     /// <summary>Creates MOVIES and TVSHOWS. UNIVERSUM never deletes folders in the output folder.</summary>
     public void EnsureCreated()
     {
@@ -175,6 +181,10 @@ public sealed record LibraryLayout(string Root)
             stem,
             sizes);
     }
+
+    /// <summary>True when <paramref name="path"/> lies in MOVIES or TVSHOWS (where results are written).</summary>
+    public bool HoldsResult(string path) =>
+        ResultFolders.Any(folder => Path.GetFullPath(path).StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar, Paths.Comparison));
 
     /// <summary>True when <paramref name="path"/> lies inside the output folder.</summary>
     public bool Contains(string path)

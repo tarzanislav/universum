@@ -889,6 +889,30 @@ internal static class SelfTest
         File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(folder, "cz-only.mkv"), overwrite: true);
         var batch = model.Batch;
         model.SelectedTool = model.Tools.First(t => t.Page == batch);
+
+        // owner's report (27. 10.): streams kept in the output folder were not found – only MOVIES and TVSHOWS are skipped
+        var library = Path.Combine(_outputDirectory, "library");
+        if (Directory.Exists(library))
+        {
+            var kept = Path.Combine(library, "Na spracovanie");
+            Directory.CreateDirectory(kept);
+            File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(kept, "Pôvodný film.mkv"), overwrite: true);
+            File.WriteAllBytes(Path.Combine(kept, "Iný film.mp4"), []);
+            batch.Folder = library;
+            batch.Recursive = true;
+            await batch.AnalyzeAsync();
+            Check(batch.Analysis is { FileCount: 1 } found && found.Groups[0].Files[0].Path.EndsWith("Pôvodný film.mkv", StringComparison.Ordinal),
+                $"batch: originals in the output folder are found, the results in MOVIES and TVSHOWS are not – {batch.Summary}");
+            File.Delete(Path.Combine(kept, "Pôvodný film.mkv"));
+            batch.Folder = kept;
+            await batch.AnalyzeAsync();
+            Check(batch.Groups.Count == 0 && batch.SummaryIsWarning && batch.Summary.Contains("len MKV", StringComparison.Ordinal) &&
+                  batch.Summary.Contains("1 × MP4", StringComparison.Ordinal),
+                "batch: a folder without MKV says why – " + batch.Summary);
+            await Screenshot(window, "batch-no-mkv.png");
+            Directory.Delete(kept, recursive: true);
+        }
+
         batch.Folder = folder;
         batch.Recursive = true;
         await batch.AnalyzeAsync();

@@ -1009,7 +1009,25 @@
                 <DockPanel Grid.Row="1" Margin="0,6,0,8">
                     <Button DockPanel.Dock="Right" Content="Upratať zvyšky" Command="{Binding CleanupCommand}" Padding="10,3"
                             ToolTip="Dočasné súbory po prerušenom spracovaní presunie do Koša" />
-                    <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" VerticalAlignment="Center" />
+                    <Button DockPanel.Dock="Right" Content="Zastaviť analýzu" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
+                            Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <!-- why nothing can be processed is said plainly, in the warning colour -->
+                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SummaryIsWarning}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <ProgressBar Height="4" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Margin="0,4,0,0" MaxWidth="420" HorizontalAlignment="Left" Width="420"
+                                     Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
                 </DockPanel>
 
                 <Grid Grid.Row="2">

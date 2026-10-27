@@ -1015,6 +1015,22 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// From the Explorer ("Pridať do Hromadného spracovania" on a file): the file's folder is analysed and the template is
+    /// made from the file's group, so files like it are processed like it.
+    /// </summary>
+    public async Task TemplateFromFileAsync(string path)
+    {
+        Folder = Path.GetDirectoryName(path);
+        await AnalyzeAsync();
+        if (Groups.FirstOrDefault(g => g.Group.Files.Any(f => Universum.Core.IO.Paths.Same(f.Path, path))) is { } group)
+        {
+            SelectedGroup = group;
+            TemplateFromGroup();
+            RunState = $"Šablóna je zo súboru {Path.GetFileName(path)} (skupina {group.Label}) – súbory ako on sa spracujú rovnako.";
+        }
+    }
+
     private void TemplateFromGroup()
     {
         var item = _items.FirstOrDefault(i => i.Group == SelectedGroup?.Group);

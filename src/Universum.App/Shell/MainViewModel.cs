@@ -7,6 +7,7 @@ using Universum.App.Setup;
 using Universum.App.Updates;
 using Universum.Core.Updates;
 using Universum.Core.MkvToolNix;
+using Universum.Core.Shell;
 
 namespace Universum.App.Shell;
 
@@ -116,15 +117,15 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Start-up: MKVToolNix status, a file or folder given on the command line (context menu of the Explorer), then (when
-    /// due) the update check.
+    /// Start-up: MKVToolNix status, the request of the command line (context menu of the Explorer), then (when due) the
+    /// update check.
     /// </summary>
-    public async Task StartAsync(string? path = null)
+    public async Task StartAsync(ShellRequest? request = null)
     {
         await RefreshStatusAsync();
-        if (path is not null)
+        if (request is { Paths.Count: > 0 })
         {
-            await OpenPathAsync(path);
+            await HandleAsync(request);
         }
 
         try
@@ -214,6 +215,68 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>A folder opens in batch processing, a file in the UNIVERSUM rules.</summary>
+    /// <summary>
+    /// A request from the Explorer's context menu. The Explorer starts UNIVERSUM once per selected file; the files of one
+    /// action arriving within a moment are handled together (several files to the multiplexer are asked about once).
+    /// </summary>
+    public async Task HandleAsync(ShellRequest request)
+    {
+        if (request.Paths.Count == 0)
+        {
+            return;
+        }
+
+        if (!_pending.TryGetValue(request.Action, out var paths))
+        {
+            _pending[request.Action] = paths = [];
+            paths.AddRange(request.Paths);
+            await Task.Delay(TimeSpan.FromMilliseconds(700));
+            _pending.Remove(request.Action);
+            await HandleNowAsync(request.Action, paths.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+            return;
+        }
+
+        paths.AddRange(request.Paths);
+    }
+
+    private async Task HandleNowAsync(ShellAction action, IReadOnlyList<string> paths)
+    {
+        switch (action)
+        {
+            case ShellAction.Multiplexer:
+                SelectedTool = Tools.First(t => t.Page == Mux);
+                await Mux.AddFilesAsync(paths.Where(System.IO.File.Exists));
+                break;
+            case ShellAction.Batch:
+                SelectedTool = Tools.First(t => t.Page == Batch);
+                var path = paths[0];
+                if (System.IO.Directory.Exists(path))
+                {
+                    Batch.Folder = path;
+                    await Batch.AnalyzeAsync();
+                }
+                else if (System.IO.File.Exists(path))
+                {
+                    // a file: its folder is analysed and the template made from it
+                    await Batch.TemplateFromFileAsync(path);
+                }
+
+                break;
+            case ShellAction.Single when System.IO.File.Exists(paths[0]):
+                SelectedTool = Tools.First(t => t.Page == Rules);
+                await Rules.LoadAsync(paths[0]);
+                break;
+            case ShellAction.Info when System.IO.File.Exists(paths[0]):
+                await ShowInfoAsync(paths[0]);
+                break;
+            default:
+                await OpenPathAsync(paths[0]);
+                break;
+        }
+    }
+
+    private readonly Dictionary<ShellAction, List<string>> _pending = [];
+
     public async Task OpenPathAsync(string path)
     {
         if (System.IO.Directory.Exists(path))

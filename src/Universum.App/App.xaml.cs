@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using Universum.App.SelfTesting;
 using Universum.App.Setup;
 using Universum.App.Shell;
+using Universum.Core.Shell;
 
 namespace Universum.App;
 
@@ -41,17 +42,36 @@ public partial class App : Application
             return;
         }
 
+        // one UNIVERSUM per user: a second start (each file selected in the Explorer starts one) hands its request over
+        _instance = SingleInstance.TryAcquire();
+        if (_instance is null && SingleInstance.Forward(e.Args, TimeSpan.FromSeconds(5)))
+        {
+            Shutdown(0);
+            return;
+        }
+
         var model = new MainViewModel(services);
         var window = new MainWindow(model);
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
+        _instance?.Listen(args => Dispatcher.InvokeAsync(async () =>
+        {
+            window.BringToFront();
+            await model.HandleAsync(ShellRequest.Parse(args));
+        }));
 
-        // "Otvoriť v UNIVERSUM" from the Explorer passes a file or folder
-        // ("C:\" arrives as C:" because of the backslash before the closing quote)
-        var path = e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal))?.TrimEnd('"');
-        await model.StartAsync(path is { Length: 2 } && path[1] == ':' ? path + "\\" : path);
+        // the context menu of the Explorer: Zlučovanie, Hromadné spracovanie, Single spracovanie, Informácie
+        await model.StartAsync(ShellRequest.Parse(e.Args));
     }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _instance?.Dispose();
+        base.OnExit(e);
+    }
+
+    private SingleInstance? _instance;
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {

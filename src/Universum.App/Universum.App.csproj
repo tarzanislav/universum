@@ -10,6 +10,8 @@
     <SatelliteResourceLanguages>sk</SatelliteResourceLanguages>
     <!-- WPF0001: ThemeMode (Fluent) is marked experimental in WPF -->
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <!-- the UNIVERSUM icon (drawn by tools/icon/make_icon.py): a letter U in deep space with a ring -->
+    <ApplicationIcon>Assets\universum.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -18,6 +20,10 @@
     <!-- official TMDB logo (blue_short) from https://www.themoviedb.org/about/logos-attribution; the PNG is rendered
          from the unchanged SVG because WPF does not draw SVG -->
     <Resource Include="Assets\tmdb-logo.png" />
+    <Resource Include="Assets\universum.ico" />
+    <Resource Include="Assets\universum-256.png" />
+    <!-- icons of the Explorer's context menu items (the installer points the registry at them) -->
+    <Content Include="Assets\menu-*.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Assets\tmdb-logo.svg" />
   </ItemGroup>
   <ItemGroup>

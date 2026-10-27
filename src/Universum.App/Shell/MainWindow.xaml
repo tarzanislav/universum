@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:pages="clr-namespace:Universum.App.Pages"
         xmlns:jobs="clr-namespace:Universum.App.Jobs"
-        Title="UNIVERSUM" Width="1280" Height="820" MinWidth="980" MinHeight="600"
+        Title="UNIVERSUM" Icon="pack://application:,,,/Assets/universum.ico" Width="1280" Height="820" MinWidth="980" MinHeight="600"
         WindowStartupLocation="CenterScreen" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
     <Window.Resources>
         <DataTemplate DataType="{x:Type pages:PlaceholderPageViewModel}">

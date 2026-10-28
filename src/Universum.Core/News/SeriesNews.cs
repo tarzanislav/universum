@@ -76,9 +76,10 @@ public sealed record SeriesPremiereRow(SeriesEpisode First, string Periodicity, 
 
 /// <summary>
 /// The schedule of series episodes from the sources of the settings, day by day: web pages by their rules and TVmaze.
-/// Each day of each source is kept on the disk (6 hours for today and later days, 3 days for past ones), so the
-/// sources are asked only for what is missing; a source that fails is reported and not asked again in this reading.
-/// The same episode from two sources is shown once (the one of the page, with the Czech title and TVmaze's IDs).
+/// Each day of each source is kept on the disk: a day read after it was over is final and never asked again (the
+/// history of Novinky), today is asked again after 6 hours, later days after a day; Obnoviť asks today and later days
+/// at once. A source that fails is reported and not asked again in this reading. The same episode from two sources is
+/// shown once (the one of the page, with the Czech title and TVmaze's IDs).
 /// </summary>
 public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCache cache)
 {
@@ -87,24 +88,38 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
 
     public const int TvMazeDaysAhead = 14;
 
+    /// <summary>
+    /// Web pages (Czech and Slovak channels) are read at least this many days ahead (owner, 28. 10. 2026: premieres there
+    /// are announced weeks before).
+    /// </summary>
+    public const int PageDaysAhead = 30;
+
+    /// <summary>
+    /// The episodes of the days of the enabled sources; <paramref name="offline"/> gives only what is kept, without asking
+    /// the sources (shown at once when a page opens).
+    /// </summary>
     public async Task<SeriesSchedule> ReadAsync(IReadOnlyList<NewsSource> sources, DateOnly today, bool refresh = false,
-        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default, bool offline = false)
     {
         var episodes = new List<SeriesEpisode>();
         var problems = new List<string>();
         foreach (var source in sources.Where(s => s.Enabled && s.Kind is NewsSourceKind.Page or NewsSourceKind.TvMaze))
         {
-            var (back, ahead) = source.Kind == NewsSourceKind.Page && source.Rules is { } rules ? (rules.DaysBack, rules.DaysAhead) : (TvMazeDaysBack, TvMazeDaysAhead);
+            var (back, ahead) = Window(source);
             var days = Enumerable.Range(-back, back + ahead + 1).Select(today.AddDays).ToList();
             try
             {
                 for (var i = 0; i < days.Count; i++)
                 {
                     var day = days[i];
-                    var lifetime = day < today ? TimeSpan.FromDays(3) : TimeSpan.FromHours(6);
-                    if (!refresh && cache.Get(source.Name, day, lifetime) is { } cached)
+                    if (cache.Get(source.Name, day, today, refresh, any: offline) is { } cached)
                     {
                         episodes.AddRange(cached);
+                        continue;
+                    }
+
+                    if (offline)
+                    {
                         continue;
                     }
 
@@ -126,6 +141,19 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
 
         return new SeriesSchedule(Merge(episodes), problems);
     }
+
+    /// <summary>The days before and after today a source is read.</summary>
+    public static (int Back, int Ahead) Window(NewsSource source) =>
+        source.Kind == NewsSourceKind.Page && source.Rules is { } rules
+            ? (rules.DaysBack, Math.Max(rules.DaysAhead, PageDaysAhead))
+            : (TvMazeDaysBack, TvMazeDaysAhead);
+
+    /// <summary>The last day read of the enabled sources of series.</summary>
+    public static DateOnly ReadTo(IReadOnlyList<NewsSource> sources, DateOnly today) =>
+        today.AddDays(sources.Where(s => s.Enabled && s.Kind is NewsSourceKind.Page or NewsSourceKind.TvMaze).Select(s => Window(s).Ahead).DefaultIfEmpty(0).Max());
+
+    /// <summary>All kept episodes aired before a day (the history of Novinky), one entry per episode.</summary>
+    public IReadOnlyList<SeriesEpisode> History(DateOnly before) => Merge(cache.Before(before));
 
     private async Task<IReadOnlyList<SeriesEpisode>> ReadDayAsync(NewsSource source, DateOnly day, CancellationToken cancellationToken)
     {
@@ -186,16 +214,23 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
 
     /// <summary>
     /// The premieres of the schedule with how often the episodes come and how many the season has – from TVmaze (by
-    /// its ID, or the series found by its original name and year), else from the airings in the schedule.
+    /// its ID, or the series found by its original name and year), else from the airings in the schedule. A premiere
+    /// <paramref name="known"/> with its episode count from TVmaze already is not asked again.
     /// </summary>
     public async Task<IReadOnlyList<SeriesPremiereRow>> PremieresAsync(IReadOnlyList<SeriesEpisode> schedule, int maxLookups = 80,
-        IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        IProgress<string>? progress = null, CancellationToken cancellationToken = default, Func<SeriesEpisode, SeriesPremiereRow?>? known = null)
     {
         var rows = new List<SeriesPremiereRow>();
         var premieres = schedule.Where(e => e.IsPremiere && e.Season is not null).ToList();
         var lookups = 0;
         foreach (var premiere in premieres)
         {
+            if (known?.Invoke(premiere) is { EpisodeCount: not null } kept && kept.First.AirDate == premiere.AirDate)
+            {
+                rows.Add(kept with { First = premiere });
+                continue;
+            }
+
             IReadOnlyList<DateOnly> dates = [];
             try
             {
@@ -235,24 +270,43 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
     }
 }
 
-/// <summary>The days read from the sources of news, one file per source and day in a folder of this Windows account.</summary>
+/// <summary>
+/// The days read from the sources of news, one file per source and day in a folder of this Windows account. A day read
+/// after it was over is final: it is kept for good (the history) and never asked again.
+/// </summary>
 public sealed class NewsCache(string folder)
 {
     private static readonly JsonSerializerOptions Options = new();
 
-    public IReadOnlyList<SeriesEpisode>? Get(string source, DateOnly day, TimeSpan lifetime)
+    /// <summary>The next week is asked again after a day, later days after three (schedules far ahead change little).</summary>
+    public static TimeSpan Lifetime(DateOnly day, DateOnly today) =>
+        day <= today ? TimeSpan.FromHours(6) : day <= today.AddDays(7) ? TimeSpan.FromDays(1) : TimeSpan.FromDays(3);
+
+    /// <summary>
+    /// A kept day, or null when it is to be asked: not kept, a past day read before it was over, today or a later day
+    /// read too long ago or when <paramref name="refresh"/> asks for them again. <paramref name="any"/> gives whatever
+    /// is kept (shown at once, before the sources are asked).
+    /// </summary>
+    public IReadOnlyList<SeriesEpisode>? Get(string source, DateOnly day, DateOnly today, bool refresh = false, bool any = false)
     {
         var file = File(source, day);
         try
         {
-            if (!System.IO.File.Exists(file) || DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(file) > lifetime)
+            if (!System.IO.File.Exists(file))
             {
                 return null;
             }
 
-            return JsonSerializer.Deserialize<List<SeriesEpisode>>(System.IO.File.ReadAllBytes(file), Options);
+            var written = System.IO.File.GetLastWriteTime(file);
+            var final = DateOnly.FromDateTime(written) > day;
+            if (!any && !final && (day < today || refresh || DateTime.Now - written > Lifetime(day, today)))
+            {
+                return null;
+            }
+
+            return Read(file);
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             return null;
         }
@@ -262,10 +316,7 @@ public sealed class NewsCache(string folder)
     {
         try
         {
-            var file = File(source, day);
-            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            System.IO.File.WriteAllBytes(file + ".part", JsonSerializer.SerializeToUtf8Bytes(episodes, Options));
-            System.IO.File.Move(file + ".part", file, overwrite: true);
+            Files.WriteAtomically(File(source, day), JsonSerializer.SerializeToUtf8Bytes(episodes, Options));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -273,12 +324,45 @@ public sealed class NewsCache(string folder)
         }
     }
 
-    /// <summary>Removes the kept days (all sources).</summary>
+    /// <summary>The episodes of all kept days before a day, of all sources ever read.</summary>
+    public IEnumerable<SeriesEpisode> Before(DateOnly day)
+    {
+        if (!Directory.Exists(folder))
+        {
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(folder, "*.json", SearchOption.AllDirectories))
+        {
+            if (DateOnly.TryParseExact(Path.GetFileNameWithoutExtension(file), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var kept) && kept < day && Read(file) is { } episodes)
+            {
+                foreach (var episode in episodes)
+                {
+                    yield return episode;
+                }
+            }
+        }
+    }
+
+    /// <summary>Removes the kept days (all sources, the history too).</summary>
     public void Clear()
     {
         if (Directory.Exists(folder))
         {
             Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    private static List<SeriesEpisode>? Read(string file)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<SeriesEpisode>>(System.IO.File.ReadAllBytes(file), Options);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
         }
     }
 

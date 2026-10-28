@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Text;
@@ -39,9 +40,11 @@ public sealed record FilmPremiere
     public double Popularity { get; init; }
 
     /// <summary>The library title by the specification (13.2).</summary>
+    [JsonIgnore]
     public TitleInfo? Title => TitleInfo.FromTmdb(MediaKind.Movie, TmdbId, OriginalTitle, EnglishTitle, Year);
 
     /// <summary>"Original (Year)" as the library names the folder.</summary>
+    [JsonIgnore]
     public string Caption => Title?.FolderName ?? (Year is { } year ? $"{OriginalTitle} ({year})" : OriginalTitle);
 }
 
@@ -78,26 +81,46 @@ public sealed class FilmPremieres(TmdbClient tmdb)
         foreach (var (id, (english, popularity)) in found)
         {
             progress?.Report($"Filmy SK/CZ: {++done} z {found.Count}");
-            if (await DetailsAsync(id, cancellationToken).ConfigureAwait(false) is not { } details)
+            if (await DetailsAsync(id, cancellationToken).ConfigureAwait(false) is { } details && Here(details, english, popularity, from, to) is { } film)
             {
-                continue;
+                films.Add(film);
             }
-
-            // the theatrical premieres here (types 2 and 3) within the dates
-            var here = details.Dates.Where(d => d.Country is "CZ" or "SK" && d.Type is 2 or 3 && d.Date >= from && d.Date <= to)
-                .GroupBy(d => d.Country).Select(g => g.OrderBy(d => d.Date).First()).OrderBy(d => d.Date).ToList();
-            if (here.Count == 0)
-            {
-                continue;
-            }
-
-            var note = here.Count == 1 || here[0].Date == here[1].Date
-                ? string.Join(" · ", here.Select(d => d.Country))
-                : $"{here[0].Country} · {here[1].Country} {here[1].Date.Day}. {here[1].Date.Month}.";
-            films.Add(details.ToPremiere(english, popularity, NewsRegion.Domestic, here[0].Date, note));
         }
 
         return films.OrderBy(f => f.Premiere).ThenByDescending(f => f.Popularity).ToList();
+    }
+
+    /// <summary>
+    /// A kept premiere asked again (the lists give only the most popular films, so a kept film that dropped out of them
+    /// is checked by its own details): its premiere from <paramref name="from"/> on, with fresh VOD and TV dates; null
+    /// when it no longer premieres then (the date moved earlier or was dropped).
+    /// </summary>
+    public async Task<FilmPremiere?> RecheckAsync(FilmPremiere film, DateOnly from, CancellationToken cancellationToken = default)
+    {
+        if (await DetailsAsync(film.TmdbId, cancellationToken).ConfigureAwait(false) is not { } details)
+        {
+            return null;
+        }
+
+        return film.Region == NewsRegion.Domestic
+            ? Here(details, film.EnglishTitle, film.Popularity, from, DateOnly.MaxValue)
+            : details.Release is { } release && release >= from ? details.ToPremiere(film.EnglishTitle, film.Popularity, NewsRegion.World, release, "") : null;
+    }
+
+    // the theatrical premieres here (types 2 and 3) within the dates, the earlier one first
+    private static FilmPremiere? Here(Details details, string english, double popularity, DateOnly from, DateOnly to)
+    {
+        var here = details.Dates.Where(d => d.Country is "CZ" or "SK" && d.Type is 2 or 3 && d.Date >= from && d.Date <= to)
+            .GroupBy(d => d.Country).Select(g => g.OrderBy(d => d.Date).First()).OrderBy(d => d.Date).ToList();
+        if (here.Count == 0)
+        {
+            return null;
+        }
+
+        var note = here.Count == 1 || here[0].Date == here[1].Date
+            ? string.Join(" · ", here.Select(d => d.Country))
+            : $"{here[0].Country} · {here[1].Country} {here[1].Date.Day}. {here[1].Date.Month}.";
+        return details.ToPremiere(english, popularity, NewsRegion.Domestic, here[0].Date, note);
     }
 
     /// <summary>The most popular films whose first release (anywhere) is between the dates.</summary>

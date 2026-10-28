@@ -9,23 +9,31 @@ using Universum.Core.Text;
 namespace Universum.App.Pages;
 
 /// <summary>
-/// Novinky – Seriály: the episodes of running series, Czech and Slovak channels and the world, from the sources of the
-/// settings. Episodes are ticked and sent to processing: the input folder is searched at once – one file goes to Single
-/// spracovanie, several to Hromadné spracovanie (one series at a time; the next series wait here), episodes not there
-/// yet wait in the list "Čaká na súbor" until checked again. Nothing starts by itself.
+/// Novinky – Seriály: the episodes of running series aired in the last week, Czech and Slovak channels and the world,
+/// from the sources of the settings; older episodes are in the history (kept for good). What is kept is shown at once,
+/// the sources are asked only for days not kept or too old. Episodes are ticked and sent to processing: the input folder
+/// is searched at once – one file goes to Single spracovanie, several to Hromadné spracovanie (one series at a time; the
+/// next series wait here), episodes not there yet wait in the list "Čaká na súbor" until checked again. Series are
+/// marked (Vybrané, a note) as in Premiéry. Nothing starts by itself.
 /// </summary>
 public sealed class SeriesNewsPageViewModel : ObservableObject
 {
+    /// <summary>The episodes of this many days back (and today) are the news; older ones are the history.</summary>
+    public const int RecentDays = 7;
+
     private readonly AppServices _services;
     private readonly TitleOpener _opener;
     private List<SeriesEpisode> _all = [];
+    private List<SeriesEpisode>? _history;
     private NewsTabItem _selected;
     private string _filter = "";
-    private bool _showUpcoming;
+    private bool _showHistory;
+    private bool _onlyChosen;
     private bool _onlyMyLists;
     private string _status = "";
     private string _problems = "";
     private bool _busy;
+    private bool _shownKept;
     private CancellationTokenSource? _work;
     private DateTime? _readAt;
 
@@ -43,12 +51,37 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         StopCommand = new RelayCommand(() => _work?.Cancel(), () => Busy);
         SendCommand = new AsyncRelayCommand(SendAsync, () => !Busy && Checked.Any());
         CheckAgainCommand = new AsyncRelayCommand(CheckAgainAsync, () => !Busy && Waiting.Count > 0);
-        services.NewsSourcesChanged += () => _readAt = null;
+        services.NewsSourcesChanged += () =>
+        {
+            _readAt = null;
+            OnPropertyChanged(nameof(Attribution));
+            Show();
+        };
+        services.NewsCleared += () =>
+        {
+            _readAt = null;
+            _history = null;
+            _shownKept = false;
+        };
         services.InputDirectoryChanged += () =>
         {
             if (Status == NoInputFolder && services.InputDirectory is not null)
             {
                 Status = "Vstupný priečinok je nastavený – epizódy môžete odoslať.";
+            }
+        };
+        services.Marks.Changed += key =>
+        {
+            foreach (var row in Tabs.SelectMany(t => t.All).Where(r => r.MarkKey == key))
+            {
+                row.MarkChanged();
+            }
+        };
+        services.PostersChanged += () =>
+        {
+            foreach (var row in Tabs.SelectMany(t => t.All))
+            {
+                row.Poster.Reset();
             }
         };
     }
@@ -64,35 +97,77 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         get => _selected;
         set
         {
-            if (value is not null)
+            if (value is not null && SetProperty(ref _selected, value))
             {
-                SetProperty(ref _selected, value);
+                OnPropertyChanged(nameof(EmptyText));
+                OnPropertyChanged(nameof(IsEmpty));
             }
         }
     }
 
-    /// <summary>Only the series whose name (Czech or original) contains this, without diacritics.</summary>
+    /// <summary>Only the series whose name (Czech or original), channel or note contains this, without diacritics.</summary>
     public string Filter
     {
         get => _filter;
         set
         {
-            if (SetProperty(ref _filter, value))
+            if (SetProperty(ref _filter, value ?? ""))
             {
                 Show();
             }
         }
     }
 
-    /// <summary>Also the episodes still to come (by default only aired ones – they can be in the input folder).</summary>
-    public bool ShowUpcoming
+    /// <summary>The news: episodes of the last week (the latest first).</summary>
+    public bool ShowRecent
     {
-        get => _showUpcoming;
+        get => !_showHistory;
+        set => ShowHistory = !value;
+    }
+
+    /// <summary>The history: older episodes (kept for good, the latest first).</summary>
+    public bool ShowHistory
+    {
+        get => _showHistory;
         set
         {
-            if (SetProperty(ref _showUpcoming, value))
+            if (SetProperty(ref _showHistory, value))
+            {
+                OnPropertyChanged(nameof(ShowRecent));
+                if (value && _history is null)
+                {
+                    _ = LoadHistoryAsync();
+                }
+
+                Build();
+            }
+        }
+    }
+
+    /// <summary>Only the series the user chose (Vybrané).</summary>
+    public bool OnlyChosen
+    {
+        get => _onlyChosen;
+        set
+        {
+            if (SetProperty(ref _onlyChosen, value))
             {
                 Show();
+            }
+        }
+    }
+
+    /// <summary>Posters of the series beside the titles (kept in the settings).</summary>
+    public bool ShowPosters
+    {
+        get => _services.Settings.NewsPosters;
+        set
+        {
+            if (_services.Settings.NewsPosters != value)
+            {
+                _services.Settings.NewsPosters = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
             }
         }
     }
@@ -111,6 +186,20 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     }
 
     public bool HasMyLists => _services.HistraListStore.Load().Any(l => l.Items.Any(i => i.Kind == MediaKind.Series));
+
+    /// <summary>A web page with Czech and Slovak channels is among the sources (else the CZ/SK tab stays empty).</summary>
+    public bool HasDomesticSource => _services.NewsSources.Any(s => s.Enabled && s.Kind == NewsSourceKind.Page);
+
+    /// <summary>Why the chosen table is empty.</summary>
+    public string EmptyText =>
+        SelectedTab.Region == NewsRegion.Domestic && !HasDomesticSource
+            ? "České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja)."
+            : OnlyChosen ? "Žiadne vybrané seriály – výber zaškrtnete v stĺpci Vybrané."
+            : Filter.Length > 0 || OnlyMyLists ? "Nič nezodpovedá hľadaniu."
+            : ShowHistory ? (_history is null ? "Načítavam históriu…" : "História je zatiaľ prázdna – epizódy sem prechádzajú po týždni.")
+            : Busy ? "Načítavam…" : "Žiadne nové epizódy – skúste Obnoviť.";
+
+    public bool IsEmpty => SelectedTab.Rows.Count == 0;
 
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
 
@@ -136,6 +225,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             if (SetProperty(ref _busy, value))
             {
                 RefreshCommands();
+                OnPropertyChanged(nameof(EmptyText));
             }
         }
     }
@@ -173,14 +263,26 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     /// <summary>Reading when the page is shown (the self-test switches it off).</summary>
     public static bool AutoLoad { get; set; } = true;
 
-    private IEnumerable<NewsEpisodeRow> Checked => Tabs.SelectMany(t => t.All).Where(r => r.IsChecked);
+    private IEnumerable<NewsEpisodeRow> Checked => Tabs.SelectMany(t => t.All).SelectMany(s => s.Episodes).Where(r => r.IsChecked);
 
-    public void Shown()
+    /// <summary>The page was opened: what is kept at once, then the sources for what is missing or too old.</summary>
+    public async void Shown()
     {
         OnPropertyChanged(nameof(HasMyLists));
+        if (!_shownKept && !Busy)
+        {
+            _shownKept = true;
+            var kept = await _services.SeriesNews.ReadAsync(_services.NewsSources, DateOnly.FromDateTime(DateTime.Now), offline: true);
+            if (_readAt is null && !Busy)
+            {
+                _all = kept.Episodes.ToList();
+                Build();
+            }
+        }
+
         if (AutoLoad && !Busy && (_readAt is null || DateTime.Now - _readAt > TimeSpan.FromHours(6)))
         {
-            _ = LoadAsync(refresh: false);
+            await LoadAsync(refresh: false);
         }
     }
 
@@ -206,15 +308,10 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             var schedule = await _services.SeriesNews.ReadAsync(_services.NewsSources, today, refresh, progress, work.Token);
             _all = schedule.Episodes.ToList();
             Problems = string.Join("\n", schedule.Problems);
-            foreach (var tab in Tabs)
-            {
-                tab.Set(_all.Where(e => e.Region == tab.Region).OrderByDescending(e => e.AirDate).ThenBy(e => e.Caption, StringComparer.CurrentCulture)
-                    .Select(e => new NewsEpisodeRow(e, this, today)));
-            }
-
-            Show();
+            Build();
             _readAt = DateTime.Now;
-            Status = $"Načítané {DateTime.Now:d. M. yyyy H:mm}: {Texts.Count(_all.Count, "epizóda", "epizódy", "epizód")}.";
+            var recent = _all.Count(e => e.AirDate <= today && e.AirDate >= today.AddDays(-RecentDays));
+            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm}: {Texts.Count(recent, "epizóda", "epizódy", "epizód")} za posledný týždeň · staršie sú v Histórii.";
         }
         catch (OperationCanceledException)
         {
@@ -227,6 +324,15 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             _work = null;
             Busy = false;
         }
+    }
+
+    /// <summary>Reads the history (all kept days before the last week) – once, when it is first shown.</summary>
+    public async Task LoadHistoryAsync()
+    {
+        var before = DateOnly.FromDateTime(DateTime.Now).AddDays(-RecentDays);
+        var news = _services.SeriesNews;
+        _history = (await Task.Run(() => news.History(before))).ToList();
+        Build();
     }
 
     /// <summary>
@@ -362,11 +468,14 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         RefreshCommands();
     }
 
-    internal void CheckedChanged()
+    internal void CheckedChanged(NewsEpisodeRow row)
     {
+        row.Series?.CheckedChanged();
         OnPropertyChanged(nameof(SendText));
         SendCommand.NotifyCanExecuteChanged();
     }
+
+    internal AppServices Services => _services;
 
     internal async Task OpenAsync(Func<TitleOpener, Task<string?>> open)
     {
@@ -376,11 +485,36 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         }
     }
 
+    // the series of the tabs (alphabetically) with their episodes of the view: the last week and the coming days, or the
+    // history; ticks and opened series stay
+    private void Build()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var from = today.AddDays(-RecentDays);
+        var episodes = SeriesNews.Merge(ShowHistory
+            ? (_history ?? []).Concat(_all.Where(e => e.AirDate < from))
+            : _all.Where(e => e.AirDate >= from));
+        foreach (var tab in Tabs)
+        {
+            var oldSeries = tab.All.ToDictionary(r => r.MarkKey, StringComparer.Ordinal);
+            var oldEpisodes = tab.All.SelectMany(r => r.Episodes).DistinctBy(r => r.Episode).ToDictionary(r => r.Episode);
+            tab.Set(episodes.Where(e => e.Region == tab.Region)
+                .GroupBy(MarkStore.Series)
+                .Select(g => new NewsSeriesRow(g.Key, g.OrderBy(e => e.AirDate).Select(e => oldEpisodes.GetValueOrDefault(e) ?? new NewsEpisodeRow(e, this)).ToList(), this)
+                {
+                    IsExpanded = oldSeries.TryGetValue(g.Key, out var old) && old.IsExpanded,
+                })
+                .OrderBy(r => r.Caption, StringComparer.Create(Texts.Slovak, ignoreCase: true)));
+        }
+
+        Show();
+        RefreshCommands();
+    }
+
     // the rows of the tabs by the filters
     private void Show()
     {
         var wanted = Words.Normalize(Filter);
-        var today = DateOnly.FromDateTime(DateTime.Now);
         HashSet<string>? mine = null;
         if (OnlyMyLists)
         {
@@ -390,10 +524,14 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 
         foreach (var tab in Tabs)
         {
-            tab.Show(r => (ShowUpcoming || r.Episode.AirDate <= today) &&
+            tab.Show(r => (!OnlyChosen || r.IsChosen) &&
                           (wanted.Length == 0 || r.Search.Contains(wanted, StringComparison.Ordinal)) &&
-                          (mine is null || mine.Contains(Words.Normalize(r.Episode.OriginalTitle)) || mine.Contains(Words.Normalize(r.Episode.Title))));
+                          (mine is null || mine.Contains(Words.Normalize(r.First.OriginalTitle)) || mine.Contains(Words.Normalize(r.First.Title))));
         }
+
+        OnPropertyChanged(nameof(EmptyText));
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(HasDomesticSource));
     }
 
     private void RefreshCommands()
@@ -411,15 +549,15 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 /// <summary>A tab of Novinky – Seriály.</summary>
 public sealed class NewsTabItem : ObservableObject
 {
-    private List<NewsEpisodeRow> _all = [];
+    private List<NewsSeriesRow> _all = [];
 
     public NewsTabItem(NewsRegion region, string title, Color color)
     {
         Region = region;
         Title = title;
-        Accent = Frozen(color);
-        Tint = Frozen(Color.FromArgb(0x30, color.R, color.G, color.B));
-        Stripe = Frozen(Color.FromArgb(0x14, color.R, color.G, color.B));
+        Accent = PremiereTabItem.Frozen(color);
+        Tint = PremiereTabItem.Frozen(Color.FromArgb(0x30, color.R, color.G, color.B));
+        Stripe = PremiereTabItem.Frozen(Color.FromArgb(0x10, color.R, color.G, color.B));
     }
 
     public NewsRegion Region { get; }
@@ -432,15 +570,17 @@ public sealed class NewsTabItem : ObservableObject
 
     public Brush Stripe { get; }
 
-    public IReadOnlyList<NewsEpisodeRow> All => _all;
+    /// <summary>All series of the view.</summary>
+    public IReadOnlyList<NewsSeriesRow> All => _all;
 
-    public ObservableCollection<NewsEpisodeRow> Rows { get; } = [];
+    /// <summary>The series shown.</summary>
+    public ObservableCollection<NewsSeriesRow> Rows { get; } = [];
 
     public string CountText => Rows.Count.ToString(Texts.Slovak);
 
-    internal void Set(IEnumerable<NewsEpisodeRow> rows) => _all = rows.ToList();
+    internal void Set(IEnumerable<NewsSeriesRow> rows) => _all = rows.ToList();
 
-    internal void Show(Func<NewsEpisodeRow, bool> visible)
+    internal void Show(Func<NewsSeriesRow, bool> visible)
     {
         Rows.Clear();
         foreach (var row in _all.Where(visible))
@@ -450,45 +590,156 @@ public sealed class NewsTabItem : ObservableObject
 
         OnPropertyChanged(nameof(CountText));
     }
+}
 
-    private static SolidColorBrush Frozen(Color color)
+/// <summary>
+/// A series in Novinky – Seriály: its nearest episode (the next one to come, else the last one aired), the mark of the
+/// series (Vybrané, a note) and, opened, the tree of its episodes. Its tick ticks all its aired episodes for processing.
+/// </summary>
+public sealed class NewsSeriesRow : MarkedRow
+{
+    private readonly string _search;
+    private bool _expanded;
+
+    public NewsSeriesRow(string markKey, IReadOnlyList<NewsEpisodeRow> episodes, SeriesNewsPageViewModel page)
+        : base(page.Services.Marks, markKey)
     {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
+        Episodes = episodes;
+        foreach (var episode in episodes)
+        {
+            episode.Series = this;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        Nearest = episodes.FirstOrDefault(e => e.Episode.AirDate >= today) ?? episodes[^1];
+        First = Nearest.Episode;
+        var first = First;
+        _search = Words.Normalize(string.Join(" ", episodes.Select(e => $"{e.Episode.Title} {e.Episode.OriginalTitle} {e.Episode.Channel}").Distinct()));
+        Poster = new PosterThumb(page.Services, () => page.Services.SeriesLookup.PosterAsync(first), PosterSize.Small);
+        ToggleCommand = new RelayCommand(() => IsExpanded = !IsExpanded);
+        OpenTmdbCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesTmdbAsync(first)));
+        OpenHistraCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesHistraAsync(first)));
+        OpenSourceCommand = new RelayCommand(() =>
+        {
+            if (Uri.TryCreate(episodes.Select(e => e.Episode.Link).LastOrDefault(l => l is not null), UriKind.Absolute, out var link))
+            {
+                Browser.Open(link);
+            }
+        }, () => HasSource);
+    }
+
+    /// <summary>The episodes of the view, the earliest first.</summary>
+    public IReadOnlyList<NewsEpisodeRow> Episodes { get; }
+
+    /// <summary>The next episode to come, else the last one aired.</summary>
+    public NewsEpisodeRow Nearest { get; }
+
+    /// <summary>The episode the series is named by (the nearest one).</summary>
+    public SeriesEpisode First { get; }
+
+    /// <summary>The poster of the whole series (found on TMDB when first shown).</summary>
+    public PosterThumb Poster { get; }
+
+    internal string Search => _search + " " + Words.Normalize(Note);
+
+    public bool IsExpanded
+    {
+        get => _expanded;
+        set
+        {
+            if (SetProperty(ref _expanded, value))
+            {
+                OnPropertyChanged(nameof(ExpandGlyph));
+            }
+        }
+    }
+
+    /// <summary>▸ closed, ▾ opened (Segoe Fluent Icons).</summary>
+    public string ExpandGlyph => IsExpanded ? "\uE70D" : "\uE76C";
+
+    public string Caption => First.Caption;
+
+    public string LocalTitle => First.Title != First.OriginalTitle ? First.Title : "";
+
+    public string Production => Nearest.Production;
+
+    public string NearestCode => Nearest.Code;
+
+    public string NearestNote => string.Join(" · ", new[] { Nearest.Mark, Texts.Count(Episodes.Count, "epizóda", "epizódy", "epizód") }.Where(t => t.Length > 0));
+
+    public string Day => Nearest.Day;
+
+    public string Date => Nearest.Date;
+
+    public string When => Nearest.When;
+
+    public DateOnly SortDate => Nearest.Episode.AirDate;
+
+    public bool IsToday => Nearest.IsToday;
+
+    public bool HasSource => Episodes.Any(e => e.Episode.Link is not null);
+
+    /// <summary>Aired episodes with a number – they can be sent to processing.</summary>
+    public bool CanCheck => Episodes.Any(e => e.CanCheck);
+
+    /// <summary>All aired episodes are ticked; setting it ticks or unticks them all.</summary>
+    public bool IsChecked
+    {
+        get => CanCheck && Episodes.Where(e => e.CanCheck).All(e => e.IsChecked);
+        set
+        {
+            foreach (var episode in Episodes.Where(e => e.CanCheck))
+            {
+                episode.IsChecked = value;
+            }
+        }
+    }
+
+    /// <summary>"2/3" ticked of the aired ones; empty when none is ticked.</summary>
+    public string CheckedText
+    {
+        get
+        {
+            var aired = Episodes.Count(e => e.CanCheck);
+            var ticked = Episodes.Count(e => e.IsChecked);
+            return ticked == 0 ? "" : $"{ticked}/{aired}";
+        }
+    }
+
+    public RelayCommand ToggleCommand { get; }
+
+    public AsyncRelayCommand OpenTmdbCommand { get; }
+
+    public AsyncRelayCommand OpenHistraCommand { get; }
+
+    public RelayCommand OpenSourceCommand { get; }
+
+    internal void CheckedChanged()
+    {
+        OnPropertyChanged(nameof(IsChecked));
+        OnPropertyChanged(nameof(CheckedText));
     }
 }
 
-/// <summary>An episode in Novinky – Seriály, with its tick for processing.</summary>
+/// <summary>An episode in the tree of a series, with its tick for processing (only aired episodes can be ticked).</summary>
 public sealed class NewsEpisodeRow : ObservableObject
 {
     private readonly SeriesNewsPageViewModel _page;
     private bool _isChecked;
 
-    public NewsEpisodeRow(SeriesEpisode episode, SeriesNewsPageViewModel page, DateOnly today)
+    public NewsEpisodeRow(SeriesEpisode episode, SeriesNewsPageViewModel page)
     {
         Episode = episode;
         _page = page;
-        IsToday = episode.AirDate == today;
-        IsFuture = episode.AirDate > today;
-        Search = Words.Normalize($"{episode.Title} {episode.OriginalTitle} {episode.Channel}");
-        OpenTmdbCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenTmdbAsync(MediaKind.Series, null, episode.OriginalTitle, episode.Year)));
-        OpenHistraCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenHistraAsync(MediaKind.Series, null, episode.OriginalTitle, episode.Year)));
-        OpenSourceCommand = new RelayCommand(() =>
-        {
-            if (Uri.TryCreate(episode.Link, UriKind.Absolute, out var link))
-            {
-                Browser.Open(link);
-            }
-        }, () => episode.Link is not null);
     }
 
     public SeriesEpisode Episode { get; }
 
-    internal string Search { get; }
+    /// <summary>The series the episode is shown under.</summary>
+    public NewsSeriesRow? Series { get; internal set; }
 
-    /// <summary>Only an episode with a number can be found in the input folder.</summary>
-    public bool CanCheck => Episode.Code.Length > 0;
+    /// <summary>Only an aired episode with a number can be found in the input folder.</summary>
+    public bool CanCheck => Episode.Code.Length > 0 && Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now);
 
     public bool IsChecked
     {
@@ -497,14 +748,12 @@ public sealed class NewsEpisodeRow : ObservableObject
         {
             if (SetProperty(ref _isChecked, value && CanCheck))
             {
-                _page.CheckedChanged();
+                _page.CheckedChanged(this);
             }
         }
     }
 
     public string Caption => Episode.Caption;
-
-    public string LocalTitle => Episode.Title != Episode.OriginalTitle ? Episode.Title : "";
 
     public string Production => string.Join(" · ", new[] { Episode.Channel, Episode.Country.Length > 0 ? CountryNames.Name(Episode.Country) : "" }.Where(p => p.Length > 0));
 
@@ -523,15 +772,27 @@ public sealed class NewsEpisodeRow : ObservableObject
 
     public DateOnly SortDate => Episode.AirDate;
 
-    public bool IsToday { get; }
+    public bool IsToday => Episode.AirDate == DateOnly.FromDateTime(DateTime.Now);
 
-    public bool IsFuture { get; }
+    /// <summary>"DNES", "zajtra", "o 3 dni", "včera", "pred 3 dňami".</summary>
+    public string When
+    {
+        get
+        {
+            var days = Episode.AirDate.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
+            return days switch
+            {
+                0 => "DNES",
+                1 => "zajtra",
+                -1 => "včera",
+                > 1 => $"o {Texts.Count(days, "deň", "dni", "dní")}",
+                _ => $"pred {-days} dňami",
+            };
+        }
+    }
 
-    public AsyncRelayCommand OpenTmdbCommand { get; }
-
-    public AsyncRelayCommand OpenHistraCommand { get; }
-
-    public RelayCommand OpenSourceCommand { get; }
+    /// <summary>"odvysielaná" or "nadchádzajúca".</summary>
+    public string State => Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? "odvysielaná" : "nadchádzajúca";
 }
 
 /// <summary>An episode sent to processing that is not in the input folder yet.</summary>

@@ -276,6 +276,38 @@ public sealed class AppServices
     /// <summary>The self-test's stand-in film premieres.</summary>
     public Universum.Core.News.FilmPremieres? FilmsForSelfTest { get; set; }
 
+    /// <summary>The series of the news found on TMDB (ID and poster); null without TMDB.</summary>
+    public Universum.Core.News.SeriesTmdb? SeriesTmdb => SeriesTmdbForSelfTest ?? (Tmdb is { } tmdb ? new Universum.Core.News.SeriesTmdb(tmdb) : null);
+
+    /// <summary>The self-test's stand-in series search.</summary>
+    public Universum.Core.News.SeriesTmdb? SeriesTmdbForSelfTest { get; set; }
+
+    /// <summary>The series of the news looked up on TMDB in this run (each once).</summary>
+    public Pages.SeriesLookup SeriesLookup => _seriesLookup ??= new Pages.SeriesLookup(this);
+
+    private Pages.SeriesLookup? _seriesLookup;
+
+    /// <summary>The premieres kept between starts (the history too).</summary>
+    public Universum.Core.News.PremiereStore PremiereStore => _premiereStore ??= new Universum.Core.News.PremiereStore(AppSettings.PremieresFile);
+
+    private Universum.Core.News.PremiereStore? _premiereStore;
+
+    /// <summary>The user's marks of titles (chosen, notes) in Premiéry and Novinky.</summary>
+    public Universum.Core.News.MarkStore Marks => _marks ??= new Universum.Core.News.MarkStore(AppSettings.MarksFile);
+
+    private Universum.Core.News.MarkStore? _marks;
+
+    /// <summary>Forgets the kept premieres and days of news (the history too); the marks stay.</summary>
+    public void ClearNews()
+    {
+        NewsCache.Clear();
+        PremiereStore.Clear();
+        NewsCleared?.Invoke();
+    }
+
+    /// <summary>Raised when the kept premieres and news were forgotten.</summary>
+    public event Action? NewsCleared;
+
     /// <summary>The sources of news of the settings (TVmaze and TMDB in a new installation).</summary>
     public IReadOnlyList<Universum.Core.News.NewsSource> NewsSources => Settings.NewsSources ?? Universum.Core.News.NewsSource.Defaults;
 
@@ -421,6 +453,12 @@ public sealed class AppSettings
     /// <summary>The server posters come from; null = TMDB's image server (HISTRA gives poster paths in TMDB's form).</summary>
     public string? PosterServer { get; set; }
 
+    /// <summary>Premiéry show posters.</summary>
+    public bool PremierePosters { get; set; } = true;
+
+    /// <summary>Novinky – Seriály show posters (of the whole series).</summary>
+    public bool NewsPosters { get; set; } = true;
+
     /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
     public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }
 
@@ -447,6 +485,12 @@ public sealed class AppSettings
 
     /// <summary>The days read from the sources of news.</summary>
     public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");
+
+    /// <summary>The premieres read so far (the history of Premiéry).</summary>
+    public static string PremieresFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "premieres.json");
+
+    /// <summary>The user's marks of titles (chosen, notes).</summary>
+    public static string MarksFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news-marks.json");
 
     /// <summary>The HISTRA lists imported into UNIVERSUM.</summary>
     public static string HistraListsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "histra-lists.json");

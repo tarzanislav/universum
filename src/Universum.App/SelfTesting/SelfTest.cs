@@ -765,6 +765,14 @@ internal static class SelfTest
         Check(page.Lists[0].Visible.Count == HistraListRow.Collapsed && page.Lists[0].ExpandText.StartsWith("Zobraziť všetky (30)", StringComparison.Ordinal),
             "lists: the first posters, then Zobraziť všetky – " + page.Lists[0].ExpandText);
         Check(File.Exists(AppSettings.HistraListsFile), "lists: kept in a file of this account");
+        var second = page.Lists[1];
+        Check(!page.Lists[0].MoveUpCommand.CanExecute(null) && page.Lists[0].MoveDownCommand.CanExecute(null) && !second.MoveDownCommand.CanExecute(null),
+            "lists: the arrows at the ends of the order");
+        second.MoveUpCommand.Execute(null);
+        Check(page.Lists[0] == second && new HistraListsPageViewModel(services).Lists[0].Name == second.Name && second.MoveDownCommand.CanExecute(null),
+            "lists: moved up, the order kept for the next start – " + page.Status);
+        page.MoveTo(second, 1);
+        Check(page.Lists[1] == second, "lists: moved back (as when dragged with the mouse)");
 
         page.Filter = "pribeh 2";
         Check(page.Lists[0].Visible.Count == 9 && page.Lists[0].FilterResult == "Zhoda: 9", "lists: search without diacritics – " + page.Lists[0].FilterResult);
@@ -817,7 +825,9 @@ internal static class SelfTest
         var cache = Path.Combine(_outputDirectory, "news-cache");
         Core.News.WebPageClient.PagesPerSecond = 1000;
         services.SeriesNewsForSelfTest = new Core.News.SeriesNews(new Core.News.WebPageClient(http), new Core.News.TvMazeClient(http, new RequestPacer(1000)), new Core.News.NewsCache(cache));
-        services.FilmsForSelfTest = new Core.News.FilmPremieres(new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000)));
+        var tmdb = new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000));
+        services.FilmsForSelfTest = new Core.News.FilmPremieres(tmdb);
+        services.SeriesTmdbForSelfTest = new Core.News.SeriesTmdb(tmdb);
         services.PostersForSelfTest = new PosterCache(http, Path.Combine(_outputDirectory, "posters"), PosterCache.DefaultServer);
 
         var rulesFile = Path.Combine(_outputDirectory, "vymysleny-zdroj.json");
@@ -840,11 +850,12 @@ internal static class SelfTest
         var domesticSeries = page.Tab(PremiereTab.SeriesDomestic).Rows.OfType<PremiereSeriesRow>().ToList();
         var worldSeries = page.Tab(PremiereTab.SeriesWorld).Rows.OfType<PremiereSeriesRow>().ToList();
         Check(!page.HasProblems, "premieres: all sources read – " + page.Problems);
-        Check(films.Count == 2 && films[0].IsToday && films[1].Caption == $"The Invented Premiere ({FakeNews.Day(3).Year})" &&
+        Check(films.Count == 2 && films[0].IsToday && films[0].When == "DNES" && films[1].Caption == $"The Invented Premiere ({FakeNews.Day(3).Year})" &&
               films[1].Where == $"CZ · SK {FakeNews.Day(4).Day}. {FakeNews.Day(4).Month}." && films[1].Availability.StartsWith("VOD ", StringComparison.Ordinal) &&
-              films[1].Production == "USA, VB · Invented Pictures",
-            "premieres: films in Czech and Slovak cinemas – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.Where} {f.Production} {f.Availability}")));
-        Check(world.Count == 2 && world[0].IsPast, "premieres: films of the world – " + string.Join(" | ", world.Select(f => $"{f.Caption} {f.Date}")));
+              films[1].Production == "USA, VB · Invented Pictures" && films[1].When == "o 3 dni",
+            "premieres: films in Czech and Slovak cinemas, the nearest first – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.When} {f.Where} {f.Production} {f.Availability}")));
+        Check(world.Count == 1 && world[0].Caption.StartsWith("Later Invented Film", StringComparison.Ordinal),
+            "premieres: only coming films of the world, the past one is in the history – " + string.Join(" | ", world.Select(f => $"{f.Caption} {f.Date}")));
         Check(domesticSeries.Count == 1 && domesticSeries[0].Caption == "Invented Show (2026)" && domesticSeries[0].LocalTitle == "Vymyslený seriál" &&
               domesticSeries[0].Production == "ČT1" && domesticSeries[0].Periodicity == "denne (po–pi)" && domesticSeries[0].Episodes == "10 epizód",
             "premieres: a new series on a Czech channel, its rhythm from TVmaze – " +
@@ -852,27 +863,61 @@ internal static class SelfTest
         Check(worldSeries.Count == 3 && worldSeries.Any(r => r.Caption == "Invented Stream (2024)" && r.What.StartsWith("3. séria", StringComparison.Ordinal) &&
                                                             r.Periodicity.StartsWith("týždenne", StringComparison.Ordinal) && r.Episodes == "8 epizód"),
             "premieres: new series and seasons of the world – " + string.Join(" | ", worldSeries.Select(r => $"{r.Caption} {r.Production} {r.What} {r.Periodicity} {r.Episodes}")));
-        Check(news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)) == 4 &&
+        var pages = news.Requests.Where(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)).ToList();
+        Check(pages.Count == 1 + Core.News.SeriesNews.PageDaysAhead + 1 && pages.Distinct().Count() == pages.Count &&
               news.Requests.IndexOf("https://rozpis.example/robots.txt") < news.Requests.FindIndex(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)),
-            "premieres: robots.txt first, then only the days of the window – " + string.Join(" | ", news.Requests.Where(r => r.Contains("rozpis", StringComparison.Ordinal))));
+            $"premieres: robots.txt first, then each day of the window once – Czech channels {Core.News.SeriesNews.PageDaysAhead} days ahead ({pages.Count} days)");
         Check(news.Requests.All(r => r.StartsWith("https://", StringComparison.Ordinal) &&
                                      new Uri(r).Host is "rozpis.example" or "api.tvmaze.com" or "api.themoviedb.org" or "image.tmdb.org"),
             "premieres: only the sources were asked");
         Check(news.UserAgents.All(a => a.StartsWith("UNIVERSUM/", StringComparison.Ordinal)), "premieres: UNIVERSUM introduces itself to the pages");
 
+        // marks: chosen and a note, kept; only the chosen ones
+        films[1].IsChosen = true;
+        films[1].Note = "  teším sa  ";
+        page.OnlyChosen = true;
+        Check(page.Tab(PremiereTab.FilmDomestic).Rows.Count == 1 && page.Tab(PremiereTab.FilmDomestic).Rows[0] == films[1] &&
+              services.Marks.Get(Core.News.MarkStore.Film(films[1].Film.TmdbId)) == new Core.News.TitleMark(true, "teším sa"),
+            "premieres: Zobraziť vybrané shows only the chosen film, its note kept");
+        page.OnlyChosen = false;
+        page.Filter = "teSim";
+        Check(page.Tab(PremiereTab.FilmDomestic).Rows.Count == 1, "premieres: the note is searched too");
+        page.Filter = "";
+
         page.SelectedTab = page.Tab(PremiereTab.FilmDomestic);
         await WaitFor(() => films.All(f => f.Poster.Image is not null));
         await Screenshot(window, "premieres-films.png");
         page.SelectedTab = page.Tab(PremiereTab.SeriesWorld);
+        await WaitFor(() => worldSeries.All(r => r.Poster.Image is not null));
+        Check(worldSeries.All(r => r.Poster.Image is not null), "premieres: posters of the series found on TMDB");
         await Screenshot(window, "premieres-series.png");
+        page.ShowPosters = false;
+        Check(!services.Settings.PremierePosters, "premieres: posters can be hidden (kept in the settings)");
+        await Screenshot(window, "premieres-series-noposters.png");
+        page.ShowPosters = true;
+
+        page.ShowHistory = true;
+        page.SelectedTab = page.Tab(PremiereTab.FilmWorld);
+        Check(page.SelectedTab.Rows.Count == 1 && page.SelectedTab.Rows[0] is PremiereFilmRow { Caption: var past } && past.StartsWith("World Invented Film", StringComparison.Ordinal),
+            "premieres: the film that is over is in the history");
+        await Screenshot(window, "premieres-history.png");
+        page.ShowHistory = false;
 
         int Days() => news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal) || r.Contains("/schedule", StringComparison.Ordinal));
         var asked = Days();
         await page.LoadAsync(refresh: false);
         Check(Days() == asked, $"premieres: the kept days are used again without asking the sources ({asked} → {Days()})");
 
+        var requests = news.Requests.Count;
+        var again = new PremieresPageViewModel(services);
+        again.Shown();
+        Check(news.Requests.Count == requests && again.Tab(PremiereTab.FilmDomestic).Rows.Count == 2 && again.Tab(PremiereTab.SeriesWorld).Rows.Count == 3 &&
+              again.Status.StartsWith("Uložené premiéry z", StringComparison.Ordinal) && File.Exists(AppSettings.PremieresFile),
+            "premieres: kept for the next start and shown at once, without asking the sources – " + again.Status);
+
         services.SeriesNewsForSelfTest = null;
         services.FilmsForSelfTest = null;
+        services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
     }
@@ -886,8 +931,16 @@ internal static class SelfTest
     {
         var news = new FakeNews();
         var http = new System.Net.Http.HttpClient(news);
-        services.SeriesNewsForSelfTest = new Core.News.SeriesNews(new Core.News.WebPageClient(http), new Core.News.TvMazeClient(http, new RequestPacer(1000)),
-            new Core.News.NewsCache(Path.Combine(_outputDirectory, "news-cache-2")));
+        // an old day kept from earlier: the history
+        var cache = new Core.News.NewsCache(Path.Combine(_outputDirectory, "news-cache-2"));
+        cache.Put("Vymyslený rozpis", FakeNews.Day(-20), [new Core.News.SeriesEpisode
+        {
+            Source = "Vymyslený rozpis", Region = Core.News.NewsRegion.Domestic, Title = "Starý seriál", OriginalTitle = "Starý seriál", Year = 2019,
+            Season = 2, Number = 5, AirDate = FakeNews.Day(-20), Channel = "Nova",
+        }]);
+        services.SeriesNewsForSelfTest = new Core.News.SeriesNews(new Core.News.WebPageClient(http), new Core.News.TvMazeClient(http, new RequestPacer(1000)), cache);
+        services.SeriesTmdbForSelfTest = new Core.News.SeriesTmdb(new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000)));
+        services.PostersForSelfTest = new PosterCache(http, Path.Combine(_outputDirectory, "posters"), PosterCache.DefaultServer);
         services.SetNewsSources([.. Core.News.NewsSource.Defaults, new Core.News.NewsSource
         {
             Name = "Vymyslený rozpis", Kind = Core.News.NewsSourceKind.Page, Rules = Core.News.PageRules.Load(FakeNews.Rules),
@@ -908,17 +961,19 @@ internal static class SelfTest
         model.Open(page);
         await page.LoadAsync(refresh: true);
         var domestic = page.Tabs[0];
-        Check(!page.HasProblems && domestic.Rows.Any(r => r.Caption == "Invented Show (2026)" && r.Code == "S01E01" && r.Mark == "nový seriál") &&
-              domestic.Rows.Count(r => r.Caption == "Domáci seriál (2020)") == 2,
-            "novinky: Czech episodes aired so far – " + string.Join(" | ", domestic.Rows.Select(r => $"{r.Caption} {r.Code} {r.Date}")) + " " + page.Problems);
-        page.ShowUpcoming = true;
-        Check(domestic.Rows.Count(r => r.Caption == "Domáci seriál (2020)") == 4, "novinky: with the episodes still to come");
-        page.ShowUpcoming = false;
+        Check(!page.HasProblems && string.Join(", ", domestic.Rows.Select(r => r.Caption)) == "Domáci seriál (2020), Invented Show (2026)",
+            "novinky: only the series, alphabetically – " + string.Join(", ", domestic.Rows.Select(r => r.Caption)) + " " + page.Problems);
+        var home = domestic.Rows[0];
+        var show = domestic.Rows[1];
+        Check(home.NearestCode == $"S05E{Number(0):00}" && home.When == "DNES" && home.Episodes.Count(e => e.CanCheck) == 2 &&
+              home.Episodes.Count == 2 + Core.News.SeriesNews.PageDaysAhead && home.Episodes[0].State == "odvysielaná" && home.Episodes[^1].State == "nadchádzajúca",
+            $"novinky: the nearest episode, and the tree of the aired and coming ones – {home.NearestCode} {home.When} {home.Episodes.Count}");
+        Check(show.NearestCode == "S01E01" && show.NearestNote.StartsWith("nový seriál", StringComparison.Ordinal), "novinky: a new series – " + show.NearestNote);
 
         services.InputFolder.Set(null);
-        var premiere = domestic.Rows.First(r => r.Code == "S01E01");
+        var premiere = show.Episodes[0];
         premiere.IsChecked = true;
-        Check(page.SendText == "Odoslať na spracovanie (1)", "novinky: one episode ticked – " + page.SendText);
+        Check(page.SendText == "Odoslať na spracovanie (1)" && show.IsChecked && show.CheckedText == "1/1", "novinky: one episode ticked – " + page.SendText);
         await page.SendAsync();
         Check(page.Status.StartsWith("Najprv nastavte vstupný priečinok", StringComparison.Ordinal) && model.SelectedTool.Page == page,
             "novinky: without the input folder nothing is sent – " + page.Status);
@@ -927,7 +982,20 @@ internal static class SelfTest
         Check(services.InputFolder.Set(input) && services.Settings.InputDirectory == Path.GetFullPath(input) && model.Premieres.InputFolder.Folder == Path.GetFullPath(input),
             "input folder: one setting for every page");
         Check(page.Status.StartsWith("Vstupný priečinok je nastavený", StringComparison.Ordinal), "novinky: the old message goes once the folder is set – " + page.Status);
+
+        // the mark of a series: the same in Premiéry
+        show.IsChosen = true;
+        show.Note = "pozrieť s rodinou";
+        Check(model.Premieres.Tab(PremiereTab.SeriesDomestic).All.Any(r => r.Caption == "Invented Show (2026)" && r.IsChosen && r.Note == "pozrieť s rodinou"),
+            "novinky: a series chosen here is chosen in Premiéry too");
+        page.OnlyChosen = true;
+        Check(domestic.Rows.Count == 1 && domestic.Rows[0] == show, "novinky: Zobraziť vybrané");
+        page.OnlyChosen = false;
+        home.IsExpanded = true;
+        await WaitFor(() => domestic.Rows.All(r => r.Poster.Image is not null));
+        Check(domestic.Rows.All(r => r.Poster.Image is not null), "novinky: posters of the whole series");
         await Screenshot(window, "novinky.png");
+        home.IsExpanded = false;
 
         await page.SendAsync();
         Check(model.SelectedTool.Page == model.Rules && model.Rules.IsSeries && model.Rules.TitleText == "Invented Show (2026)" &&
@@ -936,13 +1004,10 @@ internal static class SelfTest
         await Screenshot(window, "novinky-single.png");
 
         model.Open(page);
-        foreach (var row in domestic.Rows.Where(r => r.Caption == "Domáci seriál (2020)"))
-        {
-            row.IsChecked = true;
-        }
-
+        home.IsChecked = true;
+        Check(home.CheckedText == "2/2" && home.Episodes.Where(e => !e.CanCheck).All(e => !e.IsChecked), "novinky: the series' tick ticks its aired episodes only – " + home.CheckedText);
         var world = page.Tabs[1].Rows.First(r => r.Caption == "World Invented (2024)");
-        world.IsChecked = true;
+        world.Episodes[0].IsChecked = true;
         await page.SendAsync();
         Check(model.SelectedTool.Page == model.Batch && model.Batch.ChosenFiles?.Count == 2 && model.Batch.IsSeries &&
               model.Batch.SeriesTitle.StartsWith("Domáci seriál (2020)", StringComparison.Ordinal) && model.Batch.Analysis?.FileCount == 2,
@@ -958,6 +1023,22 @@ internal static class SelfTest
             "novinky: Skontrolovať znova finds the episode now in the folder – " + page.Status);
         Check(before.All(f => File.Exists(f.Key) && File.GetLastWriteTimeUtc(f.Key) == f.Value), "novinky: files in the input folder are only read");
 
+        model.Open(page);
+        page.ShowHistory = true;
+        await WaitFor(() => domestic.Rows.Count > 0);
+        Check(domestic.Rows.Count == 1 && domestic.Rows[0].Caption == "Starý seriál (2019)" && domestic.Rows[0].NearestCode == "S02E05",
+            "novinky: older episodes are in the history – " + string.Join(", ", domestic.Rows.Select(r => r.Caption)));
+        await Screenshot(window, "novinky-history.png");
+        page.ShowHistory = false;
+
+        var asked = news.Requests.Count;
+        var again = new SeriesNewsPageViewModel(services);
+        again.Shown();
+        await WaitFor(() => again.Tabs[0].Rows.Count > 0);
+        Check(news.Requests.Count == asked && again.Tabs[0].Rows.Count == 2, "novinky: the kept days are shown at once at the next start, without asking the sources");
+
+        services.SeriesTmdbForSelfTest = null;
+        services.PostersForSelfTest = null;
         services.SeriesNewsForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
         model.Open(model.Dashboard);
@@ -1100,6 +1181,15 @@ internal static class SelfTest
 
         private static string? Tmdb(Uri uri)
         {
+            if (uri.AbsolutePath == "/3/search/tv")
+            {
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var name = query["query"] ?? "";
+                var year = query["first_air_date_year"] ?? "2024";
+                var id = 700 + name.Length;
+                return $$$"""{"results":[{"id":{{{id}}},"name":"{{{name}}}","original_name":"{{{name}}}","first_air_date":"{{{year}}}-01-01","poster_path":"/s{{{id}}}.jpg"}]}""";
+            }
+
             if (uri.AbsolutePath == "/3/discover/movie")
             {
                 return uri.Query.Contains("region=", StringComparison.Ordinal)

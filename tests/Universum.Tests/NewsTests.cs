@@ -284,24 +284,122 @@ public sealed class NewsTests
         Assert.True(world[0].Caption == "Seoul Invented (2026) [tmdbid-13]" && world[0].PosterPath is null && world[0].Availability == "VOD 21. 11. 2026 (USA)",
             $"a title not in Latin script gets the English title and the ID; an unsafe poster path is left out – {world[0].Caption} | {world[0].Availability}");
         Assert.True(server.Requests.All(r => r.StartsWith("https://api.themoviedb.org/3/", StringComparison.Ordinal)), "only TMDB");
+
+        var recheck = await films.RecheckAsync(film with { Premiere = new DateOnly(2026, 12, 24), Availability = "" }, from);
+        Assert.True(recheck is { Premiere.Day: 3, Availability.Length: > 0 }, "a kept film checked again gets its premiere and dates");
+        Assert.Equal<FilmPremiere?>(null, await films.RecheckAsync(film, new DateOnly(2026, 11, 20)), "no premiere here any more from then");
     }
 
     [Test]
-    public void KeptDaysExpire()
+    public async Task SeriesAreFoundOnTmdb()
+    {
+        var server = new Server();
+        server.Handler = uri => uri.AbsolutePath == "/3/search/tv"
+            ? uri.Query.Contains("first_air_date_year=2026", StringComparison.Ordinal)
+                ? """{"results":[{"id":5,"name":"Other Show","original_name":"Other Show","first_air_date":"2026-01-01","poster_path":"/o.jpg"},{"id":7,"name":"Invented Show","original_name":"Vymyšlený seriál","first_air_date":"2026-09-01","poster_path":"/p.jpg"}]}"""
+                : """{"results":[]}"""
+            : null;
+        var series = new SeriesTmdb(new TmdbClient(server.Http, "test-key", null, new RequestPacer(1000)));
+        Assert.Equal(new SeriesMatch(7, "/p.jpg"), await series.FindAsync("Vymyšlený seriál", 2026), "found by the original title and year");
+        Assert.Equal<SeriesMatch?>(null, await series.FindAsync("Unknown", 2020), "nothing found");
+        Assert.True(server.Requests.All(r => r.Contains("/3/search/tv?", StringComparison.Ordinal)), "only a search of series");
+    }
+
+    [Test]
+    public void KeptDaysBecomeHistory()
     {
         var folder = Path.Combine(Path.GetTempPath(), "universum-news-" + Guid.NewGuid().ToString("N"));
         try
         {
             var cache = new NewsCache(folder);
-            var day = new DateOnly(2026, 10, 28);
-            Assert.Equal<IReadOnlyList<SeriesEpisode>?>(null, cache.Get("Zdroj / s lomkou", day, TimeSpan.FromHours(1)), "nothing kept");
-            cache.Put("Zdroj / s lomkou", day, [new SeriesEpisode { Source = "x", Region = NewsRegion.Domestic, Title = "A", OriginalTitle = "B", AirDate = day, Season = 1, Number = 2 }]);
-            var kept = cache.Get("Zdroj / s lomkou", day, TimeSpan.FromHours(1));
-            Assert.True(kept is [{ OriginalTitle: "B", Code: "S01E02" }], "kept and read back");
-            Assert.Equal<IReadOnlyList<SeriesEpisode>?>(null, cache.Get("Zdroj / s lomkou", day, TimeSpan.Zero), "expired");
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            SeriesEpisode Episode(DateOnly day, int number) =>
+                new() { Source = "x", Region = NewsRegion.Domestic, Title = "A", OriginalTitle = "B", AirDate = day, Season = 1, Number = number };
+            const string source = "Zdroj / s lomkou";
+            Assert.Equal<IReadOnlyList<SeriesEpisode>?>(null, cache.Get(source, today, today), "nothing kept");
+
+            cache.Put(source, today, [Episode(today, 2)]);
+            Assert.True(cache.Get(source, today, today) is [{ OriginalTitle: "B", Code: "S01E02" }], "today kept and read back");
+            Assert.Equal<IReadOnlyList<SeriesEpisode>?>(null, cache.Get(source, today, today, refresh: true), "Obnoviť asks today again");
+
+            // a day read while it was still to come is asked once more when it is over; read after it, it is final
+            var yesterday = today.AddDays(-1);
+            cache.Put(source, yesterday, [Episode(yesterday, 1)]);
+            Assert.True(cache.Get(source, yesterday, today) is [{ Number: 1 }] && cache.Get(source, yesterday, today, refresh: true) is [{ Number: 1 }],
+                "a past day read after it was over is final, Obnoviť does not ask it");
+            var file = Directory.GetFiles(folder, "*.json", SearchOption.AllDirectories).Single(f => f.EndsWith(yesterday.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".json", StringComparison.Ordinal));
+            File.SetLastWriteTime(file, yesterday.ToDateTime(new TimeOnly(12, 0)));
+            Assert.Equal<IReadOnlyList<SeriesEpisode>?>(null, cache.Get(source, yesterday, today), "read before it was over – asked again");
+
+            var later = today.AddDays(3);
+            cache.Put(source, later, [Episode(later, 5)]);
+            Assert.True(cache.Get(source, later, today) is [{ Number: 5 }], "a later day is kept a day");
+
+            Assert.True(cache.Before(today).Select(e => e.Number).SequenceEqual([1]), "the history: only days before today");
             Assert.True(Directory.GetFiles(folder, "*.json", SearchOption.AllDirectories).All(f => !f.Contains("lomkou", StringComparison.Ordinal)), "the source's name is no path");
             cache.Clear();
             Assert.True(!Directory.Exists(folder), "cleared");
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void PremieresAreKeptAndMerged()
+    {
+        var today = new DateOnly(2026, 10, 28);
+        FilmPremiere Film(int id, int days, NewsRegion region = NewsRegion.Domestic, string availability = "") => new()
+        {
+            TmdbId = id, OriginalTitle = "Invented " + id, EnglishTitle = "Invented " + id, Region = region, Premiere = today.AddDays(days), Availability = availability,
+        };
+
+        var kept = new[] { Film(1, -10), Film(2, 5), Film(3, 20), Film(3, 20, NewsRegion.World) };
+        var films = PremiereArchive.MergeFilms(kept, [Film(2, 6, availability: "VOD 1. 1. 2027"), Film(4, 1)], today, out var recheck);
+        Assert.True(films.Count == 5 && films.Single(f => f.TmdbId == 2).Premiere == today.AddDays(6) && films.Single(f => f.TmdbId == 2).Availability.Length > 0,
+            "what was read wins, the past film stays as history, a new one is added");
+        Assert.True(recheck.Select(f => (f.TmdbId, f.Region)).OrderBy(f => f).SequenceEqual([(3, NewsRegion.Domestic), (3, NewsRegion.World)]),
+            "kept films still to come but not read now are checked again");
+
+        SeriesPremiereRow Row(string title, int days, int season = 1, int? count = null) => new(new SeriesEpisode
+        {
+            Source = "x", Region = NewsRegion.World, Title = title, OriginalTitle = title, Year = 2026, Season = season, Number = 1,
+            AirDate = today.AddDays(days), Kind = EpisodeKind.SeasonPremiere,
+        }, "týždenne", count);
+
+        var series = PremiereArchive.MergeSeries([Row("Old", -30), Row("Moved", 3), Row("Far", 40), Row("Same", 2)], [Row("Same", 2, count: 8), Row("New", 1)], today, today.AddDays(14), complete: true);
+        Assert.True(string.Join(",", series.Select(r => r.First.OriginalTitle).Order()) == "Far,New,Old,Same" && series.Single(r => r.First.OriginalTitle == "Same").EpisodeCount == 8,
+            "a premiere no longer in the read days is dropped; the history and later ones stay – " + string.Join(",", series.Select(r => r.First.OriginalTitle)));
+        var partial = PremiereArchive.MergeSeries([Row("Moved", 3)], [], today, today.AddDays(14), complete: false);
+        Assert.True(partial.Count == 1, "nothing is dropped when a source could not be read");
+
+        var folder = Path.Combine(Path.GetTempPath(), "universum-premieres-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new PremiereStore(Path.Combine(folder, "premieres.json"));
+            Assert.True(store.Load().Films.Count == 0, "nothing kept yet");
+            Assert.True(store.Save(new PremiereArchive { Films = films, Series = series, ReadAt = new DateTime(2026, 10, 28, 12, 0, 0) }), "saved");
+            var again = store.Load();
+            Assert.True(again.Films.Count == 5 && again.Series.Count == 4 && again.ReadAt == new DateTime(2026, 10, 28, 12, 0, 0) &&
+                        again.Series.Single(r => r.First.OriginalTitle == "Same") is { EpisodeCount: 8, Periodicity: "týždenne", First.Code: "S01E01" } &&
+                        again.Films.Single(f => f.TmdbId == 2).Caption == "Invented 2",
+                "kept for the next start");
+
+            var marks = new MarkStore(Path.Combine(folder, "marks.json"));
+            var changed = new List<string>();
+            marks.Changed += changed.Add;
+            marks.Set(MarkStore.Film(2), new TitleMark(true, "  teším sa  "));
+            marks.Set(MarkStore.Series(series[0].First), new TitleMark(false, "pozrieť"));
+            var read = new MarkStore(Path.Combine(folder, "marks.json"));
+            Assert.True(read.Get(MarkStore.Film(2)) == new TitleMark(true, "teším sa") && read.Get(MarkStore.Series(series[0].First)).Note == "pozrieť" &&
+                        read.Get(MarkStore.Film(99)) == TitleMark.None && changed.Count == 2,
+                "marks are kept, the note trimmed");
+            read.Set(MarkStore.Film(2), TitleMark.None);
+            Assert.True(new MarkStore(Path.Combine(folder, "marks.json")).Get(MarkStore.Film(2)) == TitleMark.None, "a mark removed");
         }
         finally
         {

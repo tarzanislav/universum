@@ -20,7 +20,8 @@ cd "$build"
   --extra-ldflags=-static
 make -j"$(nproc 2>/dev/null || echo 4)"
 cp ffmpeg.exe ffprobe.exe "$output/"
-grep -E '^(CONFIG_GPL|CONFIG_NONFREE|CONFIG_VERSION3) ' config.h | tee "$output/ffmpeg-license-config.txt"
-if grep -qE '^#define (CONFIG_GPL|CONFIG_NONFREE) 1' config.h; then echo "not an LGPL build" >&2; exit 1; fi
+# an LGPL build: neither GPL nor non-free parts
+grep -E '^#define (CONFIG_GPL|CONFIG_NONFREE|CONFIG_VERSION3) ' config.h | tee "$output/ffmpeg-license-config.txt"
+if ! grep -qE '^#define CONFIG_GPL 0$' config.h || ! grep -qE '^#define CONFIG_NONFREE 0$' config.h; then echo "not an LGPL build" >&2; exit 1; fi
 sed -n 's/^#define FFMPEG_CONFIGURATION "\(.*\)"$/\1/p' config.h > "$output/ffmpeg-configuration.txt"
 ls -l "$output"

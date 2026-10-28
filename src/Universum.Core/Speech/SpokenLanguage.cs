@@ -122,13 +122,32 @@ public static partial class SpokenLanguage
         }
         finally
         {
+            await DeleteFolderAsync(folder).ConfigureAwait(false);
+        }
+    }
+
+    // a piece may still be held for a moment (a tool that was just stopped, an antivirus reading the new file): tried
+    // again for a second; what stays is only in the temporary files
+    private static async Task DeleteFolderAsync(string folder)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
             try
             {
                 Directory.Delete(folder, recursive: true);
+                return;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < 10)
+            {
+                await Task.Delay(100).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // a piece still held by a tool that was just stopped; the folder is only in the temporary files
+                return;
             }
         }
     }

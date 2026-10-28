@@ -214,7 +214,7 @@ public sealed class SpeechTests
         Assert.True(heard[2] is "cs" or "sk", "Slovak speech heard as " + heard[2]);
     }
 
-    private static string NewFolder() => Directory.CreateTempSubdirectory("universum-speech-").FullName;
+    private static string NewFolder() => Directory.CreateTempSubdirectory("universum-tools-test-").FullName;
 
     private static SpeechTools FakeTools(string folder)
     {

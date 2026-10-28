@@ -328,7 +328,7 @@ public sealed class PremieresPageViewModel : ObservableObject
                 ReadAt = DateTime.Now,
             };
             Keep(archive);
-            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm} · uložené premiéry sa len dopĺňajú, zdroje sa pýtajú raz denne (alebo tlačidlom Obnoviť).";
+            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm} · zdroje sa pýtajú raz denne alebo tlačidlom Obnoviť.";
         }
         catch (OperationCanceledException)
         {

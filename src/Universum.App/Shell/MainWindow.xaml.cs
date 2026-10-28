@@ -83,6 +83,12 @@ public partial class MainWindow : Window
         }
     }
 
+    // Novinky: an opened series shows the tree of its episodes (a binding of the row itself – a style's would lose to
+    // the grid's details mode)
+    private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
+        e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,
+            new System.Windows.Data.Binding(nameof(NewsSeriesRow.IsExpanded)) { Converter = new BooleanToVisibilityConverter() });
+
     private Point _listDragStart;
 
     // Listy z HISTRA: a list is dragged by its grip and dropped on another list's place

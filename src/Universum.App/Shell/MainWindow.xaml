@@ -1421,7 +1421,6 @@
             <DockPanel Margin="24,20,24,12">
                 <DockPanel.Resources>
                     <Style x:Key="NewsRow" TargetType="DataGridRow" BasedOn="{StaticResource NewsRowBase}">
-                        <Setter Property="DetailsVisibility" Value="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}" />
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsChecked}" Value="True">
                                 <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
@@ -1555,9 +1554,9 @@
                     <!-- the series alphabetically with their nearest episode; opened, the tree of their episodes right under them -->
                     <DataGrid ItemsSource="{Binding SelectedTab.Rows}" Style="{StaticResource NewsGrid}" BorderBrush="{Binding SelectedTab.Accent}"
                               AlternatingRowBackground="{Binding SelectedTab.Stripe}" RowStyle="{StaticResource NewsRow}" ColumnHeaderStyle="{StaticResource NewsHeader}"
-                              RowDetailsVisibilityMode="Collapsed">
+                              RowDetailsVisibilityMode="Collapsed" LoadingRow="OnNewsLoadingRow">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="36" CanUserSort="False">
+                            <DataGridTemplateColumn Width="36" MinWidth="36" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Command="{Binding ToggleCommand}" Padding="4" MinWidth="0" Margin="4,0,0,0" VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
@@ -1567,9 +1566,9 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Názov seriálu" Width="300" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
-                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="115" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Spracovať" Width="76" CanUserSort="False">
+                            <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.1*" MinWidth="90" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Spracovať" Width="88" MinWidth="88" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
@@ -1580,7 +1579,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Najbližšia epizóda" Width="140" SortMemberPath="NearestCode">
+                            <DataGridTemplateColumn Header="Najbližšia" Width="104" MinWidth="104" SortMemberPath="NearestCode">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1590,8 +1589,8 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="68" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Dátum" Width="100" SortMemberPath="SortDate">
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Dátum" Width="96" MinWidth="96" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1601,8 +1600,8 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Vybrané" Width="66" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
-                            <DataGridTemplateColumn Header="Poznámky" Width="*" MinWidth="140" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
+                            <DataGridTemplateColumn Header="Vybrané" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
+                            <DataGridTemplateColumn Header="Poznámky" Width="1.6*" MinWidth="120" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
                         </DataGrid.Columns>
                         <DataGrid.RowDetailsTemplate>
                             <DataTemplate>
@@ -1728,9 +1727,9 @@
                               AlternatingRowBackground="{Binding SelectedTab.Stripe}" RowStyle="{StaticResource NewsRowBase}" ColumnHeaderStyle="{StaticResource NewsHeader}"
                               Visibility="{Binding IsFilmTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Názov filmu" Width="340" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
-                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="140" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Premiéra" Width="110" SortMemberPath="SortDate">
+                            <DataGridTemplateColumn Header="Názov filmu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="100" MinWidth="100" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1741,10 +1740,10 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="72" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="150" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Vybrané" Width="66" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
-                            <DataGridTemplateColumn Header="Poznámky" Width="*" MinWidth="140" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="1.4*" MinWidth="100" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Vybrané" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
+                            <DataGridTemplateColumn Header="Poznámky" Width="1.6*" MinWidth="120" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <!-- series: title, production, premiere, day, periodicity, number of episodes, Vybrané, note -->
@@ -1752,9 +1751,9 @@
                               AlternatingRowBackground="{Binding SelectedTab.Stripe}" RowStyle="{StaticResource NewsRowBase}" ColumnHeaderStyle="{StaticResource NewsHeader}"
                               Visibility="{Binding IsSeriesTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Názov seriálu" Width="340" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
-                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="130" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Premiéra" Width="125" SortMemberPath="SortDate">
+                            <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="112" MinWidth="112" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1765,11 +1764,11 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="72" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="125" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTextColumn Header="Epizódy" Binding="{Binding Episodes}" Width="82" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Vybrané" Width="66" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
-                            <DataGridTemplateColumn Header="Poznámky" Width="*" MinWidth="140" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Epizódy" Binding="{Binding Episodes}" Width="76" MinWidth="76" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTemplateColumn Header="Vybrané" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
+                            <DataGridTemplateColumn Header="Poznámky" Width="1.6*" MinWidth="120" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Text="{Binding EmptyText}" Style="{StaticResource Hint}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap"

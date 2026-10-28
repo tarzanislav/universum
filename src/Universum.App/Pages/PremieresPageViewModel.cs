@@ -483,6 +483,9 @@ public abstract class PremiereRow(MarkStore marks, string markKey) : MarkedRow(m
 
     public abstract PosterThumb Poster { get; }
 
+    /// <summary>"Original (Year)" as the library names the title.</summary>
+    public abstract string Caption { get; }
+
     /// <summary>The source has a page of the title.</summary>
     public virtual bool HasSource => false;
 
@@ -538,7 +541,7 @@ public sealed class PremiereFilmRow : PremiereRow
 
     internal override string Search => _search + " " + Words.Normalize(Note);
 
-    public string Caption => Film.Caption;
+    public override string Caption => Film.Caption;
 
     public string LocalTitle => Film.LocalTitle;
 
@@ -586,7 +589,7 @@ public sealed class PremiereSeriesRow : PremiereRow
 
     internal override string Search => _search + " " + Words.Normalize(Note);
 
-    public string Caption => Premiere.First.Caption;
+    public override string Caption => Premiere.First.Caption;
 
     public string LocalTitle => Premiere.First.Title != Premiere.First.OriginalTitle ? Premiere.First.Title : "";
 

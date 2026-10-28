@@ -1385,14 +1385,15 @@
                             <CheckBox Content="len z mojich listov HISTRA" IsChecked="{Binding OnlyMyLists}" VerticalAlignment="Center" Margin="0,0,12,0"
                                       Visibility="{Binding HasMyLists, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
-                        <TextBox DockPanel.Dock="Right" Width="200" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                                 ToolTip="Hľadať seriál alebo stanicu (bez diakritiky)" />
-                        <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock />
                     </DockPanel>
                     <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="2,0,0,6" />
+                    <DockPanel Margin="0,0,0,8">
+                    <TextBox DockPanel.Dock="Right" Width="180" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                             ToolTip="Hľadať seriál alebo stanicu (bez diakritiky)" />
+                    <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
                     <ListBox ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" BorderThickness="0" Background="Transparent"
-                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,8" HorizontalAlignment="Left" Width="520">
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Left" Width="520">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Rows="1" />
@@ -1425,6 +1426,7 @@
                             </Style>
                         </ListBox.ItemContainerStyle>
                     </ListBox>
+                    </DockPanel>
                     <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="2,0,0,6"
                                Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>

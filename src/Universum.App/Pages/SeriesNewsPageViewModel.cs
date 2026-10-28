@@ -44,7 +44,16 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         SendCommand = new AsyncRelayCommand(SendAsync, () => !Busy && Checked.Any());
         CheckAgainCommand = new AsyncRelayCommand(CheckAgainAsync, () => !Busy && Waiting.Count > 0);
         services.NewsSourcesChanged += () => _readAt = null;
+        services.InputDirectoryChanged += () =>
+        {
+            if (Status == NoInputFolder && services.InputDirectory is not null)
+            {
+                Status = "Vstupný priečinok je nastavený – epizódy môžete odoslať.";
+            }
+        };
     }
+
+    private const string NoInputFolder = "Najprv nastavte vstupný priečinok – tam UNIVERSUM hľadá epizódy (tlačidlo Zmeniť… hore).";
 
     public InputFolderViewModel InputFolder => _services.InputFolder;
 
@@ -257,7 +266,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     {
         if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
         {
-            Status = "Najprv nastavte vstupný priečinok – tam UNIVERSUM hľadá epizódy (tlačidlo Zmeniť… hore).";
+            Status = NoInputFolder;
             return null;
         }
 

@@ -926,6 +926,7 @@ internal static class SelfTest
             "input folder: not in the library – " + services.InputFolder.Message);
         Check(services.InputFolder.Set(input) && services.Settings.InputDirectory == Path.GetFullPath(input) && model.Premieres.InputFolder.Folder == Path.GetFullPath(input),
             "input folder: one setting for every page");
+        Check(page.Status.StartsWith("Vstupný priečinok je nastavený", StringComparison.Ordinal), "novinky: the old message goes once the folder is set – " + page.Status);
         await Screenshot(window, "novinky.png");
 
         await page.SendAsync();

@@ -57,6 +57,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
+    /// <summary>The input folder (the same on every page).</summary>
+    public InputFolderViewModel InputFolder => _services.InputFolder;
+
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
 

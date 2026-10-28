@@ -36,8 +36,11 @@ public sealed class MainViewModel : ObservableObject
         Dashboard = new DashboardPageViewModel(services, this);
         HistraLists = new HistraListsPageViewModel(services);
         Premieres = new PremieresPageViewModel(services);
-        SeriesNews = new PlaceholderPageViewModel(
-            "Novinky – Seriály", "Nové epizódy bežiacich seriálov – SK/CZ a svet, s odoslaním na spracovanie.", "pripravuje sa v ďalšej časti");
+        SeriesNews = new SeriesNewsPageViewModel(services)
+        {
+            SendToSingle = SendEpisodeToSingleAsync,
+            SendToBatch = SendEpisodesToBatchAsync,
+        };
         Mega = new PlaceholderPageViewModel(
             "MEGAspracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
 
@@ -179,8 +182,8 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Premiéry – films and series, SK/CZ and the world.</summary>
     public PremieresPageViewModel Premieres { get; }
 
-    /// <summary>Novinky – Seriály – new episodes (next part of the Novinky a obsah group).</summary>
-    public PlaceholderPageViewModel SeriesNews { get; }
+    /// <summary>Novinky – Seriály – new episodes of running series, sent to processing from here.</summary>
+    public SeriesNewsPageViewModel SeriesNews { get; }
 
     /// <summary>MEGAspracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
     public PlaceholderPageViewModel Mega { get; }
@@ -224,6 +227,11 @@ public sealed class MainViewModel : ObservableObject
             if (value?.Page == Premieres)
             {
                 Premieres.Shown();
+            }
+
+            if (value?.Page == SeriesNews)
+            {
+                SeriesNews.Shown();
             }
         }
     }
@@ -393,6 +401,39 @@ public sealed class MainViewModel : ObservableObject
 
         Open(Batch);
         Notify("Hromadné spracovanie práve pracuje – nový priečinok otvorte po jeho skončení (alebo ho zastavte).");
+        return true;
+    }
+
+    /// <summary>An episode from Novinky into Single spracovanie, with its series and episode; false while Single is busy.</summary>
+    private async Task<bool> SendEpisodeToSingleAsync(string file, string seriesTitle, string episode)
+    {
+        if (Rules.Busy)
+        {
+            return false;
+        }
+
+        Open(Rules);
+        await Rules.LoadAsync(file);
+        Rules.IsSeries = true;
+        Rules.TitleText = seriesTitle;
+        if (Rules.EpisodeText.Length == 0)
+        {
+            Rules.EpisodeText = episode;
+        }
+
+        return true;
+    }
+
+    /// <summary>Episodes of one series from Novinky into Hromadné spracovanie; false while it is busy.</summary>
+    private async Task<bool> SendEpisodesToBatchAsync(IReadOnlyList<string> files, string seriesTitle)
+    {
+        if (Batch.Busy || Batch.IsRunning)
+        {
+            return false;
+        }
+
+        Open(Batch);
+        await Batch.AnalyzeFilesAsync(files, seriesTitle);
         return true;
     }
 

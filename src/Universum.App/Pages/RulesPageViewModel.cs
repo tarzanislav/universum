@@ -483,6 +483,12 @@ public sealed class RulesPageViewModel : ObservableObject
         // every video format MKVToolNix reads; anything other than MKV becomes a new MKV
         var patterns = string.Join(";", Universum.Core.Batch.BatchAnalyzer.VideoExtensions.Select(e => "*" + e));
         var dialog = new OpenFileDialog { Filter = $"Video (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|Všetky súbory|*.*" };
+        if (_services.Settings.InputDirectory is { } input && Directory.Exists(input))
+        {
+            // the input folder of the settings is where new files come
+            dialog.InitialDirectory = input;
+        }
+
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

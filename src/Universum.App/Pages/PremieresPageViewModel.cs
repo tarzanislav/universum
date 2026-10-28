@@ -58,6 +58,9 @@ public sealed class PremieresPageViewModel : ObservableObject
 
     public IReadOnlyList<PremiereTabItem> Tabs { get; }
 
+    /// <summary>The input folder of the settings (the same on every page).</summary>
+    public InputFolderViewModel InputFolder => _services.InputFolder;
+
     public PremiereTabItem SelectedTab
     {
         get => _selected;

@@ -211,6 +211,53 @@ public sealed class AppServices
 
     private HistraListStore? _histraListStore;
 
+    /// <summary>
+    /// The HTTP client of the news: without cookies (no site can follow the user), at most three redirects (each checked
+    /// to stay on the site), compressed answers allowed.
+    /// </summary>
+    private static readonly HttpClient NewsHttp = new(new SocketsHttpHandler
+    {
+        UseCookies = false,
+        AllowAutoRedirect = true,
+        MaxAutomaticRedirections = 3,
+        AutomaticDecompression = System.Net.DecompressionMethods.All,
+    })
+    { Timeout = TimeSpan.FromSeconds(30) };
+
+    private Universum.Core.News.SeriesNews? _seriesNews;
+
+    /// <summary>The schedule of series episodes from the sources of the settings (web pages by their rules, TVmaze).</summary>
+    public Universum.Core.News.SeriesNews SeriesNews => SeriesNewsForSelfTest ?? (_seriesNews ??= new Universum.Core.News.SeriesNews(
+        new Universum.Core.News.WebPageClient(NewsHttp), new Universum.Core.News.TvMazeClient(NewsHttp), NewsCache));
+
+    /// <summary>The self-test's stand-in sources of series (invented pages and answers, nothing goes to the internet).</summary>
+    public Universum.Core.News.SeriesNews? SeriesNewsForSelfTest { get; set; }
+
+    /// <summary>The kept days of the sources of news.</summary>
+    public Universum.Core.News.NewsCache NewsCache => _newsCache ??= new Universum.Core.News.NewsCache(AppSettings.NewsCacheDirectory);
+
+    private Universum.Core.News.NewsCache? _newsCache;
+
+    /// <summary>Film premieres from TMDB (with the user's key); null without TMDB.</summary>
+    public Universum.Core.News.FilmPremieres? Films => FilmsForSelfTest ?? (Tmdb is { } tmdb ? new Universum.Core.News.FilmPremieres(tmdb) : null);
+
+    /// <summary>The self-test's stand-in film premieres.</summary>
+    public Universum.Core.News.FilmPremieres? FilmsForSelfTest { get; set; }
+
+    /// <summary>The sources of news of the settings (TVmaze and TMDB in a new installation).</summary>
+    public IReadOnlyList<Universum.Core.News.NewsSource> NewsSources => Settings.NewsSources ?? Universum.Core.News.NewsSource.Defaults;
+
+    /// <summary>Stores the sources of news.</summary>
+    public void SetNewsSources(IEnumerable<Universum.Core.News.NewsSource> sources)
+    {
+        Settings.NewsSources = sources.ToList();
+        Settings.Save();
+        NewsSourcesChanged?.Invoke();
+    }
+
+    /// <summary>Raised when a source of news was added, removed, switched on or off.</summary>
+    public event Action? NewsSourcesChanged;
+
     private OpenMeteo? _weather;
 
     /// <summary>Weather of the Dashboard (Open-Meteo, no key; only the town and then its coordinates are sent).</summary>
@@ -339,6 +386,9 @@ public sealed class AppSettings
     /// <summary>The server posters come from; null = TMDB's image server (HISTRA gives poster paths in TMDB's form).</summary>
     public string? PosterServer { get; set; }
 
+    /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
+    public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }
+
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>
         Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
@@ -359,6 +409,9 @@ public sealed class AppSettings
 
     /// <summary>Downloaded posters (each one once).</summary>
     public static string PosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "posters");
+
+    /// <summary>The days read from the sources of news.</summary>
+    public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");
 
     /// <summary>The HISTRA lists imported into UNIVERSUM.</summary>
     public static string HistraListsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "histra-lists.json");

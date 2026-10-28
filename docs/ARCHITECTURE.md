@@ -140,6 +140,28 @@ in next to it without changing the rules, planning or UI.
   switched off, nothing is sent there and the stored key or token stays (the CLI honours the TMDB switch for the
   stored key). With both on, the two are to be synchronised (`SyncActive`; what exactly follows the HISTRA API).
 
+## Novinky a obsah (owner, 28 Oct 2026)
+
+- `Html/HtmlDocument`, `Html/HtmlSelector` – a small, tolerant HTML parser written for UNIVERSUM (no library): elements,
+  attributes and text with entities decoded; scripts, styles and comments skipped; implied end tags (p, li, td …);
+  limits on size, depth and nodes. Selectors: names, `*`, `.class`, `#id`, `[attr]`, `[attr=|^=|*=|$=v]`, descendant,
+  child and groups; anything else is refused, so a rule never silently matches something else.
+- `News/PageRules` – reading a schedule of series episodes from a web page, one page per day, by rules the user
+  imports into the settings (format `UNIVERSUM-zdroj 1`): the address of a day, the item and section selectors, the
+  fields (title, original, years, episode "SS×EE", channel, channel ID, genres, link) and the Czech/Slovak channels.
+  The program knows how to apply rules, not which pages exist – addresses of pages live only in the user's settings.
+- `News/WebPageClient` – polite, safe reading: HTTPS only, the site's robots.txt (own group, else "*", longest match),
+  one page per two seconds per site, no cookies, redirects only within the site, at most 5 MiB, charset from the
+  header or the meta tag; it introduces itself as UNIVERSUM.
+- `News/TvMaze` – the TVmaze API (no key, CC BY-SA, credited): schedules by country and of streaming services in the
+  user's time zone, popularity and kind filters, the episodes of a season; `SeriesNews` merges the sources (the same
+  episode once, the page's entry with TVmaze's IDs), keeps each day of each source on the disk (`NewsCache`: 6 hours
+  for today and later, 3 days for past days) and describes premieres with `Periodicity` and the season's episode count.
+- `News/FilmPremieres` – film premieres from TMDB (with the user's key): Czech and Slovak cinemas (theatrical release
+  dates of CZ and SK) and the most popular world premieres, with VOD (digital) and TV dates (CZ, else SK, else USA).
+- App: Premiéry (four pastel tables), Nastavenia → Zdroje noviniek (import of a rules file, switch off, remove),
+  `TitleOpener` (TMDB and HISTRA pages found only when the user clicks).
+
 ## Multiplexer (specification, section 5)
 
 - `Muxing/MuxSpec` – input files (`MuxSource`: keep chapters / attachments / tags), the tracks taken in output order

@@ -131,6 +131,7 @@ internal static class SelfTest
     {
         var model = new MainViewModel(services);
         MainWindow.ConfirmOnClose = false;
+        PremieresPageViewModel.AutoLoad = false;
         var window = new MainWindow(model) { Width = 1180, Height = 740, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
         window.Show();
         await model.RefreshStatusAsync();
@@ -154,6 +155,7 @@ internal static class SelfTest
 
         await TestDashboardAsync(model, window, services);
         await TestHistraListsAsync(model, window, services);
+        await TestPremieresAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -801,11 +803,239 @@ internal static class SelfTest
         page.Selected = null;
     }
 
+    /// <summary>
+    /// Premiéry with invented sources (an invented page read by imported rules, TVmaze and TMDB answer here, nothing goes
+    /// to the internet): the rules imported in the settings, the four tables, robots.txt asked first, only the days of
+    /// the window read, periodicity and episode counts from TVmaze, and the kept days used again without requests.
+    /// </summary>
+    private static async Task TestPremieresAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var news = new FakeNews();
+        var http = new System.Net.Http.HttpClient(news);
+        var cache = Path.Combine(_outputDirectory, "news-cache");
+        Core.News.WebPageClient.PagesPerSecond = 1000;
+        services.SeriesNewsForSelfTest = new Core.News.SeriesNews(new Core.News.WebPageClient(http), new Core.News.TvMazeClient(http, new RequestPacer(1000)), new Core.News.NewsCache(cache));
+        services.FilmsForSelfTest = new Core.News.FilmPremieres(new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000)));
+        services.PostersForSelfTest = new PosterCache(http, Path.Combine(_outputDirectory, "posters"), PosterCache.DefaultServer);
+
+        var rulesFile = Path.Combine(_outputDirectory, "vymysleny-zdroj.json");
+        File.WriteAllText(rulesFile, FakeNews.Rules);
+        var sources = model.Settings.NewsSources;
+        Check(sources.Rows.Count == 2 && sources.Rows[0].Name == "TVmaze" && sources.Rows[1].Name == "TMDB – filmy", "sources: TVmaze and TMDB by default");
+        File.WriteAllText(rulesFile + ".bad", "{}");
+        Check(!sources.ImportFile(rulesFile + ".bad") && sources.Status.StartsWith("Zdroj sa nepridal", StringComparison.Ordinal),
+            "sources: a file that is no rules is refused – " + sources.Status);
+        Check(sources.ImportFile(rulesFile) && sources.Rows.Count == 3 && sources.Rows[2].Address == "rozpis.example",
+            "sources: an invented page added from its rules – " + sources.Status);
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
+        await Screenshot(window, "settings-sources.png");
+
+        var page = model.Premieres;
+        model.Open(page);
+        await page.LoadAsync(refresh: true);
+        var films = page.Tab(PremiereTab.FilmDomestic).Rows.OfType<PremiereFilmRow>().ToList();
+        var world = page.Tab(PremiereTab.FilmWorld).Rows.OfType<PremiereFilmRow>().ToList();
+        var domesticSeries = page.Tab(PremiereTab.SeriesDomestic).Rows.OfType<PremiereSeriesRow>().ToList();
+        var worldSeries = page.Tab(PremiereTab.SeriesWorld).Rows.OfType<PremiereSeriesRow>().ToList();
+        Check(!page.HasProblems, "premieres: all sources read – " + page.Problems);
+        Check(films.Count == 2 && films[0].IsToday && films[1].Caption == $"The Invented Premiere ({FakeNews.Day(3).Year})" &&
+              films[1].Where == $"CZ · SK {FakeNews.Day(4).Day}. {FakeNews.Day(4).Month}." && films[1].Availability.StartsWith("VOD ", StringComparison.Ordinal) &&
+              films[1].Production == "USA, VB · Invented Pictures",
+            "premieres: films in Czech and Slovak cinemas – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.Where} {f.Production} {f.Availability}")));
+        Check(world.Count == 2 && world[0].IsPast, "premieres: films of the world – " + string.Join(" | ", world.Select(f => $"{f.Caption} {f.Date}")));
+        Check(domesticSeries.Count == 1 && domesticSeries[0].Caption == "Invented Show (2026)" && domesticSeries[0].LocalTitle == "Vymyslený seriál" &&
+              domesticSeries[0].Production == "ČT1" && domesticSeries[0].Periodicity == "denne (po–pi)" && domesticSeries[0].Episodes == "10 epizód",
+            "premieres: a new series on a Czech channel, its rhythm from TVmaze – " +
+            string.Join(" | ", domesticSeries.Select(r => $"{r.Caption} {r.Production} {r.What} {r.Periodicity} {r.Episodes}")));
+        Check(worldSeries.Count == 3 && worldSeries.Any(r => r.Caption == "Invented Stream (2024)" && r.What.StartsWith("3. séria", StringComparison.Ordinal) &&
+                                                            r.Periodicity.StartsWith("týždenne", StringComparison.Ordinal) && r.Episodes == "8 epizód"),
+            "premieres: new series and seasons of the world – " + string.Join(" | ", worldSeries.Select(r => $"{r.Caption} {r.Production} {r.What} {r.Periodicity} {r.Episodes}")));
+        Check(news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)) == 4 &&
+              news.Requests.IndexOf("https://rozpis.example/robots.txt") < news.Requests.FindIndex(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)),
+            "premieres: robots.txt first, then only the days of the window – " + string.Join(" | ", news.Requests.Where(r => r.Contains("rozpis", StringComparison.Ordinal))));
+        Check(news.Requests.All(r => r.StartsWith("https://", StringComparison.Ordinal) &&
+                                     new Uri(r).Host is "rozpis.example" or "api.tvmaze.com" or "api.themoviedb.org" or "image.tmdb.org"),
+            "premieres: only the sources were asked");
+        Check(news.UserAgents.All(a => a.StartsWith("UNIVERSUM/", StringComparison.Ordinal)), "premieres: UNIVERSUM introduces itself to the pages");
+
+        page.SelectedTab = page.Tab(PremiereTab.FilmDomestic);
+        await WaitFor(() => films.All(f => f.Poster.Image is not null));
+        await Screenshot(window, "premieres-films.png");
+        page.SelectedTab = page.Tab(PremiereTab.SeriesWorld);
+        await Screenshot(window, "premieres-series.png");
+
+        int Days() => news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal) || r.Contains("/schedule", StringComparison.Ordinal));
+        var asked = Days();
+        await page.LoadAsync(refresh: false);
+        Check(Days() == asked, $"premieres: the kept days are used again without asking the sources ({asked} → {Days()})");
+
+        services.SeriesNewsForSelfTest = null;
+        services.FilmsForSelfTest = null;
+        services.PostersForSelfTest = null;
+        services.SetNewsSources(Core.News.NewsSource.Defaults);
+    }
+
     private static async Task WaitFor(Func<bool> condition)
     {
         for (var i = 0; i < 50 && !condition(); i++)
         {
             await Task.Delay(100);
+        }
+    }
+
+    /// <summary>
+    /// The sources of news with invented answers: a schedule page (rules in <see cref="Rules"/>) with a new Czech
+    /// series and a new season today, TVmaze with a new season on a streaming service and a new series in the USA,
+    /// TMDB with two films in Czech cinemas and two in the world, and drawn posters.
+    /// </summary>
+    private sealed class FakeNews : System.Net.Http.HttpMessageHandler
+    {
+        public const string Rules = """
+            {
+              "format": "UNIVERSUM-zdroj 1",
+              "name": "Vymyslený rozpis",
+              "address": "https://rozpis.example/den/{yyyy}-{MM}-{dd}",
+              "item": "div.zaznam",
+              "section": "h3",
+              "sections": [ { "contains": "Nové seriály", "kind": "series-premiere" }, { "contains": "Ostatné", "kind": "episode" } ],
+              "fields": {
+                "title": { "select": "a.meno", "take": "own" },
+                "years": { "select": "a.meno > span" },
+                "original": { "select": "a.povodny" },
+                "genres": { "select": "div.zaner" },
+                "episode": { "select": "div.cislo", "take": "own" },
+                "channel": { "select": "div.cislo span" },
+                "channelId": { "select": ":self", "take": "attr:data-kanal" },
+                "link": { "select": "a.meno", "take": "attr:href" }
+              },
+              "domestic": [ "ct1", "nova" ],
+              "daysBack": 1,
+              "daysAhead": 2
+            }
+            """;
+
+        private readonly List<byte[]> _posters = Enumerable.Range(0, 4).Select(FakeHistra.DrawPoster).ToList();
+
+        public List<string> Requests { get; } = [];
+
+        public List<string> UserAgents { get; } = [];
+
+        public static DateOnly Day(int offset) => DateOnly.FromDateTime(DateTime.Now).AddDays(offset);
+
+        private static string Iso(int offset) => Day(offset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var uri = request.RequestUri!;
+            lock (Requests)
+            {
+                Requests.Add(uri.AbsoluteUri);
+                if (uri.Host == "rozpis.example")
+                {
+                    UserAgents.Add(request.Headers.UserAgent.ToString());
+                }
+            }
+
+            if (uri.Host == "image.tmdb.org")
+            {
+                return Answer(request, new System.Net.Http.ByteArrayContent(_posters[uri.AbsolutePath.Length % _posters.Count]));
+            }
+
+            var body = uri.Host switch
+            {
+                "rozpis.example" when uri.AbsolutePath == "/robots.txt" => "User-agent: *\nDisallow: /tajne/\n",
+                "rozpis.example" => Page(uri.AbsolutePath),
+                "api.tvmaze.com" => TvMaze(uri),
+                "api.themoviedb.org" => Tmdb(uri),
+                _ => null,
+            };
+            return body is null
+                ? Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { RequestMessage = request })
+                : Answer(request, new System.Net.Http.StringContent(body, Encoding.UTF8, uri.Host == "rozpis.example" ? "text/html" : "application/json"));
+        }
+
+        private static Task<System.Net.Http.HttpResponseMessage> Answer(System.Net.Http.HttpRequestMessage request, System.Net.Http.HttpContent content) =>
+            Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { RequestMessage = request, Content = content });
+
+        // today: a new Czech series and a new season of a foreign one; every weekday an episode of a Czech series
+        private static string Page(string path)
+        {
+            var today = path.EndsWith(Iso(0), StringComparison.Ordinal);
+            var number = 10 + DateOnly.ParseExact(path[^10..], "yyyy-MM-dd", CultureInfo.InvariantCulture).DayNumber % 50;
+            return "<html><head><meta charset=\"utf-8\"><script>var x = '<div class=\"zaznam\">';</script></head><body>" +
+                   (today
+                       ? "<h3>Nové seriály</h3><div class=\"zaznam\" data-kanal=\"ct1\"><a class=\"meno\" href=\"https://rozpis.example/serial/1\">Vymyslený seriál <span>(2026–????)</span></a>" +
+                         "<a class=\"povodny\">Invented Show</a><div class=\"zaner\">Drama / Krimi</div><div class=\"cislo\">01&times;01<br /><span>ČT1</span></div></div>"
+                       : "") +
+                   "<h3>Ostatné vysielané</h3>" +
+                   (today
+                       ? "<div class=\"zaznam\" data-kanal=\"netflix\"><a class=\"meno\">Svetový seriál <span>(2024–????)</span></a><a class=\"povodny\">World Invented</a>" +
+                         "<div class=\"cislo\">02&times;01<br /><span>Netflix</span></div></div>"
+                       : "") +
+                   $"<div class=\"zaznam\" data-kanal=\"nova\"><a class=\"meno\">Domáci seriál <span>(2020–????)</span></a><a class=\"povodny\">Domáci seriál</a>" +
+                   $"<div class=\"cislo\">05&times;{number}<br /><span>Nova</span></div></div><!-- <div class=\"zaznam\">komentár</div> --></body></html>";
+        }
+
+        private static string? TvMaze(Uri uri)
+        {
+            var today = uri.Query.Contains("date=" + Iso(0), StringComparison.Ordinal);
+            if (uri.AbsolutePath == "/schedule/web")
+            {
+                return today
+                    ? $$$$"""[{"season":3,"number":1,"type":"regular","airdate":"{{{{Iso(0)}}}}","airstamp":"{{{{Iso(0)}}}}T10:00:00+00:00","_embedded":{"show":{"id":501,"name":"Invented Stream","type":"Scripted","weight":90,"premiered":"2024-02-01","genres":["Drama"],"webChannel":{"name":"Invented+","country":null},"externals":{"imdb":"tt0000501","thetvdb":7501},"url":"https://www.tvmaze.com/shows/501/invented-stream"}}},""" +
+                      """{"season":4,"number":2,"type":"regular","airdate":"2026-01-01","airstamp":"2026-01-01T10:00:00+00:00","_embedded":{"show":{"id":502,"name":"Invented News","type":"News","weight":99}}}]"""
+                    : "[]";
+            }
+
+            if (uri.AbsolutePath == "/schedule")
+            {
+                return today
+                    ? $$$$"""[{"season":1,"number":1,"type":"regular","airdate":"{{{{Iso(0)}}}}","airstamp":"{{{{Iso(0)}}}}T12:00:00+00:00","show":{"id":601,"name":"Invented Network Show","type":"Scripted","weight":80,"premiered":"{{{{Iso(0)}}}}","network":{"name":"INV","country":{"code":"US"}},"externals":{}}}]"""
+                    : "[]";
+            }
+
+            if (uri.AbsolutePath == "/singlesearch/shows")
+            {
+                return uri.Query.Contains("Invented%20Show", StringComparison.Ordinal) ? """{"id":77,"name":"Invented Show","premiered":"2026-09-01"}""" : null;
+            }
+
+            // a season: weekly for the streaming show, weekdays for the Czech one
+            var show = uri.AbsolutePath.Split('/')[2];
+            var dates = show switch
+            {
+                "501" => Enumerable.Range(0, 8).Select(i => (3, Day(7 * i))),
+                "77" => Enumerable.Range(0, 14).Select(Day).Where(d => d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday).Take(10).Select(d => (1, d)),
+                _ => Enumerable.Range(0, 6).Select(i => (1, Day(i))),
+            };
+            return "[" + string.Join(",", dates.Select((d, i) => $$$"""{"season":{{{d.Item1}}},"number":{{{i + 1}}},"type":"regular","airdate":"{{{d.Item2:yyyy-MM-dd}}}"}""")) + "]";
+        }
+
+        private static string? Tmdb(Uri uri)
+        {
+            if (uri.AbsolutePath == "/3/discover/movie")
+            {
+                return uri.Query.Contains("region=", StringComparison.Ordinal)
+                    ? """{"page":1,"total_pages":1,"results":[{"id":101,"title":"The Invented Premiere","popularity":50.5},{"id":102,"title":"Today Invented","popularity":20}]}"""
+                    : """{"page":1,"total_pages":1,"results":[{"id":201,"title":"World Invented Film","popularity":90},{"id":202,"title":"Later Invented Film","popularity":40}]}""";
+            }
+
+            var (title, original, release, cz, sk) = uri.AbsolutePath switch
+            {
+                "/3/movie/101" => ("Vymyslená premiéra", "The Invented Premiere", 3, 3, 4),
+                "/3/movie/102" => ("Dnešný vymyslený", "Today Invented", 0, 0, 0),
+                "/3/movie/201" => ("Svetový vymyslený film", "World Invented Film", -2, 40, 40),
+                "/3/movie/202" => ("Neskorší vymyslený film", "Later Invented Film", 10, 30, 30),
+                _ => ("", "", 0, 0, 0),
+            };
+            return title.Length == 0 ? null : $$$"""
+                {"title":"{{{title}}}","original_title":"{{{original}}}","release_date":"{{{Iso(release)}}}","poster_path":"/f{{{uri.AbsolutePath[^3..]}}}.jpg",
+                 "production_countries":[{"iso_3166_1":"US"},{"iso_3166_1":"GB"}],"production_companies":[{"name":"Invented Pictures"},{"name":"Second"}],
+                 "release_dates":{"results":[
+                   {"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(cz)}}}T00:00:00.000Z"},{"type":4,"release_date":"{{{Iso(cz + 45)}}}T00:00:00.000Z"}]},
+                   {"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(sk)}}}T00:00:00.000Z"}]},
+                   {"iso_3166_1":"US","release_dates":[{"type":6,"release_date":"{{{Iso(release + 200)}}}T00:00:00.000Z"}]},
+                   {"iso_3166_1":"DE","release_dates":[{"type":3,"release_date":"{{{Iso(release)}}}T00:00:00.000Z"}]}]}}
+                """;
         }
     }
 
@@ -884,7 +1114,7 @@ internal static class SelfTest
         }
 
         // a coloured poster with a gradient (drawn on the window's thread, before any request comes)
-        private static byte[] DrawPoster(int seed)
+        internal static byte[] DrawPoster(int seed)
         {
             var colors = new[] { (0x6C, 0x5C, 0xE7), (0x00, 0xB8, 0x94), (0xE1, 0x70, 0x55), (0x09, 0x84, 0xE3), (0xE8, 0x43, 0x93), (0xFD, 0xCB, 0x6E) };
             var (r, g, b) = colors[seed % colors.Length];

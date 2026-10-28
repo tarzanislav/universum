@@ -12,6 +12,7 @@
                     <Button Content="Vybrať všetky" Command="{Binding AllCommand}" Margin="8,0,8,0" Padding="10,4" />
                     <Button Content="Nevybrať nič" Command="{Binding NoneCommand}" Padding="10,4" />
                 </StackPanel>
+                <TextBlock DockPanel.Dock="Left" Text="Hľadať list:" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" ToolTip="Hľadať list podľa názvu (bez diakritiky)" />
             </DockPanel>
         </StackPanel>

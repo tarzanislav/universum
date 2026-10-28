@@ -43,6 +43,18 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
     /// </summary>
     public async Task VerifyAsync(CancellationToken cancellationToken = default)
     {
+        try
+        {
+            await CheckAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new SpeechException("Súbory rozpoznávania reči sa nedajú prečítať: " + ex.Message, ex);
+        }
+    }
+
+    private async Task CheckAsync(CancellationToken cancellationToken)
+    {
         Dictionary<string, string>? files;
         try
         {
@@ -54,7 +66,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
             throw new SpeechException("Zoznam súborov rozpoznávania reči sa nedá prečítať – preinštalujte UNIVERSUM.", ex);
         }
 
-        var root = Path.GetFullPath(Folder);
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Folder));
         foreach (var required in new[] { Ffmpeg, Whisper, Model })
         {
             if (!files.ContainsKey(Path.GetRelativePath(root, required).Replace('\\', '/')))
@@ -76,12 +88,22 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
                 throw new SpeechException($"Súbor {relative} rozpoznávania reči chýba alebo je zmenený – nespustil sa. Preinštalujte UNIVERSUM.");
             }
         }
+
+        // nothing else may lie there: whisper loads libraries from its folder (a stray ggml-*.dll would run unchecked)
+        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            if (relative != ManifestName && !files.ContainsKey(relative))
+            {
+                throw new SpeechException($"V priečinku rozpoznávania reči je neznámy súbor {relative} – nespustilo sa nič. Preinštalujte UNIVERSUM.");
+            }
+        }
     }
 
     /// <summary>Writes the manifest of all files in the folder (the build does this once the tools are in place).</summary>
     public static async Task WriteManifestAsync(string folder, CancellationToken cancellationToken = default)
     {
-        var root = Path.GetFullPath(folder);
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {

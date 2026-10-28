@@ -18,7 +18,7 @@ public static class CzechOrSlovak
         [
             "sa", "som", "sme", "ste", "sú", "nie", "pre", "čo", "ako", "keď", "aj", "len", "tiež", "teraz", "ešte", "vo", "ktorý", "ktorá",
             "ktoré", "ktorí", "bol", "bola", "bolo", "boli", "byť", "môže", "môžem", "môžeš", "áno", "ďakujem", "nič", "niečo", "všetko",
-            "prečo", "chcem", "viem", "neviem", "povedal", "teda", "všetci", "človek", "alebo", "pretože", "ma", "iba", "lebo", "so",
+            "prečo", "chcem", "viem", "neviem", "povedal", "všetci", "človek", "alebo", "pretože", "ma", "iba", "lebo", "so",
         ],
         StringComparer.Ordinal);
 

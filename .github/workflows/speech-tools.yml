@@ -6,6 +6,11 @@ name: Speech tools
 # speech/ for the program, source/ with the FFmpeg source for the release).
 on:
   workflow_call:
+    inputs:
+      cache-only:
+        description: 'Use only the tools CI already prepared (the release downloads and builds nothing unpinned)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,10 +29,16 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: speech-tools
-          key: speech-tools-${{ hashFiles('tools/speech/**') }}
+          key: speech-tools-${{ hashFiles('tools/speech/**', '.github/workflows/speech-tools.yml') }}
+
+      - name: Prepared by CI
+        if: steps.cache.outputs.cache-hit != 'true' && inputs.cache-only
+        run: |
+          echo "::error::The speech tools for this commit are not in the cache (kept 7 days after last use) – run CI on main first (Actions → CI → Run workflow on main), then release."
+          exit 1
 
       - name: Build and check
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' && !inputs.cache-only
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends mingw-w64 nasm libz-mingw-w64-dev curl unzip xz-utils

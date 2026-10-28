@@ -155,6 +155,24 @@ public sealed class TmdbTests
     }
 
     [Test]
+    public async Task ATranslationOfTheYearWinsOverANeighbour()
+    {
+        // two invented films carry the same Czech translation; the file has the year of the second
+        const string earlier = """{"id":990011,"title":"Carp Returns","original_title":"Carp Returns","release_date":"2020-05-01"}""";
+        const string exact = """{"id":990012,"title":"The Carp Comes Back","original_title":"The Carp Comes Back","release_date":"2021-05-01"}""";
+        const string names = ""","alternative_titles":{"titles":[]},"translations":{"translations":[{"iso_639_1":"cs","data":{"title":"Kapr návrat"}}]}}""";
+        var server = new Server();
+        server.Answers["/3/search/movie"] = """{"results":[""" + earlier + "," + exact + "]}";
+        server.Answers["/3/movie/990011"] = earlier[..^1] + names;
+        server.Answers["/3/movie/990012"] = exact[..^1] + names;
+        var search = new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: Fast), null);
+
+        var results = await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2021);
+        Assert.Equal(990012, results.Best("Kapr návrat", 2021)?.Id, "the film of the year, though TMDB lists the neighbour first");
+        Assert.Equal(990011, (await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2019)).Best("Kapr návrat", 2019)?.Id, "a neighbour when no film of the year has the name");
+    }
+
+    [Test]
     public async Task RequestsAreSpacedOut()
     {
         var pacer = new RequestPacer(20);

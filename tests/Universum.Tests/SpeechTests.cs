@@ -98,7 +98,7 @@ public sealed class SpeechTests
             var slovak = await SpokenLanguage.DetectAsync(tools, unsure, "film.mkv", 0, TimeSpan.FromMinutes(100));
             Assert.Equal("sk", slovak.Language);
             Assert.Equal(5, unsure.Heard, "not sure enough: all five pieces");
-            Assert.True(!Directory.EnumerateFiles(Path.Combine(Path.GetTempPath(), "UNIVERSUM"), "speech-*.wav").Any(), "pieces are deleted");
+            Assert.True(!Directory.EnumerateDirectories(Path.GetTempPath(), "UNIVERSUM-speech-*").Any(), "the folder of the pieces is deleted");
 
             // Slovak heard as Czech: the Slovak transcription is surer of its words – Slovak, with a note
             var dubbed = new StandIn(tools, _ => 0.3, "cs", 0.62, l => l == "sk" ? 0.8 : 0.6);
@@ -106,7 +106,12 @@ public sealed class SpeechTests
             Assert.Equal("sk", fixedUp.Language);
             Assert.Sequence(["cs", "sk"], dubbed.Transcribed, "the clearest piece transcribed in both");
             Assert.True(fixedUp.SlovakMargin > 0.2 && fixedUp.Doubt?.StartsWith("podľa prepisu slovenčina, nie čeština", StringComparison.Ordinal) == true, fixedUp.Doubt ?? "no doubt");
-            Assert.True(!Directory.EnumerateFiles(Path.Combine(Path.GetTempPath(), "UNIVERSUM"), "speech-*").Any(), "the kept piece and the transcriptions are deleted");
+            Assert.True(!Directory.EnumerateDirectories(Path.GetTempPath(), "UNIVERSUM-speech-*").Any(), "the kept piece and the transcriptions are deleted");
+
+            // the pieces split between Czech and Slovak: the transcriptions are compared all the same – a suggestion to check
+            var split = new StandIn(tools, _ => 0.3, null, 0, l => l == "sk" ? 0.8 : 0.6) { Languages = ["cs", "sk", "cs", "sk", "en"] };
+            var splitResult = await SpokenLanguage.DetectAsync(tools, split, "film.mkv", 0, TimeSpan.FromMinutes(100));
+            Assert.True(splitResult is { Language: "sk", NeedsOwnConfirmation: true } && split.Transcribed.Count == 2, $"split vote: {splitResult.Language} {splitResult.Doubt}");
             var close = await SpokenLanguage.DetectAsync(tools, new StandIn(tools, _ => 0.3, "cs", 0.9, l => l == "sk" ? 0.71 : 0.7), "film.mkv", 0, TimeSpan.FromMinutes(100));
             Assert.True(close is { Language: "cs", Doubt: not null } && close.Doubt.StartsWith("čeština alebo slovenčina – overte", StringComparison.Ordinal), "too close: " + close.Doubt);
             var english = new StandIn(tools, _ => 0.3, "en", 0.9, _ => 0.9);
@@ -142,6 +147,18 @@ public sealed class SpeechTests
     }
 
     [Test]
+    public async Task AMissingInputFileDoesNotHang()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"universum-missing-{Guid.NewGuid():N}.wav");
+        var request = OperatingSystem.IsWindows()
+            ? new ProcessRequest("cmd.exe", ["/c", "more"]) { StandardInputFile = missing, Timeout = TimeSpan.FromSeconds(20) }
+            : new ProcessRequest("cat", []) { StandardInputFile = missing, Timeout = TimeSpan.FromSeconds(20) };
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var result = await new ProcessRunner().RunAsync(request);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10) && result.StandardOutput.Trim().Length == 0, $"the input is closed at once ({watch.Elapsed.TotalSeconds:0.0} s)");
+    }
+
+    [Test]
     public async Task ManifestGuardsTheTools()
     {
         var folder = NewFolder();
@@ -150,6 +167,12 @@ public sealed class SpeechTests
             Assert.Equal<SpeechTools?>(null, SpeechTools.In(folder), "nothing installed");
             var tools = FakeTools(folder);
             await tools.VerifyAsync();
+
+            File.WriteAllText(Path.Combine(folder, "whisper", "ggml-cpu-extra.dll"), "not listed");
+            var stray = await Assert.ThrowsAsync<SpeechException>(() => tools.VerifyAsync());
+            Assert.True(stray.Message.Contains("neznámy súbor whisper/ggml-cpu-extra.dll", StringComparison.Ordinal), stray.Message);
+            File.Delete(Path.Combine(folder, "whisper", "ggml-cpu-extra.dll"));
+            await (SpeechTools.In(folder + Path.DirectorySeparatorChar) ?? throw new InvalidOperationException("folder with a separator")).VerifyAsync();
 
             File.AppendAllText(tools.Whisper, "changed");
             var error = await Assert.ThrowsAsync<SpeechException>(() => tools.VerifyAsync());
@@ -219,6 +242,9 @@ public sealed class SpeechTests
 
         public List<string> Transcribed { get; } = [];
 
+        /// <summary>The language heard in each piece in turn (instead of the one language).</summary>
+        public string[]? Languages { get; init; }
+
         public Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
         {
             if (request.FileName == tools.Ffmpeg)
@@ -247,7 +273,8 @@ public sealed class SpeechTests
             }
 
             Heard++;
-            var output = language is null ? "error: failed to process audio" : $"whisper_full_with_state: auto-detected language: {language} (p = {probability:0.000000})";
+            var (heardLanguage, p2) = Languages is { } each ? (each[(Heard - 1) % each.Length], 0.9) : (language, probability);
+            var output = heardLanguage is null ? "error: failed to process audio" : $"whisper_full_with_state: auto-detected language: {heardLanguage} (p = {p2:0.000000})";
             return Task.FromResult(new ProcessResult(0, "", output.Replace(',', '.'), TimeSpan.Zero));
         }
 

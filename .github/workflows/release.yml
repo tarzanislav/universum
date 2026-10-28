@@ -32,8 +32,11 @@ env:
 
 jobs:
   # FFmpeg (built from its source at a fixed commit), whisper.cpp and the speech model (fixed SHA-256)
+  # (only from the cache CI filled on main: the release itself installs and builds nothing)
   speech-tools:
     uses: ./.github/workflows/speech-tools.yml
+    with:
+      cache-only: true
 
   build:
     name: Build, test and pack (read-only, no secrets)

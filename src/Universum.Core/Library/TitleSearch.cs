@@ -102,8 +102,9 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
             return single;
         }
 
-        // the year in a file's name is often the year the film came out here, a year after its premiere (TMDB's year)
-        if (year is { } asked && !Titles.Any(t => t.Year == asked && t.IsNamed(name)) &&
+        // the year in a file's name is often the year the film came out here, a year after its premiere (TMDB's year) –
+        // only when no film of the year itself carries the name (all their names known), never one of two neighbours
+        if (year is { } asked && !Titles.Any(t => t.Year == asked && t.IsNamed(name)) && AllNamesKnown(asked) &&
             Titles.Where(t => t.Year is { } other && Math.Abs(other - asked) == 1 && t.IsNamed(name)).ToList() is { Count: 1 } near)
         {
             return near[0];
@@ -133,6 +134,9 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
         return inCatalog.Count == 1 ? inCatalog[0] : null;
     }
 
+    // the other names of every title of the year were read, or none had to be (TMDB itself named none of them so)
+    private bool AllNamesKnown(int year) => Titles.Where(t => t.Year == year).All(t => t.OtherTitlesRead);
+
     /// <summary>
     /// The only title of the year (a year more or less; any, without a year) when there is just one, though no name of it
     /// is the guessed one (TMDB found it by a name it does not list) – a suggestion that waits for the user's
@@ -156,7 +160,7 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
 public sealed class TitleSearch
 {
     // how many of the found titles have their other names read when none is named as asked
-    private const int OtherTitlesRead = 3;
+    private const int OtherTitlesRead = 4;
 
     private readonly TmdbClient? _tmdb;
     private readonly HistraCatalog? _histra;
@@ -298,35 +302,39 @@ public sealed class TitleSearch
     public void SaveCache() => _tmdb?.SaveCache();
 
     // TMDB answers in English: a name in another language (a file named by its Czech title) is matched by the other
-    // names of the likely titles (of the year, a year more or less), read best first until one of them carries it
+    // names of the likely titles – those of the year first (all of them, up to the limit), then those a year off – read
+    // in TMDB's order; a title of the year carrying the name ends the reading, one a year off does not (a film of the
+    // year itself might carry it too)
     private async Task<IReadOnlyList<TmdbTitle>> WithOtherTitlesAsync(IReadOnlyList<TmdbTitle> found, string name, int? year, CancellationToken cancellationToken)
     {
-        bool OfYear(TmdbTitle t) => year is null || t.Year is null || Math.Abs(t.Year.Value - year.Value) <= 1;
-        if (_tmdb is null || found.Count == 0 || string.IsNullOrWhiteSpace(name) || found.Any(t => OfYear(t) && t.IsNamed(name)))
+        bool Exact(TmdbTitle t) => year is null || t.Year is null || t.Year == year;
+        bool Near(TmdbTitle t) => year is { } y && t.Year is { } other && Math.Abs(other - y) == 1;
+        if (_tmdb is null || found.Count == 0 || string.IsNullOrWhiteSpace(name) || found.Any(t => Exact(t) && t.IsNamed(name)))
         {
             return found;
         }
 
         var titles = found.ToList();
-        var read = 0;
-        for (var i = 0; i < titles.Count && read < OtherTitlesRead; i++)
+        var order = Enumerable.Range(0, titles.Count).Where(i => Exact(titles[i]))
+            .Concat(Enumerable.Range(0, titles.Count).Where(i => Near(titles[i])))
+            .Take(OtherTitlesRead)
+            .ToList();
+        foreach (var i in order)
         {
-            if (!OfYear(titles[i]))
-            {
-                continue;
-            }
-
-            read++;
             try
             {
-                titles[i] = titles[i] with { OtherTitles = await _tmdb.OtherTitlesAsync(titles[i].Kind, titles[i].Id, cancellationToken).ConfigureAwait(false) };
+                titles[i] = titles[i] with
+                {
+                    OtherTitles = await _tmdb.OtherTitlesAsync(titles[i].Kind, titles[i].Id, cancellationToken).ConfigureAwait(false),
+                    OtherTitlesRead = true,
+                };
             }
             catch (TmdbException)
             {
                 return titles; // the names could not be read: the titles stand as found
             }
 
-            if (titles[i].IsNamed(name))
+            if (Exact(titles[i]) && titles[i].IsNamed(name))
             {
                 break;
             }

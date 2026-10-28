@@ -164,9 +164,11 @@ public static partial class TitleGuess
             tmdbId = Id(idMatch.Groups["id"].Value);
         }
 
-        // "[2021]" is a year; other brackets are tags of the release
-        var text = Brackets().Replace(BracketedYear().Replace(name, " (${year}) "), " ");
-        if (!text.Contains(' ', StringComparison.Ordinal))
+        // "[2021]" after the title is its year; other brackets (and a year in front of it) are tags of the release.
+        // Dots and underscores separate the words when the name itself has no spaces (brackets aside).
+        var spaced = Brackets().Replace(name, "").Trim().Contains(' ', StringComparison.Ordinal);
+        var text = Brackets().Replace(BracketedYear().Replace(name, m => m.Index > 0 && name[..m.Index].Trim().Length > 0 ? " (" + m.Groups["year"].Value + ") " : m.Value), " ");
+        if (!spaced)
         {
             text = text.Replace('.', ' ').Replace('_', ' ');
         }
@@ -185,7 +187,7 @@ public static partial class TitleGuess
         }
 
         // "Nine Puzzles.S01E09": a clear episode number inside a word starts a word of its own
-        // "Zlatá rybka.2021.WEB-DL.CZ": words joined by dots after a name with spaces are words of their own
+        // "Zlatý kapor.2021.WEB-DL.CZ": words joined by dots after a name with spaces are words of their own
         var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .SelectMany(ReleaseWords)
             .SelectMany(t => EpisodeParser.IndexOfClearNumber(t) is > 0 and var at ? [t[..at].TrimEnd('.', '_', '-'), t[at..]] : new[] { t })
@@ -209,7 +211,7 @@ public static partial class TitleGuess
             }
         }
 
-        // the year: the last year-like word of the title part that is not its first word ("Zlatá rybka - Návrat 2021
+        // the year: the last year-like word of the title part that is not its first word ("Zlatý kapor - Návrat 2021
         // 1080p": the part after the dash belongs to the title); without a year a dash ends the title
         int? year = null;
         for (var i = end - 1; i > 0; i--)
@@ -222,7 +224,7 @@ public static partial class TitleGuess
             }
         }
 
-        // "Zlatá rybka.CZ.dabing.2021.1080p": a year among the release words right after the title
+        // "Zlatý kapor.CZ.dabing.2021.1080p": a year among the release words right after the title
         for (var i = end; year is null && i < tokens.Length; i++)
         {
             var token = tokens[i].Trim('(', ')', ',');

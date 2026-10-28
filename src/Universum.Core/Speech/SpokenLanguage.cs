@@ -22,6 +22,9 @@ public sealed record SpokenLanguageResult(string? Language, double Agreement, IR
 
     /// <summary>How much surer whisper was of the Slovak than of the Czech transcription (negative = Czech).</summary>
     public double? SlovakMargin => Comparison?.Margin;
+
+    /// <summary>The suggestion must be checked track by track ("… – overte"), not confirmed with the others at once.</summary>
+    public bool NeedsOwnConfirmation => Doubt?.Contains("overte", StringComparison.Ordinal) == true;
 }
 
 /// <summary>The clearest piece transcribed as Czech and as Slovak.</summary>
@@ -79,113 +82,127 @@ public static partial class SpokenLanguage
 
     /// <summary>The language of the audio track with this number among the file's audio tracks (0 = the first).</summary>
     /// <param name="pieceDone">Reports each finished piece (1, 2, …).</param>
+    /// <exception cref="SpeechException">A tool is missing, cannot start, does not finish in time, or a piece cannot be read.</exception>
     public static async Task<SpokenLanguageResult> DetectAsync(
         SpeechTools tools, IProcessRunner runner, string path, int audioOrdinal, TimeSpan? duration,
         IProgress<int>? pieceDone = null, CancellationToken cancellationToken = default)
     {
-        var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM");
-        Directory.CreateDirectory(folder);
-        var pieces = new List<SpeechPiece>();
-        string? problem = null;
-        (string Wave, double Probability)? clearest = null; // the surest Czech or Slovak piece, kept for the comparison
+        if (!File.Exists(tools.Ffmpeg) || !File.Exists(tools.Whisper))
+        {
+            throw new SpeechException("Nástroje rozpoznávania reči chýbajú – preinštalujte UNIVERSUM.");
+        }
+
+        // a new folder with a random name for the pieces and transcriptions: it is whisper's working folder when it
+        // transcribes, and whisper also looks there for its libraries – nothing can be prepared in it in advance
+        string folder;
         try
         {
-            foreach (var at in Positions(duration))
-            {
-                // three pieces that agree are enough
-                if (pieces.Count >= 3 && IsClear(pieces))
-                {
-                    break;
-                }
+            folder = Directory.CreateTempSubdirectory("UNIVERSUM-speech-").FullName;
+        }
+        catch (IOException ex)
+        {
+            throw new SpeechException("Dočasný priečinok pre úseky zvuku sa nedá vytvoriť: " + ex.Message, ex);
+        }
 
-                var wave = Path.Combine(folder, $"speech-{Guid.NewGuid():N}.wav");
-                try
-                {
-                    if (!File.Exists(tools.Ffmpeg) || !File.Exists(tools.Whisper))
-                    {
-                        throw new SpeechException("Nástroje rozpoznávania reči chýbajú – preinštalujte UNIVERSUM.");
-                    }
-
-                    var cut = await runner.RunAsync(new ProcessRequest(tools.Ffmpeg, CutArguments(path, audioOrdinal, at, wave)) { Timeout = TimeSpan.FromMinutes(3) },
-                        cancellationToken).ConfigureAwait(false);
-                    if (cut.ExitCode != 0 || !File.Exists(wave))
-                    {
-                        problem ??= LastLine(cut.StandardError);
-                        pieces.Add(new SpeechPiece(at, null, 0));
-                        continue;
-                    }
-
-                    if (Loudness(wave) is not { } decibels || decibels < SilenceDecibels)
-                    {
-                        pieces.Add(new SpeechPiece(at, null, 0, Silent: true)); // silence, or nothing after the end of a shorter film
-                        continue;
-                    }
-
-                    var heard = await runner.RunAsync(WhisperRequest(tools, wave), cancellationToken).ConfigureAwait(false);
-                    if (ParseDetected(heard.StandardError + "\n" + heard.StandardOutput) is { } detected)
-                    {
-                        pieces.Add(new SpeechPiece(at, detected.Language, detected.Probability));
-                        if (detected.Language is "cs" or "sk" && detected.Probability > (clearest?.Probability ?? 0))
-                        {
-                            if (clearest is { } previous)
-                            {
-                                File.Delete(previous.Wave);
-                            }
-
-                            clearest = (wave, detected.Probability);
-                        }
-                    }
-                    else
-                    {
-                        problem ??= LastLine(heard.StandardError);
-                        pieces.Add(new SpeechPiece(at, null, 0));
-                    }
-                }
-                catch (ProcessStartException ex)
-                {
-                    throw new SpeechException("Nástroj rozpoznávania reči sa nedá spustiť: " + ex.Message, ex);
-                }
-                finally
-                {
-                    if (clearest?.Wave != wave)
-                    {
-                        File.Delete(wave);
-                    }
-
-                    pieceDone?.Report(pieces.Count);
-                }
-            }
-
-            if (pieces.All(p => p is { Language: null, Silent: false }) && problem is not null)
-            {
-                throw new SpeechException("Reč sa nepodarilo spracovať: " + problem);
-            }
-
-            var decided = Decide(pieces);
-            if (decided.Language is "cs" or "sk" && clearest is { } piece)
-            {
-                try
-                {
-                    if (await CompareCzechSlovakAsync(tools, runner, piece.Wave, cancellationToken).ConfigureAwait(false) is { } comparison)
-                    {
-                        decided = WithComparison(decided, comparison);
-                    }
-                }
-                catch (ProcessStartException ex)
-                {
-                    throw new SpeechException("Nástroj rozpoznávania reči sa nedá spustiť: " + ex.Message, ex);
-                }
-            }
-
-            return decided;
+        try
+        {
+            return await DetectInAsync(folder, tools, runner, path, audioOrdinal, duration, pieceDone, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ProcessStartException ex)
+        {
+            throw new SpeechException("Nástroj rozpoznávania reči sa nedá spustiť: " + ex.Message, ex);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new SpeechException("Nástroj rozpoznávania reči neskončil včas (súbor je možno na pomalom disku alebo v sieti) – skúste to znova.", ex);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new SpeechException("Úsek zvuku sa nedá zapísať alebo prečítať: " + ex.Message, ex);
         }
         finally
         {
-            if (clearest is { } kept)
+            try
             {
-                File.Delete(kept.Wave);
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // a piece still held by a tool that was just stopped; the folder is only in the temporary files
             }
         }
+    }
+
+    private static async Task<SpokenLanguageResult> DetectInAsync(
+        string folder, SpeechTools tools, IProcessRunner runner, string path, int audioOrdinal, TimeSpan? duration,
+        IProgress<int>? pieceDone, CancellationToken cancellationToken)
+    {
+        var pieces = new List<SpeechPiece>();
+        string? problem = null;
+        (string Wave, double Probability)? clearest = null; // the surest Czech or Slovak piece, kept for the comparison
+        foreach (var at in Positions(duration))
+        {
+            // three pieces that agree are enough
+            if (pieces.Count >= 3 && IsClear(pieces))
+            {
+                break;
+            }
+
+            var wave = Path.Combine(folder, $"piece-{pieces.Count + 1}.wav");
+            var cut = await runner.RunAsync(new ProcessRequest(tools.Ffmpeg, CutArguments(path, audioOrdinal, at, wave)) { Timeout = TimeSpan.FromMinutes(3) },
+                cancellationToken).ConfigureAwait(false);
+            if (cut.ExitCode != 0 || !File.Exists(wave))
+            {
+                problem ??= LastLine(cut.StandardError);
+                pieces.Add(new SpeechPiece(at, null, 0));
+            }
+            else if (Loudness(wave) is not { } decibels || decibels < SilenceDecibels)
+            {
+                pieces.Add(new SpeechPiece(at, null, 0, Silent: true)); // silence, or nothing after the end of a shorter film
+            }
+            else
+            {
+                var heard = await runner.RunAsync(WhisperRequest(tools, wave), cancellationToken).ConfigureAwait(false);
+                if (ParseDetected(heard.StandardError + "\n" + heard.StandardOutput) is { } detected)
+                {
+                    pieces.Add(new SpeechPiece(at, detected.Language, detected.Probability));
+                    if (detected.Language is "cs" or "sk" && detected.Probability > (clearest?.Probability ?? 0))
+                    {
+                        clearest = (wave, detected.Probability);
+                    }
+                }
+                else
+                {
+                    problem ??= LastLine(heard.StandardError);
+                    pieces.Add(new SpeechPiece(at, null, 0));
+                }
+            }
+
+            pieceDone?.Report(pieces.Count);
+        }
+
+        if (pieces.All(p => p is { Language: null, Silent: false }) && problem is not null)
+        {
+            throw new SpeechException("Reč sa nepodarilo spracovať: " + problem);
+        }
+
+        // Czech or Slovak – also when the pieces split between them – is compared by transcription
+        var decided = Decide(pieces);
+        if (clearest is { } piece && (decided.Language is "cs" or "sk" || CzechAndSlovakShare(pieces) > 0.5) &&
+            await CompareCzechSlovakAsync(tools, runner, piece.Wave, cancellationToken).ConfigureAwait(false) is { } comparison)
+        {
+            decided = WithComparison(decided, comparison);
+        }
+
+        return decided;
+    }
+
+    /// <summary>Share of Czech and Slovak together in the vote of the sure pieces (0–1).</summary>
+    public static double CzechAndSlovakShare(IReadOnlyList<SpeechPiece> pieces)
+    {
+        var sure = pieces.Where(p => p.Language is not null && p.Probability >= MinimumProbability).ToList();
+        var total = sure.Sum(p => p.Probability);
+        return total <= 0 ? 0 : sure.Where(p => p.Language is "cs" or "sk").Sum(p => p.Probability) / total;
     }
 
     /// <summary>
@@ -204,13 +221,14 @@ public static partial class SpokenLanguage
             return decided with { Comparison = comparison, Doubt = Join(czechOrSlovak, rest) };
         }
 
-        // the words say one, whisper's certainty clearly the other – or the words only lean: the user checks
-        if ((byCertainty is not null && byCertainty != language) || (comparison.TextLanguage is null && byCertainty is null))
+        // the words say one, whisper's certainty clearly the other – or the words only lean, or the pieces split between
+        // Czech and Slovak: the user checks
+        if ((byCertainty is not null && byCertainty != language) || (comparison.TextLanguage is null && byCertainty is null) || decided.Language is null)
         {
             rest = Join(czechOrSlovak, rest);
         }
 
-        if (language != decided.Language)
+        if (decided.Language is not null && language != decided.Language)
         {
             rest = Join($"podľa prepisu {(language == "sk" ? "slovenčina, nie čeština" : "čeština, nie slovenčina")}", rest);
         }

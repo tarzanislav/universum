@@ -21,6 +21,9 @@ public sealed record TmdbTitle(
     /// </summary>
     public IReadOnlyList<string> OtherTitles { get; init; } = [];
 
+    /// <summary>The other names were read (<see cref="OtherTitles"/> is then complete, even when empty).</summary>
+    public bool OtherTitlesRead { get; init; }
+
     /// <summary>True when a name is the title, the original title or one of its other names (ignoring case, diacritics and punctuation).</summary>
     public bool IsNamed(string? name)
     {

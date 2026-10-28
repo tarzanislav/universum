@@ -104,6 +104,9 @@ public sealed class SlotRow : ObservableObject
 
     public bool HasSuggestion => _evidence is { Confidence: Confidence.Medium };
 
+    /// <summary>A doubtful suggestion that "Potvrdiť návrhy" leaves for the user's own choice at the track.</summary>
+    public bool NeedsOwnConfirmation => _evidence is { Confidence: Confidence.Medium, NeedsOwnConfirmation: true };
+
     /// <summary>The language is named in the track name ("CZ Dabing") and used without a choice.</summary>
     public bool IsNamedInTrack => _evidence is { Source: EvidenceSource.TrackName } && !Group.Decisions.Languages.ContainsKey(Key);
 
@@ -139,7 +142,7 @@ public sealed class SlotRow : ObservableObject
     public bool ConfirmSuggestion()
     {
         var changed = false;
-        if (_evidence is { Confidence: Confidence.Medium } suggestion)
+        if (_evidence is { Confidence: Confidence.Medium, NeedsOwnConfirmation: false } suggestion)
         {
             Group.Decisions.Languages[Key] = suggestion.Language;
             changed = true;

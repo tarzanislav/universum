@@ -74,6 +74,7 @@ public sealed class ProcessRunner : IProcessRunner
         catch (OperationCanceledException)
         {
             Kill(process);
+            await writeInput.ConfigureAwait(false); // the input file is released before anyone deletes it
             if (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException($"Program '{request.FileName}' did not finish within {request.Timeout}.");
@@ -95,21 +96,30 @@ public sealed class ProcessRunner : IProcessRunner
         return locale.Contains("UTF-8", StringComparison.OrdinalIgnoreCase) || locale.Contains("utf8", StringComparison.OrdinalIgnoreCase);
     }
 
-    // the file to the program's standard input; a program that stops reading early (exits) is not an error
+    // the file to the program's standard input, which is closed in any case (the program never waits for more); a
+    // program that stops reading early (exits), a file that cannot be read or a stop is not an error here – the program's
+    // own result tells what happened
     private static async Task WriteInputAsync(Process process, string path, CancellationToken cancellationToken)
     {
         try
         {
-            await using (var input = File.OpenRead(path))
-            {
-                await input.CopyToAsync(process.StandardInput.BaseStream, cancellationToken).ConfigureAwait(false);
-            }
-
-            process.StandardInput.Close();
+            await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, useAsync: true);
+            await input.CopyToAsync(process.StandardInput.BaseStream, cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or ObjectDisposedException)
         {
-            // the program closed its input (it has ended)
+            // see above
+        }
+        finally
+        {
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+            {
+                // the program has ended
+            }
         }
     }
 

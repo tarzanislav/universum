@@ -157,7 +157,6 @@ internal static class SelfTest
         await TestDashboardAsync(model, window, services);
         await TestHistraListsAsync(model, window, services);
         await TestPremieresAsync(model, window, services);
-        await TestSeriesNewsAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -237,6 +236,7 @@ internal static class SelfTest
         model.Settings.RemoveHistraTokenCommand.Execute(null);
         Check(services.HistraToken is null, "settings: HISTRA token removed");
 
+        await TestSeriesNewsAsync(model, window, services);
         await TestBatchPageAsync(model, window, services);
 
         // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM

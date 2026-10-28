@@ -87,7 +87,7 @@ public partial class MainWindow : Window
     // the grid's details mode)
     private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
         e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,
-            new System.Windows.Data.Binding(nameof(NewsSeriesRow.IsExpanded)) { Converter = new BooleanToVisibilityConverter() });
+            new System.Windows.Data.Binding(nameof(NewsSeriesRow.IsExpanded)) { Converter = new System.Windows.Controls.BooleanToVisibilityConverter() });
 
     private Point _listDragStart;
 

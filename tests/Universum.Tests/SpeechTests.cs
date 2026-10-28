@@ -23,6 +23,18 @@ public sealed class SpeechTests
                                   "neskoro, ako to tu teraz je, čo sa stalo a prečo to tak je, keď už tu je.";
         var written = SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.85)]), Compared(0.01, slovakText, slovakText));
         Assert.True(written is { Language: "sk", Doubt: "podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku" }, "the written language decides – " + written.Doubt);
+        // the words are Slovak though whisper spelled them with ů and ě (as it does for Slovak speech it takes for Czech)
+        const string spelledCzech = "vytajte pri dnešnom príbehu. Malá dedina sa prebůdza, starý mlynář sa pozerá na řeku a hovorí, že dnes sa musí " +
+                                    "opraviť koleso, inak nebůde múka. Syn sa usmeje a ide pre vodu, keď je ešte tma.";
+        Assert.Equal("sk", new CzechSlovakComparison(-0.03, spelledCzech, spelledCzech).TextLanguage, "words over spelling");
+        Assert.Equal("cs", new CzechSlovakComparison(0, "Malá vesnice se probouzí, mlynář se dívá na řeku a říká, že jsem tady jen já, protože když…", "").TextLanguage);
+        Assert.Equal<string?>(null, new CzechSlovakComparison(0, "kapor v rybníku pláva", "").TextLanguage, "no telling words");
+        var leaning = SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.85)]), Compared(-0.03, "sa sa sa pre pre sa", "se se jsme mě"));
+        Assert.True(leaning is { Language: "sk" } && leaning.Doubt!.Contains("čeština alebo slovenčina – overte", StringComparison.Ordinal) &&
+                    leaning.Doubt.Contains("podľa prepisu slovenčina", StringComparison.Ordinal),
+            "the words lean to Slovak (6 : 4): Slovak to check – " + leaning.Doubt);
+        var disputed = SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.9), P("cs", 0.9)]), Compared(-0.3, spelledCzech, spelledCzech));
+        Assert.True(disputed is { Language: "sk" } && disputed.Doubt!.Contains("čeština alebo slovenčina – overte", StringComparison.Ordinal), "words against certainty – " + disputed.Doubt);
         Assert.True(SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.85)]), Compared(0.01)) is { Language: "cs" } unsure &&
                     unsure.Doubt == "čeština alebo slovenčina – overte; rozpoznané len z jedného úseku", "nothing tells them apart");
         Assert.Equal<double?>(null, SpokenLanguage.MeanLogProbability("""{"transcription":[{"text":" a","tokens":[{"text":" a","p":0.5}]}]}"""), "too few words");

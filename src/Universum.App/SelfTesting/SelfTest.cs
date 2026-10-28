@@ -949,7 +949,7 @@ internal static class SelfTest
             {
                 var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
                 Write($"speech detail: audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
-                      $"written in {result.Comparison?.TextLanguage ?? "–"}, pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, " +
+                      $"written in {result.Comparison?.TextLanguage ?? (result.Comparison?.TextLeaning is { } lean ? lean + "?" : "–")}, pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, " +
                       $"doubt: {result.Doubt} | as cs: {result.Comparison?.CzechText} | as sk: {result.Comparison?.SlovakText}");
             }
 

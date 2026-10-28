@@ -17,7 +17,20 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     public string Label => Group.Label;
 
     /// <summary>What the group holds, by the titles of its files without year and ID: "Zlatý kapor", "Zlatý kapor + 2 ďalšie".</summary>
-    public string Title { get => _title; set => SetProperty(ref _title, value); }
+    public string Title
+    {
+        get => _title.Length > 0 ? _title : "Skupina " + Label;
+        set
+        {
+            if (SetProperty(ref _title, value))
+            {
+                OnPropertyChanged(nameof(Tooltip));
+            }
+        }
+    }
+
+    /// <summary>"Skupina A: Zlatý kapor + 2 ďalšie" – the letter the report and universum-cli use.</summary>
+    public string Tooltip => $"Skupina {Label}: {Title}";
 
     public int Count => Group.Files.Count;
 

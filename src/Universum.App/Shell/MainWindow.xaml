@@ -1032,19 +1032,19 @@
 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="330" MinWidth="200" MaxWidth="700" />
+                        <ColumnDefinition Width="270" MinWidth="180" MaxWidth="700" />
                         <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" MinWidth="400" />
                     </Grid.ColumnDefinitions>
                     <DataGrid ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Skupina" Binding="{Binding Label}" />
-                            <DataGridTextColumn Header="Film / seriál" Binding="{Binding Title}" Width="*" MinWidth="90">
+                            <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
+                            <DataGridTextColumn Header="Skupina (film / seriál)" Binding="{Binding Title}" Width="*" MinWidth="90">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                        <Setter Property="ToolTip" Value="{Binding Title}" />
+                                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
@@ -1117,15 +1117,17 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
+                        <!-- the buttons wrap under the title when the pane is narrow -->
                         <DockPanel Grid.Row="2" Margin="0,10,0,0">
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <Button Content="Rozpoznať jazyk audiostôp" Command="{Binding DetectAudioCommand}" Margin="0,0,8,0" Padding="10,3"
+                            <TextBlock DockPanel.Dock="Left" Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
+                                       ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
+                            <WrapPanel HorizontalAlignment="Right">
+                                <Button Content="Rozpoznať jazyk audiostôp" Command="{Binding DetectAudioCommand}" Margin="0,0,8,4" Padding="10,3"
                                         ToolTip="Vypočuje si niekoľko úsekov z rôznych miest prvého súboru skupiny a navrhne jazyk reči (whisper.cpp, všetko len v počítači; trvá pár sekúnd na stopu)" />
-                                <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,0" Padding="10,3"
+                                <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
                                         ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
-                                <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Padding="10,3" />
-                            </StackPanel>
-                            <TextBlock Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
+                                <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
+                            </WrapPanel>
                         </DockPanel>
                         <DataGrid Grid.Row="3" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">

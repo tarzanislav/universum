@@ -29,11 +29,13 @@ public sealed record SpokenLanguageResult(string? Language, double Agreement, IR
 public sealed record CzechSlovakComparison(double Margin, string CzechText, string SlovakText)
 {
     /// <summary>
-    /// The language both transcriptions are written in, by their words and letters (whisper writes much of what it
-    /// hears: "som", "sa", ä/ô/ľ or "jsem", "se", ř/ě/ů) – cs or sk when they agree, otherwise null.
+    /// The language the words of both transcriptions belong to (se / sa, jsem / som, pro / pre…): whisper writes the
+    /// words it hears, though its spelling leans to Czech (ů, ě also in Slovak speech); null when they do not tell.
     /// </summary>
-    public string? TextLanguage =>
-        TextLanguageDetector.Detect(CzechText) is { } czech && czech == TextLanguageDetector.Detect(SlovakText) && czech is "cs" or "sk" ? czech : null;
+    public string? TextLanguage => CzechOrSlovak.Decide(CzechText, SlovakText);
+
+    /// <summary>The language the words lean to, though not clearly (a suggestion with a doubt); null when they do not.</summary>
+    public string? TextLeaning => CzechOrSlovak.Lean(CzechText, SlovakText);
 }
 
 /// <summary>
@@ -195,10 +197,17 @@ public static partial class SpokenLanguage
     {
         const string czechOrSlovak = "čeština alebo slovenčina – overte";
         var rest = Without(decided.Doubt, czechOrSlovak + "; ") is { } r && r != czechOrSlovak ? r : null;
-        var language = comparison.TextLanguage ?? (Math.Abs(comparison.Margin) >= ClearMargin ? (comparison.Margin > 0 ? "sk" : "cs") : null);
+        var byCertainty = Math.Abs(comparison.Margin) >= ClearMargin ? (comparison.Margin > 0 ? "sk" : "cs") : null;
+        var language = comparison.TextLanguage ?? byCertainty ?? comparison.TextLeaning;
         if (language is null)
         {
             return decided with { Comparison = comparison, Doubt = Join(czechOrSlovak, rest) };
+        }
+
+        // the words say one, whisper's certainty clearly the other – or the words only lean: the user checks
+        if ((byCertainty is not null && byCertainty != language) || (comparison.TextLanguage is null && byCertainty is null))
+        {
+            rest = Join(czechOrSlovak, rest);
         }
 
         if (language != decided.Language)

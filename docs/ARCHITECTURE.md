@@ -121,6 +121,15 @@ in next to it without changing the rules, planning or UI.
   TMDB key; `Request` sends it only to histra.net over HTTPS. `HistraClient` is ready for the endpoints: requests
   through `RequestPacer.Histra` (2 per second), 429/5xx waited out like TMDB, 401/403 explained, answers limited to
   4 MiB, redirects elsewhere refused. No HISTRA requests are made yet (endpoints and the TMDB synchronisation to come).
+- `Library/Histra/HistraLists` – Listy z HISTRA (owner, 28 Oct 2026): the user's lists are only read (overview with
+  preview posters, then each chosen list with all its titles, page by page until the item count is reached or a page
+  brings nothing new); nothing is ever written to HISTRA. `HistraListStore` keeps the imported lists in one file of the
+  Windows account; they are refreshed only by the Synchronizovať button, and a list HISTRA no longer has stays marked.
+  Every text from a web answer goes through `Text/WebText` (control, direction and invisible characters removed).
+- `Library/PosterCache` – posters from the poster server of the settings (TMDB's image server by default; HISTRA gives
+  poster paths in TMDB's form): only "/name.jpg|png" paths, HTTPS, no redirect to another host, at most 2 MiB, a real
+  JPEG/PNG signature; each poster is downloaded once and kept on the disk. `Library/TitleLinks` builds the only
+  addresses a title opens in the browser (HISTRA, TMDB, IMDb by ID, a ČSFD search).
 - TMDB attribution: the notice and the official logo `Assets/tmdb-logo.svg` (blue_short from
   https://www.themoviedb.org/about/logos-attribution, SHA-256 = the fingerprint in its official file name
   `8e7b30f7…5f6c`, kept byte-identical) shown as `tmdb-logo.png` rendered from it (WPF draws no SVG), smaller than the

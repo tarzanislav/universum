@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -139,9 +140,9 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
               "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGAspracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
-            "left rail: Dashboard, then the groups Multiplexing, Šablóny and Štatistika");
+            "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 
@@ -152,6 +153,7 @@ internal static class SelfTest
         }
 
         await TestDashboardAsync(model, window, services);
+        await TestHistraListsAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -714,6 +716,184 @@ internal static class SelfTest
               settings.WeatherStatus.StartsWith("Počasie pre: Vymyslená Lehota – okres Druhý", StringComparison.Ordinal) &&
               dashboard.PlaceText == "Vymyslená Lehota, okres Druhý",
             $"settings: the chosen town is stored and shown with its district – {settings.WeatherStatus} | {dashboard.PlaceText}");
+    }
+
+    /// <summary>
+    /// Listy z HISTRA with invented lists (HISTRA and the poster server answer here, nothing goes to the internet): the
+    /// import window with preview posters, a list read in pages, only GET requests, the detail with IDs and links,
+    /// synchronisation keeping a list HISTRA no longer has, removal, and the lists kept for the next start.
+    /// </summary>
+    private static async Task TestHistraListsAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var page = model.HistraLists;
+        model.Open(page);
+        Check(!page.CanUse && page.Requirement.Contains("token HISTRA", StringComparison.Ordinal) && page.IsEmpty, "lists: a HISTRA token is needed – " + page.Requirement);
+
+        var histra = new FakeHistra();
+        var http = new System.Net.Http.HttpClient(histra);
+        services.HistraListsForSelfTest = new Core.Library.Histra.HistraLists(new Core.Library.Histra.HistraClient(http, "hst_selftest-0123456789", new RequestPacer(1000)));
+        services.PostersForSelfTest = new PosterCache(http, Path.Combine(_outputDirectory, "posters"), PosterCache.DefaultServer);
+        page.Refresh();
+        Check(page.CanUse && page.ImportCommand.CanExecute(null), "lists: import possible with HISTRA");
+
+        var import = await page.PrepareImportAsync();
+        Check(import is { Rows.Count: 3 } && import.Rows.All(r => !r.IsChecked) && import.Rows[0].Posters.Count == 5,
+            "lists: the overview of the lists with five preview posters – " + page.Status);
+        if (import is null)
+        {
+            return;
+        }
+
+        var importWindow = new HistraImportWindow(import) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        importWindow.Show();
+        await WaitFor(() => import.Rows.SelectMany(r => r.Posters).All(p => p.Image is not null));
+        await Screenshot(importWindow, "histra-import.png");
+        importWindow.Close();
+
+        import.Rows[0].IsChecked = true;
+        import.Rows[1].IsChecked = true;
+        Check(import.ImportText == "Importovať vybrané (2)", "lists: two lists chosen – " + import.ImportText);
+        await page.ImportAsync(import.Chosen);
+        Check(page.Lists.Count == 2 && page.Lists[0].All.Count == 30 && page.Lists[1].All.Count == 3,
+            $"lists: imported with all titles, read in pages – {page.Status}");
+        Check(histra.Requests.All(r => r.Method == "GET") && histra.Requests.Count(r => r.Address.Contains("/api/v1/lists/1?", StringComparison.Ordinal)) == 2,
+            "lists: only read from HISTRA, the long list in pages – " + string.Join(" | ", histra.Requests.Select(r => $"{r.Method} {r.Address}")));
+        Check(page.Lists[0].Visible.Count == HistraListRow.Collapsed && page.Lists[0].ExpandText.StartsWith("Zobraziť všetky (30)", StringComparison.Ordinal),
+            "lists: the first posters, then Zobraziť všetky – " + page.Lists[0].ExpandText);
+        Check(File.Exists(AppSettings.HistraListsFile), "lists: kept in a file of this account");
+
+        page.Filter = "pribeh 2";
+        Check(page.Lists[0].Visible.Count == 9 && page.Lists[0].FilterResult == "Zhoda: 9", "lists: search without diacritics – " + page.Lists[0].FilterResult);
+        page.Filter = "";
+
+        var opened = new List<Uri>();
+        var browser = Browser.Open;
+        Browser.Open = opened.Add;
+        var film = page.Lists[0].All[0];
+        film.OpenCommand.Execute(null);
+        Check(page.Selected == film && film.Caption == "Invented Story 1 (1991)" && film.LocalTitle == "Vymyslený príbeh 1",
+            $"lists: the detail of a title – {film.Caption} / {film.LocalTitle}");
+        Check(string.Join(", ", film.Links.Select(l => $"{l.Text} {l.Address.AbsoluteUri}")) ==
+              "HISTRA https://histra.net/movie/1001, TMDB https://www.themoviedb.org/movie/9001, IMDb https://www.imdb.com/title/tt0009001/, " +
+              "ČSFD (hľadať) https://www.csfd.cz/hledat/?q=Invented%20Story%201",
+            "lists: links of the title – " + string.Join(", ", film.Links.Select(l => $"{l.Text} {l.Address.AbsoluteUri}")));
+        Check(string.Join(", ", film.Ids.Select(i => $"{i.Name} {i.Value}")) == "HISTRA 1001, TMDB 9001, IMDb tt0009001, Trakt 5001",
+            "lists: IDs of the title – " + string.Join(", ", film.Ids.Select(i => $"{i.Name} {i.Value}")));
+        film.Links[0].OpenCommand.Execute(null);
+        Check(opened.Count == 1 && opened[0].AbsoluteUri == "https://histra.net/movie/1001", "lists: the HISTRA link opens the title's page");
+        Browser.Open = browser;
+        await WaitFor(() => page.Lists.SelectMany(l => l.Visible).All(r => r.SmallPoster.Image is not null) && film.LargePoster.Image is not null);
+        await Screenshot(window, "histra-lists.png");
+
+        histra.Deleted.Add(2);
+        await page.SyncAsync();
+        Check(page.Lists.Count == 2 && page.Lists[1].Missing && page.Lists[1].All.Count == 3 && page.Status.Contains("v HISTRA už nie je: 1", StringComparison.Ordinal),
+            "lists: a list HISTRA no longer has stays, marked – " + page.Status);
+        page.Confirm = _ => true;
+        page.Lists[1].RemoveCommand.Execute(null);
+        Check(page.Lists.Count == 1, "lists: removed from UNIVERSUM");
+        var again = new HistraListsPageViewModel(services);
+        Check(again.Lists.Count == 1 && again.Lists[0].All.Count == 30 && again.Lists[0].All[0].Item.Ids.Tmdb == 9001, "lists: kept for the next start");
+
+        services.HistraListsForSelfTest = null;
+        services.PostersForSelfTest = null;
+        page.Refresh();
+        page.Selected = null;
+    }
+
+    private static async Task WaitFor(Func<bool> condition)
+    {
+        for (var i = 0; i < 50 && !condition(); i++)
+        {
+            await Task.Delay(100);
+        }
+    }
+
+    /// <summary>
+    /// HISTRA and its poster server with invented lists: three lists; the first has 30 titles, given at most 20 per page
+    /// (as HISTRA cuts the limit), the second three; a deleted list answers 404. Posters are drawn pictures.
+    /// </summary>
+    private sealed class FakeHistra : System.Net.Http.HttpMessageHandler
+    {
+        private readonly List<byte[]> _posters = Enumerable.Range(0, 6).Select(DrawPoster).ToList();
+
+        public List<(string Method, string Address)> Requests { get; } = [];
+
+        public HashSet<int> Deleted { get; } = [];
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var uri = request.RequestUri!;
+            lock (Requests)
+            {
+                Requests.Add((request.Method.Method, uri.AbsoluteUri));
+            }
+
+            if (uri.Host == "image.tmdb.org")
+            {
+                return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    RequestMessage = request,
+                    Content = new System.Net.Http.ByteArrayContent(_posters[(uri.AbsolutePath.Length + uri.AbsolutePath[^5]) % _posters.Count]),
+                });
+            }
+
+            var offset = System.Text.RegularExpressions.Regex.Match(uri.Query, "offset=([0-9]+)") is { Success: true } m ? int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            string? body = null;
+            if (uri.AbsolutePath == "/api/v1/lists")
+            {
+                body = offset > 0 ? """{"lists":[]}""" : """
+                    {"lists":[
+                      {"id":1,"name":"Vymyslené príbehy","description":"","visibility":"public","item_count":30,"updated_at":"2026-10-20T18:00:00.000000+00:00","owner_name":"","is_mine":true,"preview_posters":["/p1.jpg","/p2.jpg","/p3.jpg","/p4.jpg","/p5.jpg"]},
+                      {"id":2,"name":"Na víkend","description":"Pár vymyslených titulov","visibility":"private","item_count":3,"updated_at":"2026-10-25T09:30:00.000000+00:00","owner_name":"","is_mine":true,"preview_posters":["/p6.jpg","/p7.jpg"]},
+                      {"id":3,"name":"Cudzí list","item_count":12,"is_mine":false,"owner_name":"niekto","preview_posters":[]}
+                    ]}
+                    """;
+            }
+            else if (uri.AbsolutePath is "/api/v1/lists/1" or "/api/v1/lists/2")
+            {
+                var id = uri.AbsolutePath[^1] - '0';
+                var total = id == 1 ? 30 : 3;
+                if (!Deleted.Contains(id))
+                {
+                    var items = Enumerable.Range(offset + 1, Math.Max(0, Math.Min(20, total - offset)))
+                        .Select(i => id == 1 ? Item(i, i % 7 == 0) : Item(100 + i, i == 3));
+                    body = $$"""{"list":{"id":{{id}},"name":"{{(id == 1 ? "Vymyslené príbehy" : "Na víkend")}}","item_count":{{total}},"is_mine":true,"visibility":"public"},"items":[{{string.Join(",", items)}}]}""";
+                }
+            }
+
+            return Task.FromResult(body is null
+                ? new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { RequestMessage = request }
+                : new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    RequestMessage = request,
+                    Content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json"),
+                });
+        }
+
+        private static string Item(int i, bool series) =>
+            $$"""{"media_type":"{{(series ? "show" : "movie")}}","media_id":{{1000 + i}},"title":"Vymyslený {{(series ? "seriál" : "príbeh")}} {{i}}","original_title":"Invented {{(series ? "Series" : "Story")}} {{i}}","year":{{1990 + i}},"overview":"Vymyslený dej číslo {{i}} – len na skúšku programu.","rating":{{(5 + i % 5).ToString(CultureInfo.InvariantCulture)}}.4,"runtime":{{90 + i}},"poster_path":"/p{{i}}.jpg","external_ids":{"imdb":"tt{{9000 + i:0000000}}","tmdb":"{{9000 + i}}","trakt":"{{5000 + i}}"{{(series ? $","tvdb":"{7000 + i}"" : "")}}}{{(series ? ","status":"Returning Series"" : "")}},"genres":["Dráma","Sci-Fi"]}""";
+
+        // a coloured poster with a gradient (drawn on the window's thread, before any request comes)
+        private static byte[] DrawPoster(int seed)
+        {
+            var colors = new[] { (0x6C, 0x5C, 0xE7), (0x00, 0xB8, 0x94), (0xE1, 0x70, 0x55), (0x09, 0x84, 0xE3), (0xE8, 0x43, 0x93), (0xFD, 0xCB, 0x6E) };
+            var (r, g, b) = colors[seed % colors.Length];
+            var visual = new DrawingVisual();
+            using (var context = visual.RenderOpen())
+            {
+                context.DrawRectangle(new LinearGradientBrush(Color.FromRgb((byte)r, (byte)g, (byte)b), Color.FromRgb(0x1E, 0x1E, 0x2E), 90), null, new Rect(0, 0, 154, 231));
+                context.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF)), null, new Point(77, 80), 34, 34);
+            }
+
+            var bitmap = new RenderTargetBitmap(154, 231, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
     }
 
     /// <summary>The first element of this type below <paramref name="root"/> that matches.</summary>

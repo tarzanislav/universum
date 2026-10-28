@@ -157,6 +157,62 @@ public sealed class SettingsPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>Posters are shown (Listy z HISTRA, Premiéry, Novinky).</summary>
+    public bool PostersEnabled
+    {
+        get => _services.Settings.PostersEnabled;
+        set
+        {
+            if (value != _services.Settings.PostersEnabled)
+            {
+                _services.SetPosters(value, PosterCache.ParseServer(_services.Settings.PosterServer));
+                _posterStatus = value ? "Plagáty sa zobrazujú." : "Plagáty sa nezobrazujú a nič sa kvôli nim nesťahuje.";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PosterStatus));
+            }
+        }
+    }
+
+    /// <summary>The address of the poster server as typed.</summary>
+    public string PosterServerInput
+    {
+        get => _posterServerInput ??= _services.Settings.PosterServer ?? PosterCache.DefaultServer.AbsoluteUri;
+        set => SetProperty(ref _posterServerInput, value);
+    }
+
+    private string? _posterServerInput;
+    private string _posterStatus = "";
+
+    public string PosterStatus => _posterStatus.Length > 0 ? _posterStatus
+        : _services.Settings.PosterServer is null ? "Plagáty sú zo servera TMDB (HISTRA uvádza plagáty v tvare TMDB)." : $"Plagáty sú zo servera {_services.Settings.PosterServer}.";
+
+    public RelayCommand SavePosterServerCommand => _savePosterServer ??= new RelayCommand(() =>
+    {
+        if (PosterCache.ParseServer(PosterServerInput) is not { } server)
+        {
+            _posterStatus = "Adresa sa neuložila – musí to byť https://… bez mena a hesla, napr. " + PosterCache.DefaultServer.AbsoluteUri;
+        }
+        else
+        {
+            _services.SetPosters(PostersEnabled, server);
+            PosterServerInput = server.AbsoluteUri;
+            _posterStatus = $"Uložené – plagáty budú zo servera {server.Host} (stiahnuté plagáty ostávajú).";
+        }
+
+        OnPropertyChanged(nameof(PosterStatus));
+    });
+
+    public RelayCommand DefaultPosterServerCommand => _defaultPosterServer ??= new RelayCommand(() =>
+    {
+        _services.SetPosters(PostersEnabled, null);
+        PosterServerInput = PosterCache.DefaultServer.AbsoluteUri;
+        _posterStatus = "";
+        OnPropertyChanged(nameof(PosterStatus));
+    });
+
+    private RelayCommand? _savePosterServer;
+    private RelayCommand? _defaultPosterServer;
+
     /// <summary>What happens with TMDB and HISTRA together.</summary>
     public string SyncStatus =>
         _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – názvy sa hľadajú na TMDB a overujú v katalógu HISTRA (čo TMDB nenájde, hľadá sa v HISTRA); titul, ktorý HISTRA nepotvrdí, čaká na vaše potvrdenie."

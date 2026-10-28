@@ -34,16 +34,25 @@ public sealed class MainViewModel : ObservableObject
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
+        HistraLists = new HistraListsPageViewModel(services);
+        Premieres = new PlaceholderPageViewModel(
+            "Premiéry", "Premiéry filmov a seriálov – SK/CZ a svet, s odkazmi na TMDB a HISTRA.", "pripravuje sa v ďalšej časti");
+        SeriesNews = new PlaceholderPageViewModel(
+            "Novinky – Seriály", "Nové epizódy bežiacich seriálov – SK/CZ a svet, s odoslaním na spracovanie.", "pripravuje sa v ďalšej časti");
         Mega = new PlaceholderPageViewModel(
             "MEGAspracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
 
-        // the left rail: Dashboard on its own, then three framed groups, each with its own tint (owner's order, 27. 10.)
+        // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
+        var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
         var multiplexing = new ToolGroup("MULTIPLEXING", Color.FromRgb(0x4A, 0x7B, 0xD9));
         var templates = new ToolGroup("ŠABLÓNY (TEMPLATE)", Color.FromRgb(0x3E, 0xA8, 0x5F));
         var statistics = new ToolGroup("ŠTATISTIKA", Color.FromRgb(0xD9, 0x8B, 0x2B));
         Tools =
         [
             new("Dashboard", "\uE80F", Dashboard),
+            new("Premiéry", "\uE8B2", Premieres, news),
+            new("Novinky – Seriály", "\uE7F4", SeriesNews, news),
+            new("Listy z HISTRA", "\uE8F1", HistraLists, news),
             new("Zlučovanie", "\uE71D", Mux, multiplexing),
             new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
             new("Kapitoly", "\uE8FD", Chapters, multiplexing),
@@ -162,8 +171,17 @@ public sealed class MainViewModel : ObservableObject
 
     public IReadOnlyList<ToolItem> Tools { get; }
 
-    /// <summary>The tools as the left rail shows them: grouped (Multiplexing, Šablóny, Štatistika).</summary>
+    /// <summary>The tools as the left rail shows them: grouped (Novinky a obsah, Multiplexing, Šablóny, Štatistika).</summary>
     public ICollectionView ToolsView { get; }
+
+    /// <summary>Listy z HISTRA – the user's HISTRA lists, read only.</summary>
+    public HistraListsPageViewModel HistraLists { get; }
+
+    /// <summary>Premiéry – films and series (next part of the Novinky a obsah group).</summary>
+    public PlaceholderPageViewModel Premieres { get; }
+
+    /// <summary>Novinky – Seriály – new episodes (next part of the Novinky a obsah group).</summary>
+    public PlaceholderPageViewModel SeriesNews { get; }
 
     /// <summary>MEGAspracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
     public PlaceholderPageViewModel Mega { get; }

@@ -1629,11 +1629,11 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Názov filmu" Width="*" SortMemberPath="Caption">
+                            <DataGridTemplateColumn Header="Názov filmu" Width="*" MinWidth="240" SortMemberPath="Caption">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
-                                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
+                                            <TextBlock TextTrimming="CharacterEllipsis" FontWeight="SemiBold" ToolTip="{Binding Caption}">
                                                 <Hyperlink Command="{Binding OpenTmdbCommand}" ToolTip="Otvoriť na TMDB"><Run Text="{Binding Caption, Mode=OneWay}" /></Hyperlink>
                                             </TextBlock>
                                             <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -1645,8 +1645,8 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="190" ElementStyle="{StaticResource Cell}" />
-                            <DataGridTemplateColumn Header="Premiéra" Width="120" SortMemberPath="SortDate">
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="140" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="110" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1656,22 +1656,22 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="80" ElementStyle="{StaticResource Cell}" />
-                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="190" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="75" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="170" ElementStyle="{StaticResource Cell}" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <!-- series: title, production, premiere, day, periodicity, number of episodes -->
                     <DataGrid ItemsSource="{Binding SelectedTab.Rows}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                              HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single" RowHeight="58"
+                              HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single" RowHeight="64"
                               AlternatingRowBackground="{Binding SelectedTab.Stripe}" BorderThickness="1" BorderBrush="{Binding SelectedTab.Accent}"
                               RowStyle="{StaticResource PremiereRow}" ColumnHeaderStyle="{StaticResource PremiereHeader}"
                               Visibility="{Binding IsSeriesTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Názov seriálu" Width="*" SortMemberPath="Caption">
+                            <DataGridTemplateColumn Header="Názov seriálu" Width="*" MinWidth="240" SortMemberPath="Caption">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0" ToolTip="{Binding Genres}">
-                                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
+                                            <TextBlock TextTrimming="CharacterEllipsis" FontWeight="SemiBold" ToolTip="{Binding Caption}">
                                                 <Hyperlink Command="{Binding OpenTmdbCommand}" ToolTip="Otvoriť na TMDB"><Run Text="{Binding Caption, Mode=OneWay}" /></Hyperlink>
                                             </TextBlock>
                                             <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -1684,8 +1684,8 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="160" ElementStyle="{StaticResource Cell}" />
-                            <DataGridTemplateColumn Header="Premiéra" Width="140" SortMemberPath="SortDate">
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="140" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="130" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
@@ -1695,9 +1695,9 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="80" ElementStyle="{StaticResource Cell}" />
-                            <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="150" ElementStyle="{StaticResource Cell}" />
-                            <DataGridTextColumn Header="Počet epizód" Binding="{Binding Episodes}" Width="100" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="75" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="140" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Počet epizód" Binding="{Binding Episodes}" Width="90" ElementStyle="{StaticResource Cell}" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

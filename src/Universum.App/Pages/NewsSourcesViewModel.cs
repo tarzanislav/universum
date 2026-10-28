@@ -57,7 +57,8 @@ public sealed class NewsSourcesViewModel : ObservableObject
             var sources = _services.NewsSources.Where(s => !string.Equals(s.Name, rules.Name, StringComparison.OrdinalIgnoreCase)).Append(source).ToList();
             _services.SetNewsSources(sources);
             Reload();
-            Status = $"Zdroj „{rules.Name}“ je pridaný ({rules.PageAddress(DateOnly.FromDateTime(DateTime.Now)).Host}, {rules.DaysBack} dní dozadu a {rules.DaysAhead} dopredu).";
+            Status = $"Zdroj „{rules.Name}“ je pridaný ({rules.PageAddress(DateOnly.FromDateTime(DateTime.Now)).Host}, " +
+                     $"{Texts.Count(rules.DaysBack, "deň", "dni", "dní")} dozadu a {Texts.Count(rules.DaysAhead, "deň", "dni", "dní")} dopredu).";
             return true;
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
@@ -121,7 +122,8 @@ public sealed class NewsSourceRow(NewsSource source, NewsSourcesViewModel owner)
 
     public string Detail => source.Kind switch
     {
-        NewsSourceKind.Page when source.Rules is { } rules => $"{rules.DaysBack} dní dozadu, {rules.DaysAhead} dopredu · CZ/SK stanice: {rules.Domestic.Count}",
+        NewsSourceKind.Page when source.Rules is { } rules =>
+            $"{Texts.Count(rules.DaysBack, "deň", "dni", "dní")} dozadu, {Texts.Count(rules.DaysAhead, "deň", "dni", "dní")} dopredu · CZ/SK stanice: {rules.Domestic.Count}",
         NewsSourceKind.TvMaze => $"krajiny {string.Join(", ", source.Countries)} a streamovacie služby · popularita aspoň {source.MinWeight}",
         _ => "kľúč TMDB z karty TMDB",
     };

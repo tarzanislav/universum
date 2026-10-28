@@ -13,9 +13,18 @@ public sealed class SpeechTests
     {
         static SpeechPiece P(string? language, double p, bool silent = false) => new(TimeSpan.Zero, language, p, silent);
 
-        Assert.True(SpokenLanguage.WithSlovakMargin(SpokenLanguage.Decide([P("cs", 0.9), P("cs", 0.9)]), 0.3) is { Language: "sk", SlovakMargin: 0.3 }, "the transcription decides");
-        var agreed = SpokenLanguage.WithSlovakMargin(SpokenLanguage.Decide([P("cs", 0.8), P("sk", 0.6), P("cs", 0.7)]), -0.3);
+        static CzechSlovakComparison Compared(double margin, string czech = "", string slovak = "") => new(margin, czech, slovak);
+        Assert.True(SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.9), P("cs", 0.9)]), Compared(0.3)) is { Language: "sk", SlovakMargin: 0.3 }, "the certainty decides");
+        var agreed = SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.8), P("sk", 0.6), P("cs", 0.7)]), Compared(-0.3));
         Assert.True(agreed is { Language: "cs", Doubt: "úseky: čeština 2×, slovenčina 1×" }, "a clear Czech transcription removes the doubt – " + agreed.Doubt);
+
+        // both transcriptions written in Slovak (whisper writes what it hears): Slovak, though the certainty is close
+        const string slovakText = "Dobrý večer, vitajte pri dnešnom príbehu. Starý mlynár sa pozerá na rieku a hovorí, že som tu len ja, ale ešte nie je " +
+                                  "neskoro, ako to tu teraz je, čo sa stalo a prečo to tak je, keď už tu je.";
+        var written = SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.85)]), Compared(0.01, slovakText, slovakText));
+        Assert.True(written is { Language: "sk", Doubt: "podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku" }, "the written language decides – " + written.Doubt);
+        Assert.True(SpokenLanguage.WithComparison(SpokenLanguage.Decide([P("cs", 0.85)]), Compared(0.01)) is { Language: "cs" } unsure &&
+                    unsure.Doubt == "čeština alebo slovenčina – overte; rozpoznané len z jedného úseku", "nothing tells them apart");
         Assert.Equal<double?>(null, SpokenLanguage.MeanLogProbability("""{"transcription":[{"text":" a","tokens":[{"text":" a","p":0.5}]}]}"""), "too few words");
         Assert.Equal<double?>(null, SpokenLanguage.MeanLogProbability("not json"));
 

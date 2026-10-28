@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Universum.Core.Media;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Speech;
 
@@ -16,11 +17,23 @@ public sealed record SpeechPiece(TimeSpan At, string? Language, double Probabili
 /// <param name="Doubt">Why the suggestion should be checked carefully (Slovak), or null.</param>
 public sealed record SpokenLanguageResult(string? Language, double Agreement, IReadOnlyList<SpeechPiece> Pieces, string? Doubt)
 {
+    /// <summary>Czech against Slovak by transcription of the clearest piece; null when not compared.</summary>
+    public CzechSlovakComparison? Comparison { get; init; }
+
+    /// <summary>How much surer whisper was of the Slovak than of the Czech transcription (negative = Czech).</summary>
+    public double? SlovakMargin => Comparison?.Margin;
+}
+
+/// <summary>The clearest piece transcribed as Czech and as Slovak.</summary>
+/// <param name="Margin">Mean log-probability of the words of the Slovak transcription minus that of the Czech one.</param>
+public sealed record CzechSlovakComparison(double Margin, string CzechText, string SlovakText)
+{
     /// <summary>
-    /// Czech against Slovak by transcription: how much surer whisper was of the Slovak than of the Czech transcription
-    /// of the clearest piece (mean log-probability of its words; negative = Czech); null when not compared.
+    /// The language both transcriptions are written in, by their words and letters (whisper writes much of what it
+    /// hears: "som", "sa", ä/ô/ľ or "jsem", "se", ř/ě/ů) – cs or sk when they agree, otherwise null.
     /// </summary>
-    public double? SlovakMargin { get; init; }
+    public string? TextLanguage =>
+        TextLanguageDetector.Detect(CzechText) is { } czech && czech == TextLanguageDetector.Detect(SlovakText) && czech is "cs" or "sk" ? czech : null;
 }
 
 /// <summary>
@@ -151,9 +164,9 @@ public static partial class SpokenLanguage
             {
                 try
                 {
-                    if (await SlovakMarginAsync(tools, runner, piece.Wave, cancellationToken).ConfigureAwait(false) is { } margin)
+                    if (await CompareCzechSlovakAsync(tools, runner, piece.Wave, cancellationToken).ConfigureAwait(false) is { } comparison)
                     {
-                        decided = WithSlovakMargin(decided, margin);
+                        decided = WithComparison(decided, comparison);
                     }
                 }
                 catch (ProcessStartException ex)
@@ -174,39 +187,41 @@ public static partial class SpokenLanguage
     }
 
     /// <summary>
-    /// The comparison of the Czech and the Slovak transcription decides between the two: a clear margin sets the
-    /// language (and removes the Czech-or-Slovak doubt), a small one leaves the vote's language with a doubt.
+    /// The comparison of the Czech and the Slovak transcription decides between the two: the language both are written
+    /// in, or else a clear difference in whisper's certainty, sets the language (and removes the Czech-or-Slovak doubt;
+    /// a changed language is noted); otherwise the vote's language stays with a doubt.
     /// </summary>
-    public static SpokenLanguageResult WithSlovakMargin(SpokenLanguageResult decided, double margin)
+    public static SpokenLanguageResult WithComparison(SpokenLanguageResult decided, CzechSlovakComparison comparison)
     {
-        if (Math.Abs(margin) < ClearMargin)
+        const string czechOrSlovak = "čeština alebo slovenčina – overte";
+        var rest = Without(decided.Doubt, czechOrSlovak + "; ") is { } r && r != czechOrSlovak ? r : null;
+        var language = comparison.TextLanguage ?? (Math.Abs(comparison.Margin) >= ClearMargin ? (comparison.Margin > 0 ? "sk" : "cs") : null);
+        if (language is null)
         {
-            return decided with { SlovakMargin = margin, Doubt = Join("čeština alebo slovenčina – overte", Without(decided.Doubt, "čeština alebo slovenčina – overte; ")) };
+            return decided with { Comparison = comparison, Doubt = Join(czechOrSlovak, rest) };
         }
 
-        var language = margin > 0 ? "sk" : "cs";
-        var doubt = Without(decided.Doubt, "čeština alebo slovenčina – overte; ");
         if (language != decided.Language)
         {
-            doubt = Join($"podľa prepisu {(language == "sk" ? "slovenčina" : "čeština")}, nie {(language == "sk" ? "čeština" : "slovenčina")}", doubt);
+            rest = Join($"podľa prepisu {(language == "sk" ? "slovenčina, nie čeština" : "čeština, nie slovenčina")}", rest);
         }
 
-        return decided with { Language = language, SlovakMargin = margin, Doubt = doubt };
+        return decided with { Language = language, Comparison = comparison, Doubt = rest };
     }
 
     /// <summary>
-    /// Czech or Slovak: the piece is transcribed as Czech and as Slovak and whisper's certainty of each transcription
-    /// is compared (mean log-probability of its words); positive = Slovak. Null when it cannot be compared – also when
-    /// the model's folder has letters outside ASCII (whisper reads the model path as UTF-8, Windows passes the code page).
+    /// Czech or Slovak: the piece is transcribed as Czech and as Slovak, with whisper's certainty of each (mean
+    /// log-probability of its words). Null when it cannot be compared – also when the model's folder has letters
+    /// outside ASCII (whisper reads the model path as UTF-8, Windows passes the code page).
     /// </summary>
-    public static async Task<double?> SlovakMarginAsync(SpeechTools tools, IProcessRunner runner, string wave, CancellationToken cancellationToken = default)
+    public static async Task<CzechSlovakComparison?> CompareCzechSlovakAsync(SpeechTools tools, IProcessRunner runner, string wave, CancellationToken cancellationToken = default)
     {
         if (!tools.Model.All(char.IsAscii))
         {
             return null;
         }
 
-        var scores = new Dictionary<string, double>();
+        var transcripts = new Dictionary<string, (double Score, string Text)>();
         foreach (var language in new[] { "cs", "sk" })
         {
             // the transcription is written next to the piece, named relatively (the piece's folder is the working folder)
@@ -215,12 +230,12 @@ public static partial class SpokenLanguage
             try
             {
                 var result = await runner.RunAsync(TranscriptionRequest(tools, wave, language, name), cancellationToken).ConfigureAwait(false);
-                if (result.ExitCode != 0 || !File.Exists(json) || MeanLogProbability(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false)) is not { } score)
+                if (result.ExitCode != 0 || !File.Exists(json) || Transcript(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false)) is not { } transcript)
                 {
                     return null;
                 }
 
-                scores[language] = score;
+                transcripts[language] = transcript;
             }
             finally
             {
@@ -228,7 +243,7 @@ public static partial class SpokenLanguage
             }
         }
 
-        return scores["sk"] - scores["cs"];
+        return new CzechSlovakComparison(transcripts["sk"].Score - transcripts["cs"].Score, transcripts["cs"].Text, transcripts["sk"].Text);
     }
 
     /// <summary>whisper.cpp: the piece transcribed in one language, with the probability of every word (JSON next to the piece).</summary>
@@ -241,14 +256,22 @@ public static partial class SpokenLanguage
         };
 
     /// <summary>Mean natural logarithm of the probability of the words of a whisper.cpp JSON (special tokens left out); null below 5 words.</summary>
-    public static double? MeanLogProbability(string json)
+    public static double? MeanLogProbability(string json) => Transcript(json)?.Score;
+
+    /// <summary>
+    /// The text of a whisper.cpp JSON transcription and the mean natural logarithm of the probability of its words
+    /// (special tokens left out); null below 5 words or when it cannot be read.
+    /// </summary>
+    public static (double Score, string Text)? Transcript(string json)
     {
         try
         {
             using var document = System.Text.Json.JsonDocument.Parse(json);
             var logs = new List<double>();
+            var text = new System.Text.StringBuilder();
             foreach (var segment in document.RootElement.GetProperty("transcription").EnumerateArray())
             {
+                text.Append(segment.TryGetProperty("text", out var said) ? said.GetString() : "");
                 if (!segment.TryGetProperty("tokens", out var tokens))
                 {
                     continue;
@@ -256,8 +279,8 @@ public static partial class SpokenLanguage
 
                 foreach (var token in tokens.EnumerateArray())
                 {
-                    var text = token.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
-                    if (text.StartsWith("[_", StringComparison.Ordinal) || !token.TryGetProperty("p", out var p))
+                    var piece = token.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
+                    if (piece.StartsWith("[_", StringComparison.Ordinal) || !token.TryGetProperty("p", out var p))
                     {
                         continue;
                     }
@@ -266,7 +289,7 @@ public static partial class SpokenLanguage
                 }
             }
 
-            return logs.Count >= 5 ? logs.Average() : null;
+            return logs.Count >= 5 ? (logs.Average(), text.ToString().Trim()) : null;
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
         {

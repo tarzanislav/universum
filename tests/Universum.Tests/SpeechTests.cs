@@ -44,6 +44,13 @@ public sealed class SpeechTests
 
         var arguments = SpokenLanguage.CutArguments("film.mkv", 1, TimeSpan.FromSeconds(754.5), "piece.wav");
         Assert.True(string.Join(' ', arguments).Contains("-ss 754.5 -i film.mkv -map 0:a:1 -t 30", StringComparison.Ordinal), string.Join(' ', arguments));
+
+        // no path in whisper's arguments (Windows reads them in the system code page): the model in its folder, the piece on the input
+        var tools = new SpeechTools(Path.Combine("C:", "Používatelia", "Žltý kôň"), "ffmpeg.exe", "whisper-cli.exe", Path.Combine("C:", "Žltý kôň", "models", "ggml-base.bin"));
+        var whisper = SpokenLanguage.WhisperRequest(tools, Path.Combine("C:", "Žltý kôň", "piece.wav"));
+        Assert.True(whisper.Arguments.All(a => a.All(char.IsAscii)), string.Join(' ', whisper.Arguments));
+        Assert.Equal(Path.Combine("C:", "Žltý kôň", "models"), whisper.WorkingDirectory);
+        Assert.Equal(Path.Combine("C:", "Žltý kôň", "piece.wav"), whisper.StandardInputFile);
     }
 
     [Test]
@@ -72,6 +79,25 @@ public sealed class SpeechTests
         finally
         {
             Directory.Delete(folder, true);
+        }
+    }
+
+    [Test]
+    public async Task AFileGoesToTheStandardInput()
+    {
+        var file = Path.Combine(Path.GetTempPath(), $"universum-input-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(file, "kapor v rybníku\n");
+        try
+        {
+            var request = OperatingSystem.IsWindows()
+                ? new ProcessRequest("cmd.exe", ["/c", "more"]) { StandardInputFile = file, Timeout = TimeSpan.FromSeconds(30) }
+                : new ProcessRequest("cat", []) { StandardInputFile = file, Timeout = TimeSpan.FromSeconds(30) };
+            var result = await new ProcessRunner().RunAsync(request);
+            Assert.True(result.ExitCode == 0 && result.StandardOutput.Contains("kapor v rybn", StringComparison.Ordinal), result.StandardOutput + result.StandardError);
+        }
+        finally
+        {
+            File.Delete(file);
         }
     }
 

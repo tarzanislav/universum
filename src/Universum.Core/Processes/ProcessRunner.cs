@@ -15,7 +15,7 @@ public sealed class ProcessRunner : IProcessRunner
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = false,
+            RedirectStandardInput = request.StandardInputFile is not null,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
@@ -64,10 +64,12 @@ public sealed class ProcessRunner : IProcessRunner
         var error = new StringBuilder();
         var readOutput = ReadLinesAsync(process.StandardOutput, output, request.OnOutputLine);
         var readError = ReadLinesAsync(process.StandardError, error, null);
+        var writeInput = request.StandardInputFile is { } input ? WriteInputAsync(process, input, limit.Token) : Task.CompletedTask;
         try
         {
             await process.WaitForExitAsync(limit.Token).ConfigureAwait(false);
             await Task.WhenAll(readOutput, readError).ConfigureAwait(false);
+            await writeInput.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -91,6 +93,24 @@ public sealed class ProcessRunner : IProcessRunner
                 ? ctype
                 : System.Environment.GetEnvironmentVariable("LANG") ?? "";
         return locale.Contains("UTF-8", StringComparison.OrdinalIgnoreCase) || locale.Contains("utf8", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // the file to the program's standard input; a program that stops reading early (exits) is not an error
+    private static async Task WriteInputAsync(Process process, string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using (var input = File.OpenRead(path))
+            {
+                await input.CopyToAsync(process.StandardInput.BaseStream, cancellationToken).ConfigureAwait(false);
+            }
+
+            process.StandardInput.Close();
+        }
+        catch (IOException)
+        {
+            // the program closed its input (it has ended)
+        }
     }
 
     private static async Task ReadLinesAsync(StreamReader reader, StringBuilder target, Action<string>? onLine)

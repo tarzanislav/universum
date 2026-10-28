@@ -93,12 +93,7 @@ public static partial class SpokenLanguage
                     continue;
                 }
 
-                var heard = await runner.RunAsync(
-                    new ProcessRequest(tools.Whisper, ["-m", tools.Model, "-f", wave, "-dl", "-t", Threads.ToString(CultureInfo.InvariantCulture)])
-                    {
-                        Timeout = TimeSpan.FromMinutes(5),
-                    },
-                    cancellationToken).ConfigureAwait(false);
+                var heard = await runner.RunAsync(WhisperRequest(tools, wave), cancellationToken).ConfigureAwait(false);
                 if (ParseDetected(heard.StandardError + "\n" + heard.StandardOutput) is { } detected)
                 {
                     pieces.Add(new SpeechPiece(at, detected.Language, detected.Probability));
@@ -137,6 +132,19 @@ public static partial class SpokenLanguage
         "-t", PieceLength.TotalSeconds.ToString(CultureInfo.InvariantCulture),
         "-vn", "-sn", "-dn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-f", "wav", "-y", wave,
     ];
+
+    /// <summary>
+    /// whisper.cpp: only the language of the piece. On Windows it reads its arguments in the system code page and the
+    /// model path as UTF-8, so no path goes in an argument (a user folder "Števko" would break it): the model is named
+    /// in its own folder (the working folder) and the piece comes on the standard input.
+    /// </summary>
+    public static ProcessRequest WhisperRequest(SpeechTools tools, string wave) =>
+        new(tools.Whisper, ["-m", Path.GetFileName(tools.Model), "-f", "-", "-dl", "-t", Threads.ToString(CultureInfo.InvariantCulture)])
+        {
+            WorkingDirectory = Path.GetDirectoryName(tools.Model),
+            StandardInputFile = wave,
+            Timeout = TimeSpan.FromMinutes(5),
+        };
 
     /// <summary>"whisper_full_with_state: auto-detected language: cs (p = 0.912345)" → (cs, 0.91).</summary>
     public static (string Language, double Probability)? ParseDetected(string output)

@@ -13,4 +13,7 @@ public sealed record ProcessRequest(string FileName, IReadOnlyList<string> Argum
 
     /// <summary>The process is killed when it runs longer; null means no limit.</summary>
     public TimeSpan? Timeout { get; init; }
+
+    /// <summary>A file given to the program on its standard input (then closed); null = no input.</summary>
+    public string? StandardInputFile { get; init; }
 }

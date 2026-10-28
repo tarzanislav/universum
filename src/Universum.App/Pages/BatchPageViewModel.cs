@@ -780,6 +780,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     // checked in HISTRA as everywhere: a title it does not confirm waits at the file for confirmation
                     var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
+                    _library.ChosenTitles.Add(path);
                     if (check is not null && check.Check(film).NeedsConfirmation())
                     {
                         _library.Movies.Remove(path);
@@ -827,6 +828,7 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
                 {
+                    _library.ChosenTitles.Add(file.Path);
                     if (Tmdb.NeedsConfirmation)
                     {
                         _library.Movies.Remove(file.Path);
@@ -887,7 +889,7 @@ public sealed class BatchPageViewModel : ObservableObject
         // asked by the title read from the name, never by an earlier suggestion of the service (owner's review 28. 10.:
         // a second run would otherwise confirm a title the name never matched)
         var pending = _analysis.Groups.SelectMany(g => g.Files)
-            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path))
+            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path))
             .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();

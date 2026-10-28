@@ -167,7 +167,7 @@ public static partial class TitleGuess
         // "[2021]" after the title is its year; other brackets (and a year in front of it) are tags of the release.
         // Dots and underscores separate the words when the name itself has no spaces (brackets aside).
         var spaced = Brackets().Replace(name, "").Trim().Contains(' ', StringComparison.Ordinal);
-        var text = Brackets().Replace(BracketedYear().Replace(name, m => m.Index > 0 && name[..m.Index].Trim().Length > 0 ? " (" + m.Groups["year"].Value + ") " : m.Value), " ");
+        var text = Brackets().Replace(BracketedYear().Replace(name, m => Brackets().Replace(name[..m.Index], "").Trim(' ', '.', '_', '-').Length > 0 ? " (" + m.Groups["year"].Value + ") " : m.Value), " ");
         if (!spaced)
         {
             text = text.Replace('.', ' ').Replace('_', ' ');

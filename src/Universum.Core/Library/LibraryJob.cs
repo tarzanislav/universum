@@ -51,6 +51,9 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// </summary>
     public Dictionary<string, TitleInfo> NameGuesses { get; } = new(Paths.Comparer);
 
+    /// <summary>Files whose title the user chose (a TMDB address, also one still waiting for confirmation): never searched again.</summary>
+    public HashSet<string> ChosenTitles { get; } = new(Paths.Comparer);
+
     /// <summary>Episode numbers set by the user (they win over numbers found in the names).</summary>
     public Dictionary<string, EpisodeNumber> Episodes { get; } = new(Paths.Comparer);
 

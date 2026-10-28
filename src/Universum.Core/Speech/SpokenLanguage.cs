@@ -99,7 +99,7 @@ public static partial class SpokenLanguage
         {
             folder = Directory.CreateTempSubdirectory("UNIVERSUM-speech-").FullName;
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new SpeechException("Dočasný priečinok pre úseky zvuku sa nedá vytvoriť: " + ex.Message, ex);
         }

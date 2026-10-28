@@ -302,9 +302,8 @@ public sealed class TitleSearch
     public void SaveCache() => _tmdb?.SaveCache();
 
     // TMDB answers in English: a name in another language (a file named by its Czech title) is matched by the other
-    // names of the likely titles – those of the year first (all of them, up to the limit), then those a year off – read
-    // in TMDB's order; a title of the year carrying the name ends the reading, one a year off does not (a film of the
-    // year itself might carry it too)
+    // names of the likely titles – those of the year first (all of them, up to the limit: two of them may carry the same
+    // translation, then nothing is chosen), then, when none of the year carries the name, those a year off
     private async Task<IReadOnlyList<TmdbTitle>> WithOtherTitlesAsync(IReadOnlyList<TmdbTitle> found, string name, int? year, CancellationToken cancellationToken)
     {
         bool Exact(TmdbTitle t) => year is null || t.Year is null || t.Year == year;
@@ -319,8 +318,14 @@ public sealed class TitleSearch
             .Concat(Enumerable.Range(0, titles.Count).Where(i => Near(titles[i])))
             .Take(OtherTitlesRead)
             .ToList();
+        var named = false;
         foreach (var i in order)
         {
+            if (named && !Exact(titles[i]))
+            {
+                break; // a title of the year carries the name: the neighbours are not needed
+            }
+
             try
             {
                 titles[i] = titles[i] with
@@ -334,10 +339,7 @@ public sealed class TitleSearch
                 return titles; // the names could not be read: the titles stand as found
             }
 
-            if (Exact(titles[i]) && titles[i].IsNamed(name))
-            {
-                break;
-            }
+            named |= Exact(titles[i]) && titles[i].IsNamed(name);
         }
 
         return titles;

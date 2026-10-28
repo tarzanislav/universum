@@ -260,6 +260,7 @@ public sealed class LibraryTests
         Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), TitleGuess.FromName("Zlatý kapr [2021] WEB-DL CZ", MediaKind.Movie));
         Assert.Equal(new NameGuess("Zlaty kapr", 2021, null), TitleGuess.FromName("Zlaty.kapr.[2021].1080p", MediaKind.Movie), "dots around a bracketed year");
         Assert.Equal(new NameGuess("Zlatý kapr", null, null), TitleGuess.FromName("[2021] Zlatý kapr 1080p", MediaKind.Movie), "a tag in front is no year");
+        Assert.Equal(new NameGuess("Zlatý kapr", null, null), TitleGuess.FromName("[Grp] [2021] Zlatý kapr 1080p", MediaKind.Movie), "tags in front");
         Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), TitleGuess.FromName("Zlatý.kapr.CZ.dabing.2021.1080p", MediaKind.Movie));
         Assert.Equal(new NameGuess("Zlatý kapr", null, null), TitleGuess.FromName("Zlatý kapr - CZ dabing", MediaKind.Movie), "without a year a dash ends the title");
         Assert.Equal(new NameGuess("Mr. Kapor", 2009, null), TitleGuess.FromName("Mr. Kapor 2009 1080p", MediaKind.Movie), "a dot in the title stays");

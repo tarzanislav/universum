@@ -170,6 +170,13 @@ public sealed class TmdbTests
         var results = await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2021);
         Assert.Equal(990012, results.Best("Kapr návrat", 2021)?.Id, "the film of the year, though TMDB lists the neighbour first");
         Assert.Equal(990011, (await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2019)).Best("Kapr návrat", 2019)?.Id, "a neighbour when no film of the year has the name");
+
+        // two films of the same year with the same translation: none is chosen (the user picks)
+        const string twin = """{"id":990013,"title":"Carp Again","original_title":"Carp Again","release_date":"2021-09-01"}""";
+        server.Answers["/3/search/movie"] = """{"results":[""" + exact + "," + twin + "]}";
+        server.Answers["/3/movie/990013"] = twin[..^1] + names;
+        var twins = await new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: Fast), null).SearchAsync(MediaKind.Movie, "Kapr návrat", 2021);
+        Assert.Equal<TmdbTitle?>(null, twins.Best("Kapr návrat", 2021), "twins of one year");
     }
 
     [Test]

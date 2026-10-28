@@ -215,6 +215,43 @@ public static partial class FeedParser
         return null;
     }
 
+    /// <summary>
+    /// The articles a page lists when it has no feed: each &lt;article&gt; (else each heading with a link) gives its
+    /// title, link (on the same site), first picture and first paragraph; at most 40, the date is when first seen.
+    /// </summary>
+    public static IReadOnlyList<FeedItem> FromPage(string html, Uri page, string source, string language)
+    {
+        var root = HtmlParser.Parse(html);
+        var blocks = root.QueryAll("article").ToList();
+        if (blocks.Count == 0)
+        {
+            blocks = root.QueryAll("h2 a[href], h3 a[href]").Select(a => a.Parent?.Parent ?? a).ToList();
+        }
+
+        var items = new List<FeedItem>();
+        foreach (var block in blocks)
+        {
+            var heading = block.Query("h1, h2, h3, h4") ?? block.Query("a[href]");
+            var anchor = heading?.Name == "a" ? heading : heading?.Query("a[href]") ?? block.Query("a[href]");
+            if (heading is null || anchor is null || !Uri.TryCreate(page, anchor.Attribute("href"), out var link) ||
+                !string.Equals(link.Host, page.Host, StringComparison.OrdinalIgnoreCase) || heading.TextContent.Length < 12)
+            {
+                continue;
+            }
+
+            var picture = block.Query("img")?.Let(i => i.Attribute("data-src") ?? i.Attribute("src"));
+            var image = picture is not null && Uri.TryCreate(page, picture, out var full) && full.Scheme == Uri.UriSchemeHttps ? full.AbsoluteUri : null;
+            if (Make(link.AbsoluteUri, heading.TextContent, block.Query("p")?.TextContent, image, null, source, language) is { } item)
+            {
+                items.Add(item);
+            }
+        }
+
+        return items.DistinctBy(i => i.Link).Take(40).ToList();
+    }
+
+    private static TResult Let<T, TResult>(this T value, Func<T, TResult> map) => map(value);
+
     /// <summary>True when the text looks like a feed rather than a page.</summary>
     public static bool IsFeed(string text)
     {

@@ -491,6 +491,15 @@ public sealed class NewsTests
         Assert.True(FeedParser.Parse(atom, "Atom", "cs") is [{ Title: "Vymyslená novinka", Link: "https://filmy.example/n/1", Summary: "Krátky úvod." }], "Atom");
         Assert.True(FeedParser.Discover("""<html><head><link rel="alternate" type="application/rss+xml" href="/feed/"></head></html>""", new Uri("https://filmy.example/clanky/")) ==
                     new Uri("https://filmy.example/feed/"), "the feed a page names");
+        var listed = FeedParser.FromPage("""
+            <html><body><nav><a href="/">Domov</a></nav>
+              <article><a href="/clanky/1"><img data-src="/img/1.jpg"></a><h2><a href="/clanky/1">Vymyslené miesto, kde sa točil film</a></h2><p>Krátky úvod článku.</p></article>
+              <article><h3><a href="https://ina.example/x">Odkaz na iný web s dlhým nadpisom</a></h3></article>
+              <article><h2><a href="/clanky/2">Krátky</a></h2></article>
+            </body></html>
+            """, new Uri("https://miesta.example/clanky.php"), "Miesta", "sk");
+        Assert.True(listed is [{ Title: "Vymyslené miesto, kde sa točil film", Link: "https://miesta.example/clanky/1", Image: "https://miesta.example/img/1.jpg", Summary: "Krátky úvod článku." }],
+            "a page without a feed: its articles on the same site – " + string.Join(" | ", listed.Select(i => i.Title)));
         Assert.True(FeedParser.Shorten(string.Join(" ", Enumerable.Repeat("Veta má päť slov.", 60))).Length <= FeedParser.SummaryLength, "the summary is short");
         Assert.Throws<FormatException>(() => FeedParser.Parse("<html>nie</html><x>", "x", "en"), "not a feed");
         Assert.True(FeedSource.Load("""{"format":"UNIVERSUM-zaujimavosti 1","sources":[{"name":"Vymyslený","url":"https://filmy.example/","language":"CS"}]}""") is [{ Language: "cs" }], "sources from a file");

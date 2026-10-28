@@ -213,7 +213,13 @@ public sealed class Interests(WebPageClient pages, InterestStore store)
         var text = await pages.GetAsync(address, cancellationToken).ConfigureAwait(false);
         if (!FeedParser.IsFeed(text))
         {
-            var feed = FeedParser.Discover(text, address) ?? throw new FormatException("stránka neuvádza kanál RSS ani Atom – zadajte priamo adresu kanála.");
+            // the page's feed, else the articles it lists
+            if (FeedParser.Discover(text, address) is not { } feed)
+            {
+                var listed = FeedParser.FromPage(text, address, source.Name, source.Language);
+                return listed.Count > 0 ? listed : throw new FormatException("stránka nemá kanál RSS ani zoznam článkov – zadajte priamo adresu kanála alebo stránky s článkami.");
+            }
+
             text = await pages.GetAsync(feed, cancellationToken).ConfigureAwait(false);
         }
 

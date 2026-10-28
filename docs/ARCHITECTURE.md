@@ -155,18 +155,30 @@ in next to it without changing the rules, planning or UI.
   header or the meta tag; it introduces itself as UNIVERSUM.
 - `News/TvMaze` – the TVmaze API (no key, CC BY-SA, credited): schedules by country and of streaming services in the
   user's time zone, popularity and kind filters, the episodes of a season; `SeriesNews` merges the sources (the same
-  episode once, the page's entry with TVmaze's IDs), keeps each day of each source on the disk (`NewsCache`: 6 hours
-  for today and later, 3 days for past days) and describes premieres with `Periodicity` and the season's episode count.
+  episode once, the page's entry with TVmaze's IDs), keeps each day of each source on the disk and describes premieres
+  with `Periodicity` and the season's episode count. `NewsCache`: a day read after it was over is final – kept for good
+  (the history of Novinky) and never asked again; today is asked again after 6 hours, the next week after a day, later
+  days after three; Obnoviť asks today and later days at once; pages open with what is kept (`offline`). Web pages with
+  Czech and Slovak channels are read at least 30 days ahead (`SeriesNews.PageDaysAhead`).
 - `News/FilmPremieres` – film premieres from TMDB (with the user's key): Czech and Slovak cinemas (theatrical release
   dates of CZ and SK) and the most popular world premieres, with VOD (digital) and TV dates (CZ, else SK, else USA).
-- App: Premiéry (four pastel tables), Nastavenia → Zdroje noviniek (import of a rules file, switch off, remove),
-  `TitleOpener` (TMDB and HISTRA pages found only when the user clicks).
-- Novinky – Seriály: episodes of running series (aired ones, optionally those to come, optionally only series of the
-  imported HISTRA lists) with a tick each. "Odoslať na spracovanie" looks for the ticked episodes in the input folder
+- `News/NewsStore` – `PremiereStore`/`PremiereArchive`: every premiere read is kept; new reads are merged (what was read
+  wins; kept films still to come that the popularity lists no longer give are checked by `FilmPremieres.RecheckAsync`;
+  a kept series premiere still to come that the fully read schedule no longer has is dropped); past ones are the
+  history. `MarkStore`: the user's marks (Vybrané, a note) – a film by its TMDB ID, a series by its original title and
+  year, shared by Premiéry and Novinky. `News/SeriesTmdb` finds a series on TMDB (title and year only) for its poster
+  and a direct link.
+- App: Premiéry (four pastel tables; coming premieres or the history; posters, Vybrané, notes, search), Nastavenia →
+  Zdroje noviniek (import of a rules file, switch off, remove; forget the kept news and history), `TitleOpener` (TMDB
+  and HISTRA pages found only when the user clicks), `SeriesLookup` (each series looked up once per run).
+- Novinky – Seriály: the series alphabetically (the last week and the coming days, or the history; optionally only
+  the chosen ones or series of the imported HISTRA lists), each with its nearest episode and a tree of its episodes;
+  aired episodes have a tick each (the series' tick ticks them all). "Odoslať na spracovanie" looks for the ticked episodes in the input folder
   (`News/EpisodeFinder`: season and episode from the name or folders, the series' original or local title, the year
   ±1; the library is left out): one file opens in Single spracovanie with the series and episode, several in Hromadné
   spracovanie – only those files (`BatchAnalyzer.AnalyzeAsync(only:)`), the series typed in and the kind confirmed; one
   series at a time, the next ones wait as "Pripravené"; episodes not there yet wait in "Čaká na súbor".
+- Listy z HISTRA: the order of the lists is changed by dragging a list's grip or by its arrows, and kept.
 - The input folder (`AppSettings.InputDirectory`, owner 28 Oct 2026) is one setting shown on Settings, Premiéry and
   Novinky (`InputFolderViewModel`); it may not lie in MOVIES or TVSHOWS; the file dialogs of Single and batch start there.
 

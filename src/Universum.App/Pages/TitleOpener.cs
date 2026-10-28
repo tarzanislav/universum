@@ -1,6 +1,7 @@
 using Universum.Core.Library;
 using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
+using Universum.Core.News;
 
 namespace Universum.App.Pages;
 
@@ -49,6 +50,16 @@ public sealed class TitleOpener(AppServices services)
                              Uri.EscapeDataString(name + (year is { } y ? $" y:{y}" : ""))));
         return null;
     }
+
+    /// <summary>Opens a series of the news on TMDB – directly when it was found there, else by its name.</summary>
+    public async Task<string?> OpenSeriesTmdbAsync(SeriesEpisode episode) =>
+        await services.SeriesLookup.FindAsync(episode) is { } match
+            ? await OpenTmdbAsync(MediaKind.Series, match.TmdbId, episode.OriginalTitle, episode.Year)
+            : await OpenTmdbAsync(MediaKind.Series, null, episode.OriginalTitle, episode.Year);
+
+    /// <summary>Opens a series of the news on HISTRA (by its TMDB ID when it was found on TMDB).</summary>
+    public async Task<string?> OpenSeriesHistraAsync(SeriesEpisode episode) =>
+        await OpenHistraAsync(MediaKind.Series, (await services.SeriesLookup.FindAsync(episode))?.TmdbId, episode.OriginalTitle, episode.Year);
 
     /// <summary>Opens the title on HISTRA when its catalog has it; a problem to show, or null.</summary>
     public async Task<string?> OpenHistraAsync(MediaKind kind, int? tmdbId, string name, int? year)

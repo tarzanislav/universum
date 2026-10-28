@@ -305,6 +305,30 @@ public sealed class HistraListsPageViewModel : ObservableObject
 
     private void Save() => _services.HistraListStore.Save(Lists.Select(l => l.List));
 
+    /// <summary>Moves a list to another place (arrows or dragging with the mouse); the order is kept.</summary>
+    public void MoveTo(HistraListRow row, int index)
+    {
+        var from = Lists.IndexOf(row);
+        index = Math.Clamp(index, 0, Lists.Count - 1);
+        if (from < 0 || from == index)
+        {
+            return;
+        }
+
+        Lists.Move(from, index);
+        Save();
+        foreach (var list in Lists)
+        {
+            list.PlaceChanged();
+        }
+
+        Status = $"List „{row.Name}“ je na {index + 1}. mieste.";
+    }
+
+    internal bool IsFirst(HistraListRow row) => Lists.IndexOf(row) <= 0;
+
+    internal bool IsLast(HistraListRow row) => Lists.IndexOf(row) == Lists.Count - 1;
+
     /// <summary>Updates what depends on HISTRA being usable (token, switch).</summary>
     public void Refresh()
     {
@@ -313,6 +337,10 @@ public sealed class HistraListsPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsEmpty));
         ImportCommand.NotifyCanExecuteChanged();
         SyncCommand.NotifyCanExecuteChanged();
+        foreach (var list in Lists)
+        {
+            list.PlaceChanged();
+        }
     }
 
     internal AppServices Services => _services;
@@ -342,6 +370,8 @@ public sealed class HistraListRow : ObservableObject
         _matched = All.ToList();
         ToggleCommand = new RelayCommand(() => Expanded = !Expanded);
         RemoveCommand = new RelayCommand(() => _page.Remove(this));
+        MoveUpCommand = new RelayCommand(() => _page.MoveTo(this, _page.Lists.IndexOf(this) - 1), () => !_page.IsFirst(this));
+        MoveDownCommand = new RelayCommand(() => _page.MoveTo(this, _page.Lists.IndexOf(this) + 1), () => !_page.IsLast(this));
         var tint = Tints[(int)((uint)list.Info.Id % Tints.Length)];
         Accent = Frozen(tint);
         Tint = Frozen(Color.FromArgb(0x26, tint.R, tint.G, tint.B));
@@ -351,6 +381,19 @@ public sealed class HistraListRow : ObservableObject
     public HistraList List { get; private set; }
 
     public IReadOnlyList<HistraItemRow> All { get; private set; }
+
+    /// <summary>Moves the list one place up.</summary>
+    public RelayCommand MoveUpCommand { get; }
+
+    /// <summary>Moves the list one place down.</summary>
+    public RelayCommand MoveDownCommand { get; }
+
+    /// <summary>The order of the lists changed (the arrows of the first and last list).</summary>
+    internal void PlaceChanged()
+    {
+        MoveUpCommand.NotifyCanExecuteChanged();
+        MoveDownCommand.NotifyCanExecuteChanged();
+    }
 
     public ObservableCollection<HistraItemRow> Visible { get; } = [];
 

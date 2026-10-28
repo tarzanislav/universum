@@ -24,10 +24,15 @@ public sealed class NewsSourcesViewModel : ObservableObject
         RestoreCommand = new RelayCommand(Restore, () => NewsSource.Defaults.Any(d => _services.NewsSources.All(s => s.Kind != d.Kind)));
         ClearCacheCommand = new RelayCommand(() =>
         {
+            if (!Confirm("Vymazať všetky uložené premiéry a novinky vrátane histórie?\n\nVaše výbery a poznámky ostanú. Zdroje sa pri ďalšom zobrazení načítajú znova."))
+            {
+                return;
+            }
+
             try
             {
-                _services.NewsCache.Clear();
-                Status = "Uložené dni zo zdrojov sú vymazané – pri ďalšom zobrazení sa načítajú znova.";
+                _services.ClearNews();
+                Status = "Uložené premiéry, novinky a história sú vymazané – pri ďalšom zobrazení sa zdroje načítajú znova.";
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -38,6 +43,10 @@ public sealed class NewsSourcesViewModel : ObservableObject
     }
 
     public ObservableCollection<NewsSourceRow> Rows { get; } = [];
+
+    /// <summary>Asks the user (the self-test answers itself).</summary>
+    public Func<string, bool> Confirm { get; set; } = question =>
+        System.Windows.MessageBox.Show(question, "UNIVERSUM", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) == System.Windows.MessageBoxResult.Yes;
 
     public RelayCommand ImportCommand { get; }
 
@@ -57,8 +66,9 @@ public sealed class NewsSourcesViewModel : ObservableObject
             var sources = _services.NewsSources.Where(s => !string.Equals(s.Name, rules.Name, StringComparison.OrdinalIgnoreCase)).Append(source).ToList();
             _services.SetNewsSources(sources);
             Reload();
+            var (back, ahead) = SeriesNews.Window(source);
             Status = $"Zdroj „{rules.Name}“ je pridaný ({rules.PageAddress(DateOnly.FromDateTime(DateTime.Now)).Host}, " +
-                     $"{Texts.Count(rules.DaysBack, "deň", "dni", "dní")} dozadu a {Texts.Count(rules.DaysAhead, "deň", "dni", "dní")} dopredu).";
+                     $"{Texts.Count(back, "deň", "dni", "dní")} dozadu a {Texts.Count(ahead, "deň", "dni", "dní")} dopredu). Premiéry a Novinky ho načítajú pri ďalšom zobrazení.";
             return true;
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
@@ -123,7 +133,7 @@ public sealed class NewsSourceRow(NewsSource source, NewsSourcesViewModel owner)
     public string Detail => source.Kind switch
     {
         NewsSourceKind.Page when source.Rules is { } rules =>
-            $"{Texts.Count(rules.DaysBack, "deň", "dni", "dní")} dozadu, {Texts.Count(rules.DaysAhead, "deň", "dni", "dní")} dopredu · CZ/SK stanice: {rules.Domestic.Count}",
+            $"{Texts.Count(SeriesNews.Window(source).Back, "deň", "dni", "dní")} dozadu, {Texts.Count(SeriesNews.Window(source).Ahead, "deň", "dni", "dní")} dopredu · CZ/SK stanice: {rules.Domestic.Count}",
         NewsSourceKind.TvMaze => $"krajiny {string.Join(", ", source.Countries)} a streamovacie služby · popularita aspoň {source.MinWeight}",
         _ => "kľúč TMDB z karty TMDB",
     };

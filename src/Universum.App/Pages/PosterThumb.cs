@@ -11,10 +11,26 @@ namespace Universum.App.Pages;
 /// A poster shown in a list: loaded from the poster cache only when something first shows it (so a long list downloads
 /// only what is on the screen), as a frozen bitmap decoded at the size it is drawn.
 /// </summary>
-public sealed class PosterThumb(AppServices services, string? path, PosterSize size) : ObservableObject
+public sealed class PosterThumb : ObservableObject
 {
+    private readonly AppServices _services;
+    private readonly Func<Task<string?>> _path;
+    private readonly PosterSize _size;
     private ImageSource? _image;
     private bool _asked;
+
+    public PosterThumb(AppServices services, string? path, PosterSize size)
+        : this(services, () => Task.FromResult(path), size)
+    {
+    }
+
+    /// <summary>A poster whose path is found only when it is first shown (the series of the news, looked up on TMDB).</summary>
+    public PosterThumb(AppServices services, Func<Task<string?>> path, PosterSize size)
+    {
+        _services = services;
+        _path = path;
+        _size = size;
+    }
 
     /// <summary>The picture; null while it loads, without a poster or with posters switched off.</summary>
     public ImageSource? Image
@@ -41,7 +57,7 @@ public sealed class PosterThumb(AppServices services, string? path, PosterSize s
 
     private async Task LoadAsync()
     {
-        if (services.Posters is not { } posters || path is null || await posters.GetAsync(path, size) is not { } file)
+        if (_services.Posters is not { } posters || await _path() is not { } path || await posters.GetAsync(path, _size) is not { } file)
         {
             return;
         }
@@ -51,7 +67,7 @@ public sealed class PosterThumb(AppServices services, string? path, PosterSize s
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.DecodePixelWidth = size == PosterSize.Large ? 342 : 154;
+            bitmap.DecodePixelWidth = _size == PosterSize.Large ? 342 : 154;
             bitmap.UriSource = new Uri(file);
             bitmap.EndInit();
             bitmap.Freeze();

@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
+using Universum.App.Pages;
 
 namespace Universum.App.Shell;
 
@@ -78,6 +80,44 @@ public partial class MainWindow : Window
         if (sender is System.Windows.Controls.DataGrid grid)
         {
             Model.Batch.SelectFiles(grid.SelectedItems.OfType<Pages.FileRow>());
+        }
+    }
+
+    // Novinky: an opened series shows the tree of its episodes (a binding of the row itself – a style's would lose to
+    // the grid's details mode)
+    private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
+        e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,
+            new System.Windows.Data.Binding(nameof(NewsSeriesRow.IsExpanded)) { Converter = new System.Windows.Controls.BooleanToVisibilityConverter() });
+
+    private Point _listDragStart;
+
+    // Listy z HISTRA: a list is dragged by its grip and dropped on another list's place
+    private void OnListGripDown(object sender, MouseButtonEventArgs e) => _listDragStart = e.GetPosition(this);
+
+    private void OnListGripMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && sender is FrameworkElement { DataContext: HistraListRow row } grip &&
+            (e.GetPosition(this) - _listDragStart).Length > SystemParameters.MinimumVerticalDragDistance)
+        {
+            DragDrop.DoDragDrop(grip, new DataObject(typeof(HistraListRow), row), DragDropEffects.Move);
+        }
+    }
+
+    private void OnListDragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(typeof(HistraListRow)))
+        {
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+        }
+    }
+
+    private void OnListDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(HistraListRow)) is HistraListRow dragged && sender is FrameworkElement { DataContext: HistraListRow target })
+        {
+            Model.HistraLists.MoveTo(dragged, Model.HistraLists.Lists.IndexOf(target));
+            e.Handled = true;
         }
     }
 

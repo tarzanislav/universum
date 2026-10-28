@@ -231,7 +231,7 @@ internal static class SelfTest
         model.Settings.RemoveHistraTokenCommand.Execute(null);
         Check(services.HistraToken is null, "settings: HISTRA token removed");
 
-        await TestBatchPageAsync(model, window);
+        await TestBatchPageAsync(model, window, services);
 
         // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM
         var updates = await services.Updates.CheckAsync();
@@ -875,7 +875,7 @@ internal static class SelfTest
         Check(chapters.Rows.Count == 1 && chapters.Rows[0].Name == "Kapitola 01", "chapters: generated for a 2-second file");
     }
 
-    private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window)
+    private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window, AppServices services)
     {
         var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media");
         var folder = Path.Combine(_outputDirectory, "batch");
@@ -941,6 +941,17 @@ internal static class SelfTest
             Check(audio.Count == 3 && new[] { audio[0], audio[2] }.All(a => a.Suggested.Contains("(cs)", StringComparison.Ordinal) || a.Suggested.Contains("(sk)", StringComparison.Ordinal)),
                 "batch: Czech and Slovak speech recognised as Czech or Slovak");
             await Screenshot(window, "batch-speech.png");
+
+            // the pieces and the Czech/Slovak comparison in detail (for tuning the thresholds)
+            var tools = await services.SpeechAsync();
+            var synthetic = batch.Analysis!.Groups[0].Files[0];
+            foreach (var (ordinal, spoken) in new[] { (0, "cs"), (1, "en"), (2, "sk") })
+            {
+                var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
+                Write($"speech detail: audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
+                      $"pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, doubt: {result.Doubt}");
+            }
+
             Directory.Delete(speech, recursive: true);
         }
 

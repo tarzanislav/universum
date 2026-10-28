@@ -13,6 +13,12 @@ public sealed class SpeechTests
     {
         static SpeechPiece P(string? language, double p, bool silent = false) => new(TimeSpan.Zero, language, p, silent);
 
+        Assert.True(SpokenLanguage.WithSlovakMargin(SpokenLanguage.Decide([P("cs", 0.9), P("cs", 0.9)]), 0.3) is { Language: "sk", SlovakMargin: 0.3 }, "the transcription decides");
+        var agreed = SpokenLanguage.WithSlovakMargin(SpokenLanguage.Decide([P("cs", 0.8), P("sk", 0.6), P("cs", 0.7)]), -0.3);
+        Assert.True(agreed is { Language: "cs", Doubt: "úseky: čeština 2×, slovenčina 1×" }, "a clear Czech transcription removes the doubt – " + agreed.Doubt);
+        Assert.Equal<double?>(null, SpokenLanguage.MeanLogProbability("""{"transcription":[{"text":" a","tokens":[{"text":" a","p":0.5}]}]}"""), "too few words");
+        Assert.Equal<double?>(null, SpokenLanguage.MeanLogProbability("not json"));
+
         var clear = SpokenLanguage.Decide([P("cs", 0.95), P("cs", 0.9), P("cs", 0.88)]);
         Assert.Equal("cs", clear.Language);
         Assert.Equal<string?>(null, clear.Doubt, "all agree");
@@ -72,6 +78,19 @@ public sealed class SpeechTests
             Assert.Equal("sk", slovak.Language);
             Assert.Equal(5, unsure.Heard, "not sure enough: all five pieces");
             Assert.True(!Directory.EnumerateFiles(Path.Combine(Path.GetTempPath(), "UNIVERSUM"), "speech-*.wav").Any(), "pieces are deleted");
+
+            // Slovak heard as Czech: the Slovak transcription is surer of its words – Slovak, with a note
+            var dubbed = new StandIn(tools, _ => 0.3, "cs", 0.62, l => l == "sk" ? 0.8 : 0.6);
+            var fixedUp = await SpokenLanguage.DetectAsync(tools, dubbed, "film.mkv", 0, TimeSpan.FromMinutes(100));
+            Assert.Equal("sk", fixedUp.Language);
+            Assert.Sequence(["cs", "sk"], dubbed.Transcribed, "the clearest piece transcribed in both");
+            Assert.True(fixedUp.SlovakMargin > 0.2 && fixedUp.Doubt?.StartsWith("podľa prepisu slovenčina, nie čeština", StringComparison.Ordinal) == true, fixedUp.Doubt ?? "no doubt");
+            Assert.True(!Directory.EnumerateFiles(Path.Combine(Path.GetTempPath(), "UNIVERSUM"), "speech-*").Any(), "the kept piece and the transcriptions are deleted");
+            var close = await SpokenLanguage.DetectAsync(tools, new StandIn(tools, _ => 0.3, "cs", 0.9, l => l == "sk" ? 0.71 : 0.7), "film.mkv", 0, TimeSpan.FromMinutes(100));
+            Assert.True(close is { Language: "cs", Doubt: not null } && close.Doubt.StartsWith("čeština alebo slovenčina – overte", StringComparison.Ordinal), "too close: " + close.Doubt);
+            var english = new StandIn(tools, _ => 0.3, "en", 0.9, _ => 0.9);
+            await SpokenLanguage.DetectAsync(tools, english, "film.mkv", 0, TimeSpan.FromMinutes(100));
+            Assert.Equal(0, english.Transcribed.Count, "only Czech or Slovak is transcribed");
 
             var broken = new StandIn(tools, _ => 0.3, null, 0);
             await Assert.ThrowsAsync<SpeechException>(() => SpokenLanguage.DetectAsync(tools, broken, "film.mkv", 0, TimeSpan.FromMinutes(100)));
@@ -166,12 +185,18 @@ public sealed class SpeechTests
         return SpeechTools.In(folder)!;
     }
 
-    /// <summary>FFmpeg writes a piece (silent or loud, by its position); whisper hears one language.</summary>
-    private sealed class StandIn(SpeechTools tools, Func<double, double> amplitudeAt, string? language, double probability) : IProcessRunner
+    /// <summary>
+    /// FFmpeg writes a piece (silent or loud, by its position); whisper hears one language and, asked to transcribe as
+    /// Czech or Slovak, is as sure of the words as <paramref name="sureOf"/> says (no transcription without it).
+    /// </summary>
+    private sealed class StandIn(SpeechTools tools, Func<double, double> amplitudeAt, string? language, double probability, Func<string, double>? sureOf = null)
+        : IProcessRunner
     {
         public List<string> Cuts { get; } = [];
 
         public int Heard { get; private set; }
+
+        public List<string> Transcribed { get; } = [];
 
         public Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
         {
@@ -180,6 +205,23 @@ public sealed class SpeechTests
                 Cuts.Add(string.Join(' ', request.Arguments));
                 var at = double.Parse(request.Arguments[request.Arguments.ToList().IndexOf("-ss") + 1], System.Globalization.CultureInfo.InvariantCulture);
                 WriteWave(request.Arguments[^1], amplitudeAt(at));
+                return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));
+            }
+
+            var arguments = request.Arguments.ToList();
+            if (arguments.Contains("-ojf"))
+            {
+                var as_ = arguments[arguments.IndexOf("-l") + 1];
+                Transcribed.Add(as_);
+                Assert.True(File.Exists(request.StandardInputFile) && request.WorkingDirectory == Path.GetDirectoryName(request.StandardInputFile), "the piece is still there, the output next to it");
+                if (sureOf is not null)
+                {
+                    var p = sureOf(as_).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    var tokens = string.Join(",", Enumerable.Range(0, 8).Select(i => $$"""{"text":" slovo{{i}}","id":{{100 + i}},"p":{{p}}}""").Prepend("""{"text":"[_BEG_]","id":50365,"p":0.01}"""));
+                    File.WriteAllText(Path.Combine(request.WorkingDirectory!, arguments[arguments.IndexOf("-of") + 1] + ".json"),
+                        $$"""{"result":{"language":"{{as_}}"},"transcription":[{"text":" ...","tokens":[{{tokens}}]}]}""");
+                }
+
                 return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));
             }
 

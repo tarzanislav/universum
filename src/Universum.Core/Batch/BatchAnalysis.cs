@@ -173,12 +173,16 @@ public static class BatchAnalyzer
         int parallelism = 4,
         IEnumerable<string>? excludeDirectories = null,
         CancellationToken cancellationToken = default,
-        IProgress<MediaFile>? found = null)
+        IProgress<MediaFile>? found = null,
+        IReadOnlyList<string>? only = null)
     {
         folder = Path.GetFullPath(folder);
 
-        // listing a big network folder takes a while: off the caller's thread, and it can be stopped
-        var (files, leftovers) = await Task.Run(() => FindFiles(folder, recursive, excludeDirectories, cancellationToken), cancellationToken).ConfigureAwait(false);
+        // listing a big network folder takes a while: off the caller's thread, and it can be stopped; chosen files
+        // (episodes sent from Novinky) are analysed as they are, in natural order
+        var (files, leftovers) = only is not null
+            ? ((IReadOnlyList<string>)only.Select(Path.GetFullPath).Distinct().Order(NaturalComparer.Instance).ToList(), (IReadOnlyList<string>)[])
+            : await Task.Run(() => FindFiles(folder, recursive, excludeDirectories, cancellationToken), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         var results = new (MediaFile? File, string? Error)[files.Count];
         var done = 0;

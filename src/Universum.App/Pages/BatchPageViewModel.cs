@@ -221,6 +221,8 @@ public sealed class BatchPageViewModel : ObservableObject
         get => _services.Settings.BatchFolder;
         set
         {
+            // a folder chosen again means the whole folder, not the files sent from Novinky
+            _only = null;
             _services.Settings.BatchFolder = value;
             _services.Settings.Save();
             OnPropertyChanged();
@@ -455,6 +457,7 @@ public sealed class BatchPageViewModel : ObservableObject
         try
         {
             var inspector = _services.Inspector(installation);
+            var only = _only;
             _analysis = await BatchAnalyzer.AnalyzeAsync(folder, recursive, inspector,
                 new Progress<(int Done, int Total)>(p =>
                 {
@@ -484,7 +487,8 @@ public sealed class BatchPageViewModel : ObservableObject
                     row.Group.Files.Add(file);
                     row.Title = GroupTitle(row.Group);
                     row.Refresh();
-                }));
+                }),
+                only: only);
 
             // nothing to process: why (no video, only in subfolders, only results…) – still stoppable
             string? why = null;
@@ -526,6 +530,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 Summary = why + " · " + Summary;
             }
 
+            if (only is not null)
+            {
+                Summary = $"Súbory poslané z Noviniek ({only.Count}) · " + Summary + " Celý priečinok spracujete po jeho výbere tlačidlom Priečinok….";
+            }
+
             // the output folder was changed while the folder was read: its MOVIES / TVSHOWS were not left out
             if (_services.Library?.Root != libraryAtStart)
             {
@@ -560,6 +569,49 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged(nameof(IsAnalyzing));
             Busy = false;
         }
+    }
+
+    /// <summary>The files sent from Novinky – Seriály (only they are analysed); null for a whole folder.</summary>
+    public IReadOnlyList<string>? ChosenFiles => _only;
+
+    private IReadOnlyList<string>? _only;
+
+    /// <summary>
+    /// Episodes of one series sent from Novinky – Seriály: only these files are analysed (their common folder is the
+    /// analysed one), the kind is series and the series' title is typed in (original title and year – confirmed on
+    /// TMDB and HISTRA as any other title).
+    /// </summary>
+    public async Task AnalyzeFilesAsync(IReadOnlyList<string> files, string seriesTitle)
+    {
+        if (Busy || files.Count == 0)
+        {
+            return;
+        }
+
+        Folder = CommonFolder(files);
+        _only = files;
+        await AnalyzeAsync();
+        if (_library is not null && _analysis is not null)
+        {
+            _library.Kind = MediaKind.Series;
+            OnLibraryChanged();
+            SeriesTitle = seriesTitle;
+            OnPropertyChanged(nameof(IsSeries));
+            OnPropertyChanged(nameof(IsMovies));
+        }
+    }
+
+    // the deepest folder holding all the files
+    private static string CommonFolder(IReadOnlyList<string> files)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(files[0]))!;
+        while (files.Any(f => !Path.GetFullPath(f).StartsWith(folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) &&
+               Path.GetDirectoryName(folder) is { } parent)
+        {
+            folder = parent;
+        }
+
+        return folder;
     }
 
     /// <summary>Recomputes the simulation after any decision (fast: no file is read).</summary>
@@ -1379,6 +1431,11 @@ public sealed class BatchPageViewModel : ObservableObject
     private void ChooseFolder()
     {
         var dialog = new OpenFolderDialog { Title = "Priečinok so súbormi MKV" };
+        if ((Folder is { } last && Directory.Exists(last) ? last : _services.Settings.InputDirectory) is { } start && Directory.Exists(start))
+        {
+            dialog.InitialDirectory = start;
+        }
+
         if (dialog.ShowDialog() == true)
         {
             Folder = dialog.FolderName;

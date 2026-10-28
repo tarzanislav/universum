@@ -312,6 +312,49 @@ public sealed class NewsTests
         }
     }
 
+    [Test]
+    public void EpisodesAreFoundInTheInputFolder()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "universum-input-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var files = new[]
+            {
+                Path.Combine("Vymyslený seriál", "Vymysleny.serial.S02E05.1080p.mkv"),
+                Path.Combine("Invented Show (2020)", "Season 02", "Invented Show S02E05.mkv"),
+                "Invented.Show.US.S02E06.mp4",
+                "Invented.Show.S02E07-E08.mkv",
+                "Invented Show (2009) S02E05.mkv",
+                "Other Show S02E05.mkv",
+                "Invented Show S02E05.txt",
+                Path.Combine("MOVIES", "Invented Show S02E05.mkv"),
+            };
+            foreach (var file in files)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(folder, file))!);
+                File.WriteAllText(Path.Combine(folder, file), "x");
+            }
+
+            SeriesEpisode Episode(int number, int? last = null) => new()
+            {
+                Source = "x", Region = NewsRegion.World, Title = "Vymyslený seriál", OriginalTitle = "Invented Show", Year = 2020,
+                Season = 2, Number = number, LastNumber = last, AirDate = new DateOnly(2026, 10, 28),
+            };
+
+            var found = EpisodeFinder.Find([Episode(5), Episode(6), Episode(7, 8), Episode(9)], folder, [Path.Combine(folder, "MOVIES")]);
+            string Names(int i) => string.Join(", ", found[i].Files.Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            Assert.Equal("Invented Show S02E05.mkv, Vymysleny.serial.S02E05.1080p.mkv", Names(0),
+                "original or local title, season folder; another year, another series, a text file and the library are left out");
+            Assert.Equal("Invented.Show.US.S02E06.mp4", Names(1), "a title that starts with the series' title");
+            Assert.Equal("Invented.Show.S02E07-E08.mkv", Names(2), "two episodes aired together");
+            Assert.Equal(0, found[3].Files.Count, "not there yet");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     /// <summary>Web pages and APIs with invented answers.</summary>
     private sealed class Server : HttpMessageHandler
     {

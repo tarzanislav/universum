@@ -132,6 +132,7 @@ internal static class SelfTest
         var model = new MainViewModel(services);
         MainWindow.ConfirmOnClose = false;
         PremieresPageViewModel.AutoLoad = false;
+        SeriesNewsPageViewModel.AutoLoad = false;
         var window = new MainWindow(model) { Width = 1180, Height = 740, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
         window.Show();
         await model.RefreshStatusAsync();
@@ -156,6 +157,7 @@ internal static class SelfTest
         await TestDashboardAsync(model, window, services);
         await TestHistraListsAsync(model, window, services);
         await TestPremieresAsync(model, window, services);
+        await TestSeriesNewsAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -873,6 +875,91 @@ internal static class SelfTest
         services.FilmsForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
+    }
+
+    /// <summary>
+    /// Novinky – Seriály with the invented sources: the input folder (one setting for all pages), one ticked episode
+    /// found goes to Single spracovanie with its series, several episodes of a series go to Hromadné spracovanie (only
+    /// those files), an episode not in the folder waits and is found by "Skontrolovať znova".
+    /// </summary>
+    private static async Task TestSeriesNewsAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var news = new FakeNews();
+        var http = new System.Net.Http.HttpClient(news);
+        services.SeriesNewsForSelfTest = new Core.News.SeriesNews(new Core.News.WebPageClient(http), new Core.News.TvMazeClient(http, new RequestPacer(1000)),
+            new Core.News.NewsCache(Path.Combine(_outputDirectory, "news-cache-2")));
+        services.SetNewsSources([.. Core.News.NewsSource.Defaults, new Core.News.NewsSource
+        {
+            Name = "Vymyslený rozpis", Kind = Core.News.NewsSourceKind.Page, Rules = Core.News.PageRules.Load(FakeNews.Rules),
+        }]);
+
+        // the input folder: the new Czech series and two days of a Czech series (copies of a test file)
+        var input = Path.Combine(_outputDirectory, "vstup");
+        var sample = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv");
+        int Number(int offset) => 10 + FakeNews.Day(offset).DayNumber % 50;
+        Directory.CreateDirectory(Path.Combine(input, "Invented Show"));
+        File.Copy(sample, Path.Combine(input, "Invented Show", "Invented.Show.S01E01.1080p.WEB.mkv"), overwrite: true);
+        File.Copy(sample, Path.Combine(input, $"Domaci serial S05E{Number(0):00}.mkv"), overwrite: true);
+        File.Copy(sample, Path.Combine(input, $"Domaci.serial.S05E{Number(-1):00}.mkv"), overwrite: true);
+        File.Copy(sample, Path.Combine(input, "Iny serial S05E01.mkv"), overwrite: true);
+        var before = Directory.GetFiles(input, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.GetLastWriteTimeUtc);
+
+        var page = model.SeriesNews;
+        model.Open(page);
+        await page.LoadAsync(refresh: true);
+        var domestic = page.Tabs[0];
+        Check(!page.HasProblems && domestic.Rows.Any(r => r.Caption == "Invented Show (2026)" && r.Code == "S01E01" && r.Mark == "nový seriál") &&
+              domestic.Rows.Count(r => r.Caption == "Domáci seriál (2020)") == 2,
+            "novinky: Czech episodes aired so far – " + string.Join(" | ", domestic.Rows.Select(r => $"{r.Caption} {r.Code} {r.Date}")) + " " + page.Problems);
+        page.ShowUpcoming = true;
+        Check(domestic.Rows.Count(r => r.Caption == "Domáci seriál (2020)") == 4, "novinky: with the episodes still to come");
+        page.ShowUpcoming = false;
+
+        services.InputFolder.Set(null);
+        var premiere = domestic.Rows.First(r => r.Code == "S01E01");
+        premiere.IsChecked = true;
+        Check(page.SendText == "Odoslať na spracovanie (1)", "novinky: one episode ticked – " + page.SendText);
+        await page.SendAsync();
+        Check(page.Status.StartsWith("Najprv nastavte vstupný priečinok", StringComparison.Ordinal) && model.SelectedTool.Page == page,
+            "novinky: without the input folder nothing is sent – " + page.Status);
+        Check(!services.InputFolder.Set(Path.Combine(services.Library!.Root, "MOVIES")) && services.InputFolder.Message.Contains("MOVIES", StringComparison.Ordinal),
+            "input folder: not in the library – " + services.InputFolder.Message);
+        Check(services.InputFolder.Set(input) && services.Settings.InputDirectory == Path.GetFullPath(input) && model.Premieres.InputFolder.Folder == Path.GetFullPath(input),
+            "input folder: one setting for every page");
+        await Screenshot(window, "novinky.png");
+
+        await page.SendAsync();
+        Check(model.SelectedTool.Page == model.Rules && model.Rules.IsSeries && model.Rules.TitleText == "Invented Show (2026)" &&
+              model.Rules.Plan?.Target.Source.Path.EndsWith("Invented.Show.S01E01.1080p.WEB.mkv", StringComparison.Ordinal) == true,
+            $"novinky: one file goes to Single spracovanie with its series – {page.Status} | {model.Rules.TitleText} | {model.Rules.EpisodeText}");
+        await Screenshot(window, "novinky-single.png");
+
+        model.Open(page);
+        foreach (var row in domestic.Rows.Where(r => r.Caption == "Domáci seriál (2020)"))
+        {
+            row.IsChecked = true;
+        }
+
+        var world = page.Tabs[1].Rows.First(r => r.Caption == "World Invented (2024)");
+        world.IsChecked = true;
+        await page.SendAsync();
+        Check(model.SelectedTool.Page == model.Batch && model.Batch.ChosenFiles?.Count == 2 && model.Batch.IsSeries &&
+              model.Batch.SeriesTitle.StartsWith("Domáci seriál (2020)", StringComparison.Ordinal) && model.Batch.Analysis?.FileCount == 2,
+            $"novinky: episodes of a series go to Hromadné spracovanie, only their files – {page.Status} | {model.Batch.SeriesTitle} | {model.Batch.Summary}");
+        Check(page.Waiting.Count == 1 && page.Waiting[0].Episode.OriginalTitle == "World Invented" && page.Status.Contains("čakajú nižšie", StringComparison.Ordinal),
+            "novinky: an episode not in the input folder waits – " + page.Status);
+        await Screenshot(window, "novinky-batch.png");
+
+        model.Open(page);
+        File.Copy(sample, Path.Combine(input, "World.Invented.S02E01.mkv"), overwrite: true);
+        await page.CheckAgainCommand.ExecuteAsync(null);
+        Check(page.Waiting.Count == 0 && model.SelectedTool.Page == model.Rules && model.Rules.TitleText == "World Invented (2024)",
+            "novinky: Skontrolovať znova finds the episode now in the folder – " + page.Status);
+        Check(before.All(f => File.Exists(f.Key) && File.GetLastWriteTimeUtc(f.Key) == f.Value), "novinky: files in the input folder are only read");
+
+        services.SeriesNewsForSelfTest = null;
+        services.SetNewsSources(Core.News.NewsSource.Defaults);
+        model.Open(model.Dashboard);
     }
 
     private static async Task WaitFor(Func<bool> condition)

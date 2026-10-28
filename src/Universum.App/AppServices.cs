@@ -36,6 +36,38 @@ public sealed class AppServices
         return _inspector;
     }
 
+    /// <summary>
+    /// The input folder (owner, 28. 10. 2026): where new films and episodes come; Novinky look for chosen episodes there
+    /// (with its subfolders) and the file dialogs of Single and batch processing start in it. Files there are only read.
+    /// </summary>
+    public string? InputDirectory => Settings.InputDirectory;
+
+    /// <summary>Sets the input folder (null clears it); <see cref="ArgumentException"/> when it lies in the library's MOVIES or TVSHOWS.</summary>
+    public void SetInputDirectory(string? folder)
+    {
+        if (folder is not null)
+        {
+            folder = Path.GetFullPath(folder);
+            if (Library?.ResultFolders.Any(r => Universum.Core.IO.Paths.Same(r, folder) ||
+                    folder.StartsWith(Path.TrimEndingDirectorySeparator(r) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) == true)
+            {
+                throw new ArgumentException("Vstupný priečinok nemôže byť v MOVIES ani v TVSHOWS knižnice – tam sú výsledky.");
+            }
+        }
+
+        Settings.InputDirectory = folder;
+        Settings.Save();
+        InputDirectoryChanged?.Invoke();
+    }
+
+    /// <summary>Raised when the input folder changes (all pages show the same one).</summary>
+    public event Action? InputDirectoryChanged;
+
+    private Pages.InputFolderViewModel? _inputFolder;
+
+    /// <summary>The input folder as the pages show it (one for all of them).</summary>
+    public Pages.InputFolderViewModel InputFolder => _inputFolder ??= new Pages.InputFolderViewModel(this);
+
     /// <summary>The library in the output folder; null until the user chooses the folder.</summary>
     public LibraryLayout? Library => Settings.OutputDirectory is { Length: > 0 } folder ? new LibraryLayout(folder) : null;
 
@@ -334,6 +366,9 @@ public sealed class AppSettings
 
     /// <summary>Output folder with MOVIES and TVSHOWS (specification, section 13); must be set before processing.</summary>
     public string? OutputDirectory { get; set; }
+
+    /// <summary>Where new films and episodes come (Novinky look there); null until the user chooses it.</summary>
+    public string? InputDirectory { get; set; }
 
     /// <summary>Check for updates at start and then once a day.</summary>
     public bool AutoCheckUpdates { get; set; } = true;

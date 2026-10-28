@@ -161,6 +161,14 @@ in next to it without changing the rules, planning or UI.
   dates of CZ and SK) and the most popular world premieres, with VOD (digital) and TV dates (CZ, else SK, else USA).
 - App: Premiéry (four pastel tables), Nastavenia → Zdroje noviniek (import of a rules file, switch off, remove),
   `TitleOpener` (TMDB and HISTRA pages found only when the user clicks).
+- Novinky – Seriály: episodes of running series (aired ones, optionally those to come, optionally only series of the
+  imported HISTRA lists) with a tick each. "Odoslať na spracovanie" looks for the ticked episodes in the input folder
+  (`News/EpisodeFinder`: season and episode from the name or folders, the series' original or local title, the year
+  ±1; the library is left out): one file opens in Single spracovanie with the series and episode, several in Hromadné
+  spracovanie – only those files (`BatchAnalyzer.AnalyzeAsync(only:)`), the series typed in and the kind confirmed; one
+  series at a time, the next ones wait as "Pripravené"; episodes not there yet wait in "Čaká na súbor".
+- The input folder (`AppSettings.InputDirectory`, owner 28 Oct 2026) is one setting shown on Settings, Premiéry and
+  Novinky (`InputFolderViewModel`); it may not lie in MOVIES or TVSHOWS; the file dialogs of Single and batch start there.
 
 ## Multiplexer (specification, section 5)
 

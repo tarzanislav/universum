@@ -118,7 +118,7 @@ public static class BatchPlanner
         var forced = new Dictionary<int, bool>();
         foreach (var (key, track) in SlotKey.Of(file))
         {
-            if (Evidence(track, key, group) is { } found)
+            if (Evidence(track, key, group, file.Path) is { } found)
             {
                 evidence[key] = found;
                 if (found.IsUsable && track.Language.IsUndetermined)
@@ -221,14 +221,20 @@ public static class BatchPlanner
     }
 
     /// <summary>
-    /// Best evidence for a track language: the file itself, a decision for the group, the original track name,
-    /// or a suggestion waiting for confirmation.
+    /// Best evidence for a track language: the file itself, a decision for this file, a decision for the group, the
+    /// original track name, or a suggestion waiting for confirmation (this file's own first, then the group's).
     /// </summary>
-    public static LanguageEvidence? Evidence(MediaTrack track, SlotKey key, BatchGroup group)
+    /// <param name="path">The file the track belongs to; null for the group as a whole (its first file's tracks).</param>
+    public static LanguageEvidence? Evidence(MediaTrack track, SlotKey key, BatchGroup group, string? path = null)
     {
         if (!track.Language.IsUndetermined)
         {
             return new LanguageEvidence(track.Language, Confidence.High, EvidenceSource.File);
+        }
+
+        if (path is not null && group.Decisions.FileLanguage(path, key) is { } chosen)
+        {
+            return new LanguageEvidence(chosen, Confidence.Confirmed, EvidenceSource.FileDecision);
         }
 
         if (group.Decisions.Languages.TryGetValue(key, out var decided))
@@ -239,6 +245,11 @@ public static class BatchPlanner
         if (LanguageGuess.FromName(track.Name) is { } named)
         {
             return new LanguageEvidence(named, Confidence.High, EvidenceSource.TrackName);
+        }
+
+        if (path is not null && group.FileSuggestion(path, key) is { } own)
+        {
+            return own;
         }
 
         return group.Suggestions.TryGetValue(key, out var suggestion) ? suggestion : null;
@@ -260,7 +271,7 @@ public static class BatchPlanner
             {
                 foreach (var (key, track) in SlotKey.Of(file))
                 {
-                    if (Evidence(track, key, group) is { IsUsable: true } known)
+                    if (Evidence(track, key, group, file.Path) is { IsUsable: true } known)
                     {
                         references.Add((Fingerprint.Of(track), known.Language.Primary, group));
                     }

@@ -25,6 +25,9 @@ public enum EvidenceSource
     /// <summary>Decision of the user for the whole group.</summary>
     GroupDecision,
 
+    /// <summary>Decision of the user for this one file (a film of the group spoken in another language).</summary>
+    FileDecision,
+
     /// <summary>Same kind of track (codec, channels, sampling rate, name) with a known language in another file.</summary>
     Similarity,
 

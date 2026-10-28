@@ -180,6 +180,36 @@ public sealed class TmdbTests
     }
 
     [Test]
+    public async Task ANameWithAMistakeIsStillFound()
+    {
+        // an invented film: the file names it with a typo and a wrong year
+        const string carp = """{"id":990021,"title":"The Golden Carp","original_title":"The Golden Carp","release_date":"2021-11-05"}""";
+        const string names = ""","alternative_titles":{"titles":[]},"translations":{"translations":[{"iso_639_1":"cs","data":{"title":"Zlatý kapor"}}]}}""";
+        var server = new Server
+        {
+            // TMDB finds the film only by the first word, and only without a year
+            ByAddress = address => address.AbsolutePath == "/3/search/movie"
+                ? Uri.UnescapeDataString(address.Query).Contains("query=Zlaty&", StringComparison.Ordinal) && !address.Query.Contains("year=", StringComparison.Ordinal)
+                    ? """{"results":[""" + carp + "]}"
+                    : """{"results":[]}"""
+                : null,
+        };
+        server.Answers["/3/movie/990021"] = carp[..^1] + names;
+        var search = new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: Fast), null);
+
+        var results = await search.SearchTolerantAsync(MediaKind.Movie, "Zlaty kapro", 2019);
+        Assert.Equal("hľadané podľa skráteného názvu „Zlaty“", results.Loosened);
+        Assert.Equal<TmdbTitle?>(null, results.Best("Zlaty kapro", null), "not the same name");
+        Assert.True(results.Similar("Zlaty kapro") is { Title.Id: 990021, Similarity: >= 0.8 and < 1 }, "found by the similar Czech name");
+        Assert.True(server.Requests.Any(r => r.Contains("year=2019", StringComparison.Ordinal)) && server.Requests.Any(r => Uri.UnescapeDataString(r).Contains("query=Zlaty kapro&", StringComparison.Ordinal) && !r.Contains("year=", StringComparison.Ordinal)),
+            "first with the year, then without it, then shortened");
+
+        Assert.True(TitleResults.TitleSimilarity("Zlaty kapro", "Zlatý kapor") is > 0.8 and < 1, "a swapped letter");
+        Assert.Equal(0.0, TitleResults.TitleSimilarity("Kat", "Kot"), "short names only when equal");
+        Assert.True(TitleResults.TitleSimilarity("Kapor v rybníku", "Mesto v noci") < 0.8, "different names");
+    }
+
+    [Test]
     public async Task RequestsAreSpacedOut()
     {
         var pacer = new RequestPacer(20);
@@ -248,6 +278,9 @@ public sealed class TmdbTests
 
         public Dictionary<string, string> Answers { get; } = [];
 
+        /// <summary>An answer chosen by the whole address (path and query); null falls back to <see cref="Answers"/>.</summary>
+        public Func<Uri, string?>? ByAddress { get; set; }
+
         public List<string> Requests { get; } = [];
 
         public string? Authorization { get; private set; }
@@ -277,7 +310,7 @@ public sealed class TmdbTests
 
             var response = Status != HttpStatusCode.OK
                 ? new HttpResponseMessage(Status)
-                : Answers.TryGetValue(request.RequestUri!.AbsolutePath, out var body)
+                : (ByAddress?.Invoke(request.RequestUri!) ?? Answers.GetValueOrDefault(request.RequestUri!.AbsolutePath)) is { } body
                     ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") }
                     : new HttpResponseMessage(HttpStatusCode.NotFound);
             return Task.FromResult(response);

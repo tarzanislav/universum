@@ -35,6 +35,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private CancellationTokenSource? _analysisCancellation;
     private CancellationTokenSource? _speechCancellation;
     private readonly Dictionary<string, string> _namesOfFiles = new(Universum.Core.IO.Paths.Comparer);
+    private readonly Dictionary<string, IReadOnlyList<TmdbTitle>> _candidates = new(Universum.Core.IO.Paths.Comparer);
     private bool _summaryIsWarning;
     private IReadOnlyList<BatchItem> _items = [];
     private bool _needsAnalysis;
@@ -59,9 +60,12 @@ public sealed class BatchPageViewModel : ObservableObject
         _services = services;
         ChooseFolderCommand = new RelayCommand(ChooseFolder, () => !Busy);
         AnalyzeCommand = new AsyncRelayCommand(AnalyzeAsync, () => !Busy && Directory.Exists(Folder));
-        ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions, () => !Busy && SlotRows.Any(s => s.HasSuggestion || s.ForcedSuggested));
+        ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions,
+            () => !Busy && (SlotRows.Any(s => s.HasSuggestion || s.ForcedSuggested) || FileRows.Any(f => f.AudioSlots.Any(s => s.HasOwnSuggestion))));
         DetectSubtitlesCommand = new AsyncRelayCommand(DetectSubtitlesAsync, () => !Busy && SlotRows.Any(s => s.IsSubtitles && s.NeedsLanguage));
-        DetectAudioCommand = new AsyncRelayCommand(DetectAudioAsync, () => !Busy && SlotRows.Any(s => s.Key.Type == TrackType.Audio && s.NeedsLanguage));
+        DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
+        DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
+        DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All), () => !Busy && _analysis is { Groups.Count: > 0 });
         EditTemplateCommand = new RelayCommand(EditTemplate, () => !Busy);
         TemplateFromGroupCommand = new RelayCommand(TemplateFromGroup, () => !Busy && SelectedGroup is not null);
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
@@ -145,8 +149,17 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public AsyncRelayCommand DetectSubtitlesCommand { get; }
 
-    /// <summary>Recognises the spoken language of the group's audio tracks without a language (a suggestion to confirm).</summary>
+    /// <summary>
+    /// Recognises the spoken language of the selected group's audio tracks without a language – its films one by one, a
+    /// series through one episode (a suggestion to confirm).
+    /// </summary>
     public AsyncRelayCommand DetectAudioCommand { get; }
+
+    /// <summary>The same for the files selected in the list, each on its own.</summary>
+    public AsyncRelayCommand DetectAudioSelectedCommand { get; }
+
+    /// <summary>The same for every group of the folder.</summary>
+    public AsyncRelayCommand DetectAudioAllCommand { get; }
 
     public RelayCommand EditTemplateCommand { get; }
 
@@ -775,30 +788,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (await tmdb.GetAsync(MediaKind.Movie, reference.Id) is { } film && _library is not null)
             {
                 TmdbPicker.TrySaveCache(tmdb);
-                var (title, note) = TmdbPicker.TitleText(film);
-                if (TitleGuess.Typed(MediaKind.Movie, title) is { } info)
-                {
-                    // checked in HISTRA as everywhere: a title it does not confirm waits at the file for confirmation
-                    var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
-                    _library.ChosenTitles.Add(path);
-                    if (check is not null && check.Check(film).NeedsConfirmation())
-                    {
-                        _library.Movies.Remove(path);
-                        _library.MovieSuggestions[path] = info;
-                        _library.UnverifiedTitles.Add(path);
-                        _unverifiedNotes[path] = TmdbPicker.Describe(check, film);
-                        note = (note.Length > 0 ? note + " " : "") + "⚠ " + _unverifiedNotes[path];
-                    }
-                    else
-                    {
-                        _library.Movies[path] = info;
-                        _library.UnverifiedTitles.Remove(path);
-                        _unverifiedNotes.Remove(path);
-                    }
-                }
-
-                RunState = note;
-                Replan();
+                await ApplyFilmAsync(path, film);
             }
             else
             {
@@ -809,6 +799,55 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             RunState = ex.Message;
         }
+    }
+
+    /// <summary>A film chosen by the user for a file (its TMDB address, or one of the titles found for it).</summary>
+    public async Task ChooseCandidateAsync(string path, TmdbTitle film)
+    {
+        try
+        {
+            await ApplyFilmAsync(path, film);
+        }
+        catch (TitleServiceException ex)
+        {
+            RunState = ex.Message;
+        }
+    }
+
+    /// <summary>The titles TMDB (or HISTRA) found for the file at the last "Spresniť názvy", best first; empty when none.</summary>
+    public IReadOnlyList<TmdbTitle> CandidatesFor(string path) => _candidates.GetValueOrDefault(path) ?? [];
+
+    // the film becomes the file's title – checked in HISTRA as everywhere: a title it does not confirm waits at the file
+    private async Task ApplyFilmAsync(string path, TmdbTitle film)
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        var (title, note) = TmdbPicker.TitleText(film);
+        if (TitleGuess.Typed(MediaKind.Movie, title) is { } info)
+        {
+            var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
+            _library.ChosenTitles.Add(path);
+            if (check is not null && check.Check(film).NeedsConfirmation())
+            {
+                _library.Movies.Remove(path);
+                _library.MovieSuggestions[path] = info;
+                _library.UnverifiedTitles.Add(path);
+                _unverifiedNotes[path] = TmdbPicker.Describe(check, film);
+                note = (note.Length > 0 ? note + " " : "") + "⚠ " + _unverifiedNotes[path];
+            }
+            else
+            {
+                _library.Movies[path] = info;
+                _library.UnverifiedTitles.Remove(path);
+                _unverifiedNotes.Remove(path);
+            }
+        }
+
+        RunState = note.Length > 0 ? note : $"{Path.GetFileName(path)}: {film.Display}";
+        Replan();
     }
 
     private void ChooseTmdbSeries(TmdbTitle title)
@@ -906,19 +945,43 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 asked++;
                 RunState = $"{service} {asked} / {pending.Count} ({questions} rôznych názvov)…";
-                var results = await titles.SearchAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
-                var match = results.Best(guess.Name, guess.Year);
+                // the name of a file may be wrong (owner, 28. 10.): searched also without the year or shortened, matched
+                // also by a similar name; whatever is not the name and year as read waits for confirmation at the file
+                var results = await titles.SearchTolerantAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
+                _candidates[path] = results.Titles.Take(10).ToList();
+                var year = results.Loosened is null ? guess.Year : null;
+                var match = results.Best(guess.Name, year);
+                var doubts = new List<string>();
+                if (results.Loosened is { } how)
+                {
+                    doubts.Add(how);
+                }
 
-                // the only title of the year, though none of its names is the file's: a suggestion to confirm at the file
-                var loose = match is null && results.OnlyOne(guess.Year) is not null;
-                match ??= results.OnlyOne(guess.Year);
+                if (match is null && results.Similar(guess.Name) is { } similar)
+                {
+                    match = similar.Title;
+                    doubts.Add($"názov v mene súboru sa líši (zhoda {similar.Similarity * 100:0} %)");
+                }
+
+                if (match is null && results.OnlyOne(year) is { } only)
+                {
+                    match = only;
+                    doubts.Add("jediný nájdený titul, jeho názov sa s menom súboru nezhoduje");
+                }
+
+                if (match is { Year: { } foundYear } && guess.Year is { } fileYear && Math.Abs(foundYear - fileYear) > 1)
+                {
+                    doubts.Add($"rok v mene súboru {fileYear}, na {results.Source} {foundYear}");
+                }
+
                 if (match?.ToTitleInfo() is { } info)
                 {
                     _library.MovieSuggestions[path] = info;
                     found++;
 
-                    // HISTRA found nothing, another title, or could not be asked: the file waits for its own confirmation
-                    if (loose || results.Check(match).NeedsConfirmation())
+                    // a loosened match, or HISTRA found nothing, another title, or could not be asked: the file waits for
+                    // its own confirmation (or another title chosen from the list at it)
+                    if (doubts.Count > 0 || results.Check(match).NeedsConfirmation())
                     {
                         if (results.Check(match) == TitleCheck.Unavailable && problem.Length == 0)
                         {
@@ -926,10 +989,9 @@ public sealed class BatchPageViewModel : ObservableObject
                         }
 
                         _library.UnverifiedTitles.Add(path);
-                        _unverifiedNotes[path] = loose
-                            ? $"{results.Source} našlo jediný titul {match.Display}, ale jeho názov sa s menom súboru nezhoduje – skontrolujte ho a potvrďte. " +
-                              TmdbPicker.Describe(results, match)
-                            : TmdbPicker.Describe(results, match);
+                        _unverifiedNotes[path] = (doubts.Count > 0
+                                                     ? $"{results.Source} navrhuje {match.Display}: {string.Join("; ", doubts)} – skontrolujte a potvrďte, alebo vyberte iný titul. "
+                                                     : "") + TmdbPicker.Describe(results, match);
                         unverified++;
                     }
                     else
@@ -946,7 +1008,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     _unverifiedNotes[path] = (results.Titles.Count == 1
                                                  ? $"{results.Source} našlo len {listed} – iný rok, než má súbor"
                                                  : $"{results.Source} našlo viac titulov ({listed}) a žiadny sa nevolá ako súbor") +
-                                             " – napíšte správny názov (rok) pri súbore alebo potvrďte návrh z mena súboru.";
+                                             " – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok) alebo potvrďte návrh z mena súboru.";
                     ambiguous++;
                 }
                 else if (results.FoundNowhere)
@@ -960,7 +1022,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
 
             RunState = $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
-                       (unverified > 0 ? $", {unverified} HISTRA nepotvrdila (⚠ pri súbore – potvrďte ich jednotlivo)" : "") +
+                       (unverified > 0 ? $", {unverified} čaká na potvrdenie (⚠ pri súbore – názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila)" : "") +
                        (ambiguous > 0 ? $", {ambiguous} majú viac možných titulov (⚠ pri súbore – vyberte správny)" : "") +
                        (nowhere > 0 ? $", {nowhere} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)" : "") +
                        " – skontrolujte ich a dajte Prijať návrhy názvov." + (problem.Length > 0 ? " " + problem : "");
@@ -1010,7 +1072,16 @@ public sealed class BatchPageViewModel : ObservableObject
     private void ConfirmSuggestions()
     {
         var own = SlotRows.Where(s => s.NeedsOwnConfirmation).Select(s => s.Slot).ToList();
+        own.AddRange(FileRows.SelectMany(f => f.AudioSlots)
+            .Where(s => s.Group.FileSuggestion(s.Path, s.Key) is { NeedsOwnConfirmation: true } && s.ChosenLanguage is null)
+            .Select(s => $"{Path.GetFileName(s.Path)} {s.Slot}"));
         foreach (var slot in SlotRows)
+        {
+            slot.ConfirmSuggestion();
+        }
+
+        // each file's own suggestions (heard in that file), except the doubtful ones
+        foreach (var slot in FileRows.SelectMany(f => f.AudioSlots))
         {
             slot.ConfirmSuggestion();
         }
@@ -1063,72 +1134,109 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    // the speech of each audio track without a language (and without one in its name) in the group's first file:
-    // pieces from several places of the film vote; the result is a suggestion with what to check
-    private async Task DetectAudioAsync()
+    /// <summary>Which audio tracks "Rozpoznať jazyk audiostôp" listens to.</summary>
+    public enum SpeechScope
     {
-        if (SelectedGroup?.Group is not { } group)
+        /// <summary>The files selected in the list, each on its own.</summary>
+        Selected,
+
+        /// <summary>The selected group: its films one by one, a series through one episode.</summary>
+        Group,
+
+        /// <summary>Every group of the folder, the same way.</summary>
+        All,
+    }
+
+    // the speech of the audio tracks without a language: pieces from several places of each film vote; every result is
+    // a suggestion with what to check (owner, 28. 10.: the films of a group each on their own, or only chosen films)
+    private async Task DetectAudioAsync(SpeechScope scope)
+    {
+        if (_analysis is null)
         {
             return;
         }
 
+        var series = _library?.Kind == MediaKind.Series;
+        var (targets, known) = scope switch
+        {
+            SpeechScope.Selected => SpeechTargets.ForFiles(_selectedFiles.Select(f => (f.Item.Group, f.Item.File))),
+            SpeechScope.Group when SelectedGroup?.Group is { } group => SpeechTargets.ForGroups([group], series),
+            SpeechScope.All => SpeechTargets.ForGroups(_analysis.Groups, series),
+            _ => (Array.Empty<SpeechTarget>(), 0),
+        };
+
         Busy = true;
         var cancellation = _speechCancellation = new CancellationTokenSource();
         StopCommand.NotifyCanExecuteChanged();
-        int recognised = 0, failed = 0;
+        int recognised = 0, failed = 0, done = 0;
         var notes = new List<string>();
         try
         {
-            // tracks with a language chosen for the group, or named in the track name, are not listened to
-            var undetermined = SlotRows.Where(s => s.Key.Type == TrackType.Audio && s.NeedsLanguage && s.ChosenLanguage is null).ToList();
-            var named = SlotRows.Count(s => s.Key.Type == TrackType.Audio && s.IsNamedInTrack);
-            if (undetermined.Count > 0)
+            if (targets.Count > 0)
             {
                 RunState = "Overujem nástroje rozpoznávania reči…";
                 var tools = await _services.SpeechAsync(cancellation.Token);
-                var file = group.Representative;
-                foreach (var slot in undetermined)
+                foreach (var target in targets)
                 {
-                    RunState = $"Počúvam {slot.Slot}…";
-                    var pieces = new Progress<int>(n => RunState = $"Počúvam {slot.Slot} – úsekov: {n}…");
-                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, file.Path, slot.Key.Ordinal, file.Duration, pieces, cancellation.Token);
+                    var name = $"{Path.GetFileName(target.File.Path)} – {Texts.Slot(target.Key)}";
+                    var where = $"Počúvam {done + 1}/{targets.Count}: {name}";
+                    RunState = where + "…";
+                    Progress = (double)done / targets.Count;
+                    var pieces = new Progress<int>(n => RunState = $"{where} (úsekov: {n})…");
+                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, target.Key.Ordinal, target.File.Duration, pieces, cancellation.Token);
                     if (result.Language is { } code)
                     {
-                        group.Suggestions[slot.Key] = new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
+                        SpeechTargets.Keep(target, new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
                         {
                             Detail = result.Doubt,
                             NeedsOwnConfirmation = result.NeedsOwnConfirmation,
-                        };
+                        });
                         recognised++;
                     }
                     else
                     {
                         failed++;
-                        notes.Add($"{slot.Slot}: {result.Doubt}");
+                        notes.Add($"{name}: {result.Doubt}");
                     }
+
+                    done++;
                 }
             }
 
             Replan();
-            RunState = Texts.Detection("Audio", recognised, failed, named) + (notes.Count > 0 ? " " + string.Join("; ", notes) + "." : "");
+            RunState = (targets.Count == 0 && known == 0
+                           ? scope == SpeechScope.Selected ? "Vyberte v zozname súbory, ktoré sa majú vypočuť." : "Audio: žiadne stopy bez jazyka."
+                           : Texts.Detection("Audio", recognised, failed, 0,
+                               known > 0 ? $"{known} už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania)" : null)) +
+                       (notes.Count > 0 ? " " + string.Join("; ", notes.Take(3)) + (notes.Count > 3 ? $" (a ďalšie: {notes.Count - 3})" : "") + "." : "");
         }
         catch (OperationCanceledException)
         {
             Replan();
-            RunState = $"Rozpoznávanie reči zastavené – rozpoznané doteraz: {recognised}.";
+            RunState = $"Rozpoznávanie reči zastavené – rozpoznané doteraz: {recognised} z {targets.Count}.";
         }
         catch (SpeechException ex)
         {
             Replan();
-            RunState = ex.Message;
+            RunState = ex.Message + (recognised > 0 ? $" (rozpoznané doteraz: {recognised})" : "");
         }
         finally
         {
+            Progress = 0;
             _speechCancellation = null;
             cancellation.Dispose();
             Busy = false;
             StopCommand.NotifyCanExecuteChanged();
         }
+    }
+
+    private IReadOnlyList<FileRow> _selectedFiles = [];
+
+    /// <summary>The files selected in the list (several with Ctrl or Shift).</summary>
+    public void SelectFiles(IEnumerable<FileRow> files)
+    {
+        _selectedFiles = files.ToList();
+        DetectAudioSelectedCommand.NotifyCanExecuteChanged();
     }
 
     private async Task RunAsync()
@@ -1378,7 +1486,8 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         foreach (var command in new IRelayCommand[]
                  {
-                     ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, EditTemplateCommand,
+                     ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
+                     DetectAudioAllCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand,

@@ -20,6 +20,28 @@ public sealed class BatchGroup(string signature, int index)
     /// <summary>Suggestions waiting for confirmation (specification, section 7.3, medium confidence).</summary>
     public Dictionary<SlotKey, LanguageEvidence> Suggestions { get; } = [];
 
+    /// <summary>
+    /// Suggestions for one file (full path) – the spoken language heard in that file's own audio (owner, 28. 10.: each
+    /// film of a group is listened to on its own); they win over the group's suggestions.
+    /// </summary>
+    public Dictionary<string, Dictionary<SlotKey, LanguageEvidence>> FileSuggestions { get; } =
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
+    /// <summary>The suggestion for a track of one file, or null.</summary>
+    public LanguageEvidence? FileSuggestion(string path, SlotKey key) =>
+        FileSuggestions.TryGetValue(path, out var suggestions) && suggestions.TryGetValue(key, out var suggestion) ? suggestion : null;
+
+    /// <summary>Sets the suggestion for a track of one file.</summary>
+    public void SuggestForFile(string path, SlotKey key, LanguageEvidence suggestion)
+    {
+        if (!FileSuggestions.TryGetValue(path, out var suggestions))
+        {
+            FileSuggestions[path] = suggestions = [];
+        }
+
+        suggestions[key] = suggestion;
+    }
+
     /// <summary>Subtitle slots that are probably forced (few subtitles compared with a full track of the same language).</summary>
     public HashSet<SlotKey> ForcedSuggestions { get; } = [];
 

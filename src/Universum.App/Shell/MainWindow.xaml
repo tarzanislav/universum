@@ -1073,8 +1073,14 @@
                                     ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
                             <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Single" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionChanged="OnBatchFilesSelected">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Rozpoznať jazyk audiostôp vybraných súborov" Command="{Binding DetectAudioSelectedCommand}" />
+                                    <MenuItem Header="Informácie o súbore" Command="{Binding ShowInfoCommand}" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" MinWidth="110" />
                                 <DataGridTemplateColumn Header="Film / epizóda" Width="150">
@@ -1086,8 +1092,34 @@
                                                 <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                                 <Button Content="Potvrdiť návrh" Command="{Binding ConfirmCommand}" Padding="8,2" Margin="0,2,0,0" FontSize="12" HorizontalAlignment="Left"
                                                         Visibility="{Binding IsUnverified, Converter={StaticResource BoolToVisibility}}"
-                                                        ToolTip="HISTRA tento názov nepotvrdila – potvrďte ho, ak je správny (alebo napíšte správny)" />
+                                                        ToolTip="Návrh nie je istý (názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila) – potvrďte ho, ak je správny, alebo vyberte iný" />
+                                                <!-- owner, 28. 10.: the name of a file may be wrong – any title found can be chosen -->
+                                                <ComboBox ItemsSource="{Binding Candidates}" DisplayMemberPath="Display" SelectedItem="{Binding ChosenCandidate}" FontSize="12" Margin="0,2,0,0"
+                                                          Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVisibility}}"
+                                                          ToolTip="Vybrať iný titul z nájdených na TMDB (overí sa v HISTRA)" />
                                             </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- the file's own audio tracks without a language: chosen for this file, or what its speech suggests -->
+                                <DataGridTemplateColumn Header="Jazyk audia" Width="160">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ItemsControl ItemsSource="{Binding AudioSlots}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="0,0,0,3">
+                                                            <DockPanel>
+                                                                <TextBlock Text="{Binding Slot}" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                                <ComboBox ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName" FontSize="12"
+                                                                          SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                                          ToolTip="Jazyk tejto stopy len pre tento súbor (prednosť pred voľbou pre skupinu)" />
+                                                            </DockPanel>
+                                                            <TextBlock Text="{Binding Hint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -1122,8 +1154,17 @@
                             <TextBlock DockPanel.Dock="Left" Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
                                        ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
                             <WrapPanel HorizontalAlignment="Right">
-                                <Button Content="Rozpoznať jazyk audiostôp" Command="{Binding DetectAudioCommand}" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="Vypočuje si niekoľko úsekov z rôznych miest prvého súboru skupiny a navrhne jazyk reči (whisper.cpp, všetko len v počítači; trvá pár sekúnd na stopu)" />
+                                <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
+                                <Button Content="Rozpoznať jazyk audiostôp ▾" Click="OnSpeechMenu" Margin="0,0,8,4" Padding="10,3"
+                                        ToolTip="Vypočuje si niekoľko úsekov z rôznych miest filmu a navrhne jazyk reči (whisper.cpp, všetko len v počítači; pár sekúnd na stopu). Vyberte, ktoré súbory.">
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Vybrané súbory (v zozname, Ctrl / Shift)" Command="{Binding DetectAudioSelectedCommand}" />
+                                            <MenuItem Header="Celá skupina – filmy každý zvlášť, seriál jedna epizóda" Command="{Binding DetectAudioCommand}" />
+                                            <MenuItem Header="Všetky skupiny" Command="{Binding DetectAudioAllCommand}" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
                                 <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
                                         ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
                                 <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />

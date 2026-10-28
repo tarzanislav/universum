@@ -52,6 +52,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
         _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
         NewsSources = new NewsSourcesViewModel(services);
+        InterestSources = new InterestSourcesViewModel(services);
         Load(services.Profile);
     }
 
@@ -62,6 +63,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
+
+    /// <summary>Nastavenia → Zaujímavosti.</summary>
+    public InterestSourcesViewModel InterestSources { get; }
 
     /// <summary>Asks the main window to open the update window.</summary>
     public event Action? ShowUpdatesRequested;

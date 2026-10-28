@@ -31,9 +31,6 @@ public sealed class PremieresPageViewModel : ObservableObject
 
     public const int FilmDaysAhead = 60;
 
-    /// <summary>The kept premieres are brought up to date when the page is shown and they are older than this.</summary>
-    public static readonly TimeSpan UpdateAfter = TimeSpan.FromHours(20);
-
     private readonly AppServices _services;
     private readonly TitleOpener _opener;
     private PremiereTabItem _selected;
@@ -41,7 +38,7 @@ public sealed class PremieresPageViewModel : ObservableObject
     private string _status = "";
     private string _problems = "";
     private string _filter = "";
-    private bool _showHistory;
+    private NewsView _view = NewsView.Upcoming;
     private bool _onlyChosen;
     private bool _busy;
     private CancellationTokenSource? _work;
@@ -111,26 +108,40 @@ public sealed class PremieresPageViewModel : ObservableObject
 
     public bool IsSeriesTab => !IsFilmTab;
 
+    /// <summary>The premieres of the last week (the latest first).</summary>
+    public bool ShowRecent
+    {
+        get => _view == NewsView.Recent;
+        set => SetView(value, NewsView.Recent);
+    }
+
     /// <summary>The coming premieres (from today, the nearest first).</summary>
     public bool ShowUpcoming
     {
-        get => !_showHistory;
-        set => ShowHistory = !value;
+        get => _view == NewsView.Upcoming;
+        set => SetView(value, NewsView.Upcoming);
     }
 
     /// <summary>The history: premieres that are over (the latest first).</summary>
     public bool ShowHistory
     {
-        get => _showHistory;
-        set
+        get => _view == NewsView.History;
+        set => SetView(value, NewsView.History);
+    }
+
+    private void SetView(bool chosen, NewsView view)
+    {
+        if (!chosen || _view == view)
         {
-            if (SetProperty(ref _showHistory, value))
-            {
-                OnPropertyChanged(nameof(ShowUpcoming));
-                OnPropertyChanged(nameof(Note));
-                Show();
-            }
+            return;
         }
+
+        _view = view;
+        OnPropertyChanged(nameof(ShowRecent));
+        OnPropertyChanged(nameof(ShowUpcoming));
+        OnPropertyChanged(nameof(ShowHistory));
+        OnPropertyChanged(nameof(Note));
+        Show();
     }
 
     /// <summary>Only the titles the user chose (Vybrané).</summary>
@@ -178,7 +189,12 @@ public sealed class PremieresPageViewModel : ObservableObject
     public bool HasDomesticSource => _services.NewsSources.Any(s => s.Enabled && s.Kind == NewsSourceKind.Page);
 
     /// <summary>What the chosen table contains and where it comes from.</summary>
-    public string Note => (ShowHistory ? "História – premiéry, ktoré už boli (najnovšie hore). " : "") + SelectedTab.Tab switch
+    public string Note => _view switch
+    {
+        NewsView.History => "História – premiéry, ktoré už boli (najnovšie hore). ",
+        NewsView.Recent => "Premiéry posledného týždňa (najnovšie hore). ",
+        _ => "",
+    } + SelectedTab.Tab switch
     {
         PremiereTab.FilmDomestic => $"Premiéry v kinách na Slovensku a v Česku (sledované {FilmDaysAhead} dní dopredu), s dátumom na VOD a v TV. Zdroj: TMDB.",
         PremiereTab.FilmWorld => $"Najpopulárnejšie filmy s prvou premiérou vo svete (sledované {FilmDaysAhead} dní dopredu). Zdroj: TMDB.",
@@ -241,18 +257,16 @@ public sealed class PremieresPageViewModel : ObservableObject
 
     public RelayCommand StopCommand { get; }
 
-    /// <summary>Reading when the page is shown (the self-test switches it off and reads its invented sources itself).</summary>
+    /// <summary>The daily reading at the start (the self-test switches it off and reads its invented sources itself).</summary>
     public static bool AutoLoad { get; set; } = true;
 
-    /// <summary>The page was opened: the kept premieres at once, brought up to date when they are older than a day.</summary>
+    /// <summary>
+    /// The page was opened: the kept premieres at once (the sources are asked at the first start of a day or on Obnoviť).
+    /// </summary>
     public void Shown()
     {
         EnsureLoaded();
         Show();
-        if (AutoLoad && !Busy && (_archive!.ReadAt is not { } read || DateTime.Now - read > UpdateAfter))
-        {
-            _ = LoadAsync(refresh: false);
-        }
     }
 
     /// <summary>
@@ -403,10 +417,15 @@ public sealed class PremieresPageViewModel : ObservableObject
         var wanted = Words.Normalize(Filter);
         foreach (var tab in Tabs)
         {
-            var rows = tab.All.Where(r => (ShowHistory ? r.SortDate < today : r.SortDate >= today) &&
+            var rows = tab.All.Where(r => _view switch
+                                          {
+                                              NewsView.Recent => r.SortDate >= today.AddDays(-7) && r.SortDate <= today,
+                                              NewsView.History => r.SortDate < today,
+                                              _ => r.SortDate >= today,
+                                          } &&
                                           (!OnlyChosen || r.IsChosen) &&
                                           (wanted.Length == 0 || r.Search.Contains(wanted, StringComparison.Ordinal)));
-            tab.Show(ShowHistory
+            tab.Show(_view != NewsView.Upcoming
                 ? rows.OrderByDescending(r => r.SortDate).ThenByDescending(r => r.Popularity)
                 : rows.OrderBy(r => r.SortDate).ThenByDescending(r => r.Popularity));
         }
@@ -489,6 +508,9 @@ public abstract class PremiereRow(MarkStore marks, string markKey) : MarkedRow(m
     /// <summary>The source has a page of the title.</summary>
     public virtual bool HasSource => false;
 
+    /// <summary>How the episodes come (series only), shown under the title.</summary>
+    public virtual string Rhythm => "";
+
     public string Date => $"{SortDate.Day}. {SortDate.Month}. {SortDate.Year}";
 
     public string Day => Universum.Core.News.Periodicity.DayName(SortDate);
@@ -499,21 +521,8 @@ public abstract class PremiereRow(MarkStore marks, string markKey) : MarkedRow(m
     /// <summary>The premiere is within the next week.</summary>
     public bool IsSoon => SortDate > DateOnly.FromDateTime(DateTime.Now) && SortDate <= DateOnly.FromDateTime(DateTime.Now).AddDays(7);
 
-    /// <summary>"dnes", "zajtra", "o 5 dní" for the coming week; empty otherwise.</summary>
-    public string When
-    {
-        get
-        {
-            var days = SortDate.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
-            return days switch
-            {
-                0 => "DNES",
-                1 => "zajtra",
-                > 1 and <= 7 => $"o {Texts.Count(days, "deň", "dni", "dní")}",
-                _ => "",
-            };
-        }
-    }
+    /// <summary>"DNES", "zajtra", "o 3 dni", "o týždeň", "včera", "pred 3 dňami" …</summary>
+    public string When => NewsTexts.When(SortDate);
 }
 
 /// <summary>A row of a film table.</summary>
@@ -600,6 +609,8 @@ public sealed class PremiereSeriesRow : PremiereRow
     public string What => Premiere.First.Kind == EpisodeKind.SeriesPremiere ? $"nový seriál · {Premiere.First.Code}" : $"{Premiere.First.Season}. séria · {Premiere.First.Code}";
 
     public string Periodicity => Premiere.Periodicity.Length > 0 ? Premiere.Periodicity : "–";
+
+    public override string Rhythm => Premiere.Periodicity;
 
     public string Episodes => Premiere.EpisodeCount is { } count ? Texts.Count(count, "epizóda", "epizódy", "epizód") : "–";
 

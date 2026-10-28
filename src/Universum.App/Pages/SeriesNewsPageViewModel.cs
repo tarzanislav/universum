@@ -27,7 +27,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     private List<SeriesEpisode>? _history;
     private NewsTabItem _selected;
     private string _filter = "";
-    private bool _showHistory;
+    private NewsView _view = NewsView.Recent;
     private bool _onlyChosen;
     private bool _onlyMyLists;
     private string _status = "";
@@ -118,30 +118,44 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         }
     }
 
-    /// <summary>The news: episodes of the last week (the latest first).</summary>
+    /// <summary>The news: episodes of the last week.</summary>
     public bool ShowRecent
     {
-        get => !_showHistory;
-        set => ShowHistory = !value;
+        get => _view == NewsView.Recent;
+        set => SetView(value, NewsView.Recent);
     }
 
-    /// <summary>The history: older episodes (kept for good, the latest first).</summary>
+    /// <summary>Episodes to come (as far as the sources tell, up to two months).</summary>
+    public bool ShowUpcoming
+    {
+        get => _view == NewsView.Upcoming;
+        set => SetView(value, NewsView.Upcoming);
+    }
+
+    /// <summary>The history: older episodes (kept for good).</summary>
     public bool ShowHistory
     {
-        get => _showHistory;
-        set
-        {
-            if (SetProperty(ref _showHistory, value))
-            {
-                OnPropertyChanged(nameof(ShowRecent));
-                if (value && _history is null)
-                {
-                    _ = LoadHistoryAsync();
-                }
+        get => _view == NewsView.History;
+        set => SetView(value, NewsView.History);
+    }
 
-                Build();
-            }
+    private void SetView(bool chosen, NewsView view)
+    {
+        if (!chosen || _view == view)
+        {
+            return;
         }
+
+        _view = view;
+        OnPropertyChanged(nameof(ShowRecent));
+        OnPropertyChanged(nameof(ShowUpcoming));
+        OnPropertyChanged(nameof(ShowHistory));
+        if (view == NewsView.History && _history is null)
+        {
+            _ = LoadHistoryAsync();
+        }
+
+        Build();
     }
 
     /// <summary>Only the series the user chose (Vybrané).</summary>
@@ -196,6 +210,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             ? "České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja)."
             : OnlyChosen ? "Žiadne vybrané seriály – výber zaškrtnete v stĺpci Vybrané."
             : Filter.Length > 0 || OnlyMyLists ? "Nič nezodpovedá hľadaniu."
+            : _view == NewsView.Upcoming ? "Žiadne nadchádzajúce epizódy – skúste Obnoviť."
             : ShowHistory ? (_history is null ? "Načítavam históriu…" : "História je zatiaľ prázdna – epizódy sem prechádzajú po týždni.")
             : Busy ? "Načítavam…" : "Žiadne nové epizódy – skúste Obnoviť.";
 
@@ -265,7 +280,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 
     private IEnumerable<NewsEpisodeRow> Checked => Tabs.SelectMany(t => t.All).SelectMany(s => s.Episodes).Where(r => r.IsChecked);
 
-    /// <summary>The page was opened: what is kept at once, then the sources for what is missing or too old.</summary>
+    /// <summary>The page was opened: what is kept at once (the sources are asked at the first start of a day or on Obnoviť).</summary>
     public async void Shown()
     {
         OnPropertyChanged(nameof(HasMyLists));
@@ -278,11 +293,6 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
                 _all = kept.Episodes.ToList();
                 Build();
             }
-        }
-
-        if (AutoLoad && !Busy && (_readAt is null || DateTime.Now - _readAt > TimeSpan.FromHours(6)))
-        {
-            await LoadAsync(refresh: false);
         }
     }
 
@@ -491,16 +501,22 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         var from = today.AddDays(-RecentDays);
-        var episodes = SeriesNews.Merge(ShowHistory
-            ? (_history ?? []).Concat(_all.Where(e => e.AirDate < from))
-            : _all.Where(e => e.AirDate >= from));
+        var episodes = SeriesNews.Merge(_view switch
+        {
+            NewsView.History => (_history ?? []).Concat(_all.Where(e => e.AirDate < from)),
+            NewsView.Upcoming => _all.Where(e => e.AirDate >= today),
+            _ => _all.Where(e => e.AirDate >= from && e.AirDate <= today),
+        });
+        var rhythms = (_history ?? []).Concat(_all).GroupBy(MarkStore.Series).ToDictionary(g => g.Key, g => Periodicity.Describe(g.SelectMany(e =>
+            Enumerable.Repeat(e.AirDate, e.LastNumber is { } last && e.Number is { } first && last > first ? last - first + 1 : 1))), StringComparer.Ordinal);
         foreach (var tab in Tabs)
         {
             var oldSeries = tab.All.ToDictionary(r => r.MarkKey, StringComparer.Ordinal);
             var oldEpisodes = tab.All.SelectMany(r => r.Episodes).DistinctBy(r => r.Episode).ToDictionary(r => r.Episode);
             tab.Set(episodes.Where(e => e.Region == tab.Region)
                 .GroupBy(MarkStore.Series)
-                .Select(g => new NewsSeriesRow(g.Key, g.OrderBy(e => e.AirDate).Select(e => oldEpisodes.GetValueOrDefault(e) ?? new NewsEpisodeRow(e, this)).ToList(), this)
+                .Select(g => new NewsSeriesRow(g.Key, g.OrderBy(e => e.AirDate).Select(e => oldEpisodes.GetValueOrDefault(e) ?? new NewsEpisodeRow(e, this)).ToList(),
+                    rhythms.GetValueOrDefault(g.Key) ?? "", this)
                 {
                     IsExpanded = oldSeries.TryGetValue(g.Key, out var old) && old.IsExpanded,
                 })
@@ -601,10 +617,11 @@ public sealed class NewsSeriesRow : MarkedRow
     private readonly string _search;
     private bool _expanded;
 
-    public NewsSeriesRow(string markKey, IReadOnlyList<NewsEpisodeRow> episodes, SeriesNewsPageViewModel page)
+    public NewsSeriesRow(string markKey, IReadOnlyList<NewsEpisodeRow> episodes, string rhythm, SeriesNewsPageViewModel page)
         : base(page.Services.Marks, markKey)
     {
         Episodes = episodes;
+        Rhythm = rhythm;
         foreach (var episode in episodes)
         {
             episode.Series = this;
@@ -633,6 +650,9 @@ public sealed class NewsSeriesRow : MarkedRow
 
     /// <summary>The next episode to come, else the last one aired.</summary>
     public NewsEpisodeRow Nearest { get; }
+
+    /// <summary>How the episodes come ("raz do týždňa – streda" …), from all its known episodes.</summary>
+    public string Rhythm { get; }
 
     /// <summary>The episode the series is named by (the nearest one).</summary>
     public SeriesEpisode First { get; }
@@ -774,22 +794,8 @@ public sealed class NewsEpisodeRow : ObservableObject
 
     public bool IsToday => Episode.AirDate == DateOnly.FromDateTime(DateTime.Now);
 
-    /// <summary>"DNES", "zajtra", "o 3 dni", "včera", "pred 3 dňami".</summary>
-    public string When
-    {
-        get
-        {
-            var days = Episode.AirDate.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
-            return days switch
-            {
-                0 => "DNES",
-                1 => "zajtra",
-                -1 => "včera",
-                > 1 => $"o {Texts.Count(days, "deň", "dni", "dní")}",
-                _ => $"pred {-days} dňami",
-            };
-        }
-    }
+    /// <summary>"DNES", "zajtra", "o 3 dni", "včera", "pred 3 dňami" …</summary>
+    public string When => NewsTexts.When(Episode.AirDate);
 
     /// <summary>"odvysielaná" or "nadchádzajúca".</summary>
     public string State => Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? "odvysielaná" : "nadchádzajúca";

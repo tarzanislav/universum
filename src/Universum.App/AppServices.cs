@@ -308,6 +308,69 @@ public sealed class AppServices
     /// <summary>Raised when the kept premieres and news were forgotten.</summary>
     public event Action? NewsCleared;
 
+    /// <summary>The sources of Zaujímavosti (added by the user; none in a new installation).</summary>
+    public IReadOnlyList<Universum.Core.News.FeedSource> FeedSources => Settings.FeedSources ?? [];
+
+    /// <summary>Stores the sources of Zaujímavosti.</summary>
+    public void SetFeedSources(IEnumerable<Universum.Core.News.FeedSource> sources)
+    {
+        Settings.FeedSources = sources.ToList();
+        Settings.Save();
+        FeedSourcesChanged?.Invoke();
+    }
+
+    /// <summary>Raised when a source of Zaujímavosti was added, removed, switched on or off.</summary>
+    public event Action? FeedSourcesChanged;
+
+    /// <summary>The user's DeepL key (protected for this Windows account); null without one.</summary>
+    public string? DeepLKey => Settings.DeepLKeyProtected is { Length: > 0 } stored ? UserSecret.Unprotect(stored) : null;
+
+    /// <summary>Stores the DeepL key protected for the current Windows user (null removes it).</summary>
+    public void SetDeepLKey(string? key)
+    {
+        Settings.DeepLKeyProtected = string.IsNullOrWhiteSpace(key) ? null : UserSecret.Protect(key.Trim());
+        Settings.Save();
+        TranslationChanged?.Invoke();
+    }
+
+    /// <summary>The language Zaujímavosti are translated into ("sk"; "cs" and "en" ready).</summary>
+    public string InterestLanguage => Settings.InterestLanguage is "cs" or "en" ? Settings.InterestLanguage : "sk";
+
+    public void SetInterestLanguage(string language)
+    {
+        Settings.InterestLanguage = language;
+        Settings.Save();
+        TranslationChanged?.Invoke();
+    }
+
+    /// <summary>Raised when the DeepL key or the language changes.</summary>
+    public event Action? TranslationChanged;
+
+    /// <summary>DeepL with the user's key; null without one.</summary>
+    public Universum.Core.News.DeepLClient? Translator =>
+        TranslatorForSelfTest ?? (DeepLKey is { } key && Universum.Core.News.DeepLClient.IsValidKey(key) ? new Universum.Core.News.DeepLClient(Http, key) : null);
+
+    /// <summary>The self-test's stand-in DeepL.</summary>
+    public Universum.Core.News.DeepLClient? TranslatorForSelfTest { get; set; }
+
+    /// <summary>Zaujímavosti: the articles of the sources, kept for good.</summary>
+    public Universum.Core.News.Interests Interests => InterestsForSelfTest ?? (_interests ??= new Universum.Core.News.Interests(
+        new Universum.Core.News.WebPageClient(NewsHttp), new Universum.Core.News.InterestStore(AppSettings.InterestsFile)));
+
+    private Universum.Core.News.Interests? _interests;
+
+    /// <summary>The self-test's stand-in sources of Zaujímavosti.</summary>
+    public Universum.Core.News.Interests? InterestsForSelfTest { get; set; }
+
+    /// <summary>The pictures of articles; null when they are switched off.</summary>
+    public Universum.Core.News.WebImageCache? Images =>
+        ImagesForSelfTest ?? (!Settings.InterestImages ? null : _images ??= new Universum.Core.News.WebImageCache(NewsHttp, AppSettings.ImageDirectory));
+
+    private Universum.Core.News.WebImageCache? _images;
+
+    /// <summary>The self-test's stand-in picture cache.</summary>
+    public Universum.Core.News.WebImageCache? ImagesForSelfTest { get; set; }
+
     /// <summary>The sources of news of the settings (TVmaze and TMDB in a new installation).</summary>
     public IReadOnlyList<Universum.Core.News.NewsSource> NewsSources => Settings.NewsSources ?? Universum.Core.News.NewsSource.Defaults;
 
@@ -453,6 +516,21 @@ public sealed class AppSettings
     /// <summary>The server posters come from; null = TMDB's image server (HISTRA gives poster paths in TMDB's form).</summary>
     public string? PosterServer { get; set; }
 
+    /// <summary>The sources of Zaujímavosti (null = none yet).</summary>
+    public List<Universum.Core.News.FeedSource>? FeedSources { get; set; }
+
+    /// <summary>The DeepL key, protected for the Windows account.</summary>
+    public string? DeepLKeyProtected { get; set; }
+
+    /// <summary>The language of Zaujímavosti ("sk", later "cs" or "en").</summary>
+    public string InterestLanguage { get; set; } = "sk";
+
+    /// <summary>Zaujímavosti show the pictures of articles.</summary>
+    public bool InterestImages { get; set; } = true;
+
+    /// <summary>The day Premiéry, Novinky and Zaujímavosti were last brought up to date at the start (once a day).</summary>
+    public string? LastDailyUpdate { get; set; }
+
     /// <summary>Premiéry show posters.</summary>
     public bool PremierePosters { get; set; } = true;
 
@@ -485,6 +563,12 @@ public sealed class AppSettings
 
     /// <summary>The days read from the sources of news.</summary>
     public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");
+
+    /// <summary>The articles of Zaujímavosti read so far (their history).</summary>
+    public static string InterestsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "interests.json");
+
+    /// <summary>Downloaded pictures of articles.</summary>
+    public static string ImageDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "images");
 
     /// <summary>The premieres read so far (the history of Premiéry).</summary>
     public static string PremieresFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "premieres.json");

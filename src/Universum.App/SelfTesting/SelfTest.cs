@@ -871,8 +871,17 @@ internal static class SelfTest
                 });
         }
 
-        private static string Item(int i, bool series) =>
-            $$"""{"media_type":"{{(series ? "show" : "movie")}}","media_id":{{1000 + i}},"title":"Vymyslený {{(series ? "seriál" : "príbeh")}} {{i}}","original_title":"Invented {{(series ? "Series" : "Story")}} {{i}}","year":{{1990 + i}},"overview":"Vymyslený dej číslo {{i}} – len na skúšku programu.","rating":{{(5 + i % 5).ToString(CultureInfo.InvariantCulture)}}.4,"runtime":{{90 + i}},"poster_path":"/p{{i}}.jpg","external_ids":{"imdb":"tt{{9000 + i:0000000}}","tmdb":"{{9000 + i}}","trakt":"{{5000 + i}}"{{(series ? $","tvdb":"{7000 + i}"" : "")}}}{{(series ? ","status":"Returning Series"" : "")}},"genres":["Dráma","Sci-Fi"]}""";
+        private static string Item(int i, bool series)
+        {
+            var kind = series ? "show" : "movie";
+            var word = series ? "seriál" : "príbeh";
+            var original = series ? "Series" : "Story";
+            var tvdb = series ? ",\"tvdb\":\"" + (7000 + i).ToString(CultureInfo.InvariantCulture) + "\"" : "";
+            var status = series ? ",\"status\":\"Returning Series\"" : "";
+            var rating = (5 + i % 5).ToString(CultureInfo.InvariantCulture) + ".4";
+            var imdb = "tt" + (9000 + i).ToString("0000000", CultureInfo.InvariantCulture);
+            return $$"""{"media_type":"{{kind}}","media_id":{{1000 + i}},"title":"Vymyslený {{word}} {{i}}","original_title":"Invented {{original}} {{i}}","year":{{1990 + i}},"overview":"Vymyslený dej číslo {{i}} – len na skúšku programu.","rating":{{rating}},"runtime":{{90 + i}},"poster_path":"/p{{i}}.jpg","external_ids":{"imdb":"{{imdb}}","tmdb":"{{9000 + i}}","trakt":"{{5000 + i}}"{{tvdb}}}{{status}},"genres":["Dráma","Sci-Fi"]}""";
+        }
 
         // a coloured poster with a gradient (drawn on the window's thread, before any request comes)
         private static byte[] DrawPoster(int seed)

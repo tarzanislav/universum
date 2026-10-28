@@ -78,6 +78,7 @@ public static class Texts
         EvidenceSource.File => "zo súboru",
         EvidenceSource.TrackName => "z názvu stopy",
         EvidenceSource.GroupDecision => "vaša voľba",
+        EvidenceSource.FileDecision => "vaša voľba pre súbor",
         EvidenceSource.Similarity => "NÁVRH podľa podobnej stopy – potvrďte",
         EvidenceSource.SubtitleText => "NÁVRH podľa textu titulkov – potvrďte",
         EvidenceSource.Speech => "NÁVRH podľa reči – potvrďte" + (evidence?.Detail is { } detail ? $" ({detail})" : ""),

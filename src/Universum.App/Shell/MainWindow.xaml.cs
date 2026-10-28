@@ -60,6 +60,27 @@ public partial class MainWindow : Window
         _ = Dispatcher.BeginInvoke(new Action(Close));
     }
 
+    // the button's menu opens on a click (not only with the right button), with the page as its data
+    private void OnSpeechMenu(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.DataContext = button.DataContext;
+            menu.IsOpen = true;
+        }
+    }
+
+    // several files can be selected in batch processing (Ctrl, Shift) – for listening to their audio
+    private void OnBatchFilesSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+        {
+            Model.Batch.SelectFiles(grid.SelectedItems.OfType<Pages.FileRow>());
+        }
+    }
+
     private void OnDragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;

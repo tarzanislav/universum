@@ -175,6 +175,14 @@ public sealed class TmdbPicker : ObservableObject
         try
         {
             var found = await titles.FindAsync(_kind(), text);
+
+            // the name may be written with a mistake (a file's name): without the year, then shortened – only to choose from
+            if (found.Titles.Count == 0 && TitleGuess.ParseTmdb(text) is null && TitleGuess.Typed(_kind(), text) is { } asked &&
+                await titles.SearchTolerantAsync(_kind(), asked.Name, asked.Year) is { Titles.Count: > 0 } loosened)
+            {
+                found = loosened with { Loosened = loosened.Loosened ?? "hľadané voľnejšie" };
+            }
+
             TrySaveCache(titles);
             if (version != _version)
             {
@@ -185,7 +193,7 @@ public sealed class TmdbPicker : ObservableObject
             _found = found;
             var results = found.Titles;
             var typed = TitleGuess.Typed(_kind(), text);
-            var best = results.Count == 1 ? results[0] : typed is null ? null : found.Best(typed.Name, typed.Year);
+            var best = found.Loosened is not null ? null : results.Count == 1 ? results[0] : typed is null ? null : found.Best(typed.Name, typed.Year);
             foreach (var result in results.Take(12))
             {
                 Results.Add(result);
@@ -202,7 +210,8 @@ public sealed class TmdbPicker : ObservableObject
             var byName = typed is not null && best is not null && ReferenceEquals(TmdbClient.ExactMatch(results, typed.Name, typed.Year), best);
             var yearOff = !byName && typed is not null && best is not null && best.IsNamed(typed.Name) &&
                           typed.Year is { } typedYear && best.Year is { } bestYear && Math.Abs(typedYear - bestYear) == 1;
-            Message = results.Count switch
+            Message = found.Loosened is { } how ? $"{(fromTmdb ? "TMDB" : "Katalóg HISTRA")} našlo tituly ({results.Count}) až keď sa {how.Replace("hľadané", "hľadalo")} – vyberte správny (názov sa môže líšiť)."
+                : results.Count switch
             {
                 0 when found.FoundNowhere => "",
                 0 when found.Note.Length > 0 => found.Note,

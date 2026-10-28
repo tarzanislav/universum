@@ -953,6 +953,58 @@ internal static class SelfTest
                       $"doubt: {result.Doubt} | as cs: {result.Comparison?.CzechText} | as sk: {result.Comparison?.SlovakText}");
             }
 
+            // owner, 28. 10.: each film of a group on its own, or only the chosen films
+            File.Copy(Path.Combine(media, "speech-und.mkv"), Path.Combine(speech, "Iný kapor 2019 WEB-DL CZ 1080p.mkv"), overwrite: true);
+            await batch.AnalyzeAsync();
+            Check(batch.Groups.Count == 1 && batch.FileRows.Count == 2 && batch.Groups[0].Title.Contains("+ 1 ďalší", StringComparison.Ordinal),
+                "batch: two films in one group – " + batch.Groups.FirstOrDefault()?.Title);
+            batch.SelectFiles([batch.FileRows[1]]);
+            watch.Restart();
+            await batch.DetectAudioSelectedCommand.ExecuteAsync(null);
+            var second = batch.FileRows[1].AudioSlots;
+            Write($"speech, selected file ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState} | " + string.Join(" | ", second.Select(a => $"{a.Slot}: {a.Hint}")));
+            Check(second.Count == 3 && second.All(a => a.Hint.StartsWith("návrh:", StringComparison.Ordinal)) &&
+                  batch.FileRows[0].AudioSlots.All(a => !a.Hint.StartsWith("návrh:", StringComparison.Ordinal)),
+                "batch: only the selected film was listened to, its own suggestions shown at it");
+            watch.Restart();
+            await batch.DetectAudioCommand.ExecuteAsync(null);
+            Write($"speech, whole group ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState}");
+            Check(batch.FileRows[0].AudioSlots.All(a => a.Hint.StartsWith("návrh:", StringComparison.Ordinal)) &&
+                  batch.RunState.Contains("3 už jazyk má", StringComparison.Ordinal),
+                "batch: the group's films each on their own, the film heard before not again – " + batch.RunState);
+            batch.ConfirmSuggestionsCommand.Execute(null);
+            Check(batch.FileRows.All(f => f.AudioSlots[1].ChosenLanguage == Languages.English),
+                "batch: Potvrdiť návrhy takes each film's own suggestion (English) – " + batch.RunState);
+            await Screenshot(window, "batch-speech-files.png");
+
+            // owner, 28. 10.: the name of a file may be wrong – what is not the found title's name waits, and any title
+            // found can be chosen at the file (checked in HISTRA)
+            var fakeTitles = new FakeTitleServices
+            {
+                Tmdb = """{"id":9700,"title":"The Golden Carp","original_title":"The Golden Carp","release_date":"2021-11-05"}""",
+                Histra = """{"id":31,"title":"The Golden Carp","original_title":"The Golden Carp","release_date":"2021-11-05","external_ids":{"tmdb":"9700"}}""",
+            };
+            var titlesHttp = new System.Net.Http.HttpClient(fakeTitles);
+            services.TitlesForSelfTest = new TitleSearch(
+                new Core.Library.Tmdb.TmdbClient(titlesHttp, "selftest-key", pacer: new RequestPacer(100)),
+                new Core.Library.Histra.HistraCatalog(new Core.Library.Histra.HistraClient(titlesHttp, "hst_selftest-0123456789", new RequestPacer(100))));
+            batch.IsMovies = true;
+            await batch.FindMoviesCommand.ExecuteAsync(null);
+            Check(batch.FileRows.All(f => f.HasCandidates && f.IsUnverified),
+                "batch: names unlike the found title wait, with the titles found to choose from – " + batch.RunState + " | " +
+                string.Join(" | ", batch.FileRows.Select(f => f.NamingSuggestion)));
+            await Screenshot(window, "batch-title-candidates.png");
+            var chosenFile = batch.FileRows[0];
+            chosenFile.ChosenCandidate = chosenFile.Candidates[0];
+            for (var wait = 0; wait < 50 && batch.Library!.TitleFor(chosenFile.Item.File.Path) is null; wait++)
+            {
+                await Task.Delay(100);
+            }
+
+            Check(batch.Library!.TitleFor(chosenFile.Item.File.Path)?.FolderName == "The Golden Carp (2021)" && !chosenFile.HasCandidates,
+                "batch: a title chosen from the list, confirmed in HISTRA – " + batch.RunState);
+            services.TitlesForSelfTest = null;
+
             Directory.Delete(speech, recursive: true);
         }
 

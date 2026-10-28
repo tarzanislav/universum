@@ -169,12 +169,106 @@ public sealed class SlotRow : ObservableObject
     }
 }
 
-/// <summary>One file of the selected group with its simulated result.</summary>
-public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged, BatchPageViewModel page) : ObservableObject
+/// <summary>
+/// One audio track without a language in one file: the language chosen for this file, and what the file's own speech
+/// (or the group) suggests – the films of one group may be spoken in different languages.
+/// </summary>
+public sealed class FileSlotRow : ObservableObject
 {
+    private readonly Action _changed;
+    private LanguageEvidence? _evidence;
+
+    public FileSlotRow(BatchGroup group, string path, SlotKey key, MediaTrack track, Action changed)
+    {
+        Group = group;
+        Path = path;
+        Key = key;
+        Track = track;
+        _changed = changed;
+        Refresh();
+    }
+
+    public BatchGroup Group { get; }
+
+    public string Path { get; }
+
+    public SlotKey Key { get; }
+
+    public MediaTrack Track { get; }
+
+    public string Slot => Texts.Slot(Key);
+
+    public IReadOnlyList<Language> LanguageChoices => Languages.All;
+
+    /// <summary>The language chosen for this file's track (empty: the group's, the name's or none).</summary>
+    public Language? ChosenLanguage
+    {
+        get => Group.Decisions.FileLanguage(Path, Key) is { } tag ? Languages.Find(tag.Primary) : null;
+        set
+        {
+            Group.Decisions.SetFileLanguage(Path, Key, value is null ? null : LanguageTag.FromCode(value.Ietf));
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>What decides the language when none is chosen for the file: "skupina: čeština", "návrh: … (overte)".</summary>
+    public string Hint => _evidence switch
+    {
+        null => "neurčený – vyberte",
+        { Source: EvidenceSource.FileDecision } => "",
+        { Confidence: Confidence.Medium } suggestion => "návrh: " + Texts.Language(suggestion.Language) +
+                                                         (suggestion.Detail is { } detail ? $" ({detail})" : "") +
+                                                         (Group.FileSuggestion(Path, Key) is null ? " – zo skupiny" : ""),
+        { } known => Texts.Evidence(known) + ": " + Texts.Language(known.Language),
+    };
+
+    /// <summary>This file's own suggestion (not a doubtful one) waits for "Potvrdiť návrhy".</summary>
+    public bool HasOwnSuggestion => Group.FileSuggestion(Path, Key) is { NeedsOwnConfirmation: false } && _evidence is { Confidence: Confidence.Medium };
+
+    /// <summary>Accepts this file's own suggestion as the language chosen for the file.</summary>
+    public bool ConfirmSuggestion()
+    {
+        if (!HasOwnSuggestion || _evidence is null)
+        {
+            return false;
+        }
+
+        Group.Decisions.SetFileLanguage(Path, Key, _evidence.Language);
+        return true;
+    }
+
+    public void Refresh()
+    {
+        _evidence = BatchPlanner.Evidence(Track, Key, Group, Path);
+        OnPropertyChanged(nameof(ChosenLanguage));
+        OnPropertyChanged(nameof(Hint));
+        OnPropertyChanged(nameof(HasOwnSuggestion));
+    }
+}
+
+/// <summary>One file of the selected group with its simulated result.</summary>
+public sealed class FileRow : ObservableObject
+{
+    private readonly Action<FileRow> processAnywayChanged;
+    private readonly BatchPageViewModel page;
     private CommunityToolkit.Mvvm.Input.RelayCommand? _confirm;
 
-    public BatchItem Item { get; private set; } = item;
+    public FileRow(BatchItem item, Action<FileRow> processAnywayChanged, BatchPageViewModel page)
+    {
+        Item = item;
+        this.processAnywayChanged = processAnywayChanged;
+        this.page = page;
+        AudioSlots = SlotKey.Of(item.File)
+            .Where(x => x.Key.Type == TrackType.Audio && x.Track.Language.IsUndetermined)
+            .Select(x => new FileSlotRow(item.Group, item.File.Path, x.Key, x.Track, page.Replan))
+            .ToList();
+    }
+
+    public BatchItem Item { get; private set; }
+
+    /// <summary>The file's audio tracks without a language, each with its own choice (empty for most files).</summary>
+    public IReadOnlyList<FileSlotRow> AudioSlots { get; }
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
 
@@ -216,6 +310,25 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
             return library.SuggestedTitleFor(Item.File.Path) is { } title
                 ? "návrh: " + title.FolderName + (page.UnverifiedNote(Item.File.Path) is { } why ? " ⚠ " + why : "")
                 : "";
+        }
+    }
+
+    /// <summary>The titles found for the file at "Spresniť názvy", to choose from while its title is not decided.</summary>
+    public IReadOnlyList<Universum.Core.Library.Tmdb.TmdbTitle> Candidates =>
+        page.Library is { Kind: MediaKind.Movie } library && library.TitleFor(Item.File.Path) is null ? page.CandidatesFor(Item.File.Path) : [];
+
+    public bool HasCandidates => Candidates.Count > 0;
+
+    /// <summary>Choosing one of <see cref="Candidates"/> names the file by it (checked in HISTRA as any title).</summary>
+    public Universum.Core.Library.Tmdb.TmdbTitle? ChosenCandidate
+    {
+        get => null;
+        set
+        {
+            if (value is not null)
+            {
+                _ = page.ChooseCandidateAsync(Item.File.Path, value);
+            }
         }
     }
 
@@ -264,6 +377,11 @@ public sealed class FileRow(BatchItem item, Action<FileRow> processAnywayChanged
     public void Update(BatchItem item)
     {
         Item = item;
+        foreach (var slot in AudioSlots)
+        {
+            slot.Refresh();
+        }
+
         OnPropertyChanged(string.Empty);
     }
 }

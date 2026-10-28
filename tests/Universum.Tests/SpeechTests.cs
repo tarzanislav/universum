@@ -1,4 +1,6 @@
 using System.Buffers.Binary;
+using Universum.Core.Batch;
+using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Core.Speech;
@@ -212,6 +214,44 @@ public sealed class SpeechTests
         Assert.True(heard[0] is "cs" or "sk", "Czech speech heard as " + heard[0]);
         Assert.Equal("en", heard[1], "English speech");
         Assert.True(heard[2] is "cs" or "sk", "Slovak speech heard as " + heard[2]);
+    }
+
+    [Test]
+    public void EachFilmIsHeardOnItsOwn()
+    {
+        static MediaTrack Audio(int id, string? name = null) =>
+            new() { Id = id, Number = id + 1, Type = TrackType.Audio, CodecId = "A_AC3", Name = name, Language = LanguageTag.Undetermined };
+        static MediaFile Film(string path) => new()
+        {
+            Path = path, ContainerType = "Matroska",
+            Tracks = [new MediaTrack { Id = 0, Number = 1, Type = TrackType.Video, CodecId = "V_MPEG4/ISO/AVC", Language = LanguageTag.Undetermined }, Audio(1), Audio(2, "CZ Dabing")],
+        };
+
+        var films = new BatchGroup("A", 0);
+        films.Files.AddRange([Film("a.mkv"), Film("b.mkv"), Film("c.mkv")]);
+        var key = new SlotKey(TrackType.Audio, 0);
+
+        // films: every file on its own; the track named "CZ Dabing" is known
+        var (targets, known) = SpeechTargets.ForGroups([films], series: false);
+        Assert.Equal(3, targets.Count, "the unnamed track of each film");
+        Assert.Equal(3, known, "the named track of each film");
+        Assert.True(targets.All(t => !t.ForGroup && t.Key == key), "each for its own file");
+
+        // a series: one episode speaks for the group
+        var (episodes, _) = SpeechTargets.ForGroups([films], series: true);
+        Assert.True(episodes is [{ ForGroup: true, File.Path: "a.mkv" }], "one episode");
+
+        // a film heard (or decided) is not heard again; its suggestion wins over the group's for that file only
+        SpeechTargets.Keep(targets[1], new LanguageEvidence(LanguageTag.FromCode("en"), Confidence.Medium, EvidenceSource.Speech));
+        films.Suggestions[key] = new LanguageEvidence(LanguageTag.FromCode("cs"), Confidence.Medium, EvidenceSource.Speech);
+        films.Decisions.SetFileLanguage("c.mkv", key, LanguageTag.FromCode("de"));
+        Assert.True(SpeechTargets.ForFiles(films.Files.Select(f => (films, f))).Targets is [{ File.Path: "a.mkv" }], "only the film not heard or decided yet");
+        var track = films.Files[0].Tracks[1];
+        Assert.Equal("cs", BatchPlanner.Evidence(track, key, films, "a.mkv")?.Language.Primary, "the group's suggestion");
+        Assert.Equal("en", BatchPlanner.Evidence(track, key, films, "b.mkv")?.Language.Primary, "the film's own suggestion");
+        Assert.True(BatchPlanner.Evidence(track, key, films, "c.mkv") is { Source: EvidenceSource.FileDecision, IsUsable: true } chosen && chosen.Language.Primary == "de",
+            "the choice for the film");
+        Assert.Equal("cs", BatchPlanner.Evidence(track, key, films)?.Language.Primary, "the group as a whole");
     }
 
     private static string NewFolder() => Directory.CreateTempSubdirectory("universum-tools-test-").FullName;

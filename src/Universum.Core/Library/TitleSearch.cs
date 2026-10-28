@@ -51,6 +51,12 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
     /// <summary>Why TMDB could not be used (a refused key, no answer); null when it was used or is not set up.</summary>
     public string? TmdbProblem { get; init; }
 
+    /// <summary>
+    /// How the search was loosened to find anything ("bez roka 2021", "podľa skráteného názvu „X“"); null when the name
+    /// and year as read were enough. Titles found so wait for the user's confirmation.
+    /// </summary>
+    public string? Loosened { get; init; }
+
     /// <summary>The HISTRA catalog was searched as well and nothing was found anywhere.</summary>
     public bool FoundNowhere => Titles.Count == 0 && Source == "HISTRA" && HistraSearched;
 
@@ -132,6 +138,69 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
         // HISTRA's own catalog (not only titles it passes on from TMDB) tells which one is meant
         var inCatalog = confirmed.Where(t => InHistraCatalog(t)).ToList();
         return inCatalog.Count == 1 ? inCatalog[0] : null;
+    }
+
+    /// <summary>
+    /// A title whose name is close to the guessed one though not the same (a typo in the file's name: "Zlaty kapro" →
+    /// "Zlatý kapor"), with how similar it is (0–1); null when none is close enough or two are about as close. Only a
+    /// suggestion for the user.
+    /// </summary>
+    public (TmdbTitle Title, double Similarity)? Similar(string name)
+    {
+        var ranked = Titles
+            .Select(t => (Title: t, Similarity: new[] { t.Title, t.OriginalTitle }.Concat(t.OtherTitles).Max(n => TitleSimilarity(name, n))))
+            .Where(r => r.Similarity >= MinimumSimilarity)
+            .OrderByDescending(r => r.Similarity)
+            .ToList();
+        return ranked.Count switch
+        {
+            0 => null,
+            1 => ranked[0],
+            _ when ranked[0].Similarity - ranked[1].Similarity >= 0.05 => ranked[0],
+            _ => null,
+        };
+    }
+
+    /// <summary>Names at least this similar count as the same name written with a mistake.</summary>
+    public const double MinimumSimilarity = 0.8;
+
+    /// <summary>
+    /// How similar two names are (0–1): 1 − edit distance / length of the longer one, ignoring case, diacritics and
+    /// punctuation; names shorter than 4 letters are compared only as equal.
+    /// </summary>
+    public static double TitleSimilarity(string? a, string? b)
+    {
+        var x = Words.Normalize(a);
+        var y = Words.Normalize(b);
+        if (x.Length == 0 || y.Length == 0)
+        {
+            return 0;
+        }
+
+        if (x == y)
+        {
+            return 1;
+        }
+
+        if (Math.Min(x.Length, y.Length) < 4)
+        {
+            return 0;
+        }
+
+        var previous = Enumerable.Range(0, y.Length + 1).ToArray();
+        var current = new int[y.Length + 1];
+        for (var i = 1; i <= x.Length; i++)
+        {
+            current[0] = i;
+            for (var j = 1; j <= y.Length; j++)
+            {
+                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + (x[i - 1] == y[j - 1] ? 0 : 1));
+            }
+
+            (previous, current) = (current, previous);
+        }
+
+        return 1 - (double)previous[y.Length] / Math.Max(x.Length, y.Length);
     }
 
     // the other names of every title of the year were read, or none had to be (TMDB itself named none of them so)
@@ -289,6 +358,43 @@ public sealed class TitleSearch
             HistraSearched = true,
             TmdbProblem = tmdbProblem?.Message,
         };
+    }
+
+    /// <summary>
+    /// The guessed name and year, and when nothing is found (the name of a file may be wrong): the name without the
+    /// year, then the name shortened by its last words (to two words, or one of at least 4 letters) – a typo in the
+    /// last word is then found by similarity. What is found so is marked <see cref="TitleResults.Loosened"/>.
+    /// </summary>
+    public async Task<TitleResults> SearchTolerantAsync(MediaKind kind, string name, int? year, CancellationToken cancellationToken = default)
+    {
+        var results = await SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false);
+        if (results.Titles.Count > 0)
+        {
+            return results;
+        }
+
+        if (year is not null &&
+            await SearchAsync(kind, name, null, cancellationToken).ConfigureAwait(false) is { Titles.Count: > 0 } withoutYear)
+        {
+            return withoutYear with { Loosened = $"hľadané bez roka {year}" };
+        }
+
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var count = words.Length - 1; count >= 1 && count >= words.Length - 2; count--)
+        {
+            var shorter = string.Join(' ', words.Take(count));
+            if (count == 1 && Words.Normalize(shorter).Length < 4)
+            {
+                break;
+            }
+
+            if (await SearchAsync(kind, shorter, null, cancellationToken).ConfigureAwait(false) is { Titles.Count: > 0 } found)
+            {
+                return found with { Loosened = $"hľadané podľa skráteného názvu „{shorter}“" };
+            }
+        }
+
+        return results;
     }
 
     /// <summary>

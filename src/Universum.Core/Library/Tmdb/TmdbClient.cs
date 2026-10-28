@@ -189,6 +189,12 @@ public sealed class TmdbClient
         return matches.Count == 1 ? matches[0] : null;
     }
 
+    /// <summary>
+    /// A cached GET of an API path (with its query) for the news, the answer compacted to what is kept; null for 404.
+    /// </summary>
+    internal Task<JsonDocument?> GetCompactAsync(string path, TimeSpan lifetime, Func<JsonElement, string> compact, CancellationToken cancellationToken) =>
+        GetJsonAsync(path, lifetime, cancellationToken, compact);
+
     /// <summary>Saves the cache, when a cache file was given.</summary>
     public void SaveCache()
     {

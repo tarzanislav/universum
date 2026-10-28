@@ -35,8 +35,7 @@ public sealed class MainViewModel : ObservableObject
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
         HistraLists = new HistraListsPageViewModel(services);
-        Premieres = new PlaceholderPageViewModel(
-            "Premiéry", "Premiéry filmov a seriálov – SK/CZ a svet, s odkazmi na TMDB a HISTRA.", "pripravuje sa v ďalšej časti");
+        Premieres = new PremieresPageViewModel(services);
         SeriesNews = new PlaceholderPageViewModel(
             "Novinky – Seriály", "Nové epizódy bežiacich seriálov – SK/CZ a svet, s odoslaním na spracovanie.", "pripravuje sa v ďalšej časti");
         Mega = new PlaceholderPageViewModel(
@@ -177,8 +176,8 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Listy z HISTRA – the user's HISTRA lists, read only.</summary>
     public HistraListsPageViewModel HistraLists { get; }
 
-    /// <summary>Premiéry – films and series (next part of the Novinky a obsah group).</summary>
-    public PlaceholderPageViewModel Premieres { get; }
+    /// <summary>Premiéry – films and series, SK/CZ and the world.</summary>
+    public PremieresPageViewModel Premieres { get; }
 
     /// <summary>Novinky – Seriály – new episodes (next part of the Novinky a obsah group).</summary>
     public PlaceholderPageViewModel SeriesNews { get; }
@@ -220,6 +219,11 @@ public sealed class MainViewModel : ObservableObject
             if (value?.Page == Dashboard)
             {
                 Dashboard.Shown();
+            }
+
+            if (value?.Page == Premieres)
+            {
+                Premieres.Shown();
             }
         }
     }

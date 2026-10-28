@@ -51,10 +51,14 @@ public sealed class SettingsPageViewModel : ObservableObject
         UseWeatherChoiceCommand = new RelayCommand(UseWeatherChoice, () => SelectedWeatherChoice is not null);
         RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
         _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
+        NewsSources = new NewsSourcesViewModel(services);
         Load(services.Profile);
     }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
+
+    /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
+    public NewsSourcesViewModel NewsSources { get; }
 
     /// <summary>Asks the main window to open the update window.</summary>
     public event Action? ShowUpdatesRequested;

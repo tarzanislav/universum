@@ -225,7 +225,14 @@ public sealed class HistraListsPageViewModel : ObservableObject
                 var info = infos[i];
                 var position = $"{verb} {i + 1}/{infos.Count}: {info.Name}";
                 Status = position + "…";
-                var progress = new Progress<(int Read, int Total)>(p => Status = $"{position} – {p.Read} z {p.Total} titulov…");
+                // a report that arrives after the reading ended does not cover the result
+                var progress = new Progress<(int Read, int Total)>(p =>
+                {
+                    if (Busy)
+                    {
+                        Status = $"{position} – {p.Read} z {p.Total} titulov…";
+                    }
+                });
                 if (await histra.ReadAsync(info.Id, progress, work.Token) is { } list)
                 {
                     lists.Add(list);

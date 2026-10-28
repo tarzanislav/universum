@@ -1295,6 +1295,192 @@
                 </Border>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:PremieresPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <DockPanel.Resources>
+                    <Style x:Key="Cell" TargetType="TextBlock">
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Margin" Value="6,0" />
+                    </Style>
+                    <Style x:Key="LinkButton" TargetType="Button">
+                        <Setter Property="Padding" Value="6,0" />
+                        <Setter Property="Margin" Value="0,2,4,0" />
+                        <Setter Property="FontSize" Value="11" />
+                        <Setter Property="MinHeight" Value="20" />
+                        <Setter Property="Cursor" Value="Hand" />
+                    </Style>
+                    <Style x:Key="PremiereRow" TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPast}" Value="True">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="PremiereHeader" TargetType="DataGridColumnHeader">
+                        <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="Padding" Value="8,6" />
+                    </Style>
+                </DockPanel.Resources>
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="Premiéry" />
+                    <DockPanel Margin="0,0,0,10">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                            <Button Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" ToolTip="Načíta premiéry zo zdrojov znova">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0" />
+                                    <TextBlock Text="Obnoviť" />
+                                </StackPanel>
+                            </Button>
+                            <Button Content="Zastaviť" Command="{Binding StopCommand}" Padding="12,5" Margin="0,0,12,0"
+                                    Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" />
+                    </DockPanel>
+                    <!-- the four tables as pastel tabs, each with its count -->
+                    <ListBox ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" BorderThickness="0" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Margin" Value="0,0,8,0" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Card" CornerRadius="10" BorderThickness="2" BorderBrush="{Binding Accent}" Background="{Binding Tint}" Padding="14,10">
+                                                <DockPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="9" Background="{Binding Accent}" Padding="8,1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding CountText}" Foreground="White" FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <TextBlock x:Name="Title" Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                </DockPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Card" Property="Background" Value="{Binding Accent}" />
+                                                    <Setter TargetName="Title" Property="Foreground" Value="White" />
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Card" Property="BorderThickness" Value="3" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+                    <TextBlock Text="{Binding Note}" Style="{StaticResource Hint}" Margin="2,0,0,6" />
+                    <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="2,0,0,6"
+                               Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Attribution}" Style="{StaticResource Hint}" FontSize="11.5" Margin="2,8,0,0" />
+                <Grid>
+                    <!-- films: poster, title (original and year), production, premiere, day, VOD/TV -->
+                    <DataGrid ItemsSource="{Binding SelectedTab.Rows}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single" RowHeight="64"
+                              AlternatingRowBackground="{Binding SelectedTab.Stripe}" BorderThickness="1" BorderBrush="{Binding SelectedTab.Accent}"
+                              RowStyle="{StaticResource PremiereRow}" ColumnHeaderStyle="{StaticResource PremiereHeader}"
+                              Visibility="{Binding IsFilmTab, Converter={StaticResource BoolToVisibility}}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="54" CanUserSort="False">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="38" Height="57" CornerRadius="4" Margin="6,0" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                            <Border CornerRadius="4">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding Poster.Image}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Názov filmu" Width="*" SortMemberPath="Caption">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center" Margin="6,0">
+                                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
+                                                <Hyperlink Command="{Binding OpenTmdbCommand}" ToolTip="Otvoriť na TMDB"><Run Text="{Binding Caption, Mode=OneWay}" /></Hyperlink>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="TMDB" Command="{Binding OpenTmdbCommand}" Style="{StaticResource LinkButton}" />
+                                                <Button Content="HISTRA" Command="{Binding OpenHistraCommand}" Style="{StaticResource LinkButton}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="190" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="120" SortMemberPath="SortDate">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center" Margin="6,0">
+                                            <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Where}" Style="{StaticResource Hint}" FontSize="11.5" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="80" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="190" ElementStyle="{StaticResource Cell}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <!-- series: title, production, premiere, day, periodicity, number of episodes -->
+                    <DataGrid ItemsSource="{Binding SelectedTab.Rows}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="None" SelectionMode="Single" RowHeight="58"
+                              AlternatingRowBackground="{Binding SelectedTab.Stripe}" BorderThickness="1" BorderBrush="{Binding SelectedTab.Accent}"
+                              RowStyle="{StaticResource PremiereRow}" ColumnHeaderStyle="{StaticResource PremiereHeader}"
+                              Visibility="{Binding IsSeriesTab, Converter={StaticResource BoolToVisibility}}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Názov seriálu" Width="*" SortMemberPath="Caption">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center" Margin="6,0" ToolTip="{Binding Genres}">
+                                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold">
+                                                <Hyperlink Command="{Binding OpenTmdbCommand}" ToolTip="Otvoriť na TMDB"><Run Text="{Binding Caption, Mode=OneWay}" /></Hyperlink>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <Button Content="TMDB" Command="{Binding OpenTmdbCommand}" Style="{StaticResource LinkButton}" />
+                                                <Button Content="HISTRA" Command="{Binding OpenHistraCommand}" Style="{StaticResource LinkButton}" />
+                                                <Button Content="Zdroj" Command="{Binding OpenSourceCommand}" ToolTip="{Binding SourceText}" Style="{StaticResource LinkButton}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="160" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTemplateColumn Header="Premiéra" Width="140" SortMemberPath="SortDate">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel VerticalAlignment="Center" Margin="6,0">
+                                            <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding What}" Style="{StaticResource Hint}" FontSize="11.5" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="80" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="150" ElementStyle="{StaticResource Cell}" />
+                            <DataGridTextColumn Header="Počet epizód" Binding="{Binding Episodes}" Width="100" ElementStyle="{StaticResource Cell}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:HistraListsPageViewModel}">
             <DockPanel Margin="24,20,24,12">
                 <StackPanel DockPanel.Dock="Top">
@@ -1707,6 +1893,39 @@
                             <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding NewsSources}">
+                        <StackPanel>
+                            <TextBlock Text="Zdroje noviniek (Premiéry, Novinky – Seriály)" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8"
+                                       Text="Odkiaľ UNIVERSUM číta premiéry a nové epizódy. Webovú stránku pridáte jej súborom pravidiel (Importovať zdroj…); adresy stránok sú len tu v nastaveniach. Stránky sa čítajú slušne: len https, podľa ich robots.txt, najviac jedna stránka za 2 s, bez cookies; každý deň sa pamätá, takže sa nečíta znova." />
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,4">
+                                            <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" Padding="8,3" VerticalAlignment="Center" ToolTip="Odstrániť zdroj">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="13" />
+                                            </Button>
+                                            <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Enabled}" VerticalAlignment="Center" ToolTip="Zdroj zapnutý" />
+                                            <StackPanel Margin="4,0,8,0">
+                                                <TextBlock>
+                                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" · " /><Run Text="{Binding KindText, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Style="{StaticResource Hint}" FontSize="12">
+                                                    <Run Text="{Binding Address, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Detail, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Content="Importovať zdroj…" Command="{Binding ImportCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                <Button Content="Vrátiť TVmaze a TMDB" Command="{Binding RestoreCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                <Button Content="Vymazať uložené dni" Command="{Binding ClearCacheCommand}" Padding="12,5" />
+                            </WrapPanel>
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>
                             <TextBlock Text="Plagáty filmov a seriálov" FontWeight="SemiBold" />
@@ -1840,7 +2059,7 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="GroupItem">
-                                            <Border x:Name="Frame" Margin="8,5,8,1" Padding="0,0,0,3" CornerRadius="8" BorderThickness="1"
+                                            <Border x:Name="Frame" Margin="8,4,8,1" Padding="0,0,0,2" CornerRadius="8" BorderThickness="1"
                                                     Background="{Binding Name.Background}" BorderBrush="{Binding Name.Border}">
                                                 <StackPanel>
                                                     <TextBlock x:Name="Heading" Text="{Binding Name.Title}" Foreground="{Binding Name.Heading}"
@@ -1863,11 +2082,11 @@
                         </GroupStyle.ContainerStyle>
                     </GroupStyle>
                 </ListBox.GroupStyle>
-                <!-- compact rows: the whole rail fits a window 700 px high without scrolling -->
+                <!-- compact rows: the whole rail (four groups) fits a window 740 px high without scrolling -->
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                        <Setter Property="MinHeight" Value="32" />
-                        <Setter Property="Padding" Value="10,3" />
+                        <Setter Property="MinHeight" Value="29" />
+                        <Setter Property="Padding" Value="10,2" />
                         <Setter Property="Margin" Value="4,1" />
                     </Style>
                 </ListBox.ItemContainerStyle>

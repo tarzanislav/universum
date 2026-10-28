@@ -30,10 +30,16 @@ public enum EvidenceSource
 
     /// <summary>Language recognised from the text of the subtitles.</summary>
     SubtitleText,
+
+    /// <summary>Language recognised from the speech of an audio track (whisper.cpp).</summary>
+    Speech,
 }
 
 public sealed record LanguageEvidence(LanguageTag Language, Confidence Confidence, EvidenceSource Source)
 {
+    /// <summary>What the user should know about the suggestion ("čeština alebo slovenčina – overte"), or null.</summary>
+    public string? Detail { get; init; }
+
     /// <summary>Only high and confirmed evidence is used for writing; medium evidence is a suggestion.</summary>
     public bool IsUsable => Confidence >= Confidence.High;
 }

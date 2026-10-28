@@ -57,6 +57,22 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER I
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## Rozpoznávanie jazyka reči – priečinok `speech` inštalácie
+
+Inštalácia obsahuje v priečinku `speech` tieto samostatné programy a dáta (UNIVERSUM ich spúšťa ako samostatné
+procesy; všetko beží len v počítači). Pri každom je jeho licencia a súbor `SOURCE.txt` s pôvodom; zostavu pripravuje
+`tools/speech/prepare.sh` a `manifest.json` obsahuje SHA-256 všetkých súborov.
+
+- **FFmpeg 9.0.2** (`speech/ffmpeg`) – https://ffmpeg.org, licencia **GNU LGPL 2.1 alebo novšia** (`COPYING.LGPLv2.1`).
+  Zostavený pre UNIVERSUM z oficiálneho zdrojového kódu (commit `946fcce07b6dcd0331c8cc609192aeff5e1924f8`, značka
+  `n9.0.2`) skriptom `tools/speech/build-ffmpeg.sh`, bez súčastí pod GPL; staticky pripojená knižnica zlib (licencia zlib).
+  **Úplný zdrojový kód tejto zostavy** (FFmpeg a skript zostavenia) je priložený ku každému vydaniu UNIVERSUM na
+  GitHube ako `ffmpeg-9.0.2-source.tar.xz` (https://github.com/tarzanislav/universum/releases).
+- **whisper.cpp 1.9.2** (`speech/whisper`) – https://github.com/ggml-org/whisper.cpp, licencia MIT (`LICENSE`),
+  oficiálna zostava pre Windows `whisper-bin-x64.zip`.
+- **Model reči Whisper „base“** (`speech/models/ggml-base.bin`) – model OpenAI Whisper (https://github.com/openai/whisper)
+  prevedený pre whisper.cpp (https://huggingface.co/ggerganov/whisper.cpp), licencia MIT, Copyright (c) 2022 OpenAI.
+
 ## Služby, ktoré UNIVERSUM používa (nič z nich nie je súčasťou programu)
 
 - **Počasie: Open-Meteo.com** – https://open-meteo.com, údaje pod licenciou CC BY 4.0

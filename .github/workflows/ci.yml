@@ -49,11 +49,27 @@ jobs:
           # 1 = some files need review (the test data contains undetermined languages); 2 would be an error
           if [ "$code" -ne 1 ]; then echo "::error::universum-cli analyze returned $code"; exit 1; fi
 
+  # FFmpeg, whisper.cpp and the speech model for the installation (built once, then from the cache)
+  speech-tools:
+    uses: ./.github/workflows/speech-tools.yml
+
   windows:
     name: Build, self-test and installer (Windows)
+    needs: speech-tools
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: speech-tools
+          path: speech-tools
+
+      - name: Speech tools for the tests
+        shell: pwsh
+        run: |
+          "UNIVERSUM_SPEECH_DIR=$PWD\speech-tools\speech" >> $env:GITHUB_ENV
+          & "speech-tools\speech\ffmpeg\ffmpeg.exe" -hide_banner -version | Select-Object -First 1
       # the runner image's .NET 10 SDK, else the official install script from builds.dotnet.microsoft.com
       - name: .NET 10 SDK
         shell: pwsh
@@ -126,6 +142,8 @@ jobs:
           $output += & dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true `
             "-p:Version=${{ steps.version.outputs.number }}" -o publish 2>&1
           $code = $LASTEXITCODE
+          # the speech tools are installed with the program
+          Copy-Item -Recurse -Force speech-tools\speech publish\speech
           $output | ForEach-Object { Write-Host $_ }
           $output | Where-Object { $_ -match ': (error|warning) [A-Z]+\d+' } | Select-Object -Unique -First 30 | ForEach-Object {
             $line = "$_" -replace '%', '%25'

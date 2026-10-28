@@ -83,9 +83,8 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
             return null;
         }
 
-        var names = new[] { Words.Normalize(title.Title), Words.Normalize(title.OriginalTitle) };
         return HistraTitles
-            .Where(h => h.Id != title.Id && (names.Contains(Words.Normalize(h.Title)) || names.Contains(Words.Normalize(h.OriginalTitle))) &&
+            .Where(h => h.Id != title.Id && (title.IsNamed(h.Title) || title.IsNamed(h.OriginalTitle)) &&
                         (title.Year is null || h.Year is null || h.Year == title.Year))
             .OrderByDescending(h => h.HistraId is not null)
             .FirstOrDefault();
@@ -103,14 +102,20 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
             return single;
         }
 
+        // the year in a file's name is often the year the film came out here, a year after its premiere (TMDB's year)
+        if (year is { } asked && !Titles.Any(t => t.Year == asked && t.IsNamed(name)) &&
+            Titles.Where(t => t.Year is { } other && Math.Abs(other - asked) == 1 && t.IsNamed(name)).ToList() is { Count: 1 } near)
+        {
+            return near[0];
+        }
+
         if (HistraTitles is null && Source != "HISTRA")
         {
             return null;
         }
 
-        var wanted = Words.Normalize(name);
         var ofYear = Titles.Where(t => year is null || t.Year == year).ToList();
-        var exact = ofYear.Where(t => Words.Normalize(t.Title) == wanted || Words.Normalize(t.OriginalTitle) == wanted).ToList();
+        var exact = ofYear.Where(t => t.IsNamed(name)).ToList();
         if (exact.Count == 1)
         {
             return null; // the exact match is of another year than asked: ExactMatch decided
@@ -128,6 +133,14 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
         return inCatalog.Count == 1 ? inCatalog[0] : null;
     }
 
+    /// <summary>
+    /// The only title of the year (a year more or less; any, without a year) when there is just one, though no name of it
+    /// is the guessed one (TMDB found it by a name it does not list) – a suggestion that waits for the user's
+    /// confirmation; null when there are none or several.
+    /// </summary>
+    public TmdbTitle? OnlyOne(int? year) =>
+        Titles.Where(t => year is null || t.Year is null || Math.Abs(t.Year.Value - year.Value) <= 1).ToList() is { Count: 1 } only ? only[0] : null;
+
     /// <summary>The title is in HISTRA's own catalog (not only passed on from TMDB).</summary>
     public bool InHistraCatalog(TmdbTitle title) =>
         title.HistraId is not null || HistraTitles?.Any(h => h.Kind == title.Kind && h.Id == title.Id && h.HistraId is not null) == true;
@@ -142,6 +155,9 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
 /// </summary>
 public sealed class TitleSearch
 {
+    // how many of the found titles have their other names read when none is named as asked
+    private const int OtherTitlesRead = 3;
+
     private readonly TmdbClient? _tmdb;
     private readonly HistraCatalog? _histra;
 
@@ -201,6 +217,11 @@ public sealed class TitleSearch
             try
             {
                 var found = await _tmdb.FindAsync(kind, text, cancellationToken).ConfigureAwait(false);
+                if (typed is not null)
+                {
+                    found = await WithOtherTitlesAsync(found, typed.Name, typed.Year, cancellationToken).ConfigureAwait(false);
+                }
+
                 if (found.Count > 0 || _histra is null)
                 {
                     // an ID or address: HISTRA is asked by the title's name
@@ -246,7 +267,8 @@ public sealed class TitleSearch
         {
             try
             {
-                var found = await _tmdb.SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false);
+                var found = await WithOtherTitlesAsync(await _tmdb.SearchAsync(kind, name, year, cancellationToken).ConfigureAwait(false), name, year, cancellationToken)
+                    .ConfigureAwait(false);
                 if (found.Count > 0 || _histra is null)
                 {
                     return await CheckedAsync(new TitleResults(found, "TMDB"), name, cancellationToken).ConfigureAwait(false);
@@ -274,6 +296,44 @@ public sealed class TitleSearch
 
     /// <summary>Saves the TMDB cache (HISTRA answers are kept only for the session).</summary>
     public void SaveCache() => _tmdb?.SaveCache();
+
+    // TMDB answers in English: a name in another language (a file named by its Czech title) is matched by the other
+    // names of the likely titles (of the year, a year more or less), read best first until one of them carries it
+    private async Task<IReadOnlyList<TmdbTitle>> WithOtherTitlesAsync(IReadOnlyList<TmdbTitle> found, string name, int? year, CancellationToken cancellationToken)
+    {
+        bool OfYear(TmdbTitle t) => year is null || t.Year is null || Math.Abs(t.Year.Value - year.Value) <= 1;
+        if (_tmdb is null || found.Count == 0 || string.IsNullOrWhiteSpace(name) || found.Any(t => OfYear(t) && t.IsNamed(name)))
+        {
+            return found;
+        }
+
+        var titles = found.ToList();
+        var read = 0;
+        for (var i = 0; i < titles.Count && read < OtherTitlesRead; i++)
+        {
+            if (!OfYear(titles[i]))
+            {
+                continue;
+            }
+
+            read++;
+            try
+            {
+                titles[i] = titles[i] with { OtherTitles = await _tmdb.OtherTitlesAsync(titles[i].Kind, titles[i].Id, cancellationToken).ConfigureAwait(false) };
+            }
+            catch (TmdbException)
+            {
+                return titles; // the names could not be read: the titles stand as found
+            }
+
+            if (titles[i].IsNamed(name))
+            {
+                break;
+            }
+        }
+
+        return titles;
+    }
 
     // TMDB's titles with what HISTRA finds for the same name (all years: the TMDB ID decides), in the catalog of the
     // titles' kind (a film's address typed where a series is expected is checked among films)

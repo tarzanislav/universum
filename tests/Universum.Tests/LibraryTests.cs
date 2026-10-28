@@ -252,6 +252,15 @@ public sealed class LibraryTests
         Assert.Equal(new NameGuess("Last Season of Ice", 2018, null), TitleGuess.FromName("Last.Season.of.Ice.2018.1080p"));
         Assert.Equal(new NameGuess("Nine Puzzles", null, null), TitleGuess.FromName("Nine Puzzles S01.E06", MediaKind.Series));
         Assert.Equal(new NameGuess("Ticho", 2010, null), TitleGuess.FromName("Ticho (2010) [tmdbid-99999999999]"), "an ID too long is no ID");
+
+        // release names of Czech files: a dash inside the title, dots after spaces, a year in brackets or after release words
+        Assert.Equal(new NameGuess("Zlatý kapr - Návrat", 2021, null), TitleGuess.FromName("Zlatý kapr - Návrat 2021 1080p CZ", MediaKind.Movie), "dash before the year");
+        Assert.Equal(new NameGuess("Zlaty kapr - Navrat", 2021, null), TitleGuess.FromName("Zlaty.kapr.-.Navrat.2021.WEB-DL.CZ", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), TitleGuess.FromName("Zlatý kapr.2021.WEB-DL.CZ.1080p", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), TitleGuess.FromName("Zlatý kapr [2021] WEB-DL CZ", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), TitleGuess.FromName("Zlatý.kapr.CZ.dabing.2021.1080p", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Zlatý kapr", null, null), TitleGuess.FromName("Zlatý kapr - CZ dabing", MediaKind.Movie), "without a year a dash ends the title");
+        Assert.Equal(new NameGuess("Mr. Kapor", 2009, null), TitleGuess.FromName("Mr. Kapor 2009 1080p", MediaKind.Movie), "a dot in the title stays");
         Assert.True(TitleGuess.Typed(MediaKind.Movie, "Ticho (2010) [tmdbid-99999999999]") is { TmdbId: null, Problem: "chýba TMDB ID" }, "typed: the problem is shown");
         Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Rally 4x100 (2015) [tmdbid-4242]", "Rally 4x100 (2015) [tmdbid-4242].mkv")).Kind, "a film");
         Assert.Equal(MediaKind.Movie, TitleGuess.ForFile(Path.Combine("x", "Zlatý prach Episode 2 (2019).mkv")).Kind, "a film in library form with a word number");

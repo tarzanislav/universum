@@ -10,10 +10,14 @@ namespace Universum.App.Pages;
 public sealed class GroupRow(BatchGroup group) : ObservableObject
 {
     private string _state = "";
+    private string _title = "";
 
     public BatchGroup Group { get; } = group;
 
     public string Label => Group.Label;
+
+    /// <summary>What the group holds, by the titles of its files without year and ID: "Zlatý kapor", "Zlatý kapor + 2 ďalšie".</summary>
+    public string Title { get => _title; set => SetProperty(ref _title, value); }
 
     public int Count => Group.Files.Count;
 
@@ -58,10 +62,15 @@ public sealed class SlotRow : ObservableObject
 
     public IReadOnlyList<Language> LanguageChoices => Languages.All;
 
-    /// <summary>Language chosen for the whole group (only for undetermined tracks).</summary>
+    /// <summary>
+    /// Language chosen for the whole group (only for undetermined tracks); without a choice the language named in the
+    /// track name ("CZ titulky"), which is used as it is – another choice overrides it.
+    /// </summary>
     public Language? ChosenLanguage
     {
-        get => Group.Decisions.Languages.TryGetValue(Key, out var tag) ? Languages.Find(tag.Primary) : null;
+        get => Group.Decisions.Languages.TryGetValue(Key, out var tag) ? Languages.Find(tag.Primary)
+            : _evidence is { Source: EvidenceSource.TrackName } named ? Languages.Find(named.Language.Primary)
+            : null;
         set
         {
             if (value is null)
@@ -81,6 +90,9 @@ public sealed class SlotRow : ObservableObject
     public string Evidence => Texts.Evidence(_evidence);
 
     public bool HasSuggestion => _evidence is { Confidence: Confidence.Medium };
+
+    /// <summary>The language is named in the track name ("CZ Dabing") and used without a choice.</summary>
+    public bool IsNamedInTrack => _evidence is { Source: EvidenceSource.TrackName } && !Group.Decisions.Languages.ContainsKey(Key);
 
     public string Suggested => _evidence is { Confidence: Confidence.Medium } suggestion ? Texts.Language(suggestion.Language) : "";
 

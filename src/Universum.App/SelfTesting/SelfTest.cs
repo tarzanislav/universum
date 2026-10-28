@@ -922,6 +922,26 @@ internal static class SelfTest
                 string.Join(", ", batch.Items.Select(i => $"{Path.GetFileName(i.File.Path)} {i.Status}")));
             await Screenshot(window, "batch-other-formats.png");
             Directory.Delete(kept, recursive: true);
+
+            // owner, 28. 10.: the language of audio tracks from their speech (whisper.cpp and FFmpeg installed with the
+            // program); groups named by their film
+            var speech = Path.Combine(library, "Reč");
+            Directory.CreateDirectory(speech);
+            File.Copy(Path.Combine(media, "speech-und.mkv"), Path.Combine(speech, "Zlatý kapor 2021 WEB-DL CZ 1080p.mkv"), overwrite: true);
+            batch.Folder = speech;
+            await batch.AnalyzeAsync();
+            Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
+            Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition offered for audio without a language");
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            await batch.DetectAudioCommand.ExecuteAsync(null);
+            var audio = batch.SlotRows.Where(s => s.Key.Type == TrackType.Audio).ToList();
+            Write($"speech ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState} | " + string.Join(" | ", audio.Select(a => $"{a.Slot}: {a.Suggested} – {a.Evidence}")));
+            Check(audio.Count == 3 && audio.All(a => a.HasSuggestion), "batch: the language of the three audio tracks is suggested from the speech – " + batch.RunState);
+            Check(audio.Count == 3 && audio[1].Suggested.Contains("(en)", StringComparison.Ordinal), "batch: English speech recognised – " + audio.ElementAtOrDefault(1)?.Suggested);
+            Check(audio.Count == 3 && new[] { audio[0], audio[2] }.All(a => a.Suggested.Contains("(cs)", StringComparison.Ordinal) || a.Suggested.Contains("(sk)", StringComparison.Ordinal)),
+                "batch: Czech and Slovak speech recognised as Czech or Slovak");
+            await Screenshot(window, "batch-speech.png");
+            Directory.Delete(speech, recursive: true);
         }
 
         batch.Folder = folder;
@@ -931,6 +951,8 @@ internal static class SelfTest
         Check(batch.IsSeries, "batch: series recognised from the episode numbers");
         Check(batch.SeriesSuggestion.Contains("Seriál", StringComparison.Ordinal), "batch: series title suggested – " + batch.SeriesSuggestion);
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 4, "batch: everything waits for the title and the subtitle language");
+        Check(batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Audio, 1)) is { IsNamedInTrack: true } named && named.ChosenLanguage == Languages.Czech,
+            "batch: the language named in the track name (CZ Dabing) is shown as chosen");
         await Screenshot(window, "batch-analysed.png");
 
         var forcedSlot = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0));

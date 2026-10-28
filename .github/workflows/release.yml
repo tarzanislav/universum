@@ -31,8 +31,13 @@ env:
   MKVTOOLNIX_PORTABLE_SHA256: '01D76DBFDBD5615D9E02F69B0710D1429A902D47A98C8EEE33BD884C4FCB3CBF'
 
 jobs:
+  # FFmpeg (built from its source at a fixed commit), whisper.cpp and the speech model (fixed SHA-256)
+  speech-tools:
+    uses: ./.github/workflows/speech-tools.yml
+
   build:
     name: Build, test and pack (read-only, no secrets)
+    needs: speech-tools
     runs-on: windows-2025
     outputs:
       version: ${{ steps.version.outputs.number }}
@@ -62,6 +67,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: speech-tools
+          path: speech-tools
 
       - name: Release notes
         shell: pwsh
@@ -96,6 +106,7 @@ jobs:
           $signer = $signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
           if ($signature.Status -ne 'Valid' -or $signer -cne 'LINET Services GmbH') { throw "mkvmerge.exe signature: $($signature.Status) $signer" }
           "UNIVERSUM_MKVTOOLNIX_DIR=$($mkvmerge.DirectoryName)" >> $env:GITHUB_ENV
+          "UNIVERSUM_SPEECH_DIR=$PWD\speech-tools\speech" >> $env:GITHUB_ENV
 
       - name: Tests
         run: dotnet run --project tests/Universum.Tests -c Release
@@ -108,7 +119,9 @@ jobs:
           dotnet publish src/Universum.Cli/Universum.Cli.csproj -c Release -r win-x64 --self-contained true "-p:Version=$env:VERSION" -o publish
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet publish src/Universum.App/Universum.App.csproj -c Release -r win-x64 --self-contained true "-p:Version=$env:VERSION" -o publish
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # the speech tools are installed with the program
+          Copy-Item -Recurse -Force speech-tools\speech publish\speech
 
       - name: Installer and checksum list
         shell: pwsh
@@ -123,6 +136,8 @@ jobs:
           # the first line names the version, so the signed list cannot be reused for another release
           [IO.File]::WriteAllText((Join-Path $dir "SHA256SUMS.txt"), "# UNIVERSUM $env:VERSION`n$hash  $file`n")
           Write-Host "::notice title=Release::$file SHA-256 $hash"
+          # the complete source of the FFmpeg in the installation is offered with the release (LGPL)
+          Copy-Item speech-tools\source\ffmpeg-*-source.tar.xz $dir
 
       - name: Keep for signing
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -131,6 +146,7 @@ jobs:
           path: |
             installer/Output/UNIVERSUM_Setup_${{ steps.version.outputs.number }}.exe
             installer/Output/SHA256SUMS.txt
+            installer/Output/ffmpeg-*-source.tar.xz
           if-no-files-found: error
           retention-days: 1
 
@@ -189,6 +205,8 @@ jobs:
           } else {
             $target = @('--verify-tag')
           }
-          gh release create $env:TAG (Join-Path release $file) $sums (Join-Path release "SHA256SUMS.txt.sig") `
+          $ffmpegSource = @(Get-ChildItem release -Filter 'ffmpeg-*-source.tar.xz' | ForEach-Object FullName)
+          if ($ffmpegSource.Count -ne 1) { throw "the FFmpeg source of the installation is missing" }
+          gh release create $env:TAG (Join-Path release $file) $sums (Join-Path release "SHA256SUMS.txt.sig") $ffmpegSource[0] `
             --title "UNIVERSUM $env:VERSION" --notes-file "docs/releases/v$env:VERSION.md" @target
           exit $LASTEXITCODE

@@ -41,6 +41,37 @@ public static class Texts
         return language is null ? tag.ToString() : $"{language.SlovakName} ({tag.Primary})";
     }
 
+    /// <summary>
+    /// What a language detection found: "Titulky: 2 rozpoznané z textu (návrh pri stope – potvrďte ho), 1 sa rozpoznať
+    /// nepodarilo, 1 má jazyk z názvu stopy."
+    /// </summary>
+    /// <param name="cannot">Tracks that cannot be read at all ("1 obrazové sa čítať nedajú"), or null.</param>
+    public static string Detection(string what, int recognised, int failed, int named, string? cannot = null)
+    {
+        var parts = new List<string>();
+        if (recognised > 0)
+        {
+            parts.Add($"{recognised} rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy)");
+        }
+
+        if (failed > 0)
+        {
+            parts.Add($"{failed} sa rozpoznať nepodarilo – jazyk vyberte pri stope");
+        }
+
+        if (named > 0)
+        {
+            parts.Add($"{named} má jazyk z názvu stopy (už je vybraný)");
+        }
+
+        if (cannot is not null)
+        {
+            parts.Add(cannot);
+        }
+
+        return parts.Count == 0 ? $"{what}: nič na rozpoznanie – všetky majú jazyk." : $"{what}: {string.Join(", ", parts)}.";
+    }
+
     public static string Evidence(LanguageEvidence? evidence) => evidence?.Source switch
     {
         null => "neznámy – vyberte jazyk",
@@ -49,6 +80,7 @@ public static class Texts
         EvidenceSource.GroupDecision => "vaša voľba",
         EvidenceSource.Similarity => "NÁVRH podľa podobnej stopy – potvrďte",
         EvidenceSource.SubtitleText => "NÁVRH podľa textu titulkov – potvrďte",
+        EvidenceSource.Speech => "NÁVRH podľa reči – potvrďte" + (evidence?.Detail is { } detail ? $" ({detail})" : ""),
         _ => "",
     };
 

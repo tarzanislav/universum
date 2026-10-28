@@ -177,7 +177,19 @@ in next to it without changing the rules, planning or UI.
   template match, title, episode and place in the library, and review reasons. `Suggest` adds suggestions that are never used unconfirmed: the language of
   a similar track elsewhere in the folder (codec, channels, sampling rate, name) and forced subtitles detected from
   subtitle counts (statistics tags). `Text/TextLanguageDetector` + `MkvToolNix/SubtitleText` recognise the
-  language of text subtitles on request.
+  language of text subtitles on request; suggestions from subtitle text or speech are kept and never replaced by a
+  similarity.
+- `Speech/SpokenLanguage` – the spoken language of an audio track on request (owner, 28 Oct 2026): FFmpeg cuts 30 s
+  pieces from 20/50/80 % of the film (35/65 % when they disagree) as 16 kHz mono WAV, silent ones are left out,
+  `whisper-cli -dl` tells each piece's language (the piece comes on standard input and the model is named in its own
+  working folder – on Windows whisper reads arguments in the system code page), the sure pieces vote. Czech or Slovak:
+  the clearest piece is transcribed as both; the words only one language has (`Text/CzechOrSlovak`), else a clear
+  difference in whisper's certainty, decide – otherwise the suggestion carries "čeština alebo slovenčina – overte".
+  Always a suggestion (`EvidenceSource.Speech`, medium confidence).
+- `Speech/SpeechTools` – the `speech` folder installed with the program: FFmpeg (whole, LGPL, built from source at a
+  fixed commit by `tools/speech/build-ffmpeg.sh`), whisper.cpp and the model "base" (fixed SHA-256), prepared by
+  `tools/speech/prepare.sh` in the reusable workflow `speech-tools.yml` (cached); `manifest.json` lists the SHA-256 of
+  every file and is checked before anything of it runs. The release attaches the complete FFmpeg source.
 - `Batch/BatchRunner` – processes the files that need work: files whose source or target drives meet one after
   another, others in parallel (with one output drive: one at a time); pause, resume, stop after the current file.
   `BatchReport` writes CSV and HTML reports with the target paths.
@@ -206,8 +218,8 @@ in next to it without changing the rules, planning or UI.
 
 ## Processes
 
-`ProcessRunner` starts tools without a shell, passes arguments one by one, reads output as UTF-8, kills the whole
-process tree on cancellation and forces a UTF-8 locale on Linux. Exit codes of MKVToolNix: 0 success, 1 warnings,
+`ProcessRunner` starts tools without a shell, passes arguments one by one, reads output as UTF-8, can give a file on
+standard input, kills the whole process tree on cancellation and forces a UTF-8 locale on Linux. Exit codes of MKVToolNix: 0 success, 1 warnings,
 2 error.
 
 ## Safety

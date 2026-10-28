@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generates the small, invented test MKV files in testdata/media (CC0).
-# Requires ffmpeg and mkvmerge. Run from the repository root: tools/make-testdata.sh
+# Requires ffmpeg, mkvmerge and espeak-ng (synthetic speech). Run from the repository root: tools/make-testdata.sh
 set -euo pipefail
 
 out="testdata/media"
@@ -71,5 +71,28 @@ ffmpeg -loglevel error -y -fflags +genpts -r 10 -i "$work/v.h264" -i "$work/a-en
 # MPEG transport stream (a TV recording): Slovak AC-3 first, English AAC.
 ffmpeg -loglevel error -y -fflags +genpts -r 10 -i "$work/v.h264" -i "$work/a-sk.ac3" -i "$work/a-en.aac" \
   -map 0 -map 1 -map 2 -c copy -metadata:s:a:0 language=slk -metadata:s:a:1 language=eng "$out/sk-en.ts"
+
+# Speech for the recognition of the spoken language: invented sentences read by espeak-ng (synthetic voice), three
+# audio tracks without a language or name – Czech, English, Slovak.
+cat > "$work/speech-cs.txt" <<'TXT'
+Dobrý večer, vítejte u dnešního vymyšleného příběhu. Malá vesnice pod horami se probouzí do chladného rána. Starý mlynář otevírá dveře a dívá se na zamrzlou řeku. Říká svému synovi, že dnes musí opravit kolo, jinak nebude mouka na chleba. Syn se usměje, vezme kladivo a jde k potoku. Celý den pracují spolu a večer sedí u kamen a vyprávějí si o létě.
+TXT
+cat > "$work/speech-en.txt" <<'TXT'
+Good evening, and welcome to tonight's invented story. A small village below the mountains wakes up to a cold morning. The old miller opens the door and looks at the frozen river. He tells his son that today they must repair the wheel, or there will be no flour for bread. The son smiles, takes a hammer and walks down to the stream. They work together all day, and in the evening they sit by the stove and talk about summer.
+TXT
+cat > "$work/speech-sk.txt" <<'TXT'
+Dobrý večer, vitajte pri dnešnom vymyslenom príbehu. Malá dedina pod horami sa prebúdza do chladného rána. Starý mlynár otvára dvere a pozerá sa na zamrznutú rieku. Hovorí svojmu synovi, že dnes musia opraviť koleso, inak nebude múka na chlieb. Syn sa usmeje, vezme kladivo a ide k potoku. Celý deň pracujú spolu a večer sedia pri peci a rozprávajú sa o lete.
+TXT
+for language in cs en sk; do
+  voice="$language"; [ "$language" = en ] && voice=en-us
+  espeak-ng -v "$voice" -s 150 -f "$work/speech-$language.txt" -w "$work/speech-$language.wav"
+  ffmpeg -loglevel error -y -i "$work/speech-$language.wav" -ac 1 -ar 16000 -c:a libopus -b:a 16k "$work/speech-$language.opus"
+done
+ffmpeg -loglevel error -y -f lavfi -i "testsrc=size=64x36:rate=5" -t 29 -c:v libx264 -preset ultrafast -bf 0 "$work/v-long.h264"
+mkvmerge -q "${common[@]}" -o "$out/speech-und.mkv" \
+  "$work/v-long.h264" \
+  --language 0:und "$work/speech-cs.opus" \
+  --language 0:und --default-track-flag 0:0 "$work/speech-en.opus" \
+  --language 0:und --default-track-flag 0:0 "$work/speech-sk.opus"
 
 ls -l "$out"

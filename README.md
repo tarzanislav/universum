@@ -12,6 +12,9 @@ v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý prie
   poradie stôp (CZ → SK → ostatné) a odstránenie tagov.
 - **Hromadné spracovanie** – analýza celého priečinka, skupiny súborov podľa štruktúry a tolerantné šablóny,
   ktoré si poradia aj so súbormi s chýbajúcou stopou.
+- **Rozpoznanie jazyka** stôp bez jazyka – z názvu stopy, z textu titulkov a **z reči audiostopy**
+  ([whisper.cpp](https://github.com/ggml-org/whisper.cpp) a [FFmpeg](https://ffmpeg.org) sú súčasťou inštalácie,
+  všetko beží len v počítači); výsledok je vždy návrh na potvrdenie.
 - **Knižnica pre Jellyfin** – výsledky idú do výstupného priečinka: `MOVIES\Creep (2004)\Creep (2004) - CZ EN FHD H264 BIG.mkv`
   a `TVSHOWS\Nine Puzzles (2025) [tmdbid-227191]\Season 01\Nine Puzzles S01E04 - CZ titulky FHD H264 SMALL.mkv`.
   Názvy vie vyhľadať na [TMDB](https://www.themoviedb.org/) s vlastným bezplatným kľúčom používateľa.
@@ -32,6 +35,8 @@ Apache License 2.0 – pozri [LICENSE](LICENSE).
 
 UNIVERSUM je samostatný projekt. Nie je súčasťou MKVToolNix a jeho autor ho nevydáva ani nepodporuje.
 MKVToolNix (© Moritz Bunkus) má vlastnú licenciu; UNIVERSUM ho iba spúšťa ako samostatné programy.
+FFmpeg (LGPL 2.1+), whisper.cpp a model reči (MIT) v priečinku `speech` inštalácie majú vlastné licencie – pozri
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); úplný zdrojový kód priloženého FFmpeg je pri každom vydaní.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 

@@ -45,6 +45,15 @@ public sealed class LibraryJob(LibraryLayout layout)
 
     public Dictionary<string, TitleInfo> MovieSuggestions { get; } = new(Paths.Comparer);
 
+    /// <summary>
+    /// The film titles read from the names (folder or file), kept apart from the suggestions: a title service is
+    /// always asked by them, never by a title it suggested before (that would confirm its own suggestion).
+    /// </summary>
+    public Dictionary<string, TitleInfo> NameGuesses { get; } = new(Paths.Comparer);
+
+    /// <summary>Files whose title the user chose (a TMDB address, also one still waiting for confirmation): never searched again.</summary>
+    public HashSet<string> ChosenTitles { get; } = new(Paths.Comparer);
+
     /// <summary>Episode numbers set by the user (they win over numbers found in the names).</summary>
     public Dictionary<string, EpisodeNumber> Episodes { get; } = new(Paths.Comparer);
 
@@ -119,6 +128,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             else if (guess is not null)
             {
                 job.MovieSuggestions[file] = Title(MediaKind.Movie, guess);
+                job.NameGuesses[file] = job.MovieSuggestions[file];
             }
         }
 

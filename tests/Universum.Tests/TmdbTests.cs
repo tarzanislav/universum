@@ -97,6 +97,88 @@ public sealed class TmdbTests
         }
     }
 
+    // an invented film: English title, Czech and Slovak translations, a Czech alternative title
+    private const string GoldenCarpFound =
+        """{"id":990001,"title":"The Golden Carp","original_title":"The Golden Carp","original_language":"en","release_date":"2021-11-05"}""";
+
+    private const string GoldenCarp =
+        """
+        {"id":990001,"title":"The Golden Carp","original_title":"The Golden Carp","original_language":"en","release_date":"2021-11-05",
+         "alternative_titles":{"titles":[{"iso_3166_1":"CZ","title":"Zlatý kapr: Návrat","type":""}]},
+         "translations":{"translations":[
+           {"iso_3166_1":"CZ","iso_639_1":"cs","data":{"title":"Zlatý kapr","overview":"Dlhý popis deja, ktorý sa do cache neukladá."}},
+           {"iso_3166_1":"SK","iso_639_1":"sk","data":{"title":"Zlatý kapor","overview":""}},
+           {"iso_3166_1":"US","iso_639_1":"en","data":{"title":"","overview":""}}]}}
+        """;
+
+    private const string OtherCarp = """{"id":990002,"title":"Carp Kingdom","original_title":"Carp Kingdom","original_language":"en","release_date":"2022-03-01"}""";
+
+    [Test]
+    public async Task FileNamedInCzechGetsTheOriginalTitle()
+    {
+        var server = new Server();
+        server.Answers["/3/search/movie"] = """{"results":[""" + OtherCarp + "," + GoldenCarpFound + "]}";
+        server.Answers["/3/movie/990001"] = GoldenCarp;
+        var cacheFile = Path.Combine(Path.GetTempPath(), "universum-tmdb-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var tmdb = new TmdbClient(server.Http, "abc123", cacheFile, Fast);
+            var search = new TitleSearch(tmdb, null);
+
+            // the Czech name of the file is one of the film's translations: the original title and TMDB's year
+            var guess = TitleGuess.ForFile(Path.Combine("x", "Filmy", "Zlatý kapr.2021.WEB-DL.CZ.1080p.mkv")).Title!;
+            Assert.Equal(new NameGuess("Zlatý kapr", 2021, null), guess, "dots after a name with spaces");
+            var results = await search.SearchAsync(MediaKind.Movie, guess.Name, guess.Year);
+            Assert.Equal("The Golden Carp (2021)", results.Best(guess.Name, guess.Year)?.ToTitleInfo()?.FolderName, "translation");
+            Assert.Equal("The Golden Carp (2021)", results.Best("Zlaty kapor", 2021)?.ToTitleInfo()?.FolderName, "Slovak, without diacritics");
+            Assert.Equal("The Golden Carp (2021)", results.Best("Zlatý kapr - Návrat", 2021)?.ToTitleInfo()?.FolderName, "alternative title");
+
+            // the year of the release here, a year after the premiere
+            Assert.Equal(990001, (await search.SearchAsync(MediaKind.Movie, "Zlatý kapr", 2022)).Best("Zlatý kapr", 2022)?.Id, "a year later");
+
+            // a name no title carries: no match; the only title of the year is a suggestion to confirm
+            var unknown = await search.SearchAsync(MediaKind.Movie, "Kapor v rybníku", 2022);
+            Assert.Equal<TmdbTitle?>(null, unknown.Best("Kapor v rybníku", 2022), "no name matches");
+            Assert.Equal<TmdbTitle?>(null, unknown.OnlyOne(2022), "two titles of 2021–2023");
+            Assert.Equal(990002, unknown.OnlyOne(2023)?.Id, "the only one of 2022–2024");
+
+            tmdb.SaveCache();
+            var cache = File.ReadAllText(cacheFile);
+            Assert.True(cache.Contains("Zlat", StringComparison.Ordinal) && !cache.Contains("popis", StringComparison.Ordinal), "only the names are cached");
+            Assert.True(server.Requests.Count(r => r.Contains("append_to_response=alternative_titles,translations", StringComparison.Ordinal)) <= 2,
+                "the names are read once per title");
+        }
+        finally
+        {
+            File.Delete(cacheFile);
+        }
+    }
+
+    [Test]
+    public async Task ATranslationOfTheYearWinsOverANeighbour()
+    {
+        // two invented films carry the same Czech translation; the file has the year of the second
+        const string earlier = """{"id":990011,"title":"Carp Returns","original_title":"Carp Returns","release_date":"2020-05-01"}""";
+        const string exact = """{"id":990012,"title":"The Carp Comes Back","original_title":"The Carp Comes Back","release_date":"2021-05-01"}""";
+        const string names = ""","alternative_titles":{"titles":[]},"translations":{"translations":[{"iso_639_1":"cs","data":{"title":"Kapr návrat"}}]}}""";
+        var server = new Server();
+        server.Answers["/3/search/movie"] = """{"results":[""" + earlier + "," + exact + "]}";
+        server.Answers["/3/movie/990011"] = earlier[..^1] + names;
+        server.Answers["/3/movie/990012"] = exact[..^1] + names;
+        var search = new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: Fast), null);
+
+        var results = await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2021);
+        Assert.Equal(990012, results.Best("Kapr návrat", 2021)?.Id, "the film of the year, though TMDB lists the neighbour first");
+        Assert.Equal(990011, (await search.SearchAsync(MediaKind.Movie, "Kapr návrat", 2019)).Best("Kapr návrat", 2019)?.Id, "a neighbour when no film of the year has the name");
+
+        // two films of the same year with the same translation: none is chosen (the user picks)
+        const string twin = """{"id":990013,"title":"Carp Again","original_title":"Carp Again","release_date":"2021-09-01"}""";
+        server.Answers["/3/search/movie"] = """{"results":[""" + exact + "," + twin + "]}";
+        server.Answers["/3/movie/990013"] = twin[..^1] + names;
+        var twins = await new TitleSearch(new TmdbClient(server.Http, "abc123", pacer: Fast), null).SearchAsync(MediaKind.Movie, "Kapr návrat", 2021);
+        Assert.Equal<TmdbTitle?>(null, twins.Best("Kapr návrat", 2021), "twins of one year");
+    }
+
     [Test]
     public async Task RequestsAreSpacedOut()
     {

@@ -55,6 +55,21 @@ internal static class Assert
         throw new AssertionException($"{what}: expected {typeof(TException).Name}");
     }
 
+    public static async Task<TException> ThrowsAsync<TException>(Func<Task> action, string what = "")
+        where TException : Exception
+    {
+        try
+        {
+            await action();
+        }
+        catch (TException ex)
+        {
+            return ex;
+        }
+
+        throw new AssertionException($"{what}: expected {typeof(TException).Name}");
+    }
+
     public static void Skip(string reason) => throw new SkipException(reason);
 }
 

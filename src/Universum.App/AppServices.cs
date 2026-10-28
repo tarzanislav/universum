@@ -9,6 +9,7 @@ using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
 using Universum.Core.Processes;
+using Universum.Core.Speech;
 using Universum.Core.Weather;
 using Universum.Platform.Windows;
 
@@ -153,6 +154,25 @@ public sealed class AppServices
 
     /// <summary>Raised when the HISTRA token changes.</summary>
     public event Action? HistraChanged;
+
+    private SpeechTools? _speech;
+
+    /// <summary>
+    /// The tools of the recognition of the spoken language, installed with the program in "speech" (UNIVERSUM_SPEECH_DIR
+    /// for tests), checked against their manifest once per run; <see cref="SpeechException"/> when missing or changed.
+    /// </summary>
+    public async Task<SpeechTools> SpeechAsync(CancellationToken cancellationToken = default)
+    {
+        if (_speech is { } verified)
+        {
+            return verified;
+        }
+
+        var folder = Environment.GetEnvironmentVariable("UNIVERSUM_SPEECH_DIR") is { Length: > 0 } custom ? custom : SpeechTools.DefaultFolder;
+        var tools = SpeechTools.In(folder) ?? throw new SpeechException("Rozpoznávanie reči nie je nainštalované – nainštalujte UNIVERSUM znova (inštalátor ho obsahuje).");
+        await tools.VerifyAsync(cancellationToken);
+        return _speech = tools;
+    }
 
     private OpenMeteo? _weather;
 

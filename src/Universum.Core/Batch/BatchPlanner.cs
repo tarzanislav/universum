@@ -270,7 +270,8 @@ public static class BatchPlanner
 
         foreach (var group in analysis.Groups)
         {
-            // similarity suggestions are recalculated; suggestions from reading subtitle text are kept (expensive)
+            // similarity suggestions are recalculated; suggestions from reading subtitle text or hearing the speech are
+            // kept (expensive) and are not replaced by a similarity
             foreach (var key in group.Suggestions.Where(s => s.Value.Source == EvidenceSource.Similarity).Select(s => s.Key).ToList())
             {
                 group.Suggestions.Remove(key);
@@ -280,7 +281,7 @@ public static class BatchPlanner
             var representative = group.Representative;
             foreach (var (key, track) in SlotKey.Of(representative))
             {
-                if (Evidence(track, key, group) is { IsUsable: true })
+                if (Evidence(track, key, group) is { IsUsable: true } || group.Suggestions.ContainsKey(key))
                 {
                     continue;
                 }

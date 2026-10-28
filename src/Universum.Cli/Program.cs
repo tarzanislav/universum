@@ -346,13 +346,15 @@ static void SetTitle(LibraryJob library, BatchAnalysis analysis, TitleInfo title
     }
 }
 
-// suggestions from the names replaced by TMDB titles where the name and year match exactly
+// suggestions from the names replaced by TMDB titles where the name (also a translation: a file named in Czech) and the
+// year match, as in the program (TitleSearch: the other names of the likely titles are read)
 static async Task<string> RefineSuggestionsAsync(TmdbClient tmdb, LibraryJob library)
 {
+    var search = new TitleSearch(tmdb, null);
     if (library.Kind == MediaKind.Series)
     {
         if (library.Series is null && library.SeriesSuggestion is { } guess &&
-            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Series, guess.Name, guess.Year), guess.Name, guess.Year) is { } match &&
+            (await search.SearchAsync(MediaKind.Series, guess.Name, guess.Year)).Best(guess.Name, guess.Year) is { } match &&
             match.ToTitleInfo() is { } series)
         {
             library.SeriesSuggestion = series;
@@ -369,10 +371,11 @@ static async Task<string> RefineSuggestionsAsync(TmdbClient tmdb, LibraryJob lib
     }
 
     var found = 0;
-    foreach (var (path, guess) in library.MovieSuggestions.ToList())
+    foreach (var (path, suggestion) in library.MovieSuggestions.ToList())
     {
+        var guess = library.NameGuesses.GetValueOrDefault(path) ?? suggestion;
         if (!library.Movies.ContainsKey(path) &&
-            TmdbClient.ExactMatch(await tmdb.SearchAsync(MediaKind.Movie, guess.Name, guess.Year), guess.Name, guess.Year)?.ToTitleInfo() is { } movie)
+            (await search.SearchAsync(MediaKind.Movie, guess.Name, guess.Year)).Best(guess.Name, guess.Year)?.ToTitleInfo() is { } movie)
         {
             library.MovieSuggestions[path] = movie;
             found++;

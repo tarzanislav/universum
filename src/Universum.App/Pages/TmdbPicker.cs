@@ -198,13 +198,17 @@ public sealed class TmdbPicker : ObservableObject
 
             var fromTmdb = found.Source == "TMDB";
             var many = $"{(fromTmdb ? "TMDB našlo" : "Katalóg HISTRA našiel")} {results.Count} titulov";
+            // chosen by its name and year (also a translation), by its name a year off (the release here), or by HISTRA
             var byName = typed is not null && best is not null && ReferenceEquals(TmdbClient.ExactMatch(results, typed.Name, typed.Year), best);
+            var yearOff = !byName && typed is not null && best is not null && best.IsNamed(typed.Name) &&
+                          typed.Year is { } typedYear && best.Year is { } bestYear && Math.Abs(typedYear - bestYear) == 1;
             Message = results.Count switch
             {
                 0 when found.FoundNowhere => "",
                 0 when found.Note.Length > 0 => found.Note,
                 0 => fromTmdb ? "TMDB nič nenašlo – skúste iný názov alebo zadajte ID." : "Katalóg HISTRA nič nenašiel – skúste iný názov alebo rok.",
                 1 => found.Note,
+                _ when best is not null && yearOff => Join(many + $", vybraný je ten s rovnakým názvom, rok {best.Year} (o rok iný – možno rok uvedenia u nás).", found.Note),
                 _ when best is not null && byName => Join(many + ", vybraný je ten s presným názvom a rokom.", found.Note),
                 _ when best is not null => Join(many + ", vybraný je ten, ktorý potvrdzuje katalóg HISTRA.", found.Note),
                 _ => Join(many + " – vyberte správny.", found.Note),

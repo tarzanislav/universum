@@ -15,6 +15,23 @@ public sealed record TmdbTitle(
     /// <summary>The title's number in the HISTRA catalog, for a result from HISTRA's own catalog (not one it only passed on from TMDB).</summary>
     public int? HistraId { get; init; }
 
+    /// <summary>
+    /// The title's names in other languages and countries (TMDB's translations and alternative titles), when they were
+    /// read: a file named by its Czech or Slovak title is recognised by them. Empty when not read.
+    /// </summary>
+    public IReadOnlyList<string> OtherTitles { get; init; } = [];
+
+    /// <summary>The other names were read (<see cref="OtherTitles"/> is then complete, even when empty).</summary>
+    public bool OtherTitlesRead { get; init; }
+
+    /// <summary>True when a name is the title, the original title or one of its other names (ignoring case, diacritics and punctuation).</summary>
+    public bool IsNamed(string? name)
+    {
+        var wanted = Words.Normalize(name);
+        return wanted.Length > 0 &&
+               (Words.Normalize(Title) == wanted || Words.Normalize(OriginalTitle) == wanted || OtherTitles.Any(o => Words.Normalize(o) == wanted));
+    }
+
     /// <summary>The library title by the specification: original title in Latin script, otherwise English title + ID.</summary>
     public TitleInfo? ToTitleInfo() => TitleInfo.FromTmdb(Kind, Id, OriginalTitle, Title, Year);
 
@@ -96,6 +113,20 @@ public sealed class TmdbClient
         return document is null ? null : Parse(kind, document.RootElement, withSeasons: true);
     }
 
+    /// <summary>
+    /// The names of a title in other languages and countries – TMDB's translations and alternative titles – so a file
+    /// named by its Czech title is recognised; empty when TMDB has no title with this ID. Only the names are kept in the cache.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> OtherTitlesAsync(MediaKind kind, int id, CancellationToken cancellationToken = default)
+    {
+        var path = (kind == MediaKind.Movie ? "movie/" : "tv/") + id.ToString(CultureInfo.InvariantCulture) +
+                   "?language=en-US&append_to_response=alternative_titles,translations";
+        using var document = await GetJsonAsync(path, DetailsLifetime, cancellationToken, NamesOnly).ConfigureAwait(false);
+        return document is not null && document.RootElement.TryGetProperty("names", out var names) && names.ValueKind == JsonValueKind.Array
+            ? names.EnumerateArray().Where(n => n.ValueKind == JsonValueKind.String).Select(n => n.GetString()!).ToList()
+            : [];
+    }
+
     /// <summary>Titles matching a name (and year, when given), best first as TMDB orders them.</summary>
     public async Task<IReadOnlyList<TmdbTitle>> SearchAsync(MediaKind kind, string query, int? year, CancellationToken cancellationToken = default)
     {
@@ -148,16 +179,13 @@ public sealed class TmdbClient
     }
 
     /// <summary>
-    /// The one result that matches a guessed name exactly (title or original title, ignoring case and diacritics) and,
+    /// The one result that matches a guessed name exactly (title, original title or another name read for it, ignoring case and diacritics) and,
     /// when the guess has a year, the year; null when there is none or more than one.
     /// </summary>
     public static TmdbTitle? ExactMatch(IReadOnlyList<TmdbTitle> results, string name, int? year)
     {
         var wanted = Words.Normalize(name);
-        var matches = results.Where(r =>
-                (Words.Normalize(r.Title) == wanted || Words.Normalize(r.OriginalTitle) == wanted) &&
-                (year is null || r.Year == year))
-            .ToList();
+        var matches = results.Where(r => r.IsNamed(wanted) && (year is null || r.Year == year)).ToList();
         return matches.Count == 1 ? matches[0] : null;
     }
 
@@ -176,7 +204,8 @@ public sealed class TmdbClient
         }
     }
 
-    private async Task<JsonDocument?> GetJsonAsync(string path, TimeSpan lifetime, CancellationToken cancellationToken)
+    // compact: what of the answer is kept (in the cache too) – the names of a title instead of all its translations
+    private async Task<JsonDocument?> GetJsonAsync(string path, TimeSpan lifetime, CancellationToken cancellationToken, Func<JsonElement, string>? compact = null)
     {
         lock (_cache)
         {
@@ -241,6 +270,12 @@ public sealed class TmdbClient
                 try
                 {
                     document = body is null ? null : JsonDocument.Parse(body);
+                    if (document is not null && compact is not null)
+                    {
+                        body = compact(document.RootElement);
+                        document.Dispose();
+                        document = JsonDocument.Parse(body);
+                    }
                 }
                 catch (JsonException ex)
                 {
@@ -299,6 +334,51 @@ public sealed class TmdbClient
         }
 
         return new TmdbTitle(kind, id, title ?? original, original, Text(element, "original_language"), year, seasons);
+    }
+
+    // translations ("translations": [{ "data": { "title" | "name" } }]) and alternative titles (films: "titles", series:
+    // "results") as { "names": [...] }, each name once
+    private static string NamesOnly(JsonElement element)
+    {
+        var names = new List<string>();
+        void Add(string? name)
+        {
+            if (!string.IsNullOrWhiteSpace(name) && !names.Contains(name.Trim(), StringComparer.Ordinal))
+            {
+                names.Add(name.Trim());
+            }
+        }
+
+        if (element.TryGetProperty("translations", out var translations) && translations.ValueKind == JsonValueKind.Object &&
+            translations.TryGetProperty("translations", out var list) && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var translation in list.EnumerateArray())
+            {
+                if (translation.ValueKind == JsonValueKind.Object && translation.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
+                {
+                    Add(Text(data, "title") ?? Text(data, "name"));
+                }
+            }
+        }
+
+        if (element.TryGetProperty("alternative_titles", out var alternatives) && alternatives.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var key in new[] { "titles", "results" })
+            {
+                if (alternatives.TryGetProperty(key, out var titles) && titles.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var title in titles.EnumerateArray())
+                    {
+                        if (title.ValueKind == JsonValueKind.Object)
+                        {
+                            Add(Text(title, "title"));
+                        }
+                    }
+                }
+            }
+        }
+
+        return JsonSerializer.Serialize(new { names });
     }
 
     private static string? Text(JsonElement element, string property) =>

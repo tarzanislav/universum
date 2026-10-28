@@ -15,7 +15,7 @@ public sealed class ProcessRunner : IProcessRunner
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = false,
+            RedirectStandardInput = request.StandardInputFile is not null,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
@@ -64,14 +64,17 @@ public sealed class ProcessRunner : IProcessRunner
         var error = new StringBuilder();
         var readOutput = ReadLinesAsync(process.StandardOutput, output, request.OnOutputLine);
         var readError = ReadLinesAsync(process.StandardError, error, null);
+        var writeInput = request.StandardInputFile is { } input ? WriteInputAsync(process, input, limit.Token) : Task.CompletedTask;
         try
         {
             await process.WaitForExitAsync(limit.Token).ConfigureAwait(false);
             await Task.WhenAll(readOutput, readError).ConfigureAwait(false);
+            await writeInput.ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             Kill(process);
+            await writeInput.ConfigureAwait(false); // the input file is released before anyone deletes it
             if (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException($"Program '{request.FileName}' did not finish within {request.Timeout}.");
@@ -91,6 +94,33 @@ public sealed class ProcessRunner : IProcessRunner
                 ? ctype
                 : System.Environment.GetEnvironmentVariable("LANG") ?? "";
         return locale.Contains("UTF-8", StringComparison.OrdinalIgnoreCase) || locale.Contains("utf8", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // the file to the program's standard input, which is closed in any case (the program never waits for more); a
+    // program that stops reading early (exits), a file that cannot be read or a stop is not an error here – the program's
+    // own result tells what happened
+    private static async Task WriteInputAsync(Process process, string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1 << 16, useAsync: true);
+            await input.CopyToAsync(process.StandardInput.BaseStream, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException or ObjectDisposedException)
+        {
+            // see above
+        }
+        finally
+        {
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+            {
+                // the program has ended
+            }
+        }
     }
 
     private static async Task ReadLinesAsync(StreamReader reader, StringBuilder target, Action<string>? onLine)

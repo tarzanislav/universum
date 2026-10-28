@@ -1,0 +1,57 @@
+name: Speech tools
+
+# The "speech" folder installed with UNIVERSUM (recognition of the spoken language): FFmpeg built from its source at a
+# fixed commit, whisper.cpp and the speech model checked against fixed SHA-256 (tools/speech/prepare.sh). Built once
+# and kept in the cache until tools/speech changes; used by CI and by the release (artifact "speech-tools":
+# speech/ for the program, source/ with the FFmpeg source for the release).
+on:
+  workflow_call:
+    inputs:
+      cache-only:
+        description: 'Use only the tools CI already prepared (the release downloads and builds nothing unpinned)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  speech-tools:
+    name: Speech tools (FFmpeg, whisper.cpp, model)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Cache
+        id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: speech-tools
+          key: speech-tools-${{ hashFiles('tools/speech/**', '.github/workflows/speech-tools.yml') }}
+
+      - name: Prepared by CI
+        if: steps.cache.outputs.cache-hit != 'true' && inputs.cache-only
+        run: |
+          echo "::error::The speech tools for this commit are not in the cache (kept 7 days after last use) – run CI on main first (Actions → CI → Run workflow on main), then release."
+          exit 1
+
+      - name: Build and check
+        if: steps.cache.outputs.cache-hit != 'true' && !inputs.cache-only
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends mingw-w64 nasm libz-mingw-w64-dev curl unzip xz-utils
+          tools/speech/prepare.sh speech-tools/speech speech-tools/source
+
+      - name: Contents
+        run: |
+          find speech-tools -type f -printf '%10s  %p\n' | sort -k2
+          python3 -c "import json; m = json.load(open('speech-tools/speech/manifest.json')); print(len(m['files']), 'files in the manifest')"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: speech-tools
+          path: speech-tools
+          if-no-files-found: error
+          retention-days: 3

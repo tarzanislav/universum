@@ -164,8 +164,11 @@ public static partial class TitleGuess
             tmdbId = Id(idMatch.Groups["id"].Value);
         }
 
-        var text = Brackets().Replace(name, " ");
-        if (!text.Contains(' ', StringComparison.Ordinal))
+        // "[2021]" after the title is its year; other brackets (and a year in front of it) are tags of the release.
+        // Dots and underscores separate the words when the name itself has no spaces (brackets aside).
+        var spaced = Brackets().Replace(name, "").Trim().Contains(' ', StringComparison.Ordinal);
+        var text = Brackets().Replace(BracketedYear().Replace(name, m => Brackets().Replace(name[..m.Index], "").Trim(' ', '.', '_', '-').Length > 0 ? " (" + m.Groups["year"].Value + ") " : m.Value), " ");
+        if (!spaced)
         {
             text = text.Replace('.', ' ').Replace('_', ' ');
         }
@@ -184,14 +187,23 @@ public static partial class TitleGuess
         }
 
         // "Nine Puzzles.S01E09": a clear episode number inside a word starts a word of its own
+        // "Zlatý kapor.2021.WEB-DL.CZ": words joined by dots after a name with spaces are words of their own
         var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(ReleaseWords)
             .SelectMany(t => EpisodeParser.IndexOfClearNumber(t) is > 0 and var at ? [t[..at].TrimEnd('.', '_', '-'), t[at..]] : new[] { t })
             .Where(t => t.Length > 0)
             .ToArray();
         var end = tokens.Length;
+        var dash = tokens.Length;
         for (var i = 0; i < tokens.Length; i++)
         {
             var token = tokens[i].Trim('(', ')', ',');
+            if (token == "-")
+            {
+                dash = Math.Min(dash, i > 0 ? i : dash);
+                continue;
+            }
+
             if ((!film && IsEpisodeAt(tokens, i)) || (i > 0 && (StopWords.Contains(token) || Resolution().IsMatch(token))))
             {
                 end = i;
@@ -199,7 +211,8 @@ public static partial class TitleGuess
             }
         }
 
-        // the year: the last year-like word of the title part that is not its first word
+        // the year: the last year-like word of the title part that is not its first word ("Zlatý kapor - Návrat 2021
+        // 1080p": the part after the dash belongs to the title); without a year a dash ends the title
         int? year = null;
         for (var i = end - 1; i > 0; i--)
         {
@@ -211,8 +224,35 @@ public static partial class TitleGuess
             }
         }
 
+        // "Zlatý kapor.CZ.dabing.2021.1080p": a year among the release words right after the title
+        for (var i = end; year is null && i < tokens.Length; i++)
+        {
+            var token = tokens[i].Trim('(', ')', ',');
+            if (Year().IsMatch(token))
+            {
+                year = int.Parse(token, NumberStyles.None, CultureInfo.InvariantCulture);
+            }
+            else if (!StopWords.Contains(token) || (!film && IsEpisodeAt(tokens, i)))
+            {
+                break;
+            }
+        }
+
+        if (year is null)
+        {
+            end = Math.Min(end, dash);
+        }
+
         var result = Clean(tokens.Take(end));
         return result.Length == 0 ? null : new NameGuess(result, year, tmdbId);
+    }
+
+    // a word with dots or underscores is split when a part after the first is a year, a resolution or a release word
+    // ("Rybka.2021.WEB-DL"); "Mr." or "H.264" stay whole
+    private static IEnumerable<string> ReleaseWords(string token)
+    {
+        var parts = token.Split(['.', '_'], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 && parts.Skip(1).Any(p => Year().IsMatch(p) || Resolution().IsMatch(p) || (p != "-" && StopWords.Contains(p))) ? parts : [token];
     }
 
     private static string Clean(IEnumerable<string> words) => LibraryNames.Clean(string.Join(' ', words).Trim(' ', '-', '.', ','));
@@ -249,6 +289,9 @@ public static partial class TitleGuess
 
     [GeneratedRegex(@"\[[^\]]*\]|\{[^}]*\}", RegexOptions.CultureInvariant)]
     private static partial Regex Brackets();
+
+    [GeneratedRegex(@"\[\s*(?<year>(?:18|19|20|21)\d\d)\s*\]", RegexOptions.CultureInvariant)]
+    private static partial Regex BracketedYear();
 
     [GeneratedRegex(@"\(\s*(?<year>(?:18|19|20|21)\d\d)\s*\)\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex TrailingYear();

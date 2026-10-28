@@ -12,6 +12,7 @@ using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
+using Universum.Core.Speech;
 using Universum.Core.Templates;
 using Universum.Core.Text;
 using Universum.Platform.Windows;
@@ -32,6 +33,8 @@ public sealed class BatchPageViewModel : ObservableObject
     private bool _ranSinceAnalysis;
     private CancellationTokenSource? _tmdbCancellation;
     private CancellationTokenSource? _analysisCancellation;
+    private CancellationTokenSource? _speechCancellation;
+    private readonly Dictionary<string, string> _namesOfFiles = new(Universum.Core.IO.Paths.Comparer);
     private bool _summaryIsWarning;
     private IReadOnlyList<BatchItem> _items = [];
     private bool _needsAnalysis;
@@ -57,7 +60,8 @@ public sealed class BatchPageViewModel : ObservableObject
         ChooseFolderCommand = new RelayCommand(ChooseFolder, () => !Busy);
         AnalyzeCommand = new AsyncRelayCommand(AnalyzeAsync, () => !Busy && Directory.Exists(Folder));
         ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions, () => !Busy && SlotRows.Any(s => s.HasSuggestion || s.ForcedSuggested));
-        DetectSubtitlesCommand = new AsyncRelayCommand(DetectSubtitlesAsync, () => !Busy && SlotRows.Any(s => s.IsSubtitles && s.NeedsLanguage && s.Track.IsTextSubtitles));
+        DetectSubtitlesCommand = new AsyncRelayCommand(DetectSubtitlesAsync, () => !Busy && SlotRows.Any(s => s.IsSubtitles && s.NeedsLanguage));
+        DetectAudioCommand = new AsyncRelayCommand(DetectAudioAsync, () => !Busy && SlotRows.Any(s => s.Key.Type == TrackType.Audio && s.NeedsLanguage));
         EditTemplateCommand = new RelayCommand(EditTemplate, () => !Busy);
         TemplateFromGroupCommand = new RelayCommand(TemplateFromGroup, () => !Busy && SelectedGroup is not null);
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
@@ -65,7 +69,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
         RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
-        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null);
+        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null || _speechCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
@@ -140,6 +144,9 @@ public sealed class BatchPageViewModel : ObservableObject
     public RelayCommand ConfirmSuggestionsCommand { get; }
 
     public AsyncRelayCommand DetectSubtitlesCommand { get; }
+
+    /// <summary>Recognises the spoken language of the group's audio tracks without a language (a suggestion to confirm).</summary>
+    public AsyncRelayCommand DetectAudioCommand { get; }
 
     public RelayCommand EditTemplateCommand { get; }
 
@@ -462,6 +469,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     }
 
                     row.Group.Files.Add(file);
+                    row.Title = GroupTitle(row.Group);
                     row.Refresh();
                 }));
 
@@ -485,7 +493,7 @@ public sealed class BatchPageViewModel : ObservableObject
             Groups.Clear();
             foreach (var group in _analysis.Groups)
             {
-                Groups.Add(new GroupRow(group));
+                Groups.Add(new GroupRow(group) { Title = GroupTitle(group) });
             }
 
             Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
@@ -556,6 +564,7 @@ public sealed class BatchPageViewModel : ObservableObject
             var items = _items.Where(i => i.Group == row.Group).ToList();
             var review = items.Count(i => i.Status == BatchStatus.NeedsReview);
             row.State = review == 0 ? "pripravené" : $"na kontrolu: {review}";
+            row.Title = GroupTitle(row.Group);
         }
 
         foreach (var slot in SlotRows)
@@ -582,6 +591,45 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(KindNeedsConfirmation));
         OnPropertyChanged(nameof(HasSpecialsQuestions));
         RefreshCommands();
+    }
+
+    /// <summary>
+    /// The titles of the group's files without year and ID (decided, suggested, or guessed from the names), the first
+    /// with the number of the others: "Zlatý kapor", "Zlatý kapor + 1 ďalší", "+ 2 ďalšie", "+ 5 ďalších".
+    /// </summary>
+    public string GroupTitle(BatchGroup group)
+    {
+        string? first = null;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in group.Files)
+        {
+            var title = (_library?.TitleFor(file.Path) ?? _library?.SuggestedTitleFor(file.Path))?.CleanName ?? NameOf(file.Path);
+            if (title.Length > 0 && seen.Add(Words.Normalize(title)))
+            {
+                first ??= title;
+            }
+        }
+
+        var others = seen.Count - 1;
+        return first is null ? ""
+            : others switch
+            {
+                0 => first,
+                1 => $"{first} + 1 ďalší",
+                < 5 => $"{first} + {others} ďalšie",
+                _ => $"{first} + {others} ďalších",
+            };
+    }
+
+    // the title read from a file's name, remembered (the analysis names its groups after every file it reads)
+    private string NameOf(string path)
+    {
+        if (!_namesOfFiles.TryGetValue(path, out var name))
+        {
+            _namesOfFiles[path] = name = TitleGuess.ForFile(path).Title?.Name ?? Path.GetFileNameWithoutExtension(path);
+        }
+
+        return name;
     }
 
     private void ShowGroup()
@@ -732,6 +780,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     // checked in HISTRA as everywhere: a title it does not confirm waits at the file for confirmation
                     var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
+                    _library.ChosenTitles.Add(path);
                     if (check is not null && check.Check(film).NeedsConfirmation())
                     {
                         _library.Movies.Remove(path);
@@ -779,6 +828,7 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
                 {
+                    _library.ChosenTitles.Add(file.Path);
                     if (Tmdb.NeedsConfirmation)
                     {
                         _library.Movies.Remove(file.Path);
@@ -836,9 +886,11 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var service = titles.Tmdb is null ? "HISTRA" : titles.UsesHistra ? "TMDB + HISTRA" : "TMDB";
 
+        // asked by the title read from the name, never by an earlier suggestion of the service (owner's review 28. 10.:
+        // a second run would otherwise confirm a title the name never matched)
         var pending = _analysis.Groups.SelectMany(g => g.Files)
-            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path))
-            .Select(f => (f.Path, Guess: _library.MovieSuggestions[f.Path]))
+            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path))
+            .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
         Busy = true;
@@ -846,7 +898,7 @@ public sealed class BatchPageViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
         void OnWaiting(TimeSpan delay) => RunState = $"{service} žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s a pokračujem…";
         titles.Waiting += OnWaiting;
-        int asked = 0, found = 0, unverified = 0, nowhere = 0;
+        int asked = 0, found = 0, unverified = 0, ambiguous = 0, nowhere = 0;
         var problem = "";
         try
         {
@@ -855,13 +907,18 @@ public sealed class BatchPageViewModel : ObservableObject
                 asked++;
                 RunState = $"{service} {asked} / {pending.Count} ({questions} rôznych názvov)…";
                 var results = await titles.SearchAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
-                if (results.Best(guess.Name, guess.Year) is { } match && match.ToTitleInfo() is { } info)
+                var match = results.Best(guess.Name, guess.Year);
+
+                // the only title of the year, though none of its names is the file's: a suggestion to confirm at the file
+                var loose = match is null && results.OnlyOne(guess.Year) is not null;
+                match ??= results.OnlyOne(guess.Year);
+                if (match?.ToTitleInfo() is { } info)
                 {
                     _library.MovieSuggestions[path] = info;
                     found++;
 
                     // HISTRA found nothing, another title, or could not be asked: the file waits for its own confirmation
-                    if (results.Check(match).NeedsConfirmation())
+                    if (loose || results.Check(match).NeedsConfirmation())
                     {
                         if (results.Check(match) == TitleCheck.Unavailable && problem.Length == 0)
                         {
@@ -869,7 +926,10 @@ public sealed class BatchPageViewModel : ObservableObject
                         }
 
                         _library.UnverifiedTitles.Add(path);
-                        _unverifiedNotes[path] = TmdbPicker.Describe(results, match);
+                        _unverifiedNotes[path] = loose
+                            ? $"{results.Source} našlo jediný titul {match.Display}, ale jeho názov sa s menom súboru nezhoduje – skontrolujte ho a potvrďte. " +
+                              TmdbPicker.Describe(results, match)
+                            : TmdbPicker.Describe(results, match);
                         unverified++;
                     }
                     else
@@ -877,6 +937,17 @@ public sealed class BatchPageViewModel : ObservableObject
                         _library.UnverifiedTitles.Remove(path);
                         _unverifiedNotes.Remove(path);
                     }
+                }
+                else if (results.Titles.Count > 0)
+                {
+                    // several titles and none named as the file: the suggestion from the name waits for a choice at the file
+                    _library.UnverifiedTitles.Add(path);
+                    var listed = string.Join(", ", results.Titles.Take(3).Select(t => t.Display)) + (results.Titles.Count > 3 ? ", …" : "");
+                    _unverifiedNotes[path] = (results.Titles.Count == 1
+                                                 ? $"{results.Source} našlo len {listed} – iný rok, než má súbor"
+                                                 : $"{results.Source} našlo viac titulov ({listed}) a žiadny sa nevolá ako súbor") +
+                                             " – napíšte správny názov (rok) pri súbore alebo potvrďte návrh z mena súboru.";
+                    ambiguous++;
                 }
                 else if (results.FoundNowhere)
                 {
@@ -890,6 +961,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
             RunState = $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
                        (unverified > 0 ? $", {unverified} HISTRA nepotvrdila (⚠ pri súbore – potvrďte ich jednotlivo)" : "") +
+                       (ambiguous > 0 ? $", {ambiguous} majú viac možných titulov (⚠ pri súbore – vyberte správny)" : "") +
                        (nowhere > 0 ? $", {nowhere} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)" : "") +
                        " – skontrolujte ich a dajte Prijať návrhy názvov." + (problem.Length > 0 ? " " + problem : "");
         }
@@ -937,12 +1009,17 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void ConfirmSuggestions()
     {
+        var own = SlotRows.Where(s => s.NeedsOwnConfirmation).Select(s => s.Slot).ToList();
         foreach (var slot in SlotRows)
         {
             slot.ConfirmSuggestion();
         }
 
         Replan();
+        if (own.Count > 0)
+        {
+            RunState = $"Návrhy s upozornením ostali na vašu voľbu ({string.Join(", ", own)}) – jazyk vyberte pri stope.";
+        }
     }
 
     /// <summary>Recognises the language of undetermined text subtitles of the selected group (reads the representative file).</summary>
@@ -956,22 +1033,101 @@ public sealed class BatchPageViewModel : ObservableObject
         Busy = true;
         try
         {
-            foreach (var slot in SlotRows.Where(s => s.IsSubtitles && s.NeedsLanguage && s.Track.IsTextSubtitles).ToList())
+            // tracks with the language in their name ("CZ titulky") or chosen for the group are not read
+            var undetermined = SlotRows.Where(s => s.IsSubtitles && s.NeedsLanguage && s.ChosenLanguage is null).ToList();
+            var named = SlotRows.Count(s => s.IsSubtitles && s.IsNamedInTrack);
+            int recognised = 0, unreadable = 0;
+            var images = undetermined.Count(s => !s.Track.IsTextSubtitles);
+            foreach (var slot in undetermined.Where(s => s.Track.IsTextSubtitles).ToList())
             {
                 RunState = $"Čítam titulky {slot.Slot}…";
                 var text = await SubtitleText.ExtractAsync(installation, _services.Runner, group.Representative, slot.Track);
                 if (text is not null && TextLanguageDetector.Detect(text) is { } code)
                 {
                     group.Suggestions[slot.Key] = new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.SubtitleText);
+                    recognised++;
+                }
+                else
+                {
+                    unreadable++;
                 }
             }
 
-            RunState = "";
             Replan();
+            RunState = Texts.Detection("Titulky", recognised, unreadable, named,
+                images > 0 ? $"{images} obrazové (PGS, VobSub) sa čítať nedajú – jazyk vyberte pri stope" : null);
         }
         finally
         {
             Busy = false;
+        }
+    }
+
+    // the speech of each audio track without a language (and without one in its name) in the group's first file:
+    // pieces from several places of the film vote; the result is a suggestion with what to check
+    private async Task DetectAudioAsync()
+    {
+        if (SelectedGroup?.Group is not { } group)
+        {
+            return;
+        }
+
+        Busy = true;
+        var cancellation = _speechCancellation = new CancellationTokenSource();
+        StopCommand.NotifyCanExecuteChanged();
+        int recognised = 0, failed = 0;
+        var notes = new List<string>();
+        try
+        {
+            // tracks with a language chosen for the group, or named in the track name, are not listened to
+            var undetermined = SlotRows.Where(s => s.Key.Type == TrackType.Audio && s.NeedsLanguage && s.ChosenLanguage is null).ToList();
+            var named = SlotRows.Count(s => s.Key.Type == TrackType.Audio && s.IsNamedInTrack);
+            if (undetermined.Count > 0)
+            {
+                RunState = "Overujem nástroje rozpoznávania reči…";
+                var tools = await _services.SpeechAsync(cancellation.Token);
+                var file = group.Representative;
+                foreach (var slot in undetermined)
+                {
+                    RunState = $"Počúvam {slot.Slot}…";
+                    var pieces = new Progress<int>(n => RunState = $"Počúvam {slot.Slot} – úsekov: {n}…");
+                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, file.Path, slot.Key.Ordinal, file.Duration, pieces, cancellation.Token);
+                    if (result.Language is { } code)
+                    {
+                        group.Suggestions[slot.Key] = new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
+                        {
+                            Detail = result.Doubt,
+                            NeedsOwnConfirmation = result.NeedsOwnConfirmation,
+                        };
+                        recognised++;
+                    }
+                    else
+                    {
+                        failed++;
+                        notes.Add($"{slot.Slot}: {result.Doubt}");
+                    }
+                }
+            }
+
+            Replan();
+            RunState = Texts.Detection("Audio", recognised, failed, named) + (notes.Count > 0 ? " " + string.Join("; ", notes) + "." : "");
+        }
+        catch (OperationCanceledException)
+        {
+            Replan();
+            RunState = $"Rozpoznávanie reči zastavené – rozpoznané doteraz: {recognised}.";
+        }
+        catch (SpeechException ex)
+        {
+            Replan();
+            RunState = ex.Message;
+        }
+        finally
+        {
+            _speechCancellation = null;
+            cancellation.Dispose();
+            Busy = false;
+            StopCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -1056,6 +1212,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         _tmdbCancellation?.Cancel();
+        _speechCancellation?.Cancel();
         if (_control is not null)
         {
             _control.StopAfterCurrent = true;
@@ -1221,7 +1378,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         foreach (var command in new IRelayCommand[]
                  {
-                     ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, EditTemplateCommand,
+                     ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand,

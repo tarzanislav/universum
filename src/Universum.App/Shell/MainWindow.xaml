@@ -1032,16 +1032,24 @@
 
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="210" />
+                        <ColumnDefinition Width="270" MinWidth="180" MaxWidth="700" />
                         <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="400" />
                     </Grid.ColumnDefinitions>
                     <DataGrid ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Skupina" Binding="{Binding Label}" />
+                            <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
+                            <DataGridTextColumn Header="Skupina (film / seriál)" Binding="{Binding Title}" Width="*" MinWidth="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Súbory" Binding="{Binding Count}" />
-                            <DataGridTextColumn Header="Stav" Binding="{Binding State}" Width="*" />
+                            <DataGridTextColumn Header="Stav" Binding="{Binding State}" />
                         </DataGrid.Columns>
                         <DataGrid.RowDetailsTemplate>
                             <DataTemplate>
@@ -1050,22 +1058,78 @@
                             </DataTemplate>
                         </DataGrid.RowDetailsTemplate>
                     </DataGrid>
+                    <!-- the list of groups can be widened -->
+                    <GridSplitter Grid.Column="1" Width="10" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                                  Background="Transparent" Cursor="SizeWE" ToolTip="Ťahaním zmeníte šírku zoznamu skupín" />
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="1.2*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,0" Padding="10,3"
-                                        ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
-                                <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Padding="10,3" />
-                            </StackPanel>
-                            <TextBlock Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
+                        <DockPanel Margin="0,0,0,6">
+                            <Button DockPanel.Dock="Right" Content="Informácie" Command="{Binding ShowInfoCommand}" Padding="10,3"
+                                    ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
+                            <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
-                        <DataGrid Grid.Row="1" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Single" AutoGenerateColumns="False" IsReadOnly="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" MinWidth="110" />
+                                <DataGridTemplateColumn Header="Film / epizóda" Width="150">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
+                                                         ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
+                                                <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <Button Content="Potvrdiť návrh" Command="{Binding ConfirmCommand}" Padding="8,2" Margin="0,2,0,0" FontSize="12" HorizontalAlignment="Left"
+                                                        Visibility="{Binding IsUnverified, Converter={StaticResource BoolToVisibility}}"
+                                                        ToolTip="HISTRA tento názov nepotvrdila – potvrďte ho, ak je správny (alebo napíšte správny)" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="1.5*" MinWidth="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Target}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Výsledok" Binding="{Binding Outcome}" Width="*" MinWidth="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextWrapping" Value="Wrap" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="Aj tak">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding ProcessAnyway, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
+                                                      Visibility="{Binding CanProcessAnyway, Converter={StaticResource BoolToVisibility}}"
+                                                      ToolTip="Spracovať aj bez povinnej stopy šablóny" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <!-- the buttons wrap under the title when the pane is narrow -->
+                        <DockPanel Grid.Row="2" Margin="0,10,0,0">
+                            <TextBlock DockPanel.Dock="Left" Text="Stopy skupiny" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
+                                       ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
+                            <WrapPanel HorizontalAlignment="Right">
+                                <Button Content="Rozpoznať jazyk audiostôp" Command="{Binding DetectAudioCommand}" Margin="0,0,8,4" Padding="10,3"
+                                        ToolTip="Vypočuje si niekoľko úsekov z rôznych miest prvého súboru skupiny a navrhne jazyk reči (whisper.cpp, všetko len v počítači; trvá pár sekúnd na stopu)" />
+                                <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
+                                        ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
+                                <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
+                            </WrapPanel>
+                        </DockPanel>
+                        <DataGrid Grid.Row="3" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
@@ -1105,55 +1169,6 @@
                                                           ToolTip="zaškrtnuté = forced, prázdne = nie, plné pole = podľa súboru" />
                                                 <TextBlock Text="{Binding ForcedHint}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        <DockPanel Grid.Row="2" Margin="0,10,0,6">
-                            <Button DockPanel.Dock="Right" Content="Informácie" Command="{Binding ShowInfoCommand}" Padding="10,3"
-                                    ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
-                            <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </DockPanel>
-                        <DataGrid Grid.Row="3" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Single" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Súbor" Binding="{Binding FileName}" Width="*" MinWidth="110" />
-                                <DataGridTemplateColumn Header="Film / epizóda" Width="150">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel>
-                                                <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
-                                                         ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
-                                                <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                                <Button Content="Potvrdiť návrh" Command="{Binding ConfirmCommand}" Padding="8,2" Margin="0,2,0,0" FontSize="12" HorizontalAlignment="Left"
-                                                        Visibility="{Binding IsUnverified, Converter={StaticResource BoolToVisibility}}"
-                                                        ToolTip="HISTRA tento názov nepotvrdila – potvrďte ho, ak je správny (alebo napíšte správny)" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="1.5*" MinWidth="90">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                            <Setter Property="ToolTip" Value="{Binding Target}" />
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="Výsledok" Binding="{Binding Outcome}" Width="*" MinWidth="90">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="TextWrapping" Value="Wrap" />
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTemplateColumn Header="Aj tak">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding ProcessAnyway, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
-                                                      Visibility="{Binding CanProcessAnyway, Converter={StaticResource BoolToVisibility}}"
-                                                      ToolTip="Spracovať aj bez povinnej stopy šablóny" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

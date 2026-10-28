@@ -990,8 +990,9 @@ internal static class SelfTest
                 new Core.Library.Histra.HistraCatalog(new Core.Library.Histra.HistraClient(titlesHttp, "hst_selftest-0123456789", new RequestPacer(100))));
             batch.IsMovies = true;
             await batch.FindMoviesCommand.ExecuteAsync(null);
-            Check(batch.FileRows.All(f => f.HasCandidates && f.IsUnverified),
-                "batch: names unlike the found title wait, with the titles found to choose from – " + batch.RunState + " | " +
+            // the film of another year waits with the list; the one of the year HISTRA's own catalog gives for the name is suggested
+            Check(batch.FileRows[0] is { HasCandidates: true, IsUnverified: true } && batch.FileRows[1].NamingSuggestion.StartsWith("návrh: The Golden Carp (2021)", StringComparison.Ordinal),
+                "batch: a name unlike the found title waits, with the titles found to choose from – " + batch.RunState + " | " +
                 string.Join(" | ", batch.FileRows.Select(f => f.NamingSuggestion)));
             await Screenshot(window, "batch-title-candidates.png");
             var chosenFile = batch.FileRows[0];

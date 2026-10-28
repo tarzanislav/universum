@@ -239,11 +239,13 @@ public sealed class NewsTests
     public void PeriodicityIsDescribed()
     {
         var monday = new DateOnly(2026, 10, 5);
-        Assert.Equal("týždenne v pondelok", Periodicity.Describe(Enumerable.Range(0, 6).Select(i => monday.AddDays(7 * i))), "weekly");
-        Assert.Equal("denne (po–pi)", Periodicity.Describe(Enumerable.Range(0, 14).Select(monday.AddDays).Where(d => d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)), "weekdays");
-        Assert.Equal("denne", Periodicity.Describe(Enumerable.Range(0, 10).Select(monday.AddDays)), "every day");
+        Assert.Equal("raz do týždňa – pondelok", Periodicity.Describe(Enumerable.Range(0, 6).Select(i => monday.AddDays(7 * i))), "weekly");
+        Assert.Equal("2 epizódy týždenne – streda", Periodicity.Describe(Enumerable.Range(0, 4).SelectMany(i => new[] { monday.AddDays(7 * i + 2), monday.AddDays(7 * i + 2) })), "two at once weekly");
+        Assert.Equal("každý pracovný deň (po–pi)", Periodicity.Describe(Enumerable.Range(0, 14).Select(monday.AddDays).Where(d => d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)), "weekdays");
+        Assert.Equal("každý deň", Periodicity.Describe(Enumerable.Range(0, 10).Select(monday.AddDays)), "every day");
         Assert.Equal("všetky naraz", Periodicity.Describe(Enumerable.Repeat(monday, 8)), "binge release");
-        Assert.Equal("2× týždenne (po, št)", Periodicity.Describe(Enumerable.Range(0, 4).SelectMany(w => new[] { monday.AddDays(7 * w), monday.AddDays(7 * w + 3) })), "twice a week");
+        Assert.Equal("dvakrát do týždňa – pondelok, štvrtok", Periodicity.Describe(Enumerable.Range(0, 4).SelectMany(w => new[] { monday.AddDays(7 * w), monday.AddDays(7 * w + 3) })), "twice a week");
+        Assert.Equal("dvakrát do týždňa – utorok, nedeľa", Periodicity.Describe(Enumerable.Range(0, 4).SelectMany(w => new[] { monday.AddDays(7 * w + 1), monday.AddDays(7 * w + 6) })), "Sunday last");
         Assert.Equal("každé 2 týždne", Periodicity.Describe(Enumerable.Range(0, 5).Select(i => monday.AddDays(14 * i))), "every two weeks");
         Assert.Equal("", Periodicity.Describe([monday]), "one episode");
         Assert.Equal("streda", Periodicity.DayName(new DateOnly(2026, 10, 28)), "day name");
@@ -454,6 +456,92 @@ public sealed class NewsTests
     }
 
     /// <summary>Web pages and APIs with invented answers.</summary>
+    [Test]
+    public void FeedsAreRead()
+    {
+        const string rss = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE rss [<!ENTITY x SYSTEM "file:///etc/passwd">]>
+            <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+              <channel><title>Invented Film News</title>
+                <item><title>An &amp; Invented Premiere</title><link>https://films.example/a</link>
+                  <description><![CDATA[<p>The <b>first</b> sentence. The second one.</p><img src="https://img.example/a.jpg">]]></description>
+                  <pubDate>Wed, 28 Oct 2026 10:00:00 GMT</pubDate></item>
+                <item><title>With a picture</title><link>https://films.example/b</link><enclosure url="https://img.example/b.png" type="image/png" />
+                  <pubDate>Wed, 28 Oct 2026 12:30:00 +0100</pubDate></item>
+                <item><title>No link</title></item>
+                <item><title>Unsafe picture</title><link>https://films.example/c</link><media:content url="http://img.example/c.jpg" medium="image" /></item>
+              </channel>
+            </rss>
+            """;
+        var items = FeedParser.Parse(rss, "Zdroj", "en");
+        Assert.Equal(3, items.Count, "items with a link");
+        Assert.True(items[0] is { Title: "An & Invented Premiere", Summary: "The first sentence. The second one.", Image: "https://img.example/a.jpg", Language: "en" } &&
+                    items[0].Published == new DateTimeOffset(2026, 10, 28, 10, 0, 0, TimeSpan.Zero),
+            $"title, plain summary, picture from the summary, date – {items[0].Summary} | {items[0].Published}");
+        Assert.True(items[1].Image == "https://img.example/b.png" && items[1].Published == new DateTimeOffset(2026, 10, 28, 12, 30, 0, TimeSpan.FromHours(1)), "enclosure, offset");
+        Assert.True(items[2].Image is null, "only https pictures");
+
+        const string atom = """
+            <feed xmlns="http://www.w3.org/2005/Atom"><title>Vymyslené</title>
+              <entry><title type="html">Vymyslená &lt;i&gt;novinka&lt;/i&gt;</title><link rel="alternate" href="https://filmy.example/n/1"/>
+                <published>2026-10-27T08:00:00+01:00</published><summary>Krátky úvod.</summary></entry>
+            </feed>
+            """;
+        Assert.True(FeedParser.Parse(atom, "Atom", "cs") is [{ Title: "Vymyslená novinka", Link: "https://filmy.example/n/1", Summary: "Krátky úvod." }], "Atom");
+        Assert.True(FeedParser.Discover("""<html><head><link rel="alternate" type="application/rss+xml" href="/feed/"></head></html>""", new Uri("https://filmy.example/clanky/")) ==
+                    new Uri("https://filmy.example/feed/"), "the feed a page names");
+        Assert.True(FeedParser.Shorten(string.Join(" ", Enumerable.Repeat("Veta má päť slov.", 60))).Length <= FeedParser.SummaryLength, "the summary is short");
+        Assert.Throws<FormatException>(() => FeedParser.Parse("<html>nie</html><x>", "x", "en"), "not a feed");
+        Assert.True(FeedSource.Load("""{"format":"UNIVERSUM-zaujimavosti 1","sources":[{"name":"Vymyslený","url":"https://filmy.example/","language":"CS"}]}""") is [{ Language: "cs" }], "sources from a file");
+        Assert.Throws<FormatException>(() => FeedSource.Load("""{"format":"UNIVERSUM-zaujimavosti 1","sources":[{"name":"x","url":"http://filmy.example/"}]}"""), "only https");
+    }
+
+    [Test]
+    public async Task InterestsAreKeptAndTranslated()
+    {
+        var server = new Server();
+        var asked = new List<string>();
+        server.Handler = uri => uri.AbsolutePath switch
+        {
+            "/robots.txt" => null,
+            "/" => """<html><head><link rel="alternate" type="application/rss+xml" href="https://films.example/feed"></head></html>""",
+            "/feed" => """<rss><channel><item><title>Invented news</title><link>https://films.example/1</link><description>A short text.</description><pubDate>Wed, 28 Oct 2026 12:00:00 GMT</pubDate></item><item><title>Second</title><link>https://films.example/2</link><pubDate>Wed, 28 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>""",
+            _ => null,
+        };
+        var deepl = new Server();
+        deepl.Handler = uri =>
+        {
+            asked.Add(uri.AbsoluteUri);
+            return """{"translations":[{"text":"Vymyslená novinka"},{"text":"Krátky text."},{"text":"Druhá"},{"text":"."}]}""";
+        };
+        WebPageClient.PagesPerSecond = 1000;
+        var folder = Path.Combine(Path.GetTempPath(), "universum-interests-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var interests = new Interests(new WebPageClient(server.Http), new InterestStore(Path.Combine(folder, "interests.json")));
+            var translator = new DeepLClient(deepl.Http, "00000000-0000-0000-0000-000000000000:fx");
+            var (archive, problems) = await interests.RefreshAsync([new FeedSource { Name = "Vymyslený", Url = "https://films.example/" }], translator, "sk");
+            Assert.True(problems.Count == 0 && archive.Items.Count == 2, "read through the page's feed – " + string.Join(" | ", problems));
+            Assert.True(archive.Items.Single(i => i.Link == "https://films.example/1").Translations["sk"] == new FeedTranslation("Vymyslená novinka", "Krátky text.") &&
+                        archive.Items.Single(i => i.Link == "https://films.example/2").Translations["sk"].Summary == "",
+                "titles and summaries translated");
+            Assert.True(asked.Count == 1 && asked[0] == "https://api-free.deepl.com/v2/translate" && archive.Translated.Values.Single() > 0, "one batch to DeepL Free, counted");
+
+            var (again, _) = await interests.RefreshAsync([new FeedSource { Name = "Vymyslený", Url = "https://films.example/" }], translator, "sk");
+            Assert.True(again.Items.Count == 2 && asked.Count == 1 && again.Items.All(i => i.Translations.ContainsKey("sk")), "kept; nothing translated twice");
+            Assert.True(new InterestStore(Path.Combine(folder, "interests.json")).Load().Items.Count == 2, "kept for the next start");
+            Assert.True(WebImageCache.IsPicture([0xFF, 0xD8, 0xFF, 0xE0]) && !WebImageCache.IsPicture("<svg"u8), "only pictures");
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
     private sealed class Server : HttpMessageHandler
     {
         private HttpClient? _http;

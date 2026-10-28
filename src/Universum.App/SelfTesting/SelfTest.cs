@@ -142,8 +142,8 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGAspracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
             "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
@@ -157,6 +157,7 @@ internal static class SelfTest
         await TestDashboardAsync(model, window, services);
         await TestHistraListsAsync(model, window, services);
         await TestPremieresAsync(model, window, services);
+        await TestInterestsAsync(model, window, services);
 
         model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
         await Screenshot(window, "settings.png");
@@ -857,11 +858,11 @@ internal static class SelfTest
         Check(world.Count == 1 && world[0].Caption.StartsWith("Later Invented Film", StringComparison.Ordinal),
             "premieres: only coming films of the world, the past one is in the history – " + string.Join(" | ", world.Select(f => $"{f.Caption} {f.Date}")));
         Check(domesticSeries.Count == 1 && domesticSeries[0].Caption == "Invented Show (2026)" && domesticSeries[0].LocalTitle == "Vymyslený seriál" &&
-              domesticSeries[0].Production == "ČT1" && domesticSeries[0].Periodicity == "denne (po–pi)" && domesticSeries[0].Episodes == "10 epizód",
+              domesticSeries[0].Production == "ČT1" && domesticSeries[0].Periodicity == "každý pracovný deň (po–pi)" && domesticSeries[0].Episodes == "10 epizód",
             "premieres: a new series on a Czech channel, its rhythm from TVmaze – " +
             string.Join(" | ", domesticSeries.Select(r => $"{r.Caption} {r.Production} {r.What} {r.Periodicity} {r.Episodes}")));
         Check(worldSeries.Count == 3 && worldSeries.Any(r => r.Caption == "Invented Stream (2024)" && r.What.StartsWith("3. séria", StringComparison.Ordinal) &&
-                                                            r.Periodicity.StartsWith("týždenne", StringComparison.Ordinal) && r.Episodes == "8 epizód"),
+                                                            r.Periodicity.StartsWith("raz do týždňa – ", StringComparison.Ordinal) && r.Episodes == "8 epizód"),
             "premieres: new series and seasons of the world – " + string.Join(" | ", worldSeries.Select(r => $"{r.Caption} {r.Production} {r.What} {r.Periodicity} {r.Episodes}")));
         var pages = news.Requests.Where(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal)).ToList();
         Check(pages.Count == 1 + Core.News.SeriesNews.PageDaysAhead + 1 && pages.Distinct().Count() == pages.Count &&
@@ -896,12 +897,16 @@ internal static class SelfTest
         await Screenshot(window, "premieres-series-noposters.png");
         page.ShowPosters = true;
 
-        page.ShowHistory = true;
+        page.ShowRecent = true;
         page.SelectedTab = page.Tab(PremiereTab.FilmWorld);
+        Check(page.SelectedTab.Rows.Count == 1 && page.SelectedTab.Rows[0].Caption.StartsWith("World Invented Film", StringComparison.Ordinal) &&
+              page.SelectedTab.Rows[0].When == "pred 2 dňami",
+            "premieres: Posledný týždeň shows the premieres of the last days – " + string.Join(", ", page.SelectedTab.Rows.Select(r => $"{r.Caption} {r.When}")));
+        page.ShowHistory = true;
         Check(page.SelectedTab.Rows.Count == 1 && page.SelectedTab.Rows[0] is PremiereFilmRow { Caption: var past } && past.StartsWith("World Invented Film", StringComparison.Ordinal),
             "premieres: the film that is over is in the history");
         await Screenshot(window, "premieres-history.png");
-        page.ShowHistory = false;
+        page.ShowUpcoming = true;
 
         int Days() => news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal) || r.Contains("/schedule", StringComparison.Ordinal));
         var asked = Days();
@@ -920,6 +925,68 @@ internal static class SelfTest
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
+    }
+
+    /// <summary>
+    /// Zaujímavosti with invented sources (a page naming its RSS feed, a Czech Atom feed, pictures) and an invented DeepL:
+    /// sources added in the settings, articles read, translated once, kept for the next start, filtered and starred.
+    /// </summary>
+    private static async Task TestInterestsAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var feeds = new FakeFeeds();
+        var http = new System.Net.Http.HttpClient(feeds);
+        Core.News.WebPageClient.PagesPerSecond = 1000;
+        services.InterestsForSelfTest = new Core.News.Interests(new Core.News.WebPageClient(http), new Core.News.InterestStore(AppSettings.InterestsFile));
+        services.TranslatorForSelfTest = new Core.News.DeepLClient(http, "selftest-0000-0000-0000-000000000000:fx");
+        services.ImagesForSelfTest = new Core.News.WebImageCache(http, Path.Combine(_outputDirectory, "images"));
+
+        var settings = model.Settings.InterestSources;
+        Check(settings.AddSource("Vymyslené filmy", "https://filmy.example/", "en") && !settings.AddSource("Zlý", "http://filmy.example/", "en"),
+            "interests: a source added in the settings (https only) – " + settings.Status);
+        var file = Path.Combine(_outputDirectory, "vymyslene-zdroje.json");
+        File.WriteAllText(file, """{"format":"UNIVERSUM-zaujimavosti 1","sources":[{"name":"Vymyslené kino","url":"https://kino.example/atom","language":"cs"}]}""");
+        Check(settings.ImportFile(file) && services.FeedSources.Count == 2 && settings.Rows.Count == 2, "interests: sources imported from a file – " + settings.Status);
+
+        var page = model.Interests;
+        model.Open(page);
+        Check(page.IsEmpty, "interests: nothing kept yet");
+        await page.RefreshAsync();
+        Check(!page.HasProblems && page.Featured is { } featured && featured.Title == "SK: Invented festival opens" && page.Cards.Count == 2,
+            $"interests: this week's articles, translated – {page.Featured?.Title} + {page.Cards.Count} | {page.Problems}");
+        var translated = feeds.DeepL;
+        Check(translated == 1 && page.Cards.All(c => c.Title.StartsWith("SK: ", StringComparison.Ordinal)), "interests: one batch to DeepL, Czech too");
+        page.ShowAll = true;
+        Check(page.Cards.Count == 3, "interests: Všetko shows the history");
+        page.Source = "Vymyslené kino";
+        Check(page.Featured?.Source == "Vymyslené kino" && page.Cards.Count == 0, "interests: only one source");
+        page.Source = null;
+        page.ShowOriginal = true;
+        Check(page.Featured?.Title == "Invented festival opens", "interests: the original text");
+        page.ShowOriginal = false;
+        page.Featured!.FavoriteCommand.Execute(null);
+        page.OnlyFavorites = true;
+        Check(page.Featured?.IsFavorite == true && page.Cards.Count == 0, "interests: the starred article");
+        page.OnlyFavorites = false;
+        page.ShowWeek = true;
+        await WaitFor(() => page.Featured?.Image is not null && page.Cards.All(c => !c.HasImage || c.Image is not null));
+        Check(page.Featured?.Image is not null, "interests: pictures of the articles");
+        await Screenshot(window, "zaujimavosti.png");
+
+        await page.RefreshAsync();
+        Check(feeds.DeepL == translated, "interests: nothing translated twice");
+        var again = new InterestsPageViewModel(services);
+        again.ShowAll = true;
+        again.Shown();
+        Check(again.Cards.Count + (again.Featured is null ? 0 : 1) == 4 && again.Status.StartsWith("Uložené zaujímavosti", StringComparison.Ordinal),
+            "interests: kept for the next start");
+        Check(feeds.Requests.All(r => new Uri(r).Host is "filmy.example" or "kino.example" or "api-free.deepl.com"), "interests: only the sources and DeepL were asked");
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Settings);
+        await Screenshot(window, "settings-interests.png");
+
+        services.SetFeedSources([]);
+        services.InterestsForSelfTest = null;
+        services.TranslatorForSelfTest = null;
+        services.ImagesForSelfTest = null;
     }
 
     /// <summary>
@@ -965,9 +1032,16 @@ internal static class SelfTest
             "novinky: only the series, alphabetically – " + string.Join(", ", domestic.Rows.Select(r => r.Caption)) + " " + page.Problems);
         var home = domestic.Rows[0];
         var show = domestic.Rows[1];
-        Check(home.NearestCode == $"S05E{Number(0):00}" && home.When == "DNES" && home.Episodes.Count(e => e.CanCheck) == 2 &&
-              home.Episodes.Count == 2 + Core.News.SeriesNews.PageDaysAhead && home.Episodes[0].State == "odvysielaná" && home.Episodes[^1].State == "nadchádzajúca",
-            $"novinky: the nearest episode, and the tree of the aired and coming ones – {home.NearestCode} {home.When} {home.Episodes.Count}");
+        Check(home.NearestCode == $"S05E{Number(0):00}" && home.When == "DNES" && home.Episodes.Count == 2 && home.Episodes.All(e => e.CanCheck && e.State == "odvysielaná") &&
+              home.Rhythm == "každý deň",
+            $"novinky: the last week – the nearest episode, the tree of the aired ones, the rhythm – {home.NearestCode} {home.When} {home.Episodes.Count} {home.Rhythm}");
+        page.ShowUpcoming = true;
+        var coming = domestic.Rows.First(r => r.Caption == "Domáci seriál (2020)");
+        Check(coming.Episodes.Count == 1 + Core.News.SeriesNews.PageDaysAhead && coming.Episodes[^1].State == "nadchádzajúca" && !coming.Episodes[^1].CanCheck,
+            $"novinky: Nadchádzajúce – the episodes to come, {Core.News.SeriesNews.PageDaysAhead} days ahead ({coming.Episodes.Count})");
+        page.ShowRecent = true;
+        home = domestic.Rows[0];
+        show = domestic.Rows[1];
         Check(show.NearestCode == "S01E01" && show.NearestNote.StartsWith("nový seriál", StringComparison.Ordinal), "novinky: a new series – " + show.NearestNote);
 
         services.InputFolder.Set(null);
@@ -1029,7 +1103,16 @@ internal static class SelfTest
         Check(domestic.Rows.Count == 1 && domestic.Rows[0].Caption == "Starý seriál (2019)" && domestic.Rows[0].NearestCode == "S02E05",
             "novinky: older episodes are in the history – " + string.Join(", ", domestic.Rows.Select(r => r.Caption)));
         await Screenshot(window, "novinky-history.png");
-        page.ShowHistory = false;
+        page.ShowRecent = true;
+
+        // the Dashboard's week: the chosen series' episodes and the premieres, the films of the week
+        model.Open(model.Dashboard);
+        await model.Dashboard.Week.RefreshAsync();
+        Check(model.Dashboard.Week.Episodes.Any(e => e.Title == "Invented Show (2026)" && e.Chosen && e.IsToday) && model.Dashboard.Week.Films.Count >= 2 &&
+              model.Dashboard.Week.Films.Any(f => f.Chosen),
+            "dashboard: this week's episodes and films – " + string.Join(" | ", model.Dashboard.Week.Episodes.Select(e => $"{e.Day} {e.Title} {e.Detail}")));
+        await Screenshot(window, "dashboard-week.png");
+        model.Open(page);
 
         var asked = news.Requests.Count;
         var again = new SeriesNewsPageViewModel(services);
@@ -1214,6 +1297,71 @@ internal static class SelfTest
                    {"iso_3166_1":"US","release_dates":[{"type":6,"release_date":"{{{Iso(release + 200)}}}T00:00:00.000Z"}]},
                    {"iso_3166_1":"DE","release_dates":[{"type":3,"release_date":"{{{Iso(release)}}}T00:00:00.000Z"}]}]}}
                 """;
+        }
+    }
+
+    /// <summary>
+    /// Invented sources of Zaujímavosti: a page that names its RSS feed (three English articles of the last days and one
+    /// older, pictures drawn), a Czech Atom feed, and DeepL answering "SK: " + the text.
+    /// </summary>
+    private sealed class FakeFeeds : System.Net.Http.HttpMessageHandler
+    {
+        private readonly byte[] _picture = FakeHistra.DrawPoster(2);
+
+        public List<string> Requests { get; } = [];
+
+        public int DeepL { get; private set; }
+
+        protected override async Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var uri = request.RequestUri!;
+            lock (Requests)
+            {
+                Requests.Add(uri.AbsoluteUri);
+            }
+
+            static string Rfc(int hours) => DateTimeOffset.UtcNow.AddHours(-hours).ToString("ddd, dd MMM yyyy HH:mm:ss 'GMT'", CultureInfo.InvariantCulture);
+            string? body = (uri.Host, uri.AbsolutePath) switch
+            {
+                ("api-free.deepl.com", _) => await TranslateAsync(request),
+                (_, "/robots.txt") => null,
+                ("filmy.example", "/") => """<html><head><link rel="alternate" type="application/rss+xml" href="https://filmy.example/rss"></head><body>Vymyslené</body></html>""",
+                ("filmy.example", "/rss") => $$$"""
+                    <rss version="2.0"><channel><title>Invented films</title>
+                      <item><title>Invented festival opens</title><link>https://filmy.example/a/1</link><description>&lt;p&gt;An invented festival opened today. Stars came.&lt;/p&gt;</description>
+                        <enclosure url="https://filmy.example/img/1.png" type="image/png" /><pubDate>{{{Rfc(1)}}}</pubDate></item>
+                      <item><title>A review of an invented film</title><link>https://filmy.example/a/2</link><description>Good, not great.</description>
+                        <enclosure url="https://filmy.example/img/2.png" type="image/png" /><pubDate>{{{Rfc(50)}}}</pubDate></item>
+                      <item><title>An old invented story</title><link>https://filmy.example/a/3</link><description>From the archive.</description><pubDate>{{{Rfc(240)}}}</pubDate></item>
+                    </channel></rss>
+                    """,
+                ("kino.example", "/atom") => $$$"""
+                    <feed xmlns="http://www.w3.org/2005/Atom"><title>Vymyšlené kino</title>
+                      <entry><title>Vymyšlená novinka z kina</title><link href="https://kino.example/n/1"/><published>{{{DateTimeOffset.UtcNow.AddHours(-20):yyyy-MM-ddTHH:mm:ssZ}}}</published><summary>Krátky úvod.</summary></entry>
+                    </feed>
+                    """,
+                _ => null,
+            };
+            if (uri.AbsolutePath.StartsWith("/img/", StringComparison.Ordinal))
+            {
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { RequestMessage = request, Content = new System.Net.Http.ByteArrayContent(_picture) };
+            }
+
+            return body is null
+                ? new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound) { RequestMessage = request }
+                : new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    RequestMessage = request,
+                    Content = new System.Net.Http.StringContent(body, Encoding.UTF8, uri.Host == "api-free.deepl.com" ? "application/json" : "text/xml"),
+                };
+        }
+
+        private async Task<string> TranslateAsync(System.Net.Http.HttpRequestMessage request)
+        {
+            DeepL++;
+            using var document = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            var texts = document.RootElement.GetProperty("text").EnumerateArray().Select(t => "SK: " + t.GetString());
+            return System.Text.Json.JsonSerializer.Serialize(new { translations = texts.Select(t => new { text = t }) });
         }
     }
 

@@ -100,6 +100,9 @@ public sealed partial class WebPageClient(HttpClient http)
         using var request = new HttpRequestMessage(HttpMethod.Get, address);
         request.Headers.UserAgent.ParseAdd(UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/rss+xml", 0.9));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/atom+xml", 0.9));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml", 0.8));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/plain", 0.8));
         request.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue("cs"));
         HttpResponseMessage response;

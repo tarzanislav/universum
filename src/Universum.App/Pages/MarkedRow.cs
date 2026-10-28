@@ -31,3 +31,31 @@ public abstract class MarkedRow(MarkStore marks, string markKey) : ObservableObj
         OnPropertyChanged(nameof(Note));
     }
 }
+
+/// <summary>What the tables of Premiéry and Novinky show: the last week, what is to come, or the history.</summary>
+public enum NewsView
+{
+    Recent,
+    Upcoming,
+    History,
+}
+
+/// <summary>Texts shared by the tables of Premiéry, Novinky and the Dashboard.</summary>
+public static class NewsTexts
+{
+    /// <summary>"DNES", "zajtra", "o 3 dni", "o týždeň", "o 12 dní", "včera", "pred týždňom", "pred 3 dňami".</summary>
+    public static string When(DateOnly day)
+    {
+        var days = day.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
+        return days switch
+        {
+            0 => "DNES",
+            1 => "zajtra",
+            -1 => "včera",
+            7 => "o týždeň",
+            -7 => "pred týždňom",
+            > 1 => $"o {Texts.Count(days, "deň", "dni", "dní")}",
+            _ => $"pred {-days} dňami",
+        };
+    }
+}

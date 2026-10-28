@@ -73,6 +73,7 @@ public sealed class DashboardPageViewModel : ObservableObject
         Titles = new("", "Názvy titulov", () => _main.Open(_main.Settings));
         Tools = new("", "MKVToolNix a aktualizácie", () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
         Status = [Queue, Mux, Batch, Library, Titles, Tools];
+        Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres));
 
         services.WeatherChanged += () =>
         {
@@ -207,9 +208,13 @@ public sealed class DashboardPageViewModel : ObservableObject
 
     public AsyncRelayCommand InfoFileCommand { get; }
 
+    /// <summary>The episodes and films of this week.</summary>
+    public WeekOverview Week { get; }
+
     /// <summary>The page is shown: the overview now, the weather when it is old, the library counted again.</summary>
     public void Shown()
     {
+        _ = Week.RefreshAsync();
         RefreshStatus();
         _ = CountLibraryAsync();
         _ = RefreshWeatherAsync(force: false);
@@ -414,4 +419,63 @@ public sealed class DashboardPageViewModel : ObservableObject
             Process.Start(new ProcessStartInfo(address.AbsoluteUri) { UseShellExecute = true })?.Dispose();
         }
     }
+}
+
+/// <summary>A line of the week's overview: the day, the title and what comes.</summary>
+public sealed record WeekRow(string Day, string Title, string Detail, bool Chosen, bool IsToday);
+
+/// <summary>
+/// The Dashboard's week (owner, 29. 10. 2026): which episodes of which series come this week and on which day – of the
+/// chosen series (Vybrané) and the premieres of new series and seasons – and the films premiering this week; from what
+/// Premiéry and Novinky have kept, nothing is asked here.
+/// </summary>
+public sealed class WeekOverview(AppServices services, Action openNews, Action openPremieres) : ObservableObject
+{
+    private IReadOnlyList<WeekRow> _episodes = [];
+    private IReadOnlyList<WeekRow> _films = [];
+
+    public IReadOnlyList<WeekRow> Episodes { get => _episodes; private set => SetProperty(ref _episodes, value); }
+
+    public IReadOnlyList<WeekRow> Films { get => _films; private set => SetProperty(ref _films, value); }
+
+    public bool NoEpisodes => Episodes.Count == 0;
+
+    public bool NoFilms => Films.Count == 0;
+
+    public RelayCommand OpenNewsCommand { get; } = new(openNews);
+
+    public RelayCommand OpenPremieresCommand { get; } = new(openPremieres);
+
+    public async Task RefreshAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var last = today.AddDays(6);
+        var marks = services.Marks;
+        var archive = await Task.Run(services.PremiereStore.Load);
+        Films = archive.Films.Where(f => f.Premiere >= today && f.Premiere <= last)
+            .GroupBy(f => f.TmdbId).Select(g => g.OrderBy(f => f.Region).First())
+            .Select(f => (Film: f, Chosen: marks.Get(Universum.Core.News.MarkStore.Film(f.TmdbId)).Chosen))
+            .OrderBy(f => f.Film.Premiere).ThenByDescending(f => f.Chosen).ThenByDescending(f => f.Film.Popularity).Take(14)
+            .Select(f => new WeekRow(Day(f.Film.Premiere), f.Film.Caption,
+                f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? "kino " + f.Film.PremiereNote : "svetová premiéra", f.Chosen, f.Film.Premiere == today))
+            .ToList();
+
+        var schedule = await services.SeriesNews.ReadAsync(services.NewsSources, today, offline: true);
+        Episodes = schedule.Episodes.Where(e => e.AirDate >= today && e.AirDate <= last)
+            .Select(e => (Episode: e, Chosen: marks.Get(Universum.Core.News.MarkStore.Series(e)).Chosen))
+            .Where(e => e.Chosen || e.Episode.IsPremiere)
+            .OrderBy(e => e.Episode.AirDate).ThenByDescending(e => e.Chosen).ThenBy(e => e.Episode.Caption, StringComparer.CurrentCulture).Take(30)
+            .Select(e => new WeekRow(Day(e.Episode.AirDate), e.Episode.Caption,
+                string.Join(" · ", new[] { e.Episode.Code, e.Episode.Kind switch
+                {
+                    Universum.Core.News.EpisodeKind.SeriesPremiere => "nový seriál",
+                    Universum.Core.News.EpisodeKind.SeasonPremiere => "nová séria",
+                    _ => "",
+                }, e.Episode.Channel }.Where(t => t.Length > 0)), e.Chosen, e.Episode.AirDate == today))
+            .ToList();
+        OnPropertyChanged(nameof(NoEpisodes));
+        OnPropertyChanged(nameof(NoFilms));
+    }
+
+    private static string Day(DateOnly day) => $"{Universum.Core.News.Periodicity.DayName(day)} {day.Day}. {day.Month}.";
 }

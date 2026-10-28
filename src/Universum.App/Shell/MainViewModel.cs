@@ -41,8 +41,9 @@ public sealed class MainViewModel : ObservableObject
             SendToSingle = SendEpisodeToSingleAsync,
             SendToBatch = SendEpisodesToBatchAsync,
         };
+        Interests = new InterestsPageViewModel(services);
         Mega = new PlaceholderPageViewModel(
-            "MEGAspracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
+            "MEGA spracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
 
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
@@ -55,13 +56,14 @@ public sealed class MainViewModel : ObservableObject
             new("Premiéry", "\uE8B2", Premieres, news),
             new("Novinky – Seriály", "\uE7F4", SeriesNews, news),
             new("Listy z HISTRA", "\uE8F1", HistraLists, news),
+            new("Zaujímavosti", "\uE734", Interests, news),
             new("Zlučovanie", "\uE71D", Mux, multiplexing),
             new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
             new("Kapitoly", "\uE8FD", Chapters, multiplexing),
             new("Informácie", "\uE946", Info, multiplexing),
             new("Single spracovanie", "\uE90F", Rules, templates),
             new("Hromadné spracovanie", "\uE8B7", Batch, templates),
-            new("MEGAspracovanie", "\uE945", Mega, templates),
+            new("MEGA spracovanie", "\uE945", Mega, templates),
             new("Fronta úloh", "\uE823", Queue, statistics),
             new("Výstup úloh", "\uE7C3", Output, statistics),
             new("Nastavenia", "\uE713", Settings, statistics),
@@ -157,6 +159,7 @@ public sealed class MainViewModel : ObservableObject
         await RefreshStatusAsync();
         Dashboard.Shown();
         await handling;
+        _ = DailyUpdateAsync();
 
         try
         {
@@ -185,7 +188,10 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Novinky – Seriály – new episodes of running series, sent to processing from here.</summary>
     public SeriesNewsPageViewModel SeriesNews { get; }
 
-    /// <summary>MEGAspracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
+    /// <summary>Zaujímavosti – news and curiosities of the film world.</summary>
+    public InterestsPageViewModel Interests { get; }
+
+    /// <summary>MEGA spracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
     public PlaceholderPageViewModel Mega { get; }
 
     public DashboardPageViewModel Dashboard { get; }
@@ -233,7 +239,37 @@ public sealed class MainViewModel : ObservableObject
             {
                 SeriesNews.Shown();
             }
+
+            if (value?.Page == Interests)
+            {
+                Interests.Shown();
+            }
         }
+    }
+
+    /// <summary>
+    /// The first start of a day brings Premiéry, Novinky and Zaujímavosti up to date in the background (owner, 29. 10.
+    /// 2026: only once a day, else by Obnoviť); the self-test switches it off.
+    /// </summary>
+    public async Task DailyUpdateAsync()
+    {
+        var today = DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (!PremieresPageViewModel.AutoLoad || _services.Settings.LastDailyUpdate == today)
+        {
+            return;
+        }
+
+        _services.Settings.LastDailyUpdate = today;
+        _services.Settings.Save();
+        await Premieres.LoadAsync(refresh: false);
+        await SeriesNews.LoadAsync(refresh: false);
+        if (_services.FeedSources.Count > 0)
+        {
+            Interests.Shown();
+            await Interests.RefreshAsync();
+        }
+
+        await Dashboard.Week.RefreshAsync();
     }
 
     public string MkvToolNixStatus { get => _mkvToolNixStatus; private set => SetProperty(ref _mkvToolNixStatus, value); }

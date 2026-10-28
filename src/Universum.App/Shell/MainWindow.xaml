@@ -45,7 +45,23 @@
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="Language" Value="sk-SK" />
             <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
+            <Setter Property="CellStyle">
+                <Setter.Value>
+                    <!-- a chosen row stays readable: the tab's pastel colour, never the dark selection of the theme -->
+                    <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style x:Key="NewsHeader" TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
@@ -65,6 +81,10 @@
                 <DataTrigger Binding="{Binding IsChosen}" Value="True">
                     <Setter Property="BorderBrush" Value="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                 </DataTrigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                </Trigger>
             </Style.Triggers>
         </Style>
         <DataTemplate x:Key="NewsTitleCell">
@@ -88,6 +108,8 @@
                                 Visibility="{Binding HasSource, Converter={StaticResource BoolToVisibility}}" />
                     </WrapPanel>
                     <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource NewsSubtitle}" />
+                    <TextBlock Text="{Binding Rhythm, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold"
+                               Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                 </StackPanel>
             </DockPanel>
         </DataTemplate>
@@ -1494,6 +1516,7 @@
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <WrapPanel VerticalAlignment="Center">
                             <RadioButton Content="Posledný týždeň" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
                             <CheckBox Content="Zobraziť vybrané" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,0,16,0" ToolTip="Len seriály zaškrtnuté v stĺpci Vybrané" />
@@ -1579,23 +1602,22 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Dátum" Binding="{Binding Date}" Width="96" MinWidth="96" SortMemberPath="SortDate" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Kedy" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NewsCell}">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Najbližšia" Width="104" MinWidth="104" SortMemberPath="NearestCode">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
                                             <TextBlock Text="{Binding NearestCode}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding NearestNote}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Dátum" Width="96" MinWidth="96" SortMemberPath="SortDate">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel VerticalAlignment="Center" Margin="6,0">
-                                            <TextBlock Text="{Binding Date}" />
-                                            <TextBlock Text="{Binding When}" FontWeight="Bold" FontSize="11.5" Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1710,6 +1732,7 @@
                                  ToolTip="Hľadať názov, produkciu alebo poznámku (bez diakritiky)" />
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <WrapPanel VerticalAlignment="Center">
+                            <RadioButton Content="Posledný týždeň" IsChecked="{Binding ShowRecent}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
@@ -1734,12 +1757,19 @@
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
                                             <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding When}" FontWeight="Bold" FontSize="11.5" Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" Style="{StaticResource NewsSubtitle}" />
                                             <TextBlock Text="{Binding Where}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Kedy" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NewsCell}">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="1.4*" MinWidth="100" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Vybrané" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
@@ -1753,17 +1783,16 @@
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTemplateColumn Header="Premiéra" Width="112" MinWidth="112" SortMemberPath="SortDate">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel VerticalAlignment="Center" Margin="6,0">
-                                            <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding When}" FontWeight="Bold" FontSize="11.5" Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" Style="{StaticResource NewsSubtitle}" />
-                                            <TextBlock Text="{Binding What}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Premiéra" Binding="{Binding Date}" Width="100" MinWidth="100" SortMemberPath="SortDate" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Kedy" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource NewsCell}">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Séria · epizóda" Binding="{Binding What}" Width="120" MinWidth="120" SortMemberPath="What" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Periodicita" Binding="{Binding Periodicity}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Epizódy" Binding="{Binding Episodes}" Width="76" MinWidth="76" ElementStyle="{StaticResource NewsCell}" />
@@ -1987,6 +2016,191 @@
                 </Grid>
             </DockPanel>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:InterestsPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <!-- a pastel banner, the controls, the chips of the sources -->
+                <StackPanel DockPanel.Dock="Top">
+                    <Border CornerRadius="14" Padding="22,14" Margin="0,0,0,10">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#55F28C7C" Offset="0" />
+                                <GradientStop Color="#55F2B34E" Offset="0.3" />
+                                <GradientStop Color="#5563C48F" Offset="0.55" />
+                                <GradientStop Color="#556FA8E8" Offset="0.8" />
+                                <GradientStop Color="#55A78BE6" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" ToolTip="Načíta zdroje hneď (inak pri prvom spustení dňa)">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0" />
+                                        <TextBlock Text="Obnoviť" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Content="Zastaviť" Command="{Binding StopCommand}" Padding="12,5" Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Zaujímavosti" FontSize="28" FontWeight="SemiBold" />
+                                <TextBlock Text="Novinky, recenzie a zaujímavosti zo sveta filmu – preložené do vášho jazyka, celé články u ich autorov." TextWrapping="Wrap" Opacity="0.85" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="Hľadať v nadpisoch a úvodoch (bez diakritiky)" />
+                        <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
+                        <WrapPanel VerticalAlignment="Center">
+                            <RadioButton Content="Dnes" IsChecked="{Binding ShowToday}" GroupName="InterestPeriod" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Tento týždeň" IsChecked="{Binding ShowWeek}" GroupName="InterestPeriod" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Všetko (História)" IsChecked="{Binding ShowAll}" GroupName="InterestPeriod" MinWidth="0" Margin="0,0,24,0" />
+                            <CheckBox Content="Len obľúbené ★" IsChecked="{Binding OnlyFavorites}" MinWidth="0" Margin="0,0,16,0" />
+                            <CheckBox Content="Zobraziť originál" IsChecked="{Binding ShowOriginal}" MinWidth="0" />
+                        </WrapPanel>
+                    </DockPanel>
+                    <ItemsControl ItemsSource="{Binding Sources}" Margin="0,0,0,6">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding ChooseCommand}" Margin="0,0,6,6" Cursor="Hand" ToolTip="Len články tohto zdroja (znova kliknúť = všetky)">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Chip" CornerRadius="12" Padding="12,3" BorderThickness="1.5" BorderBrush="{Binding Accent}" Background="{Binding Tint}">
+                                                <TextBlock x:Name="Label" Text="{Binding Text}" FontWeight="SemiBold" FontSize="12" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter TargetName="Chip" Property="Background" Value="{Binding Accent}" />
+                                                    <Setter TargetName="Label" Property="Foreground" Value="White" />
+                                                </DataTrigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="2,0,0,4" />
+                    <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="2,0,0,6"
+                               Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Attribution}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" Margin="2,8,0,0" />
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- the newest article big -->
+                            <Border DataContext="{Binding Featured}" CornerRadius="14" BorderThickness="2" BorderBrush="{Binding Accent}" Background="{Binding Tint}"
+                                    Padding="14" Margin="0,0,10,14" Visibility="{Binding DataContext.IsEmpty, RelativeSource={RelativeSource AncestorType=ScrollViewer}, Converter={StaticResource InverseBoolToVisibility}}">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Width="360" Height="200" CornerRadius="10" Margin="0,0,18,0" Background="{Binding Accent}"
+                                            Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                                        <Border CornerRadius="10">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding Image}" Stretch="UniformToFill" />
+                                            </Border.Background>
+                                        </Border>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <Border CornerRadius="10" Background="{Binding Accent}" Padding="10,2" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding Source}" Foreground="White" FontWeight="SemiBold" FontSize="12" />
+                                            </Border>
+                                            <TextBlock Text="{Binding When}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                            <TextBlock Text="{Binding LanguageText}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Summary}" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,10" MaxHeight="110" TextTrimming="WordEllipsis" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Content="Čítať celý článok" Command="{Binding OpenCommand}" Padding="14,5" Margin="0,0,8,0" />
+                                            <Button Command="{Binding FavoriteCommand}" Padding="10,5" Margin="0,0,8,0" ToolTip="Obľúbené">
+                                                <TextBlock>
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="☆" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                                    <Setter Property="Text" Value="★" />
+                                                                    <Setter Property="Foreground" Value="#E8A33A" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button>
+                                            <Button Content="Originál / preklad" Command="{Binding ToggleOriginalCommand}" Padding="10,5" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                            <!-- the other articles as colourful cards -->
+                            <ItemsControl ItemsSource="{Binding Cards}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="300" Margin="0,0,12,12" CornerRadius="12" BorderThickness="1.5" BorderBrush="{Binding Accent}" Background="{Binding Tint}">
+                                            <StackPanel>
+                                                <Border Height="150" CornerRadius="11,11,0,0" Background="{Binding Accent}" Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                                                    <Border CornerRadius="11,11,0,0">
+                                                        <Border.Background>
+                                                            <ImageBrush ImageSource="{Binding Image}" Stretch="UniformToFill" />
+                                                        </Border.Background>
+                                                    </Border>
+                                                </Border>
+                                                <StackPanel Margin="12,10,12,12">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                        <Border CornerRadius="9" Background="{Binding Accent}" Padding="8,1" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding Source}" Foreground="White" FontWeight="SemiBold" FontSize="11" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding When}" Style="{StaticResource Hint}" FontSize="11.5" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="64" TextTrimming="WordEllipsis" />
+                                                    <TextBlock Text="{Binding Summary}" FontSize="12.5" TextWrapping="Wrap" MaxHeight="88" TextTrimming="WordEllipsis" Margin="0,6,0,8"
+                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding LanguageText}" Style="{StaticResource Hint}" FontSize="11" VerticalAlignment="Center" />
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button Content="Čítať" Command="{Binding OpenCommand}" Padding="10,2" Margin="0,0,6,0" />
+                                                            <Button Command="{Binding FavoriteCommand}" Padding="8,2" Margin="0,0,6,0" ToolTip="Obľúbené">
+                                                                <TextBlock>
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Text" Value="☆" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                                                    <Setter Property="Text" Value="★" />
+                                                                                    <Setter Property="Foreground" Value="#E8A33A" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </Button>
+                                                            <Button Content="Originál" Command="{Binding ToggleOriginalCommand}" Padding="8,2" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Content="Zobraziť ďalšie" Command="{Binding MoreCommand}" HorizontalAlignment="Center" Padding="16,6" Margin="0,4,0,12"
+                                    Visibility="{Binding HasMore, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </ScrollViewer>
+                    <TextBlock Text="{Binding EmptyText}" Style="{StaticResource Hint}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" IsHitTestVisible="False"
+                               Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:DashboardPageViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="32,24" MaxWidth="1100" HorizontalAlignment="Left">
@@ -2001,9 +2215,15 @@
                             <ColumnDefinition Width="1.3*" MinWidth="380" />
                         </Grid.ColumnDefinitions>
                         <!-- today: time, date, name day -->
-                        <Border Style="{StaticResource Card}" Padding="20,16">
+                        <Border Style="{StaticResource Card}" Padding="20,16" BorderBrush="#66F2A07C">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#40FFB38A" Offset="0" />
+                                    <GradientStop Color="#26F28CB0" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
                             <StackPanel>
-                                <TextBlock Text="Dnes" FontWeight="SemiBold" />
+                                <TextBlock Text="Dnes" FontWeight="SemiBold" Foreground="#D9673A" />
                                 <TextBlock Text="{Binding TimeText}" FontSize="46" FontWeight="Light" Margin="0,2,0,0" />
                                 <TextBlock Text="{Binding DateText}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding NameDayText}" FontSize="16" Margin="0,10,0,0" TextWrapping="Wrap"
@@ -2013,7 +2233,13 @@
                             </StackPanel>
                         </Border>
                         <!-- weather of the town in the settings (Open-Meteo, named below) -->
-                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,16">
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,16" BorderBrush="#665BA8E0">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#4D7CC4F5" Offset="0" />
+                                    <GradientStop Color="#26A78BE6" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
                             <DockPanel>
                                 <DockPanel DockPanel.Dock="Top">
                                     <Button DockPanel.Dock="Right" Content="Obnoviť" Command="{Binding RefreshWeatherCommand}" Padding="10,3"
@@ -2036,7 +2262,7 @@
                                     <StackPanel Visibility="{Binding HasWeather, Converter={StaticResource BoolToVisibility}}">
                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                                             <TextBlock Text="{Binding WeatherSymbol}" FontFamily="Segoe UI Symbol" FontSize="44" VerticalAlignment="Center" Margin="0,0,14,0"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                       Foreground="#F2A33A" />
                                             <TextBlock Text="{Binding TemperatureText}" FontSize="44" FontWeight="Light" VerticalAlignment="Center" Margin="0,0,16,0" />
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding WeatherDescription}" FontSize="16" FontWeight="SemiBold" />
@@ -2051,7 +2277,7 @@
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="10,2" ToolTip="{Binding Description}">
+                                                    <Border CornerRadius="8" Background="#337CC4F5" Margin="0,0,6,0" Padding="10,4" ToolTip="{Binding Description}">
                                                         <StackPanel>
                                                             <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
                                                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -2069,8 +2295,103 @@
                             </DockPanel>
                         </Border>
                     </Grid>
+                    <!-- this week: episodes of the chosen series and premieres, films premiering -->
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Card}" Padding="20,14" BorderBrush="#6663C48F">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#3363C48F" Offset="0" />
+                                    <GradientStop Color="#1F6FA8E8" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="Novinky – Seriály" Command="{Binding Week.OpenNewsCommand}" Padding="10,2" />
+                                    <TextBlock Text="Tento týždeň – seriály" FontWeight="SemiBold" FontSize="15" Foreground="#2F9461" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="Žiadne epizódy vybraných seriálov ani premiéry seriálov – seriály, ktoré sledujete, zaškrtnite v Novinkách v stĺpci Vybrané."
+                                           Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding Week.NoEpisodes, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Week.Episodes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="104" />
+                                                    <ColumnDefinition Width="16" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="Day" Text="{Binding Day}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="1" Text="★" Foreground="#E8A33A" Visibility="{Binding Chosen, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,10,0" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </Grid>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                    <Setter TargetName="Day" Property="Foreground" Value="#2F9461" />
+                                                    <Setter TargetName="Day" Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,14" BorderBrush="#66F28C7C">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#33F28C7C" Offset="0" />
+                                    <GradientStop Color="#1FF2C14E" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="Premiéry" Command="{Binding Week.OpenPremieresCommand}" Padding="10,2" />
+                                    <TextBlock Text="Tento týždeň – filmy" FontWeight="SemiBold" FontSize="15" Foreground="#C9573F" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="Tento týždeň nemá premiéru žiadny sledovaný film." Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                           Visibility="{Binding Week.NoFilms, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Week.Films}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="104" />
+                                                    <ColumnDefinition Width="16" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="Day" Text="{Binding Day}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Grid.Column="1" Text="★" Foreground="#E8A33A" Visibility="{Binding Chosen, Converter={StaticResource BoolToVisibility}}" />
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                    <Setter TargetName="Day" Property="Foreground" Value="#C9573F" />
+                                                    <Setter TargetName="Day" Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                     <!-- what the tools are doing now -->
-                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14">
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14" BorderBrush="#66A78BE6">
+                        <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#2EA78BE6" Offset="0" />
+                                    <GradientStop Color="#1A6FA8E8" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
                         <StackPanel>
                             <TextBlock Text="UNIVERSUM teraz" FontWeight="SemiBold" Margin="0,0,0,6" />
                             <ItemsControl ItemsSource="{Binding Status}">
@@ -2106,7 +2427,13 @@
                         </StackPanel>
                     </Border>
                     <!-- quick starts -->
-                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14">
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,14" BorderBrush="#66F2C14E">
+                        <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#2EF2C14E" Offset="0" />
+                                    <GradientStop Color="#1AF28CB0" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
                         <StackPanel>
                             <TextBlock Text="Rýchle akcie" FontWeight="SemiBold" Margin="0,0,0,8" />
                             <WrapPanel>
@@ -2238,6 +2565,63 @@
                                 <Button Content="Vrátiť TVmaze a TMDB" Command="{Binding RestoreCommand}" Padding="12,5" Margin="0,0,8,0" />
                                 <Button Content="Vymazať uložené novinky a históriu…" Command="{Binding ClearCacheCommand}" Padding="12,5" />
                             </WrapPanel>
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding InterestSources}">
+                        <StackPanel>
+                            <TextBlock Text="Zaujímavosti" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8"
+                                       Text="Zdroje noviniek a zaujímavostí zo sveta filmu: adresa stránky (UNIVERSUM nájde jej kanál RSS) alebo priamo kanála RSS/Atom. Preberá sa len nadpis, krátky úvod a obrázok, celý článok sa otvorí na stránke autora. Adresy sú len tu v nastaveniach." />
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,3">
+                                            <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" Padding="8,3" VerticalAlignment="Center" ToolTip="Odstrániť zdroj">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="13" />
+                                            </Button>
+                                            <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Enabled}" VerticalAlignment="Center" MinWidth="0" ToolTip="Zdroj zapnutý" />
+                                            <TextBlock VerticalAlignment="Center" Margin="4,0,8,0">
+                                                <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Address, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /><Run Text=" · " /><Run Text="{Binding Language, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </TextBlock>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Meno zdroja" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" Text="{Binding NewUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="https://adresa stránky alebo kanála RSS" Margin="0,0,6,0" />
+                                <ComboBox Grid.Column="2" ItemsSource="{Binding Languages}" SelectedValuePath="Value" DisplayMemberPath="Text" SelectedValue="{Binding NewLanguage}"
+                                          ToolTip="Jazyk článkov zdroja" Margin="0,0,6,0" />
+                                <Button Grid.Column="3" Content="Pridať" Command="{Binding AddCommand}" Padding="12,5" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Text="Meno · adresa (https://…) · jazyk článkov" Margin="2,2,0,0" />
+                            <WrapPanel Margin="0,8,0,0">
+                                <Button Content="Importovať zdroje…" Command="{Binding ImportCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                <Button Content="Vymazať uložené články…" Command="{Binding ClearCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                <CheckBox Content="Zobrazovať obrázky článkov" IsChecked="{Binding Images}" VerticalAlignment="Center" MinWidth="0" />
+                            </WrapPanel>
+                            <TextBlock Text="Preklad (DeepL – vlastný kľúč)" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <DockPanel Margin="0,6,0,0">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Overiť a uložiť" Command="{Binding SaveKeyCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveKeyCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <TextBox Text="{Binding KeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Kľúč DeepL API (bezplatný končí :fx)" />
+                            </DockPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <TextBlock Text="Prekladať do " VerticalAlignment="Center" />
+                                <ComboBox ItemsSource="{Binding Targets}" SelectedValuePath="Value" DisplayMemberPath="Text" SelectedValue="{Binding Target}" MinWidth="140" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding KeyStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+                                       Text="Posiela sa len nadpis a úvod verejných článkov; prekladá sa každý článok raz, najviac 60 pri jednej aktualizácii a nikdy nad mesačný limit bezplatného kľúča." />
                             <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>

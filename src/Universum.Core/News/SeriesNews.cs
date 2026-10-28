@@ -86,13 +86,13 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
     /// <summary>Days before and after today of a TVmaze source.</summary>
     public const int TvMazeDaysBack = 7;
 
-    public const int TvMazeDaysAhead = 14;
+    public const int TvMazeDaysAhead = 60;
 
     /// <summary>
     /// Web pages (Czech and Slovak channels) are read at least this many days ahead (owner, 28. 10. 2026: premieres there
     /// are announced weeks before).
     /// </summary>
-    public const int PageDaysAhead = 30;
+    public const int PageDaysAhead = 60;
 
     /// <summary>
     /// The episodes of the days of the enabled sources; <paramref name="offline"/> gives only what is kept, without asking

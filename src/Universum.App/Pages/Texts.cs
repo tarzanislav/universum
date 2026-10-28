@@ -7,6 +7,13 @@ namespace Universum.App.Pages;
 /// <summary>Slovak texts for values of the core.</summary>
 public static class Texts
 {
+    /// <summary>Slovak number and date formats (thousands separated by a space).</summary>
+    public static System.Globalization.CultureInfo Slovak { get; } = System.Globalization.CultureInfo.GetCultureInfo("sk-SK");
+
+    /// <summary>A count with the Slovak form of the noun: "1 list", "3 listy", "5 listov".</summary>
+    public static string Count(int count, string one, string few, string many) =>
+        $"{count.ToString("N0", Slovak)} {(count == 1 ? one : count is >= 2 and <= 4 ? few : many)}";
+
     public static IReadOnlyList<Choice<TrackType>> TrackTypes { get; } =
         [new(TrackType.Audio, "Zvuk"), new(TrackType.Subtitles, "Titulky")];
 

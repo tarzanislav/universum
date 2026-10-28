@@ -174,6 +174,43 @@ public sealed class AppServices
         return _speech = tools;
     }
 
+    private PosterCache? _posters;
+
+    /// <summary>
+    /// Posters of films and series from the server in the settings (TMDB's image server by default), kept on the disk;
+    /// null when posters are switched off.
+    /// </summary>
+    public PosterCache? Posters =>
+        PostersForSelfTest ?? (!Settings.PostersEnabled ? null
+            : _posters ??= new PosterCache(Http, AppSettings.PosterDirectory, PosterCache.ParseServer(Settings.PosterServer) ?? PosterCache.DefaultServer));
+
+    /// <summary>The self-test's stand-in poster server (invented pictures, nothing goes to the internet).</summary>
+    public PosterCache? PostersForSelfTest { get; set; }
+
+    /// <summary>Switches posters on or off and sets their server (null = TMDB's image server).</summary>
+    public void SetPosters(bool enabled, Uri? server)
+    {
+        Settings.PostersEnabled = enabled;
+        Settings.PosterServer = server is null || server == PosterCache.DefaultServer ? null : server.AbsoluteUri;
+        Settings.Save();
+        _posters = null;
+        PostersChanged?.Invoke();
+    }
+
+    /// <summary>Raised when posters are switched on or off or their server changes.</summary>
+    public event Action? PostersChanged;
+
+    /// <summary>The user's HISTRA lists, read only (null without a usable token or with HISTRA switched off).</summary>
+    public HistraLists? HistraLists => HistraListsForSelfTest ?? (Histra is { } histra ? new HistraLists(histra) : null);
+
+    /// <summary>The self-test's stand-in HISTRA lists (invented answers, nothing goes to the internet).</summary>
+    public HistraLists? HistraListsForSelfTest { get; set; }
+
+    /// <summary>The HISTRA lists imported into UNIVERSUM (a file of this Windows account, never sent anywhere).</summary>
+    public HistraListStore HistraListStore => _histraListStore ??= new(AppSettings.HistraListsFile);
+
+    private HistraListStore? _histraListStore;
+
     private OpenMeteo? _weather;
 
     /// <summary>Weather of the Dashboard (Open-Meteo, no key; only the town and then its coordinates are sent).</summary>
@@ -296,6 +333,12 @@ public sealed class AppSettings
     /// <summary>Town of the Dashboard weather as Open-Meteo found it; null = no weather is asked for.</summary>
     public WeatherPlace? WeatherPlace { get; set; }
 
+    /// <summary>Posters are shown (Listy z HISTRA, Premiéry, Novinky).</summary>
+    public bool PostersEnabled { get; set; } = true;
+
+    /// <summary>The server posters come from; null = TMDB's image server (HISTRA gives poster paths in TMDB's form).</summary>
+    public string? PosterServer { get; set; }
+
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>
         Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
@@ -313,6 +356,12 @@ public sealed class AppSettings
 
     /// <summary>Cache of identification results (path, size, time → structure).</summary>
     public static string IdentificationCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "identification-cache.json");
+
+    /// <summary>Downloaded posters (each one once).</summary>
+    public static string PosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "posters");
+
+    /// <summary>The HISTRA lists imported into UNIVERSUM.</summary>
+    public static string HistraListsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "histra-lists.json");
 
     public static AppSettings Load()
     {

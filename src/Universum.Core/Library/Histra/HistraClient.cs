@@ -12,7 +12,8 @@ public sealed class HistraException(string message, Exception? inner = null) : T
 /// Talks to the HISTRA API (https://histra.net) with the user's token as a Bearer header. Requests go only to
 /// histra.net over HTTPS, one at a time through <see cref="RequestPacer.Histra"/> (2 per second); "too many requests"
 /// (429) and passing server errors are waited out and retried as with TMDB; answers are limited to
-/// <see cref="MaxResponseBytes"/>. UNIVERSUM uses HISTRA only to search its catalog (<see cref="HistraCatalog"/>).
+/// <see cref="MaxResponseBytes"/>. UNIVERSUM only reads from HISTRA: it searches the catalog (<see cref="HistraCatalog"/>)
+/// and, on the user's button, reads the user's lists (<see cref="HistraLists"/>).
 /// </summary>
 public sealed class HistraClient
 {

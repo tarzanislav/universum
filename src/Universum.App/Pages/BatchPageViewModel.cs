@@ -659,6 +659,7 @@ public sealed class BatchPageViewModel : ObservableObject
         _items = [];
         _library = null;
         _fingerprintCancellation?.Cancel();
+        _fingerprintCancellation = null;
         _fingerprints = new Dictionary<string, string>(Paths.Comparer);
         SlotRows.Clear();
         FileRows.Clear();
@@ -920,6 +921,11 @@ public sealed class BatchPageViewModel : ObservableObject
         if (_fingerprints.Count > 0)
         {
             _items = BatchPlanner.MarkAlreadyInLibrary(_items, _services.LibraryIndex, _fingerprints);
+        }
+
+        if (_fingerprintCancellation is null && !IsAnalyzing && UncheckedOriginals().Count > 0)
+        {
+            _ = CheckLibraryAsync();
         }
         foreach (var row in Groups)
         {
@@ -2066,24 +2072,31 @@ public sealed class BatchPageViewModel : ObservableObject
     private CancellationTokenSource? _fingerprintCancellation;
     private Dictionary<string, string> _fingerprints = new(Paths.Comparer);
 
-    // the fingerprints of the originals to be written whose place in the library holds files: a result made from the
-    // same original into the same target is "už v knižnici" (the run would skip it anyway)
+    // the originals to be written whose place in the library holds files and whose fingerprint is not known yet: they
+    // are read in the background whenever a file gets its place (after the analysis, a title, an episode …)
+    private List<string> UncheckedOriginals() => _items
+        .Where(i => i.NeedsWork && i.Placement is { } placement && !_fingerprints.ContainsKey(Path.GetFullPath(i.File.Path)) &&
+                    Directory.Exists(placement.Directory))
+        .Select(i => i.File.Path).Distinct(Paths.Comparer).ToList();
+
+    // a result made from the same original into the same target is "už v knižnici" (the run would skip it anyway)
     private async Task CheckLibraryAsync()
     {
-        // not disposed: a later analysis may still cancel it (it holds no timer)
-        _fingerprintCancellation?.Cancel();
+        // one check at a time; a new analysis cancels it (not disposed: it holds no timer)
+        if (_fingerprintCancellation is not null)
+        {
+            return;
+        }
+
         var analysis = _analysis;
-        var paths = _items.Where(i => i.NeedsWork && i.Placement is { } placement && Directory.Exists(placement.Directory))
-            .Select(i => i.File.Path).Distinct(Paths.Comparer).ToList();
+        var paths = UncheckedOriginals();
         if (analysis is null || paths.Count == 0)
         {
-            _fingerprintCancellation = null;
             return;
         }
 
         var cancellation = new CancellationTokenSource();
         _fingerprintCancellation = cancellation;
-
         var found = new Dictionary<string, string>(Paths.Comparer);
         try
         {
@@ -2091,11 +2104,19 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 foreach (var path in paths)
                 {
-                    found[Path.GetFullPath(path)] = await LibraryIndex.FingerprintAsync(path, cancellation.Token);
+                    try
+                    {
+                        found[Path.GetFullPath(path)] = await LibraryIndex.FingerprintAsync(path, cancellation.Token);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        // not readable now: not marked (the run decides), not read again and again
+                        found[Path.GetFullPath(path)] = "";
+                    }
                 }
             }, cancellation.Token);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        catch (OperationCanceledException)
         {
             return;
         }
@@ -2112,7 +2133,11 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        _fingerprints = found;
+        foreach (var (path, fingerprint) in found)
+        {
+            _fingerprints[path] = fingerprint;
+        }
+
         if (!Busy)
         {
             Replan();

@@ -517,12 +517,13 @@ public sealed class WeekOverview : ObservableObject
         var last = today.AddDays(6);
         var marks = _services.Marks;
         var archive = await Task.Run(_services.PremiereStore.Load);
-        Films = archive.Films.Where(f => f.Premiere >= today && f.Premiere <= last)
+        Films = Universum.Core.News.FilmPremieres.Classify(archive.Films).Where(f => f.Premiere >= today && f.Premiere <= last)
             .GroupBy(f => f.TmdbId).Select(g => g.OrderBy(f => f.Region).First())
             .Select(f => (Film: f, Chosen: marks.Get(Universum.Core.News.MarkStore.Film(f.TmdbId)).Chosen))
             .OrderBy(f => f.Film.Premiere).ThenByDescending(f => f.Chosen).ThenByDescending(f => f.Film.Popularity).Take(14)
             .Select(f => new WeekRow(Day(f.Film.Premiere), f.Film.Caption,
-                f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? "kino " + f.Film.PremiereNote : "svetová premiéra", f.Chosen, f.Film.Premiere == today))
+                f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? "kino " + f.Film.PremiereNote
+                    : f.Film.PremiereNote.Length > 0 ? "svetová premiéra · " + f.Film.PremiereNote : "svetová premiéra", f.Chosen, f.Film.Premiere == today))
             .ToList();
 
         var schedule = await _services.SeriesNews.ReadAsync(_services.NewsSources, today, offline: true);

@@ -26,11 +26,23 @@ public sealed record FilmPremiere
 
     public required DateOnly Premiere { get; init; }
 
-    /// <summary>Where it premieres ("CZ", "SK", "CZ · SK 31. 10.") or empty.</summary>
+    /// <summary>
+    /// Where it premieres: a Czech or Slovak film "CZ", "SK", "CZ · SK 31. 10."; a film of the world in the cinemas here
+    /// "v kinách CZ · SK od 6. 11."; else empty.
+    /// </summary>
     public string PremiereNote { get; init; } = "";
 
     /// <summary>Countries of production and the first company ("USA · Warner Bros. Pictures").</summary>
     public string Production { get; init; } = "";
+
+    /// <summary>The countries of production (ISO codes).</summary>
+    public IReadOnlyList<string> Countries { get; init; } = [];
+
+    /// <summary>The original language (ISO code) when TMDB tells it.</summary>
+    public string Language { get; init; } = "";
+
+    /// <summary>The region by origin; null in premieres kept before 29. 10. 2026 (sorted by <see cref="FilmPremieres.Classify(FilmPremiere)"/>).</summary>
+    public NewsRegion? Origin { get; init; }
 
     /// <summary>When it comes to VOD and TV ("VOD 12. 12. 2026 · TV 1. 3. 2027 (USA)") or empty.</summary>
     public string Availability { get; init; } = "";
@@ -50,10 +62,13 @@ public sealed record FilmPremiere
 
 /// <summary>
 /// Film premieres from TMDB (owner, 28. 10. 2026: for films TMDB is the source – it keeps release dates per country):
-/// premieres in Czech and Slovak cinemas, and the most popular premieres in the world, each with the dates of VOD and TV
-/// releases. Lists are cached 12 hours, the details of a film 3 days; only the dates and the film's IDs are sent.
+/// Czech and Slovak films in the cinemas here, and the most popular premieres in the world, each with the dates of VOD and
+/// TV releases. By origin (owner, 29. 10. 2026): a Czech or Slovak film (country of production or original language) is
+/// <see cref="NewsRegion.Domestic"/>, any other <see cref="NewsRegion.World"/> – a foreign film in the cinemas here with
+/// its world premiere and the dates here as a note. Lists are cached 12 hours, the details of a film 3 days; only the dates
+/// and the film's IDs are sent.
 /// </summary>
-public sealed class FilmPremieres(TmdbClient tmdb)
+public sealed partial class FilmPremieres(TmdbClient tmdb)
 {
     private static readonly TimeSpan ListLifetime = TimeSpan.FromHours(12);
     private static readonly TimeSpan DetailLifetime = TimeSpan.FromDays(3);
@@ -62,7 +77,10 @@ public sealed class FilmPremieres(TmdbClient tmdb)
     /// <summary>At most this many pages of 20 films per list.</summary>
     public const int MaxPages = 5;
 
-    /// <summary>Films in Czech or Slovak cinemas between the dates (the earlier of the two premieres).</summary>
+    /// <summary>
+    /// Films in Czech or Slovak cinemas between the dates: a Czech or Slovak film on the earlier of the two premieres, a
+    /// foreign one on its world premiere with the dates here as a note.
+    /// </summary>
     public async Task<IReadOnlyList<FilmPremiere>> DomesticAsync(DateOnly from, DateOnly to, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         var found = new Dictionary<int, (string English, double Popularity)>();
@@ -80,8 +98,8 @@ public sealed class FilmPremieres(TmdbClient tmdb)
         var done = 0;
         foreach (var (id, (english, popularity)) in found)
         {
-            progress?.Report($"Filmy SK/CZ: {++done} z {found.Count}");
-            if (await DetailsAsync(id, cancellationToken).ConfigureAwait(false) is { } details && Here(details, english, popularity, from, to) is { } film)
+            progress?.Report($"Filmy v kinách SK/CZ: {++done} z {found.Count}");
+            if (await DetailsAsync(id, cancellationToken).ConfigureAwait(false) is { } details && InCinemasHere(details, english, popularity, from, to) is { } film)
             {
                 films.Add(film);
             }
@@ -103,27 +121,99 @@ public sealed class FilmPremieres(TmdbClient tmdb)
         }
 
         return film.Region == NewsRegion.Domestic
-            ? Here(details, film.EnglishTitle, film.Popularity, from, DateOnly.MaxValue)
-            : details.Release is { } release && release >= from ? details.ToPremiere(film.EnglishTitle, film.Popularity, NewsRegion.World, release, "") : null;
+            ? InCinemasHere(details, film.EnglishTitle, film.Popularity, from, DateOnly.MaxValue)
+            : OfTheWorld(details, film.EnglishTitle, film.Popularity, from, DateOnly.MaxValue);
     }
 
-    // the theatrical premieres here (types 2 and 3) within the dates, the earlier one first
-    private static FilmPremiere? Here(Details details, string english, double popularity, DateOnly from, DateOnly to)
+    /// <summary>A Czech or Slovak film: a country of production or the original language.</summary>
+    private static bool IsHome(Details details) => details.Countries.Any(HomeOrigin.IsHomeCountry) || HomeOrigin.IsHomeLanguage(details.Language);
+
+    // a film of the cinemas here: a Czech or Slovak one on its premiere here, a foreign one on its world premiere
+    private static FilmPremiere? InCinemasHere(Details details, string english, double popularity, DateOnly from, DateOnly to)
     {
-        var here = details.Dates.Where(d => d.Country is "CZ" or "SK" && d.Type is 2 or 3 && d.Date >= from && d.Date <= to)
-            .GroupBy(d => d.Country).Select(g => g.OrderBy(d => d.Date).First()).OrderBy(d => d.Date).ToList();
+        var here = HereDates(details, from, to);
         if (here.Count == 0)
         {
             return null;
         }
 
-        var note = here.Count == 1 || here[0].Date == here[1].Date
-            ? string.Join(" · ", here.Select(d => d.Country))
-            : $"{here[0].Country} · {here[1].Country} {here[1].Date.Day}. {here[1].Date.Month}.";
-        return details.ToPremiere(english, popularity, NewsRegion.Domestic, here[0].Date, note);
+        if (IsHome(details))
+        {
+            var note = here.Count == 1 || here[0].Date == here[1].Date
+                ? string.Join(" · ", here.Select(d => d.Country))
+                : $"{here[0].Country} · {here[1].Country} {here[1].Date.Day}. {here[1].Date.Month}.";
+            return details.ToPremiere(english, popularity, NewsRegion.Domestic, here[0].Date, note);
+        }
+
+        return details.ToPremiere(english, popularity, NewsRegion.World, details.Release ?? here[0].Date, CinemaNote(here));
     }
 
-    /// <summary>The most popular films whose first release (anywhere) is between the dates.</summary>
+    // a film of the world: a Czech or Slovak one goes among the cinemas here; a foreign one on its first release, with the
+    // dates of the cinemas here (if any are to come) as a note
+    private static FilmPremiere? OfTheWorld(Details details, string english, double popularity, DateOnly from, DateOnly to)
+    {
+        if (IsHome(details))
+        {
+            return InCinemasHere(details, english, popularity, from, to);
+        }
+
+        return details.Release is { } release && release >= from && release <= to
+            ? details.ToPremiere(english, popularity, NewsRegion.World, release, CinemaNote(HereDates(details, from, DateOnly.MaxValue)))
+            : null;
+    }
+
+    // the theatrical premieres here (types 2 and 3) within the dates, the earlier one first
+    private static List<Release> HereDates(Details details, DateOnly from, DateOnly to) =>
+        details.Dates.Where(d => d.Country is "CZ" or "SK" && d.Type is 2 or 3 && d.Date >= from && d.Date <= to)
+            .GroupBy(d => d.Country).Select(g => g.OrderBy(d => d.Date).First()).OrderBy(d => d.Date).ToList();
+
+    // "v kinách CZ · SK od 6. 11.", "v kinách CZ od 6. 11. · SK od 13. 11." or empty
+    private static string CinemaNote(IReadOnlyList<Release> here) =>
+        here.Count == 0 ? ""
+        : here.Count == 1 || here[0].Date == here[1].Date ? $"v kinách {string.Join(" · ", here.Select(d => d.Country))} od {Short(here[0].Date)}"
+        : $"v kinách {here[0].Country} od {Short(here[0].Date)} · {here[1].Country} od {Short(here[1].Date)}";
+
+    private static string Short(DateOnly day) => $"{day.Day}. {day.Month}.";
+
+    /// <summary>
+    /// The kept films by origin, one per region and film: films kept before 29. 10. 2026 were sorted by where they premiere
+    /// – a foreign film of the cinemas here goes to the world (its dates here as a note), a Czech or Slovak one of the
+    /// world here. A film already among the world keeps its entry there.
+    /// </summary>
+    public static List<FilmPremiere> Classify(IEnumerable<FilmPremiere> films) =>
+        films.Select(f => (Film: Classify(f), Moved: f.Origin is null && Classify(f).Region != f.Region))
+            .GroupBy(f => (f.Film.Region, f.Film.TmdbId))
+            .Select(g => g.FirstOrDefault(f => !f.Moved).Film is { } stays
+                ? stays.PremiereNote.Length == 0 && g.FirstOrDefault(f => f.Moved).Film is { PremiereNote.Length: > 0 } moved ? stays with { PremiereNote = moved.PremiereNote } : stays
+                : g.First().Film)
+            .ToList();
+
+    /// <inheritdoc cref="Classify(IEnumerable{FilmPremiere})"/>
+    public static FilmPremiere Classify(FilmPremiere film)
+    {
+        if (film.Origin is not null)
+        {
+            return film;
+        }
+
+        var home = film.Countries.Count > 0 || film.Language.Length > 0
+            ? film.Countries.Any(HomeOrigin.IsHomeCountry) || HomeOrigin.IsHomeLanguage(film.Language)
+            : film.Production.Split(" · ")[0].Split(", ").Any(c => c is "ČR" or "SR");
+        var region = home ? NewsRegion.Domestic : NewsRegion.World;
+        var note = region == film.Region ? film.PremiereNote
+            : home ? ""
+            : OldNote().Match(film.PremiereNote) is { Success: true } old
+                ? old.Groups[3].Success
+                    ? $"v kinách {old.Groups[1].Value} od {Short(film.Premiere)} · {old.Groups[2].Value} od {old.Groups[3].Value}"
+                    : $"v kinách {string.Join(" · ", new[] { old.Groups[1].Value, old.Groups[2].Value }.Where(c => c.Length > 0))} od {Short(film.Premiere)}"
+                : "";
+        return film with { Region = region, Origin = region, PremiereNote = note };
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(CZ|SK)(?: · (CZ|SK)(?: (\d{1,2}\. \d{1,2}\.))?)?$")]
+    private static partial System.Text.RegularExpressions.Regex OldNote();
+
+    /// <summary>The most popular films whose first release (anywhere) is between the dates; a Czech or Slovak one only with its premiere here.</summary>
     public async Task<IReadOnlyList<FilmPremiere>> WorldAsync(DateOnly from, DateOnly to, int pages = 3, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         var found = await DiscoverAsync(
@@ -134,9 +224,9 @@ public sealed class FilmPremieres(TmdbClient tmdb)
         foreach (var film in found)
         {
             progress?.Report($"Filmy vo svete: {++done} z {found.Count}");
-            if (await DetailsAsync(film.Id, cancellationToken).ConfigureAwait(false) is { Release: { } release } details && release >= from && release <= to)
+            if (await DetailsAsync(film.Id, cancellationToken).ConfigureAwait(false) is { } details && OfTheWorld(details, film.English, film.Popularity, from, to) is { } premiere)
             {
-                films.Add(details.ToPremiere(film.English, film.Popularity, NewsRegion.World, release, ""));
+                films.Add(premiere);
             }
         }
 
@@ -198,6 +288,7 @@ public sealed class FilmPremieres(TmdbClient tmdb)
         title = Text(root, "title"),
         original_title = Text(root, "original_title"),
         release_date = Text(root, "release_date"),
+        original_language = Text(root, "original_language"),
         poster_path = Text(root, "poster_path"),
         countries = Array(root, "production_countries").Select(c => Text(c, "iso_3166_1")).OfType<string>().ToList(),
         companies = Array(root, "production_companies").Select(c => Text(c, "name")).OfType<string>().Take(2).ToList(),
@@ -229,6 +320,9 @@ public sealed class FilmPremieres(TmdbClient tmdb)
 
     private sealed record Details(int Id, string Title, string Original, DateOnly? Release, string? Poster, IReadOnlyList<string> Countries, IReadOnlyList<string> Companies, IReadOnlyList<Release> Dates)
     {
+        /// <summary>The original language (ISO code), when TMDB tells it.</summary>
+        public string Language { get; init; } = "";
+
         public static Details? Parse(JsonElement root)
         {
             var original = WebText.Clean(Text(root, "original_title"), 300);
@@ -246,7 +340,10 @@ public sealed class FilmPremieres(TmdbClient tmdb)
                     ? companies.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => WebText.Clean(e.GetString(), 100)).ToList()
                     : [],
                 Array(root, "dates").Select(d => Date(Text(d, "d")) is { } day && Text(d, "c") is { } country && d.TryGetProperty("t", out var t) && t.TryGetInt32(out var type)
-                    ? new Release(country, type, day) : null).OfType<Release>().ToList());
+                    ? new Release(country, type, day) : null).OfType<Release>().ToList())
+            {
+                Language = WebText.Clean(Text(root, "original_language"), 10),
+            };
         }
 
         public FilmPremiere ToPremiere(string english, double popularity, NewsRegion region, DateOnly premiere, string note) => new()
@@ -257,8 +354,11 @@ public sealed class FilmPremieres(TmdbClient tmdb)
             LocalTitle = Title.Length > 0 && Title != Original ? Title : "",
             Year = Release?.Year ?? premiere.Year,
             Region = region,
+            Origin = region,
             Premiere = premiere,
             PremiereNote = note,
+            Countries = Countries.Where(c => c.Length is > 0 and <= 3).Take(10).ToList(),
+            Language = Language,
             Production = string.Join(" · ", new[] { string.Join(", ", Countries.Take(3).Select(CountryNames.Name)), Companies.FirstOrDefault() ?? "" }.Where(p => p.Length > 0)),
             Availability = Availability(),
             PosterPath = Poster,

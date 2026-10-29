@@ -259,8 +259,11 @@ public sealed class NewsTests
         server.Handler = uri => uri.AbsolutePath switch
         {
             "/3/discover/movie" when uri.Query.Contains("region=CZ", StringComparison.Ordinal) => """{"total_pages":1,"results":[{"id":11,"title":"Invented Film","popularity":5}]}""",
-            "/3/discover/movie" when uri.Query.Contains("region=SK", StringComparison.Ordinal) => """{"total_pages":1,"results":[{"id":11,"title":"Invented Film","popularity":5},{"id":12,"title":"Only Abroad","popularity":9}]}""",
-            "/3/discover/movie" => """{"total_pages":1,"results":[{"id":13,"title":"Seoul Invented","popularity":7}]}""",
+            "/3/discover/movie" when uri.Query.Contains("region=SK", StringComparison.Ordinal) => """{"total_pages":1,"results":[{"id":11,"title":"Invented Film","popularity":5},{"id":12,"title":"Only Abroad","popularity":9},{"id":14,"title":"Hollywood Invented","popularity":8}]}""",
+            "/3/discover/movie" => """{"total_pages":1,"results":[{"id":13,"title":"Seoul Invented","popularity":7},{"id":15,"title":"Prague Invented","popularity":6},{"id":16,"title":"Brno Invented","popularity":3}]}""",
+            "/3/movie/14" => $$$"""{"title":"Hollywoodský vymyslený","original_title":"Hollywood Invented","release_date":"{{{Iso(5)}}}","production_countries":[{"iso_3166_1":"US"}],"release_dates":{"results":[{"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(12)}}}T00:00:00.000Z"}]}]}}""",
+            "/3/movie/15" => $$$"""{"title":"Pražský vymyslený","original_title":"Pražský vymyslený","original_language":"cs","release_date":"{{{Iso(4)}}}","release_dates":{"results":[{"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(4)}}}T00:00:00.000Z"}]}]}}""",
+            "/3/movie/16" => $$$"""{"title":"Brnenský vymyslený","original_title":"Brněnský vymyšlený","release_date":"{{{Iso(6)}}}","production_countries":[{"iso_3166_1":"CZ"}],"release_dates":{"results":[]}}""",
             "/3/movie/11" => $$$"""{"title":"Vymyslený film","original_title":"Invented Film","release_date":"{{{Iso(-10)}}}","poster_path":"/a.jpg","production_countries":[{"iso_3166_1":"CZ"},{"iso_3166_1":"XX"}],"production_companies":[{"name":"Studio"}],"release_dates":{"results":[{"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(2)}}}T00:00:00.000Z"},{"type":4,"release_date":"{{{Iso(40)}}}T00:00:00.000Z"}]},{"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(9)}}}T00:00:00.000Z"},{"type":6,"release_date":"{{{Iso(90)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/12" => $$$"""{"title":"Len v zahraničí","original_title":"Only Abroad","release_date":"{{{Iso(1)}}}","release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"type":3,"release_date":"{{{Iso(1)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/13" => $$$"""{"title":"Soul","original_title":"서울","release_date":"{{{Iso(3)}}}","poster_path":"../x.jpg","release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"type":4,"release_date":"{{{Iso(20)}}}T00:00:00.000Z"}]}]}}""",
@@ -270,8 +273,13 @@ public sealed class NewsTests
         var from = new DateOnly(2026, 10, 25);
         var to = new DateOnly(2026, 12, 31);
 
-        var domestic = await films.DomesticAsync(from, to);
-        Assert.Equal(1, domestic.Count, "a film without a Czech or Slovak premiere is left out");
+        var cinemas = await films.DomesticAsync(from, to);
+        Assert.Equal(2, cinemas.Count, "a film without a Czech or Slovak premiere is left out");
+        var abroad = cinemas.Single(f => f.TmdbId == 14);
+        Assert.True(abroad.Region == NewsRegion.World && abroad.Premiere == new DateOnly(2026, 11, 6) && abroad.PremiereNote == "v kinách SK od 13. 11.",
+            $"a foreign film in the cinemas here is among the world's, on its world premiere, its date here noted – {abroad.Premiere} {abroad.PremiereNote}");
+        var domestic = cinemas.Where(f => f.Region == NewsRegion.Domestic).ToList();
+        Assert.Equal(1, domestic.Count, "the Czech film");
         var film = domestic[0];
         Assert.Equal("Invented Film (2026)", film.Caption, "library title");
         Assert.Equal(new DateOnly(2026, 11, 3), film.Premiere, "the earlier of the Czech and Slovak premieres");
@@ -281,7 +289,10 @@ public sealed class NewsTests
         Assert.Equal("Vymyslený film", film.LocalTitle, "Czech title");
         Assert.Equal(11, film.TmdbId, "TMDB ID");
 
-        var world = await films.WorldAsync(from, to);
+        var all = await films.WorldAsync(from, to);
+        Assert.True(all.Count == 2 && all.Single(f => f.TmdbId == 15) is { Region: NewsRegion.Domestic, Language: "cs" },
+            "a Czech film of the world list goes among the Czech and Slovak ones; one without a premiere here is left out");
+        var world = all.Where(f => f.Region == NewsRegion.World).ToList();
         Assert.Equal(1, world.Count, "world premieres");
         Assert.True(world[0].Caption == "Seoul Invented (2026) [tmdbid-13]" && world[0].PosterPath is null && world[0].Availability == "VOD 21. 11. 2026 (USA)",
             $"a title not in Latin script gets the English title and the ID; an unsafe poster path is left out – {world[0].Caption} | {world[0].Availability}");
@@ -290,6 +301,102 @@ public sealed class NewsTests
         var recheck = await films.RecheckAsync(film with { Premiere = new DateOnly(2026, 12, 24), Availability = "" }, from);
         Assert.True(recheck is { Premiere.Day: 3, Availability.Length: > 0 }, "a kept film checked again gets its premiere and dates");
         Assert.Equal<FilmPremiere?>(null, await films.RecheckAsync(film, new DateOnly(2026, 11, 20)), "no premiere here any more from then");
+    }
+
+    [Test]
+    public async Task SeriesAreSortedByOrigin()
+    {
+        var server = new Server();
+        server.Handler = uri => uri.AbsolutePath switch
+        {
+            "/singlesearch/shows" when uri.Query.Contains("Vymyslen", StringComparison.Ordinal) =>
+                """{"id":21,"name":"Vymyslený seriál","premiered":"2025-03-01","language":"Czech","webChannel":{"name":"Stream+","country":null}}""",
+            "/singlesearch/shows" when uri.Query.Contains("Invented%20Detective", StringComparison.Ordinal) =>
+                """{"id":22,"name":"Invented Detective","premiered":"1990-01-01","language":"English","network":{"name":"INV","country":{"code":"US"}}}""",
+            "/shows/9" => """{"id":9,"name":"Slovak Invented","premiered":"2026-01-01","language":"Slovak","webChannel":{"name":"Stream","country":null}}""",
+            _ => null,
+        };
+        var day = new DateOnly(2026, 10, 29);
+        SeriesEpisode Episode(string source, NewsRegion aired, string title, string original, int? year = null, string language = "", string country = "", int? tvmaze = null) => new()
+        {
+            Source = source, Region = aired, Title = title, OriginalTitle = original, Year = year, Season = 1, Number = 2, AirDate = day,
+            Language = language, Country = country, TvMaze = tvmaze,
+        };
+
+        var episodes = new List<SeriesEpisode>
+        {
+            Episode("Vymyslený rozpis", NewsRegion.Domestic, "Domáci seriál", "Domáci seriál"),
+            Episode("Vymyslený rozpis", NewsRegion.Domestic, "Cudzí seriál", "Foreign Invented"),
+            Episode("Vymyslený rozpis", NewsRegion.World, "Vymyslený seriál", "Vymyslený seriál", 2025),
+            Episode("Vymyslený rozpis", NewsRegion.Domestic, "Invented Detective", "Invented Detective"),
+            Episode(SeriesNews.TvMazeSource, NewsRegion.World, "Czech Stream", "Czech Stream", language: "Czech"),
+            Episode(SeriesNews.TvMazeSource, NewsRegion.World, "World Show", "World Show", language: "English", country: "US"),
+            Episode(SeriesNews.TvMazeSource, NewsRegion.World, "Slovak Invented", "Slovak Invented", 2026, tvmaze: 9),
+            Episode("Vymyslený rozpis", NewsRegion.Domestic, "Iný cudzí", "Other Invented", language: "English", tvmaze: 10),
+        };
+        var folder = Path.Combine(Path.GetTempPath(), "universum-origins-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var file = Path.Combine(folder, "origins.json");
+            var tvmaze = new TvMazeClient(server.Http, new RequestPacer(1000));
+            var news = new SeriesNews(new WebPageClient(server.Http), tvmaze, new NewsCache(folder), new SeriesOrigins(file));
+            await news.LearnOriginsAsync(episodes, day);
+            Assert.Equal(5, server.Requests.Count, "only the series the sources did not tell are asked – " + string.Join(" ", server.Requests));
+            Assert.True(server.Requests.All(r => r.StartsWith("https://api.tvmaze.com/", StringComparison.Ordinal)), "only TVmaze");
+
+            string Sorted(SeriesNews by) => string.Join(" | ", by.Classify(episodes).Select(e => $"{e.Title}: {e.Region}"));
+            const string expected = "Domáci seriál: Domestic | Vymyslený seriál: Domestic | Czech Stream: Domestic | World Show: World | " +
+                                    "Slovak Invented: Domestic | Iný cudzí: World";
+            Assert.Equal(expected, Sorted(news),
+                "Czech and Slovak series by language or by TVmaze; a dubbed foreign series of a Czech channel is left out, unless the world source has it");
+
+            await news.LearnOriginsAsync(episodes, day);
+            Assert.Equal(5, server.Requests.Count, "a series is asked once (one not found again after 30 days)");
+            var later = new SeriesNews(new WebPageClient(server.Http), tvmaze, new NewsCache(folder), new SeriesOrigins(file));
+            Assert.Equal(expected, Sorted(later), "the origins are kept for the next start");
+
+            var sorted = news.Classify(episodes[0])!;
+            Assert.True(sorted.Origin == NewsRegion.Domestic && news.Classify(sorted with { Region = NewsRegion.World }) is { Region: NewsRegion.Domestic },
+                "an episode sorted once keeps its region");
+
+            var archive = new PremiereArchive
+            {
+                Series = [new SeriesPremiereRow(episodes[0], "", null), new SeriesPremiereRow(episodes[1], "", null), new SeriesPremiereRow(episodes[5], "", 8)],
+            }.Classified(news.Classify);
+            Assert.Equal("Domáci seriál: Domestic, World Show: World", string.Join(", ", archive.Series.Select(r => $"{r.First.Title}: {r.First.Region}")),
+                "the kept premieres are sorted too");
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void KeptFilmsAreSortedByOrigin()
+    {
+        FilmPremiere Old(int id, NewsRegion region, string production, string note, int day) => new()
+        {
+            TmdbId = id, OriginalTitle = "Invented " + id, EnglishTitle = "Invented " + id, Region = region, Production = production, PremiereNote = note,
+            Premiere = new DateOnly(2026, 11, day),
+        };
+
+        var films = FilmPremieres.Classify(
+        [
+            Old(1, NewsRegion.Domestic, "USA · Studio", "CZ · SK 10. 11.", 3),
+            Old(2, NewsRegion.Domestic, "ČR, XX · Studio", "CZ", 4),
+            Old(3, NewsRegion.World, "SR", "", 5),
+            Old(4, NewsRegion.Domestic, "VB", "SK", 6),
+            Old(4, NewsRegion.World, "VB", "", 1),
+        ]);
+        string Text(FilmPremiere f) => $"{f.TmdbId} {f.Region} {f.Premiere.Day}. «{f.PremiereNote}»";
+        Assert.Equal("1 World 3. «v kinách CZ od 3. 11. · SK od 10. 11.» | 2 Domestic 4. «CZ» | 3 Domestic 5. «» | 4 World 1. «v kinách SK od 6. 11.»",
+            string.Join(" | ", films.Select(Text)),
+            "a foreign film of the cinemas here goes to the world with its dates as a note; a Czech or Slovak one here; one film once per region");
+        Assert.True(films.All(f => f.Origin == f.Region) && FilmPremieres.Classify(films).SequenceEqual(films), "sorted once");
     }
 
     [Test]

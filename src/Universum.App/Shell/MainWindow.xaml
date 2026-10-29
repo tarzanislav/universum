@@ -2477,7 +2477,7 @@
                             </Border.Background>
                             <StackPanel>
                                 <TextBlock Text="Pripravené vo vstupnom priečinku" FontWeight="SemiBold" FontSize="15" Foreground="#5E8A2A" Margin="0,0,0,8" />
-                                <TextBlock Text="Žiadny vybraný titul zatiaľ nie je vo vstupnom priečinku – UNIVERSUM ho stráži pri každom spustení."
+                                <TextBlock Text="Vo vstupnom priečinku zatiaľ nie je žiadna epizóda seriálu z Noviniek ani vybraný film – UNIVERSUM ho stráži pri každom spustení."
                                            Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding Week.HasFound, Converter={StaticResource InverseBoolToVisibility}}" />
                                 <ItemsControl ItemsSource="{Binding Week.Found}">
                                     <ItemsControl.ItemTemplate>

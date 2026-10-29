@@ -23,6 +23,8 @@ public sealed class RulesPageViewModel : ObservableObject
     private readonly AppServices _services;
     private readonly Dictionary<int, LanguageTag> _languages = [];
     private readonly Dictionary<int, string> _videoNames = [];
+    private readonly HashSet<int> _kept = [];
+    private readonly List<int> _order = [];
     private MediaFile? _file;
     private EditPlan? _plan;
     private string _fileName = "";
@@ -80,6 +82,8 @@ public sealed class RulesPageViewModel : ObservableObject
         _undoRecord = null;
         _languages.Clear();
         _videoNames.Clear();
+        _kept.Clear();
+        _order.Clear();
         _file = null;
         _plan = null;
         _placement = null;
@@ -218,6 +222,8 @@ public sealed class RulesPageViewModel : ObservableObject
         _undoRecord = null;
         _languages.Clear();
         _videoNames.Clear();
+        _kept.Clear();
+        _order.Clear();
         _file = null;
         _plan = null;
         Rows.Clear();
@@ -243,10 +249,68 @@ public sealed class RulesPageViewModel : ObservableObject
         }
     }
 
-    /// <summary>Chooses a language for an undetermined track (also used by the self-test).</summary>
+    /// <summary>
+    /// Chooses the language of a track (also used by the self-test): an undetermined one, or a wrong one written in the
+    /// file (owner, 29. 10. 2026: "EN" that is Czech); the file's own language again needs no choice.
+    /// </summary>
     public void ChooseLanguage(int trackId, string code)
     {
-        _languages[trackId] = LanguageTag.FromCode(code);
+        var language = LanguageTag.FromCode(code);
+        if (_file?.Tracks.FirstOrDefault(t => t.Id == trackId) is { Language.IsUndetermined: false } track &&
+            string.Equals(track.Language.Primary, language.Primary, StringComparison.OrdinalIgnoreCase))
+        {
+            _languages.Remove(trackId);
+        }
+        else
+        {
+            _languages[trackId] = language;
+        }
+
+        Recalculate();
+    }
+
+    /// <summary>Moves a track one place up (-1) or down (+1) among the audio or subtitle tracks (owner, 29. 10. 2026).</summary>
+    public void MoveTrack(int trackId, int by)
+    {
+        var row = Rows.FirstOrDefault(r => r.TrackId == trackId);
+        var same = Rows.Where(r => r.CanMove && r.Target.Type == row?.Target.Type).ToList();
+        var at = row is null ? -1 : same.IndexOf(row);
+        if (at >= 0 && at + by >= 0 && at + by < same.Count)
+        {
+            MoveTrackTo(trackId, same[at + by].TrackId);
+        }
+    }
+
+    /// <summary>Puts a dragged track at the place of another track of the same type.</summary>
+    public void MoveTrackTo(int trackId, int targetId)
+    {
+        var order = Rows.Where(r => r.CanMove).ToList();
+        if (order.FirstOrDefault(r => r.TrackId == trackId) is not { } row || order.FirstOrDefault(r => r.TrackId == targetId) is not { } target ||
+            row == target || row.Target.Type != target.Target.Type)
+        {
+            return;
+        }
+
+        var down = order.IndexOf(row) < order.IndexOf(target);
+        order.Remove(row);
+        order.Insert(order.IndexOf(target) + (down ? 1 : 0), row);
+        _order.Clear();
+        _order.AddRange(order.Select(r => r.TrackId));
+        Recalculate();
+    }
+
+    /// <summary>Keeps (or leaves out again) subtitles whose language is not among the subtitle languages.</summary>
+    public void KeepTrack(int trackId, bool keep)
+    {
+        if (keep)
+        {
+            _kept.Add(trackId);
+        }
+        else
+        {
+            _kept.Remove(trackId);
+        }
+
         Recalculate();
     }
 
@@ -257,7 +321,8 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var target = UniversumRules.Apply(_file, _services.Profile, new TrackDecisions { Languages = _languages, VideoNames = _videoNames });
+        var target = UniversumRules.Apply(_file, _services.Profile,
+            new TrackDecisions { Languages = _languages, VideoNames = _videoNames, Kept = _kept, Order = _order });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -269,14 +334,14 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             var track = target.Tracks[i];
             var chosen = _languages.TryGetValue(track.TrackId, out var tag) ? Languages.Find(tag.Primary) : null;
-            Rows.Add(new RuleRow(track, i + 1, chosen, row =>
-            {
-                // recalculate after the combo box has finished its update (the rows are rebuilt)
-                if (row.ChosenLanguage is { } language)
-                {
-                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() => ChooseLanguage(row.TrackId, language.Ietf));
-                }
-            }));
+            Rows.Add(new RuleRow(track, i + 1, chosen, LanguageChosen, Moved, KeepChanged, kept: _kept.Contains(track.TrackId)));
+        }
+
+        // owner, 29. 10. 2026: subtitles out of the language list are shown at the end – the user can keep them
+        foreach (var removed in target.RemovedByLanguage)
+        {
+            Rows.Add(new RuleRow(new TrackTarget(removed, removed.Name, removed.Language, removed.Flags, TrackRole.Main), 0, null,
+                LanguageChosen, Moved, KeepChanged, removedByLanguage: true));
         }
 
         Summary = _plan.Method switch
@@ -292,6 +357,21 @@ public sealed class RulesPageViewModel : ObservableObject
         Issues = string.Join("\n", target.Issues.Select(Describe));
         UpdateTarget();
     }
+
+    // the rows are rebuilt by a recalculation: it runs after the control that changed has finished its update
+    private void LanguageChosen(RuleRow row)
+    {
+        if (row.ChosenLanguage is { } language)
+        {
+            Later(() => ChooseLanguage(row.TrackId, language.Ietf));
+        }
+    }
+
+    private void Moved(RuleRow row, int by) => Later(() => MoveTrack(row.TrackId, by));
+
+    private void KeepChanged(RuleRow row, bool keep) => Later(() => KeepTrack(row.TrackId, keep));
+
+    private static void Later(Action action) => System.Windows.Application.Current.Dispatcher.InvokeAsync(action);
 
     /// <summary>Kind, title and episode guessed from the file and folder names; the user can correct them.</summary>
     private void GuessTitle(string path)

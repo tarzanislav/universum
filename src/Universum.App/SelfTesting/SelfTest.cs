@@ -177,6 +177,22 @@ internal static class SelfTest
         await Screenshot(window, "rules-undetermined.png");
         model.Rules.ChooseLanguage(2, "cs");
         model.Rules.ChooseLanguage(3, "cs");
+
+        // owner, 29. 10. 2026: in Single spracovanie too – tracks moved up or down, a language written in the file corrected
+        string RuleSubtitles() => string.Join(",", model.Rules.Plan!.Target.Tracks.Where(t => t.Type == TrackType.Subtitles)
+            .Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
+        Check(RuleSubtitles() == "cs!,cs,en", "rules: subtitles in the order of the rules – " + RuleSubtitles());
+        model.Rules.MoveTrack(5, -1);
+        Check(RuleSubtitles() == "cs!,en,cs" && model.Rules.Rows.Where(r => r.Target.Type == TrackType.Subtitles).Select(r => r.TrackId).SequenceEqual([3, 5, 4]),
+            "rules: English subtitles moved up – " + RuleSubtitles());
+        await Screenshot(window, "rules-track-order.png");
+        model.Rules.MoveTrack(5, 1);
+        Check(RuleSubtitles() == "cs!,cs,en", "rules: and back – " + RuleSubtitles());
+        Check(model.Rules.Rows.First(r => r.TrackId == 1).ChosenLanguage == Languages.English, "rules: the file's language is shown in the list");
+        model.Rules.ChooseLanguage(1, "sk");
+        Check(model.Rules.Plan!.Target.For(1).Language.Primary == "sk", "rules: a language written in the file corrected");
+        model.Rules.ChooseLanguage(1, "en");
+        Check(model.Rules.Plan!.Target.For(1).Language.Primary == "en" && !model.Rules.Plan.Target.For(1).LanguageChanged, "rules: the file's own language again");
         model.Rules.KeepOriginal = true;
         services.SetOutputDirectory(library);
         Check(Directory.Exists(Path.Combine(library, "MOVIES")) && Directory.Exists(Path.Combine(library, "TVSHOWS")), "library: MOVIES and TVSHOWS created");

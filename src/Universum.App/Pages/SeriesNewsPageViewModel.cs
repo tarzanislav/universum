@@ -84,6 +84,21 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
                 row.Poster.Reset();
             }
         };
+        services.Watchlist.Changed += () =>
+        {
+            foreach (var row in Tabs.SelectMany(t => t.All))
+            {
+                row.MarkChanged();
+            }
+        };
+        services.InputWatch.Changed += () =>
+        {
+            foreach (var row in Tabs.SelectMany(t => t.All))
+            {
+                row.FolderChanged();
+            }
+        };
+        services.InputDirectoryChanged += () => _ = services.InputWatch.ScanAsync();
     }
 
     private const string NoInputFolder = "Najprv nastavte vstupný priečinok – tam UNIVERSUM hľadá epizódy (tlačidlo Zmeniť… hore).";
@@ -284,6 +299,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     public async void Shown()
     {
         OnPropertyChanged(nameof(HasMyLists));
+        _ = _services.InputWatch.ScanAsync();
         if (!_shownKept && !Busy)
         {
             _shownKept = true;
@@ -618,7 +634,7 @@ public sealed class NewsSeriesRow : MarkedRow
     private bool _expanded;
 
     public NewsSeriesRow(string markKey, IReadOnlyList<NewsEpisodeRow> episodes, string rhythm, SeriesNewsPageViewModel page)
-        : base(page.Services.Marks, markKey)
+        : base(page.Services.Marks, markKey, page.Services.Watchlist)
     {
         Episodes = episodes;
         Rhythm = rhythm;
@@ -739,6 +755,25 @@ public sealed class NewsSeriesRow : MarkedRow
         OnPropertyChanged(nameof(IsChecked));
         OnPropertyChanged(nameof(CheckedText));
     }
+
+    /// <summary>"✓ v priečinku: 2" – the chosen series' episodes already in the input folder; empty when none.</summary>
+    public string FolderText
+    {
+        get
+        {
+            var count = Episodes.Count(e => e.InFolder);
+            return count == 0 ? "" : $"✓ v priečinku: {count}";
+        }
+    }
+
+    internal void FolderChanged()
+    {
+        OnPropertyChanged(nameof(FolderText));
+        foreach (var episode in Episodes)
+        {
+            episode.FolderChanged();
+        }
+    }
 }
 
 /// <summary>An episode in the tree of a series, with its tick for processing (only aired episodes can be ticked).</summary>
@@ -797,8 +832,17 @@ public sealed class NewsEpisodeRow : ObservableObject
     /// <summary>"DNES", "zajtra", "o 3 dni", "včera", "pred 3 dňami" …</summary>
     public string When => NewsTexts.When(Episode.AirDate);
 
+    /// <summary>The episode is already in the input folder (a chosen series, as last checked).</summary>
+    public bool InFolder => _page.Services.InputWatch.Contains(Episode);
+
+    internal void FolderChanged()
+    {
+        OnPropertyChanged(nameof(InFolder));
+        OnPropertyChanged(nameof(State));
+    }
+
     /// <summary>"odvysielaná" or "nadchádzajúca".</summary>
-    public string State => Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? "odvysielaná" : "nadchádzajúca";
+    public string State => InFolder ? "✓ vo vstupnom priečinku" : Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? "odvysielaná" : "nadchádzajúca";
 }
 
 /// <summary>An episode sent to processing that is not in the input folder yet.</summary>

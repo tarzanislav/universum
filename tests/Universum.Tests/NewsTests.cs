@@ -551,6 +551,40 @@ public sealed class NewsTests
         }
     }
 
+    [Test]
+    public async Task LegalOffersAreKept()
+    {
+        var server = new Server();
+        server.Handler = uri => uri.AbsolutePath == "/3/movie/11/watch/providers"
+            ? """{"id":11,"results":{"SK":{"link":"x","flatrate":[{"provider_name":"Invented+"}],"rent":[{"provider_name":"Shop"}]},"CZ":{"flatrate":[{"provider_name":"Invented+"}]},"US":{"flatrate":[{"provider_name":"Elsewhere"}]}}}"""
+            : uri.AbsolutePath == "/3/tv/12/watch/providers" ? """{"id":12,"results":{}}""" : null;
+        var providers = new WatchProviders(new Universum.Core.Library.Tmdb.TmdbClient(server.Http, "test-key", null, new RequestPacer(1000)));
+        var today = new DateOnly(2026, 10, 29);
+        var offers = await providers.GetAsync(Universum.Core.Library.MediaKind.Movie, 11, today);
+        Assert.True(offers.Count == 3 && offers.All(o => o.Country is "SK" or "CZ" && o.Since == today), "only Slovakia and Czechia – " + string.Join(" | ", offers) + " | " + string.Join(" ", server.Requests));
+        var title = new TitleAvailability("Invented Film (2026)", Universum.Core.Library.MediaKind.Movie, 11, DateTime.Now, offers.ToList());
+        Assert.Equal("Invented+ (SK, CZ)", title.Text, "where to watch");
+        Assert.True((await providers.GetAsync(Universum.Core.Library.MediaKind.Series, 12, today)).Count == 0, "nowhere yet");
+
+        var merged = WatchProviders.Merge([new WatchOffer("SK", "Invented+", "flatrate", today.AddDays(-5))], offers.Select(o => o with { Since = today }));
+        Assert.True(merged.Single(o => o.Country == "SK" && o.Kind == "flatrate").Since == today.AddDays(-5) && merged.Single(o => o.Kind == "rent").Since == today,
+            "an offer keeps the day it was first seen");
+        Assert.Equal("Shop (SK) – požičanie", new TitleAvailability("x", Universum.Core.Library.MediaKind.Movie, 1, DateTime.Now, [new("SK", "Shop", "rent", today)]).Text, "only to rent");
+    }
+
+    [Test]
+    public void ChosenFilmsAreFoundInTheInputFolder()
+    {
+        var film = new FilmPremiere
+        {
+            TmdbId = 1, OriginalTitle = "Le Film Inventé", EnglishTitle = "The Invented Film", LocalTitle = "Vymyslený film", Year = 2026,
+            Region = NewsRegion.World, Premiere = new DateOnly(2026, 10, 1),
+        };
+        bool Is(string name) => FilmFinder.Matches(film, Universum.Core.Library.TitleGuess.ForFile(Path.Combine(Path.GetTempPath(), name)));
+        Assert.True(Is("The.Invented.Film.2026.1080p.WEB.mkv") && Is("Vymysleny film (2026) CZ.mkv") && Is("Le Film Invente 2025.mkv"), "original, English or Czech title, year ±1");
+        Assert.True(!Is("The.Invented.Film.2019.mkv") && !Is("The Invented Film S01E01.mkv") && !Is("Another Film 2026.mkv"), "another year, an episode, another film");
+    }
+
     private sealed class Server : HttpMessageHandler
     {
         private HttpClient? _http;

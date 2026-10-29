@@ -7,7 +7,7 @@ namespace Universum.App.Pages;
 /// A row of Premiéry or Novinky with the user's mark of its title: chosen (Vybrané) and a note, kept at once – a film
 /// by its TMDB ID, a series for all its rows.
 /// </summary>
-public abstract class MarkedRow(MarkStore marks, string markKey) : ObservableObject
+public abstract class MarkedRow(MarkStore marks, string markKey, Watchlist? watch = null) : ObservableObject
 {
     /// <summary>The title the mark belongs to.</summary>
     public string MarkKey { get; } = markKey;
@@ -24,11 +24,15 @@ public abstract class MarkedRow(MarkStore marks, string markKey) : ObservableObj
         set => marks.Set(MarkKey, marks.Get(MarkKey) with { Note = value ?? "" });
     }
 
-    /// <summary>The mark changed (here or in another row of the same title).</summary>
+    /// <summary>Where the title can be watched legally ("▶ Netflix (SK)"), when it is chosen and offered.</summary>
+    public string Streaming => watch?.Text(MarkKey) ?? "";
+
+    /// <summary>The mark (or the availability) changed (here or in another row of the same title).</summary>
     public void MarkChanged()
     {
         OnPropertyChanged(nameof(IsChosen));
         OnPropertyChanged(nameof(Note));
+        OnPropertyChanged(nameof(Streaming));
     }
 }
 

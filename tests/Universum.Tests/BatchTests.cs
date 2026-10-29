@@ -564,14 +564,17 @@ public sealed class BatchTests
         again.Start = Universum.Core.Mega.MegaStart.At;
         again.StartAt = DateTime.Now.AddHours(-2);
         var reloaded = new Universum.Core.Mega.MegaStore(file);
-        Assert.Equal(0, reloaded.Due(DateTime.Now, started: true).Count, "the stored batch has no time yet");
+        Assert.Equal(0, reloaded.Due(DateTime.Now).Count, "the stored batch has no time yet");
         var timed = reloaded.Batches[0];
         timed.Start = Universum.Core.Mega.MegaStart.At;
+        timed.StartAt = DateTime.Now.AddMinutes(1);
+        Assert.Equal(0, reloaded.Due(DateTime.Now).Count, "not yet");
         timed.StartAt = DateTime.Now.AddMinutes(-1);
-        Assert.Equal(1, reloaded.Due(DateTime.Now, started: true).Count, "its time has come");
+        Assert.Equal(1, reloaded.Due(DateTime.Now).Count, "its time has come");
         timed.StartAt = DateTime.Now.AddHours(-3);
-        Assert.Equal(0, reloaded.Due(DateTime.Now, started: false).Count, "missed while not running");
-        Assert.Equal(Universum.Core.Mega.MegaBatchState.Missed, timed.State, "marked as missed");
+        Assert.Equal(0, reloaded.Due(DateTime.Now).Count, "missed: UNIVERSUM did not run, the computer slept or the time is in the past");
+        Assert.Equal(Universum.Core.Mega.MegaBatchState.Missed, timed.State, "marked as missed – a night run is not started in the morning");
+        Assert.Equal(Universum.Core.Mega.MegaBatchState.Missed, new Universum.Core.Mega.MegaStore(file).Batches[0].State, "and kept so");
     }
 
     [Test]
@@ -611,6 +614,54 @@ public sealed class BatchTests
         Assert.True(!File.Exists(Path.Combine(library.Layout.Shows, "Seriál (2026)", "Season 01", "Seriál S01E03 - CZ EN SD H264 SMALL.mkv")), "the changed file is not");
         Assert.Equal("3 z 5 súborov v knižnici, 2 preskočených pri kontrole.", job.Outcome, "outcome");
         Assert.True(job.Messages.Count(m => m.Text.StartsWith("PRESKOČENÝ", StringComparison.Ordinal)) == 2, "skipped files in the output");
+    }
+
+    [Test]
+    public async Task MegaNeverWritesAnotherFileOrOlderDecisions()
+    {
+        // review of 29. 10. 2026: a file replaced by another one with the same tracks is not the prepared file, and a
+        // result made after the batch was prepared (with newer decisions) is never replaced by the batch
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        var series = analysis.Groups[0];
+        series.Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var ready = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork).ToList();
+        var replaced = ready.First(i => i.File.Path.EndsWith("Seriál E2.mkv", StringComparison.Ordinal));
+        var processed = ready.First(i => i.File.Path.EndsWith("Seriál E10.mkv", StringComparison.Ordinal));
+
+        // the analysed file is replaced by another release with the same layout (only a track name differs) before the batch is made
+        var time = File.GetLastWriteTimeUtc(replaced.File.Path);
+        await MergeAsync(replaced.File.Path + ".new", "--track-name", "1:Iné vydanie", TestData.Media("en-und-cz-forced.mkv"));
+        File.Move(replaced.File.Path + ".new", replaced.File.Path, overwrite: true);
+        File.SetLastWriteTimeUtc(replaced.File.Path, time);
+        var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [replaced, processed])!;
+
+        // meanwhile the episode 10 is processed in Hromadné spracovanie with other decisions (Slovak audio)
+        var index = new LibraryIndex(Path.Combine(work.Path, "library-index.json"));
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(work.Path, "_journal"), index);
+        series.Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
+        var newer = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single(i => i.File.Path == processed.File.Path);
+        Assert.Equal(ProcessingStatus.Done, (await BatchRunner.RunAsync([newer], processor, new OutputOptions(OriginalHandling.Keep)))[0].Status, "processed meanwhile");
+
+        var inspector = await InspectorAsync();
+        var job = new Universum.Core.Mega.MegaJob(batch, processor, (path, token) => inspector.InspectAsync(path, token));
+        var queue = new Universum.Core.Jobs.JobQueue();
+        queue.Add(job);
+        await queue.Start();
+
+        string Messages() => string.Join(" | ", job.Messages.Select(m => m.Text));
+        var states = batch.Files.ToDictionary(f => Path.GetFileName(f.Path));
+        Assert.True(states["Seriál E2.mkv"] is { State: Universum.Core.Mega.MegaFileState.Skipped } other && other.Note.Contains("iný súbor", StringComparison.Ordinal),
+            "another file with the same tracks is not written – " + Messages());
+        Assert.True(states["Seriál E10.mkv"] is { State: Universum.Core.Mega.MegaFileState.Skipped } older && older.Note.Contains("novší výsledok", StringComparison.Ordinal),
+            "the newer result stays – " + Messages());
+        var season = Path.Combine(library.Layout.Shows, "Seriál (2026)", "Season 01");
+        Assert.True(Directory.EnumerateFiles(season).Single() is var only && Path.GetFileName(only).StartsWith("Seriál S01E10 - ", StringComparison.Ordinal) && Path.GetFileName(only).Contains("SK", StringComparison.Ordinal),
+            "only the newer result is in the library: " + string.Join(", ", Directory.EnumerateFiles(season).Select(Path.GetFileName)));
     }
 
     [Test]

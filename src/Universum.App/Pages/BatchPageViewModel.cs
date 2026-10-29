@@ -87,7 +87,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 RefreshCommands();
             }
         };
-        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork) &&
+        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork) &&
                                                              _services.Settings.OriginalHandling is not null);
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);

@@ -23,8 +23,10 @@ public sealed class MegaJob(
     public MegaBatch Batch { get; } = batch;
 
     /// <summary>The file and its prepared item, or why it cannot be written now (null item).</summary>
+    /// <param name="index">The library index: a result made from this original after the batch was prepared is never replaced.</param>
     public static async Task<(BatchItem? Item, string Problem)> CheckAsync(
-        MegaFile file, MegaBatch batch, Func<string, CancellationToken, Task<MediaFile>> inspect, CancellationToken cancellationToken)
+        MegaFile file, MegaBatch batch, Func<string, CancellationToken, Task<MediaFile>> inspect, CancellationToken cancellationToken,
+        LibraryIndex? index = null)
     {
         if (!File.Exists(file.Path))
         {
@@ -47,9 +49,10 @@ public sealed class MegaJob(
             return (null, "súbor sa nedá prečítať: " + ex.Message);
         }
 
-        if (MegaFile.TracksOf(media) != file.Tracks)
+        // the same checks as a run of Hromadné spracovanie: the file read now against the file that was analysed
+        if (FileProcessor.StructureOf(media) != file.Structure)
         {
-            return (null, "zmenili sa stopy súboru");
+            return (null, "súbor sa medzičasom zmenil (stopy, názvy, príznaky alebo tagy) – je to iný súbor, než ktorý sa pripravil");
         }
 
         var target = UniversumRules.Apply(media, batch.Profile, file.Decisions());
@@ -68,11 +71,30 @@ public sealed class MegaJob(
             Title = file.Title,
             Episode = file.Episode,
         };
-        return item.NeedsWork ? (item, "") : (null, "už je v knižnici");
+        if (!item.NeedsWork)
+        {
+            return (null, AlreadyInLibrary);
+        }
+
+        // processed meanwhile (Hromadné spracovanie, another batch): the same result is there, or one made with newer
+        // decisions – the batch's older decisions never replace it
+        if (index is not null && index.MadeSince(placement, await LibraryIndex.FingerprintAsync(file.Path, cancellationToken).ConfigureAwait(false), batch.CreatedUtc) is { } made)
+        {
+            return made == LibraryIndex.TargetSignature(target)
+                ? (null, AlreadyInLibrary)
+                : (null, "medzičasom sa spracoval inak (napr. v Hromadnom spracovaní) – dávka by novší výsledok prepísala staršími rozhodnutiami");
+        }
+
+        return (item, "");
     }
+
+    /// <summary>The reason of a file whose result is already in its place.</summary>
+    public const string AlreadyInLibrary = "už je v knižnici";
 
     protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
     {
+        // the check reads files (also from a cache): off the thread that added the job (the window's)
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         var waiting = Batch.Files.Where(f => f.State == MegaFileState.Waiting).ToList();
         context.Log(JobSeverity.Info, $"MEGA {Batch.Label}: {waiting.Count} súborov – kontrola pred spustením.");
         var items = new List<(BatchItem Item, MegaFile File)>();
@@ -80,11 +102,11 @@ public sealed class MegaJob(
         foreach (var file in waiting)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (item, problem) = await CheckAsync(file, Batch, inspect, cancellationToken).ConfigureAwait(false);
+            var (item, problem) = await CheckAsync(file, Batch, inspect, cancellationToken, processor.Index).ConfigureAwait(false);
             if (item is null)
             {
                 skipped++;
-                file.State = problem == "už je v knižnici" ? MegaFileState.AlreadyInLibrary : MegaFileState.Skipped;
+                file.State = problem == AlreadyInLibrary ? MegaFileState.AlreadyInLibrary : MegaFileState.Skipped;
                 file.Note = problem;
                 context.Log(file.State == MegaFileState.AlreadyInLibrary ? JobSeverity.Info : JobSeverity.Warning,
                     $"{(file.State == MegaFileState.AlreadyInLibrary ? "Už v knižnici" : "PRESKOČENÝ")}: {Path.GetFileName(file.Path)} – {problem}");

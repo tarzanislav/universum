@@ -69,8 +69,11 @@ public sealed class MegaFile
 
     public required DateTime ModifiedUtc { get; init; }
 
-    /// <summary>The tracks as they were read (ID, type, codec, language): the decisions are valid only for these.</summary>
-    public required string Tracks { get; init; }
+    /// <summary>
+    /// The file as it was analysed (tracks with their IDs, numbers, UIDs, codecs, names, languages, flags and tags; tags and
+    /// chapters of the file – <see cref="FileProcessor.StructureOf"/>): the decisions are valid only for this file.
+    /// </summary>
+    public required string Structure { get; init; }
 
     public required TitleInfo Title { get; init; }
 
@@ -104,10 +107,6 @@ public sealed class MegaFile
         Order = Order,
     };
 
-    /// <summary>The tracks of a file in the form kept in <see cref="Tracks"/>.</summary>
-    public static string TracksOf(MediaFile file) =>
-        string.Join(";", file.Tracks.Select(t => $"{t.Id}:{t.Type}:{t.CodecId ?? t.Codec}:{t.Language.Ietf ?? t.Language.Legacy}"));
-
     /// <summary>A prepared file of Hromadné spracovanie (it has its place in the library and something to do).</summary>
     public static MegaFile From(BatchItem item)
     {
@@ -122,7 +121,7 @@ public sealed class MegaFile
             Path = item.File.Path,
             Size = info.Length,
             ModifiedUtc = info.LastWriteTimeUtc,
-            Tracks = TracksOf(item.File),
+            Structure = FileProcessor.StructureOf(item.File),
             Title = item.Title,
             Episode = item.Episode,
             Languages = item.Decisions.Languages.ToDictionary(),
@@ -276,10 +275,18 @@ public sealed class MegaStore
             : null;
     }
 
-    /// <summary>Batches whose time has come; <paramref name="started"/> false marks those whose time passed long ago as missed.</summary>
-    public IReadOnlyList<MegaBatch> Due(DateTime now, bool started)
+    /// <summary>How late a batch may still start: a later one waits for the user (owner, 29. 10. 2026).</summary>
+    public static readonly TimeSpan Lateness = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// Batches whose time has come. One whose time passed more than <see cref="Lateness"/> ago – UNIVERSUM was not running,
+    /// the computer slept, or the time was set into the past – is marked missed and waits for the user: a night run is
+    /// never started in the morning by itself.
+    /// </summary>
+    public IReadOnlyList<MegaBatch> Due(DateTime now)
     {
         var due = new List<MegaBatch>();
+        var missed = false;
         foreach (var batch in _batches.Where(b => b is { State: MegaBatchState.Waiting, Start: MegaStart.At, StartAt: not null }))
         {
             if (batch.StartAt!.Value > now)
@@ -287,18 +294,17 @@ public sealed class MegaStore
                 continue;
             }
 
-            // owner, 29. 10. 2026: a night run is not started in the morning without the user – a time missed while
-            // UNIVERSUM was not running (more than a few minutes ago at its start) waits for the user
-            if (!started && now - batch.StartAt.Value > TimeSpan.FromMinutes(5))
+            if (now - batch.StartAt.Value > Lateness)
             {
                 batch.State = MegaBatchState.Missed;
+                missed = true;
                 continue;
             }
 
             due.Add(batch);
         }
 
-        if (!started)
+        if (missed)
         {
             Save();
         }

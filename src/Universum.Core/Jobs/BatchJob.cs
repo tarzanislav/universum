@@ -21,6 +21,9 @@ public sealed class BatchJob(
     /// <summary>The results of the run (empty before it).</summary>
     public IReadOnlyList<ProcessingResult> Results => _results;
 
+    /// <summary>The files the run writes (MEGA spracovanie never starts them in another job meanwhile).</summary>
+    public IReadOnlyList<string> Paths { get; } = items.Where(i => i.NeedsWork).Select(i => i.File.Path).ToList();
+
     /// <summary>The number of files the run writes.</summary>
     public int FileCount { get; } = items.Count(i => i.NeedsWork);
 

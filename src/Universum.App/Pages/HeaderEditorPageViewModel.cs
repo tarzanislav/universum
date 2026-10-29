@@ -187,7 +187,13 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
                 row.Take(track);
             }
 
+            // subtitles out of the language list are marked for removal (the user can take them back)
             var rest = Rows.Where(r => !ordered.Contains(r)).ToList();
+            foreach (var row in rest.Where(r => target.RemovedByLanguage.Any(t => t.Id == r.TrackId)))
+            {
+                row.IsRemoved = true;
+            }
+
             Rows.Clear();
             foreach (var row in ordered.Concat(rest))
             {

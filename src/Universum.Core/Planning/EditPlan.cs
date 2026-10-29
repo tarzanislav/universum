@@ -42,6 +42,10 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             AddFlag(changes, track, ChangeKind.Default, source.Flags.Default, track.Flags.Default);
             AddFlag(changes, track, ChangeKind.Enabled, source.Flags.Enabled, track.Flags.Enabled);
             AddFlag(changes, track, ChangeKind.Forced, source.Flags.Forced, track.Flags.Forced);
+            if (track.OtherFlagsChanged)
+            {
+                changes.Add(new PlannedChange(track.TrackId, ChangeKind.OtherFlags, OtherFlags(source.Flags), OtherFlags(track.Flags)));
+            }
         }
 
         foreach (var removed in target.Removed)
@@ -72,6 +76,13 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
 
         return changes;
     }
+
+    // "hearing impaired, original" – the flags beyond default, enabled and forced that are set
+    private static string OtherFlags(Media.TrackFlags flags) => string.Join(", ", new[]
+    {
+        flags.HearingImpaired ? "hearing impaired" : null, flags.VisualImpaired ? "visual impaired" : null,
+        flags.TextDescriptions ? "text descriptions" : null, flags.Original ? "original" : null, flags.Commentary ? "commentary" : null,
+    }.OfType<string>());
 
     private static void AddFlag(List<PlannedChange> changes, TrackTarget track, ChangeKind kind, bool before, bool after)
     {

@@ -42,6 +42,15 @@ public sealed class GroupDecisions
         chosen[key] = chosenLanguage;
     }
 
+    /// <summary>Subtitle slots kept although their language is not among the profile's subtitle languages.</summary>
+    public HashSet<SlotKey> Kept { get; } = [];
+
+    /// <summary>
+    /// The order of slots the user gave (owner, 29. 10. 2026: dragged up or down); the slots not listed follow in the
+    /// rules' order.
+    /// </summary>
+    public List<SlotKey> Order { get; } = [];
+
     /// <summary>Files (full paths) to process even though required template slots are missing.</summary>
     public HashSet<string> ProcessAnyway { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 }

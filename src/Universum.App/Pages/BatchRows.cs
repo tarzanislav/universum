@@ -48,13 +48,68 @@ public sealed class SlotRow : ObservableObject
     private readonly Action _changed;
     private LanguageEvidence? _evidence;
 
-    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed)
+    private readonly Action<SlotRow, int>? _move;
+    private bool _removedByLanguage;
+
+    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null)
     {
         Group = group;
         Key = key;
         Track = track;
         _changed = changed;
+        _move = move;
+        MoveUpCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, -1), () => !_removedByLanguage);
+        MoveDownCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, 1), () => !_removedByLanguage);
         Refresh();
+    }
+
+    /// <summary>Moves the track one place up among the tracks of its type (owner, 29. 10. 2026).</summary>
+    public CommunityToolkit.Mvvm.Input.RelayCommand MoveUpCommand { get; }
+
+    public CommunityToolkit.Mvvm.Input.RelayCommand MoveDownCommand { get; }
+
+    /// <summary>
+    /// The subtitles are left out: their language is not among the subtitle languages (Nastavenia) nor the audio's.
+    /// </summary>
+    public bool IsRemovedByLanguage => _removedByLanguage;
+
+    /// <summary>The user keeps the subtitles although their language is not in the list.</summary>
+    public bool Kept
+    {
+        get => Group.Decisions.Kept.Contains(Key);
+        set
+        {
+            if (value)
+            {
+                Group.Decisions.Kept.Add(Key);
+            }
+            else
+            {
+                Group.Decisions.Kept.Remove(Key);
+            }
+
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>Subtitles out of the language list: the user may keep them.</summary>
+    public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);
+
+    /// <summary>What happens with the track in the result when it is not just kept.</summary>
+    public string ResultNote => _removedByLanguage ? "odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)"
+        : Kept ? "ponechané – jazyk mimo zoznamu titulkov"
+        : "";
+
+    /// <summary>Called after a recalculation with what the rules do with the track in the group's first file.</summary>
+    public void SetRemovedByLanguage(bool removed)
+    {
+        _removedByLanguage = removed;
+        OnPropertyChanged(nameof(IsRemovedByLanguage));
+        OnPropertyChanged(nameof(CanKeep));
+        OnPropertyChanged(nameof(ResultNote));
+        MoveUpCommand.NotifyCanExecuteChanged();
+        MoveDownCommand.NotifyCanExecuteChanged();
     }
 
     public BatchGroup Group { get; }
@@ -76,17 +131,20 @@ public sealed class SlotRow : ObservableObject
     public IReadOnlyList<Language> LanguageChoices => Languages.All;
 
     /// <summary>
-    /// Language chosen for the whole group (only for undetermined tracks); without a choice the language named in the
-    /// track name ("CZ titulky"), which is used as it is – another choice overrides it.
+    /// Language chosen for the whole group; without a choice the file's language, or the language named in the track
+    /// name ("CZ titulky"), which is used as it is – another choice overrides it (owner, 29. 10. 2026: also a wrong
+    /// language written in the file, "EN" that is Czech).
     /// </summary>
     public Language? ChosenLanguage
     {
         get => Group.Decisions.Languages.TryGetValue(Key, out var tag) ? Languages.Find(tag.Primary)
+            : !NeedsLanguage ? Languages.Find(Track.Language.Primary)
             : _evidence is { Source: EvidenceSource.TrackName } named ? Languages.Find(named.Language.Primary)
             : null;
         set
         {
-            if (value is null)
+            // the file's own language again: no decision is needed
+            if (value is null || (!NeedsLanguage && string.Equals(LanguageTag.FromCode(value.Ietf).Primary, Track.Language.Primary, StringComparison.OrdinalIgnoreCase)))
             {
                 Group.Decisions.Languages.Remove(Key);
             }
@@ -106,7 +164,9 @@ public sealed class SlotRow : ObservableObject
     /// </summary>
     public string Evidence => _evidence is null && FileSuggestions is { Length: > 0 } files
         ? $"návrhy pri súboroch: {files} – potvrďte ich tlačidlom Potvrdiť návrhy (alebo vyberte jazyk pre celú skupinu)"
-        : Texts.Evidence(_evidence);
+        : !NeedsLanguage && _evidence is { Source: EvidenceSource.GroupDecision }
+            ? $"vaša voľba (v súbore: {Texts.Language(Track.Language)})"
+            : Texts.Evidence(_evidence);
 
     // the files' own suggestions for this track, by language: "angličtina 20×, čeština 2×"
     private string FileSuggestions => string.Join(", ", Group.FileSuggestions.Values
@@ -178,6 +238,9 @@ public sealed class SlotRow : ObservableObject
         OnPropertyChanged(nameof(Suggested));
         OnPropertyChanged(nameof(Forced));
         OnPropertyChanged(nameof(ForcedHint));
+        OnPropertyChanged(nameof(Kept));
+        OnPropertyChanged(nameof(CanKeep));
+        OnPropertyChanged(nameof(ResultNote));
     }
 }
 

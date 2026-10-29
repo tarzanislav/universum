@@ -892,6 +892,7 @@ public sealed class BatchPageViewModel : ObservableObject
             slot.Refresh();
         }
 
+        ArrangeSlots();
         var byItem = _items.ToDictionary(i => i.File.Path);
         foreach (var file in FileRows)
         {
@@ -959,6 +960,66 @@ public sealed class BatchPageViewModel : ObservableObject
         return name;
     }
 
+    /// <summary>
+    /// Moves a track of the group one place up (-1) or down (+1) among the kept tracks of its type (owner, 29. 10. 2026);
+    /// the order is the group's decision for all its files.
+    /// </summary>
+    public void MoveSlot(SlotRow row, int by)
+    {
+        var same = SlotRows.Where(s => s.Key.Type == row.Key.Type && !s.IsRemovedByLanguage).ToList();
+        var at = same.IndexOf(row);
+        if (at >= 0 && at + by >= 0 && at + by < same.Count)
+        {
+            MoveSlotTo(row, same[at + by]);
+        }
+    }
+
+    /// <summary>Puts a dragged track at the place of another track of the same type.</summary>
+    public void MoveSlotTo(SlotRow row, SlotRow target)
+    {
+        if (row == target || row.Key.Type != target.Key.Type || row.Group != target.Group || row.IsRemovedByLanguage || target.IsRemovedByLanguage)
+        {
+            return;
+        }
+
+        var order = SlotRows.Where(s => !s.IsRemovedByLanguage).ToList();
+        var down = order.IndexOf(row) < order.IndexOf(target);
+        order.Remove(row);
+        order.Insert(order.IndexOf(target) + (down ? 1 : 0), row);
+        row.Group.Decisions.Order.Clear();
+        row.Group.Decisions.Order.AddRange(order.Select(s => s.Key));
+        Replan();
+    }
+
+    /// <summary>The group's tracks in the order of the result (of its first file), the left-out subtitles at the end.</summary>
+    private void ArrangeSlots()
+    {
+        if (SlotRows.Count == 0 || SlotRows[0].Group is not { } group ||
+            _items.FirstOrDefault(i => i.Group == group && i.File == group.Representative) is not { } item)
+        {
+            return;
+        }
+
+        var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
+        var removed = item.Target.RemovedByLanguage.Where(t => keyOf.ContainsKey(t.Id)).Select(t => keyOf[t.Id]).ToHashSet();
+        var order = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).Select(t => keyOf[t.TrackId]).ToList();
+        foreach (var slot in SlotRows)
+        {
+            slot.SetRemovedByLanguage(removed.Contains(slot.Key));
+        }
+
+        var wanted = SlotRows.OrderBy(s => order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
+            .ThenBy(s => s.Key.Type).ThenBy(s => s.Key.Ordinal).ToList();
+        for (var i = 0; i < wanted.Count; i++)
+        {
+            var from = SlotRows.IndexOf(wanted[i]);
+            if (from != i)
+            {
+                SlotRows.Move(from, i);
+            }
+        }
+    }
+
     private void ShowGroup()
     {
         SlotRows.Clear();
@@ -972,8 +1033,10 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var (key, track) in SlotKey.Of(group.Representative))
         {
-            SlotRows.Add(new SlotRow(group, key, track, Replan));
+            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot));
         }
+
+        ArrangeSlots();
 
         foreach (var item in _items.Where(i => i.Group == group))
         {

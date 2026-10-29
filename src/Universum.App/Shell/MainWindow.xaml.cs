@@ -121,6 +121,50 @@ public partial class MainWindow : Window
         }
     }
 
+    // Hromadné spracovanie, Stopy skupiny: a track is dragged by its grip onto the place of another track of its type
+    private void OnSlotGripDown(object sender, MouseButtonEventArgs e) => _listDragStart = e.GetPosition(this);
+
+    private void OnSlotGripMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && sender is FrameworkElement { DataContext: SlotRow row } grip && !row.IsRemovedByLanguage &&
+            (e.GetPosition(this) - _listDragStart).Length > SystemParameters.MinimumVerticalDragDistance)
+        {
+            DragDrop.DoDragDrop(grip, new DataObject(typeof(SlotRow), row), DragDropEffects.Move);
+        }
+    }
+
+    private void OnSlotDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetData(typeof(SlotRow)) is SlotRow dragged && SlotUnder(e) is { } target &&
+                    target.Key.Type == dragged.Key.Type && !target.IsRemovedByLanguage
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnSlotDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(SlotRow)) is SlotRow dragged && SlotUnder(e) is { } target)
+        {
+            Model.Batch.MoveSlotTo(dragged, target);
+            e.Handled = true;
+        }
+    }
+
+    // the track of the row under the mouse
+    private static SlotRow? SlotUnder(DragEventArgs e)
+    {
+        for (var element = e.OriginalSource as DependencyObject; element is not null; element = System.Windows.Media.VisualTreeHelper.GetParent(element))
+        {
+            if (element is System.Windows.Controls.DataGridRow { DataContext: SlotRow row })
+            {
+                return row;
+            }
+        }
+
+        return null;
+    }
+
     private void OnDragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;

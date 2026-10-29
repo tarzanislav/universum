@@ -125,6 +125,26 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task GroupCorrectsLanguagesAndOrder()
+    {
+        // owner, 29. 10. 2026: a language written in the file can be corrected for the whole group ("EN" that is Czech),
+        // and the tracks moved up or down keep that order in every file of the group
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        var series = analysis.Groups[0];
+        series.Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        series.Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
+        series.Decisions.Order.AddRange([new SlotKey(TrackType.Subtitles, 2), new SlotKey(TrackType.Subtitles, 0)]);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Where(i => i.Group == series).ToList();
+        foreach (var item in items)
+        {
+            Assert.Equal(EvidenceSource.GroupDecision, item.Evidence[new SlotKey(TrackType.Audio, 0)].Source, "the group's choice wins over the file");
+            Assert.Equal("cs,sk", string.Join(",", item.Target.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.Language.Primary)), "Slovak audio, Czech first");
+            Assert.Equal("en,cs,cs", string.Join(",", item.Target.Tracks.Where(t => t.Type == TrackType.Subtitles).Select(t => t.Language.Primary)), "the user's order");
+        }
+    }
+
+    [Test]
     public async Task TemplateToleratesMissingOptionalTracks()
     {
         using var work = await SeriesFolderAsync();

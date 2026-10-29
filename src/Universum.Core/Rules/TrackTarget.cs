@@ -15,8 +15,11 @@ public sealed record TrackTarget(MediaTrack Source, string? Name, LanguageTag La
 
     public bool LanguageChanged => !string.Equals(Source.Language.Primary, Language.Primary, StringComparison.OrdinalIgnoreCase);
 
-    public bool FlagsChanged =>
-        Source.Flags.Default != Flags.Default || Source.Flags.Enabled != Flags.Enabled || Source.Flags.Forced != Flags.Forced;
+    public bool FlagsChanged => Source.Flags != Flags;
+
+    /// <summary>A flag other than default, enabled and forced changes (hearing impaired, original, commentary …).</summary>
+    public bool OtherFlagsChanged =>
+        (Source.Flags with { Default = false, Enabled = false, Forced = false }) != (Flags with { Default = false, Enabled = false, Forced = false });
 
     public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged;
 }

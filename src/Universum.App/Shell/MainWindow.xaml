@@ -1337,25 +1337,49 @@
                                 <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
                             </WrapPanel>
                         </DockPanel>
+                        <!-- owner, 29. 10. 2026: the tracks in the order of the result; dragged by the grip (or the arrows) within their type -->
                         <DataGrid Grid.Row="3" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False"
+                                  AllowDrop="True" DragOver="OnSlotDragOver" Drop="OnSlotDrop">
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                     <Setter Property="Background" Value="{Binding Key.Type, Converter={StaticResource TrackTypeBrush}}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRemovedByLanguage}" Value="True">
+                                            <Setter Property="Opacity" Value="0.55" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Poradie" Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)"
+                                                        PreviewMouseLeftButtonDown="OnSlotGripDown" MouseMove="OnSlotGripMove">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
+                                                </Border>
+                                                <Button Command="{Binding MoveUpCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="Posunúť stopu hore">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70E;" FontSize="10" />
+                                                </Button>
+                                                <Button Command="{Binding MoveDownCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="Posunúť stopu dole">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="10" />
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Stopa" Binding="{Binding Slot}" />
                                 <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="70" />
                                 <DataGridTextColumn Header="Názov v súbore" Binding="{Binding Name}" Width="*" MinWidth="80" />
                                 <DataGridTemplateColumn Header="Jazyk" Width="150">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Grid>
-                                                <TextBlock Text="{Binding FileLanguage}" Visibility="{Binding NeedsLanguage, Converter={StaticResource InverseBoolToVisibility}}" VerticalAlignment="Center" />
-                                                <ComboBox Visibility="{Binding NeedsLanguage, Converter={StaticResource BoolToVisibility}}" ItemsSource="{Binding LanguageChoices}"
-                                                          DisplayMemberPath="SlovakName" SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}" />
-                                            </Grid>
+                                            <!-- owner, 29. 10. 2026: also a language written in the file can be corrected ("EN" that is Czech) -->
+                                            <ComboBox ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName"
+                                                      SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                      ToolTip="Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -1365,6 +1389,10 @@
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Evidence}" TextWrapping="Wrap" FontSize="11.5" />
                                                 <TextBlock Text="{Binding Suggested}" FontWeight="SemiBold" FontSize="11.5" />
+                                                <CheckBox Visibility="{Binding CanKeep, Converter={StaticResource BoolToVisibility}}" IsChecked="{Binding Kept, UpdateSourceTrigger=PropertyChanged}"
+                                                          FontSize="11.5" Margin="0,2,0,0" ToolTip="Tieto titulky ponechať, hoci ich jazyk nie je v zozname titulkov (Nastavenia)">
+                                                    <TextBlock Text="{Binding ResultNote}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                                </CheckBox>
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -2839,6 +2867,10 @@
                             <TextBlock Text="Preferované jazyky (v poradí priority, kódy oddelené čiarkou)" FontWeight="SemiBold" />
                             <TextBox Text="{Binding PreferredLanguages, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,4" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" Text="Stopy v týchto jazykoch idú prvé; zvuk v nich znamená, že sa úplné titulky nezapínajú; forced platí len pre ne." />
+                            <TextBlock Text="Jazyky titulkov (v tomto poradí, kódy oddelené čiarkou)" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBox Text="{Binding SubtitleLanguages, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,4" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap"
+                                       Text="Titulky v iných jazykoch sa odstránia – okrem titulkov v jazyku niektorej zvukovej stopy (idú za týmito). V Hromadnom spracovaní ich môžete pri stope ponechať. Prázdne = ponechať všetky titulky." />
                             <TextBlock Text="Slová pre forced titulky" FontWeight="SemiBold" Margin="0,14,0,0" />
                             <TextBox Text="{Binding ForcedKeywords, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
                             <TextBlock Text="Slová pre titulky pre nepočujúcich" FontWeight="SemiBold" Margin="0,14,0,0" />

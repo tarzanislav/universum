@@ -371,6 +371,12 @@ public sealed class FileProcessor(
             }
 
             arguments.AddRange(["--set", "flag-default=" + Bit(track.Default), "--set", "flag-enabled=" + Bit(track.Enabled), "--set", "flag-forced=" + Bit(track.Forced)]);
+            if (track.OtherFlags is { } other)
+            {
+                arguments.AddRange(["--set", "flag-hearing-impaired=" + Bit(other.HearingImpaired), "--set", "flag-visual-impaired=" + Bit(other.VisualImpaired),
+                    "--set", "flag-text-descriptions=" + Bit(other.TextDescriptions), "--set", "flag-original=" + Bit(other.Original),
+                    "--set", "flag-commentary=" + Bit(other.Commentary)]);
+            }
         }
 
         return arguments;
@@ -813,7 +819,8 @@ public sealed class FileProcessor(
             TitleSaved = true,
             Title = file.Title,
             Tracks = file.Tracks.Where(t => t.Number is not null)
-                .Select(t => new UndoTrack(t.Number!.Value, t.Name, t.Language.Legacy, t.Language.Ietf, t.Flags.Default, t.Flags.Enabled, t.Flags.Forced, t.Uid))
+                .Select(t => new UndoTrack(t.Number!.Value, t.Name, t.Language.Legacy, t.Language.Ietf, t.Flags.Default, t.Flags.Enabled, t.Flags.Forced, t.Uid,
+                    new UndoFlags(t.Flags.HearingImpaired, t.Flags.VisualImpaired, t.Flags.TextDescriptions, t.Flags.Original, t.Flags.Commentary)))
                 .ToList(),
         };
         var path = Path.Combine(journalDirectory, id + ".undo.json");

@@ -285,7 +285,10 @@ public sealed class RulesPageViewModel : ObservableObject
             WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({ChangeCount(_plan.Changes.Count)}) – trvá to pár sekúnd.",
             _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
             _ => $"Mení sa poradie stôp – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
-        } + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
+        } + (target.RemovedByLanguage.Count > 0
+                ? " Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): " + string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))) + "."
+                : "")
+          + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
         UpdateTarget();
     }

@@ -40,6 +40,11 @@ public static class TargetVerifier
             Check(problems, actual.Flags.Default == expected.Flags.Default, $"{where}: default {actual.Flags.Default}, expected {expected.Flags.Default}");
             Check(problems, actual.Flags.Enabled == expected.Flags.Enabled, $"{where}: enabled {actual.Flags.Enabled}, expected {expected.Flags.Enabled}");
             Check(problems, actual.Flags.Forced == expected.Flags.Forced, $"{where}: forced {actual.Flags.Forced}, expected {expected.Flags.Forced}");
+            if (expected.OtherFlagsChanged)
+            {
+                var flags = actual.Flags with { Default = expected.Flags.Default, Enabled = expected.Flags.Enabled, Forced = expected.Flags.Forced };
+                Check(problems, flags == expected.Flags, $"{where}: flags {actual.Flags}, expected {expected.Flags}");
+            }
         }
 
         Check(problems, !target.RepairIndex || result.TracksOf(TrackType.Video).All(v => v.IndexEntries is null or > 0), "video index still missing");

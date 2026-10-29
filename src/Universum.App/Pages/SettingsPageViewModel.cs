@@ -16,6 +16,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private string _preferredLanguages = "";
+    private string _subtitleLanguages = "";
     private string _forcedKeywords = "";
     private string _hearingImpairedKeywords = "";
     private string _commentaryKeywords = "";
@@ -395,6 +396,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string PreferredLanguages { get => _preferredLanguages; set => SetProperty(ref _preferredLanguages, value); }
 
+    /// <summary>Subtitle languages kept, in their order (owner, 29. 10. 2026: cs, sk, en, pl, hu, ru).</summary>
+    public string SubtitleLanguages { get => _subtitleLanguages; set => SetProperty(ref _subtitleLanguages, value); }
+
     public string ForcedKeywords { get => _forcedKeywords; set => SetProperty(ref _forcedKeywords, value); }
 
     public string HearingImpairedKeywords { get => _hearingImpairedKeywords; set => SetProperty(ref _hearingImpairedKeywords, value); }
@@ -414,6 +418,7 @@ public sealed class SettingsPageViewModel : ObservableObject
     private void Load(RuleProfile profile)
     {
         PreferredLanguages = string.Join(", ", profile.PreferredLanguages);
+        SubtitleLanguages = string.Join(", ", profile.SubtitleLanguages);
         ForcedKeywords = string.Join(", ", profile.ForcedKeywords);
         HearingImpairedKeywords = string.Join(", ", profile.HearingImpairedKeywords);
         CommentaryKeywords = string.Join(", ", profile.CommentaryKeywords);
@@ -542,6 +547,7 @@ public sealed class SettingsPageViewModel : ObservableObject
             Library = RuleProfile.Default.Library with { Movies = movieSizes, Series = seriesSizes },
             Name = "Vlastný profil",
             PreferredLanguages = languages,
+            SubtitleLanguages = List(SubtitleLanguages).Select(code => Languages.Find(code)?.Ietf ?? code.ToLowerInvariant()).Distinct().ToList(),
             ForcedKeywords = List(ForcedKeywords),
             HearingImpairedKeywords = List(HearingImpairedKeywords),
             CommentaryKeywords = List(CommentaryKeywords),
@@ -571,7 +577,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     private static bool IsDefault(RuleProfile profile)
     {
         var d = RuleProfile.Default;
-        return profile.PreferredLanguages.SequenceEqual(d.PreferredLanguages) && profile.ForcedKeywords.SequenceEqual(d.ForcedKeywords) &&
+        return profile.PreferredLanguages.SequenceEqual(d.PreferredLanguages) && profile.SubtitleLanguages.SequenceEqual(d.SubtitleLanguages) &&
+               profile.ForcedKeywords.SequenceEqual(d.ForcedKeywords) &&
                profile.HearingImpairedKeywords.SequenceEqual(d.HearingImpairedKeywords) && profile.CommentaryKeywords.SequenceEqual(d.CommentaryKeywords) &&
                profile.RemoveTags == d.RemoveTags && profile.RepairIndex == d.RepairIndex && profile.VideoNameLength == d.VideoNameLength &&
                profile.Library.Movies == d.Library.Movies && profile.Library.Series == d.Library.Series;

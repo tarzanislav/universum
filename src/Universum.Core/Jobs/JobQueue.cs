@@ -95,6 +95,12 @@ public sealed class JobQueue
             return false;
         }
 
+        // a page may wait for a job (Hromadné spracovanie): a waiting one taken away is finished as cancelled
+        if (job.Status == JobStatus.Waiting)
+        {
+            job.MarkCancelled();
+        }
+
         lock (_jobs)
         {
             if (!_jobs.Remove(job))

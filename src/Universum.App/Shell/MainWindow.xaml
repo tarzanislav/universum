@@ -1525,7 +1525,7 @@
                                 <Button Content="{Binding PauseText}" Command="{Binding PauseCommand}" Margin="0,0,6,0" Padding="10,4" />
                                 <Button Content="Zastaviť" Command="{Binding StopCommand}" Margin="0,0,6,0" Padding="10,4"
                                         ToolTip="Dokončí rozpracované súbory a ďalej nepokračuje" />
-                                <Button Content="Spustiť" Command="{Binding RunCommand}" Padding="18,4" />
+                                <Button Content="Spustiť" Command="{Binding RunCommand}" Padding="18,4" ToolTip="Spustí spracovanie ako úlohu vo Fronte úloh (priebeh aj výstup každého súboru uvidíte aj tam)" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Simulation}" FontWeight="SemiBold" TextWrapping="Wrap" />

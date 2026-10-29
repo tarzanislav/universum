@@ -487,6 +487,39 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task RunIsAJobOfTheQueue()
+    {
+        // owner, 29. 10. 2026: Hromadné spracovanie is seen in Fronta úloh and Výstup úloh – a line for every file
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library);
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(work.Path, "_journal"));
+        var queue = new Universum.Core.Jobs.JobQueue();
+
+        // a run still waiting is taken out of the queue: it ends as cancelled, nothing is written
+        var waiting = new Universum.Core.Jobs.BatchJob("čaká", items, processor, new OutputOptions(OriginalHandling.Keep));
+        queue.Add(waiting);
+        Assert.True(queue.Remove(waiting) && waiting.Status == Universum.Core.Jobs.JobStatus.Cancelled && waiting.Results.Count == 0, "removed before it ran");
+
+        var job = new Universum.Core.Jobs.BatchJob("Hromadné spracovanie: test", items, processor, new OutputOptions(OriginalHandling.Keep));
+        queue.Add(job);
+        await queue.Start();
+
+        Assert.Equal(Universum.Core.Jobs.JobStatus.Done, job.Status, string.Join(" | ", job.Messages.Select(m => m.Text)));
+        Assert.Equal(5, job.FileCount, "five files to write");
+        Assert.Equal(6, job.Messages.Count, "the start and a line per file: " + string.Join(" | ", job.Messages.Select(m => m.Text)));
+        Assert.True(job.Messages.Skip(1).All(m => m.Text.Contains(" / 5 · OK: ", StringComparison.Ordinal) && m.Text.Contains("Season 01", StringComparison.Ordinal)),
+            "each file with its place in the library");
+        Assert.Equal("5 z 5 súborov v knižnici.", job.Outcome, "outcome in the queue");
+        Assert.Equal(1.0, job.Progress, "progress");
+        Assert.True(!queue.Retry(job), "a finished run is not repeated from the queue (the page analyses again)");
+    }
+
+    [Test]
     public async Task RunWritesSeriesIntoTheLibrary()
     {
         using var work = await SeriesFolderAsync();

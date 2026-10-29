@@ -54,7 +54,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private bool _busy;
     private bool _running;
     private BatchControl? _control;
-    private CancellationTokenSource? _cancellation;
+    private Core.Jobs.BatchJob? _job;
 
     public BatchPageViewModel(AppServices services)
     {
@@ -1713,8 +1713,6 @@ public sealed class BatchPageViewModel : ObservableObject
 
         Busy = true;
         _running = true;
-        _control = new BatchControl();
-        _cancellation = new CancellationTokenSource();
         Finish = null;
         var started = System.Diagnostics.Stopwatch.StartNew();
         RefreshCommands();
@@ -1722,14 +1720,34 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             var processor = _services.Processor(installation);
             _library.Layout.EnsureCreated();
-            _results = await BatchRunner.RunAsync(
+
+            // owner, 29. 10. 2026: the run is a job of the job queue – seen in Fronta úloh and Výstup úloh
+            var job = new Core.Jobs.BatchJob(
+                $"Hromadné spracovanie: {Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))} → knižnica",
                 _items, processor, new OutputOptions(handling),
                 new Progress<BatchProgress>(p =>
                 {
                     Progress = p.Total == 0 ? 0 : (p.Finished + (p.Result is null ? p.FileFraction : 0)) / p.Total;
                     RunState = $"{p.Finished} / {p.Total} · {Path.GetFileName(p.Item.File.Path)}";
-                }),
-                _control, _cancellation.Token);
+                }));
+            _job = job;
+            _control = job.Control;
+            var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            job.Changed += j =>
+            {
+                if (j.IsFinished)
+                {
+                    finished.TrySetResult();
+                }
+            };
+            _services.Jobs.Add(job, start: true);
+            if (job.Status == Core.Jobs.JobStatus.Waiting && _services.Jobs.Running is { } other)
+            {
+                RunState = $"Čaká vo fronte úloh – najprv sa dokončí úloha {other.Id} ({other.Description}).";
+            }
+
+            await finished.Task;
+            _results = job.Results;
             var cache = _services.Inspector(installation);
             foreach (var result in _results.Where(r => r.Status == ProcessingStatus.Done))
             {
@@ -1744,17 +1762,23 @@ public sealed class BatchPageViewModel : ObservableObject
             var done = _results.Count(r => r.Status == ProcessingStatus.Done);
             var failed = _results.Count(r => r.Status == ProcessingStatus.Failed);
             var present = _results.Count(r => r.Status == ProcessingStatus.AlreadyInLibrary);
-            RunState = $"Hotovo: {done} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
-                       (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
-                       (_control.StopAfterCurrent ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
+
+            // cancelled in the job queue (Zrušiť), or the run itself failed (its message is in Výstup úloh)
+            var cancelled = job.Status == Core.Jobs.JobStatus.Cancelled;
+            var broken = job.Status == Core.Jobs.JobStatus.Failed && _results.Count == 0;
+            var stopped = cancelled || _control.StopAfterCurrent;
+            RunState = broken ? $"Spracovanie sa nepodarilo spustiť – pozri Výstup úloh (úloha {job.Id})."
+                : $"Hotovo: {done} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
+                  (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
+                  (cancelled ? " – zrušené vo fronte úloh." : stopped ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
             _ranSinceAnalysis = true;
             var took = started.Elapsed;
             var time = took.TotalMinutes >= 1 ? $"{(int)took.TotalHours}:{took.Minutes:00}:{took.Seconds:00}" : $"{Math.Max(1, (int)took.TotalSeconds)} s";
             Finish = new BatchFinish(
-                failed > 0 ? BatchFinishKind.Errors : _control.StopAfterCurrent ? BatchFinishKind.Stopped : BatchFinishKind.Done,
-                (failed > 0 ? "HOTOVO S CHYBAMI" : _control.StopAfterCurrent ? "ZASTAVENÉ" : "HOTOVO") + $" – spracovanie skončilo o {DateTime.Now:H:mm}",
+                failed > 0 || broken ? BatchFinishKind.Errors : stopped ? BatchFinishKind.Stopped : BatchFinishKind.Done,
+                (broken ? "CHYBA" : failed > 0 ? "HOTOVO S CHYBAMI" : cancelled ? "ZRUŠENÉ" : stopped ? "ZASTAVENÉ" : "HOTOVO") + $" – spracovanie skončilo o {DateTime.Now:H:mm}",
                 $"{Texts.Count(done, "súbor", "súbory", "súborov")} v knižnici" + (present > 0 ? $" · {present} tam už bolo" : "") +
-                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") + $" · trvanie {time}");
+                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") + $" · trvanie {time} · úloha {job.Id} vo Fronte úloh");
         }
         finally
         {
@@ -1800,6 +1824,12 @@ public sealed class BatchPageViewModel : ObservableObject
             _control.StopAfterCurrent = true;
             _control.Resume();
             RunState = "Zastavím po dokončení rozpracovaných súborov…";
+
+            // a run still waiting in the job queue is taken out of it
+            if (_job is { Status: Core.Jobs.JobStatus.Waiting } waiting)
+            {
+                _services.Jobs.Cancel(waiting);
+            }
         }
     }
 

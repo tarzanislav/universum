@@ -283,6 +283,27 @@ in next to it without changing the rules, planning or UI.
 - `Batch/BatchRunner` – processes the files that need work: files whose source or target drives meet one after
   another, others in parallel (with one output drive: one at a time); pause, resume, stop after the current file.
   `BatchReport` writes CSV and HTML reports with the target paths.
+- `Jobs/BatchJob` – a run of Hromadné spracovanie as one job of the job queue (owner, 29. 10. 2026): progress and a line
+  per file in the job output; pause and stop stay on the page, Zrušiť in the queue cancels.
+
+## MEGA spracovanie (owner, 29. 10. 2026)
+
+- `Mega/MegaStore` – batches prepared in Hromadné spracovanie, kept in `mega.json` (written atomically, a broken list is
+  renamed aside, never deleted). A `MegaBatch` is the exact list of its files (`MegaFile`: path, size, time of the last
+  change, tracks by ID/type/codec/language) with every decision (track decisions by track ID, title, episode, planned
+  place) and the rules' profile with the template, the library and the handling of originals at the time it was made.
+  Files of open batches are reserved: `BatchPlanner.Plan(…, reserved)` marks them `InMegaBatch` ("v dávke N"), so a file
+  belongs to one open batch only and is never written by Hromadné spracovanie meanwhile.
+- Start: by the user, after the batch above it, or at a date and time (`Due`, checked every 30 s while UNIVERSUM runs);
+  a batch more than `Lateness` (3 min) late – UNIVERSUM not running, the computer asleep, a time set into the past – is
+  marked `Missed` and waits for the user. A batch queued when UNIVERSUM ended waits again. A batch is taken (`Queued`)
+  before anything is awaited, so it never starts twice.
+- `Mega/MegaJob` – a batch as a job of the job queue. Right before writing every file is read again: missing, changed
+  (size, time, `FileProcessor.StructureOf` of the analysed file – the same fields as a run of Hromadné spracovanie),
+  blocked, already in its place, or with a result in its folder made from the same original after the batch was
+  prepared (`LibraryIndex.MadeSince` – newer decisions are never replaced or doubled) → skipped with the reason; the rest
+  is planned again from the stored decisions (the same target) and written by `BatchRunner`. Retrying skipped files
+  leaves out files taken meanwhile by another open batch or an unfinished job.
 
 ## Updates (specification, section 4)
 

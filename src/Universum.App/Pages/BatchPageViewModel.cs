@@ -78,6 +78,17 @@ public sealed class BatchPageViewModel : ObservableObject
         StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null || _speechCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
+        // a batch of MEGA spracovanie added, finished or removed: its files are free again or taken
+        services.MegaChanged += () =>
+        {
+            if (!Busy && _analysis is not null)
+            {
+                Replan();
+                RefreshCommands();
+            }
+        };
+        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork) &&
+                                                             _services.Settings.OriginalHandling is not null);
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
@@ -227,6 +238,15 @@ public sealed class BatchPageViewModel : ObservableObject
     public RelayCommand RulesOnlyCommand { get; }
 
     public AsyncRelayCommand RunCommand { get; }
+
+    /// <summary>
+    /// Odoslať do MEGA (owner, 29. 10. 2026): the prepared files become a batch of MEGA spracovanie, written later; files
+    /// waiting for a check stay here.
+    /// </summary>
+    public RelayCommand SendToMegaCommand { get; }
+
+    /// <summary>Opens MEGA spracovanie after a batch was sent (the main window switches the page).</summary>
+    public event Action? MegaRequested;
 
     public RelayCommand PauseCommand { get; }
 
@@ -878,7 +898,9 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         BatchPlanner.Suggest(_analysis, _services.Profile);
-        _items = BatchPlanner.Plan(_analysis, Template, _services.Profile, _library);
+        // owner, 29. 10. 2026: files of open MEGA batches are shown "v dávke N" and left to that batch
+        _items = BatchPlanner.Plan(_analysis, Template, _services.Profile, _library,
+            _services.Mega.Reserved().ToDictionary(r => r.Key, r => r.Value.Label, Core.IO.Paths.Comparer));
         foreach (var row in Groups)
         {
             var items = _items.Where(i => i.Group == row.Group).ToList();
@@ -1789,6 +1811,46 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
+    private void SendToMega()
+    {
+        if (_analysis is null || _library is null || _services.Settings.OriginalHandling is not { } handling)
+        {
+            return;
+        }
+
+        var ready = _items.Where(i => i.NeedsWork).ToList();
+        var waiting = _items.Count(i => i.Status == BatchStatus.NeedsReview && !i.Reasons.Any(r => r.Kind == ReviewReasonKind.InMegaBatch));
+        var titles = ready.Select(i => i.Title?.Name).OfType<string>().Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+        var name = $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))}: " +
+                   string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? $" + {titles.Count - 3} ďalšie" : "");
+        if (!Confirm($"Odoslať do MEGA spracovania {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
+                     "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." +
+                     (waiting > 0 ? $"\n\n{Texts.Count(waiting, "súbor čaká", "súbory čakajú", "súborov čaká")} na kontrolu – tie ostanú tu." : "")))
+        {
+            return;
+        }
+
+        try
+        {
+            if (_services.Mega.Add(name, _library.Layout.Root, Template.Apply(_services.Profile), handling, ready) is { } batch)
+            {
+                RunState = $"Odoslané do MEGA spracovania ako {batch.Label} ({Texts.Count(batch.Files.Count, "súbor", "súbory", "súborov")}).";
+                _services.NotifyMegaChanged();
+                Replan();
+                RefreshCommands();
+                MegaRequested?.Invoke();
+            }
+            else
+            {
+                RunState = "Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RunState = "Dávku sa nepodarilo uložiť: " + ex.Message;
+        }
+    }
+
     private void TogglePause()
     {
         if (_control is null)
@@ -1999,7 +2061,7 @@ public sealed class BatchPageViewModel : ObservableObject
                      DetectAudioAllCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
-                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand,
+                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

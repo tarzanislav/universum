@@ -31,6 +31,17 @@ namespace Universum.Core.Execution;
 public sealed class FileProcessor(
     MkvToolNixInstallation installation, IProcessRunner runner, IRecycleBin recycleBin, string journalDirectory, LibraryIndex? index = null)
 {
+    /// <summary>The library index the processor records its results in (null without one).</summary>
+    public LibraryIndex? Index => index;
+
+    /// <summary>
+    /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
+    /// (MEGA spracovanie keeps it with a batch).
+    /// </summary>
+    public static string StructureOf(MediaFile file) =>
+        string.Join("\n", new[] { $"tags:{file.GlobalTagEntries};chapters:{file.ChapterEntries}" }.Concat(file.Tracks.Select(t =>
+            $"{t.Id}|{t.Type}|{t.Number}|{t.Uid}|{t.CodecId}|{t.Name}|{t.Language.Legacy}|{t.Language.Ietf}|{t.Flags}|{t.TagEntries}")));
+
     /// <summary>Extension of results being written; not a video extension, so media servers ignore them. Safe to delete.</summary>
     public const string TemporaryExtension = ".universum-tmp";
 

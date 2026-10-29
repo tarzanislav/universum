@@ -1954,6 +1954,36 @@ internal static class SelfTest
         Check(batch.IsMovies && batch.FileRows.All(f => f.IsFilm) && batch.Items.Where(i => i.File.Path.StartsWith(film, StringComparison.Ordinal))
                   .All(i => i.Reasons.All(r => r.Kind != Core.Batch.ReviewReasonKind.KindNotConfirmed)),
             "batch: MOVIES – the numbered versions stay a film, its kind certain");
+
+        // owner, 29. 10. 2026: MEGA spracovanie – the prepared files go into a batch written later, shown "v dávke" here
+        var batches = model.Mega.Rows.Count;
+        var ready = batch.Items.Where(i => i.NeedsWork).Select(i => i.File.Path).ToList();
+        Check(batch.SendToMegaCommand.CanExecute(null) && ready.Count > 0, $"batch: Odoslať do MEGA enabled ({ready.Count} ready)");
+        batch.SendToMegaCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.Mega && model.Mega.Rows.Count == batches + 1 && model.Mega.Selected?.Batch.Files.Count == ready.Count,
+            $"mega: a batch with the {ready.Count} prepared files – {batch.RunState}");
+        Check(batch.Items.Where(i => ready.Contains(i.File.Path)).All(i => !i.NeedsWork && i.Reasons.Any(r => r.Kind == Core.Batch.ReviewReasonKind.InMegaBatch)),
+            "batch: its files are shown in the batch, not written here");
+        var megaBatch = model.Mega.Selected!.Batch;
+        model.Mega.Selected.Start = Core.Mega.MegaStart.At;
+        Check(megaBatch.StartAt is { } at && at > DateTime.Now && model.Mega.Selected.State.StartsWith("čaká na ", StringComparison.Ordinal),
+            "mega: a time to start – " + model.Mega.Selected.State);
+        await Screenshot(window, "mega.png");
+        model.Mega.Selected.Start = Core.Mega.MegaStart.Manual;
+        await model.Mega.StartAsync(megaBatch);
+        for (var wait = 0; wait < 600 && model.Mega.LastJob is { IsFinished: false }; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(megaBatch.State == Core.Mega.MegaBatchState.Done && megaBatch.Files.All(f => f.State == Core.Mega.MegaFileState.Done) &&
+              megaBatch.Files.All(f => File.Exists(f.Note)),
+            "mega: the batch written into the library after the check – " + megaBatch.Outcome + " | " +
+            string.Join(" | ", model.Mega.LastJob?.Messages.Select(m => m.Text) ?? []));
+        Check(services.Jobs.Jobs.Contains(model.Mega.LastJob!), "mega: the batch ran as a job of the job queue");
+        await Screenshot(window, "mega-done.png");
+        model.Mega.ClearFinishedCommand.Execute(null);
+        Check(!services.Mega.Batches.Contains(megaBatch), "mega: finished batches cleared");
     }
 
     private static async Task Screenshot(Window window, string fileName)

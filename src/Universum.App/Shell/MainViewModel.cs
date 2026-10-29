@@ -42,8 +42,7 @@ public sealed class MainViewModel : ObservableObject
             SendToBatch = SendEpisodesToBatchAsync,
         };
         Interests = new InterestsPageViewModel(services);
-        Mega = new PlaceholderPageViewModel(
-            "MEGA spracovanie", "Ďalší spôsob spracovania so šablónami UNIVERSUM v skupine Šablóny.", "jeho náplň sa upresňuje");
+        Mega = new MegaPageViewModel(services);
 
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
@@ -85,6 +84,7 @@ public sealed class MainViewModel : ObservableObject
         Info.KnownSource = () => Mux.KnownFiles.Concat(Batch.KnownFiles);
         Mux.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.InfoRequested += path => _ = ShowInfoAsync(path);
+        Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
     }
 
     /// <summary>
@@ -193,8 +193,8 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Zaujímavosti – news and curiosities of the film world.</summary>
     public InterestsPageViewModel Interests { get; }
 
-    /// <summary>MEGA spracovanie – a new tool of the Šablóny group, its content not yet decided.</summary>
-    public PlaceholderPageViewModel Mega { get; }
+    /// <summary>MEGA spracovanie – batches prepared in Hromadné spracovanie, written later (owner, 29. 10. 2026).</summary>
+    public MegaPageViewModel Mega { get; }
 
     public DashboardPageViewModel Dashboard { get; }
 

@@ -452,6 +452,54 @@ public sealed class AppServices
     /// <summary>Adds a job; starts the queue when the settings say so.</summary>
     public void Enqueue(Universum.Core.Jobs.Job job) => Jobs.Add(job, Settings.AutoStartQueue);
 
+    private Universum.Core.Mega.MegaStore? _mega;
+
+    /// <summary>
+    /// The batches of MEGA spracovanie (owner, 29. 10. 2026). A list that cannot be read is put aside (renamed, never
+    /// deleted) and a new one starts; <see cref="MegaProblem"/> says so.
+    /// </summary>
+    public Universum.Core.Mega.MegaStore Mega
+    {
+        get
+        {
+            if (_mega is null)
+            {
+                try
+                {
+                    _mega = new Universum.Core.Mega.MegaStore(AppSettings.MegaFile);
+                }
+                catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    var aside = AppSettings.MegaFile + ".poskodeny-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                    var file = AppSettings.MegaFile;
+                    try
+                    {
+                        File.Move(AppSettings.MegaFile, aside);
+                    }
+                    catch (Exception moveError) when (moveError is IOException or UnauthorizedAccessException)
+                    {
+                        // it stays where it is; the new list is kept beside it
+                        aside = AppSettings.MegaFile;
+                        file = AppSettings.MegaFile + ".novy";
+                    }
+
+                    MegaProblem = $"Zoznam dávok sa nedal prečítať ({ex.Message}); pôvodný je odložený v {aside}.";
+                    _mega = new Universum.Core.Mega.MegaStore(file);
+                }
+            }
+
+            return _mega;
+        }
+    }
+
+    /// <summary>Why the list of MEGA batches could not be read (empty when it was).</summary>
+    public string MegaProblem { get; private set; } = "";
+
+    /// <summary>Raised when a batch was added or changed outside the MEGA page (Hromadné spracovanie sent one).</summary>
+    public event Action? MegaChanged;
+
+    public void NotifyMegaChanged() => MegaChanged?.Invoke();
+
     private Updates.UpdateService? _updates;
 
     /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
@@ -614,6 +662,9 @@ public sealed class AppSettings
 
     /// <summary>Where the chosen titles can be watched legally, as last checked.</summary>
     public static string AvailabilityFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "availability.json");
+
+    /// <summary>The batches of MEGA spracovanie.</summary>
+    public static string MegaFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "mega.json");
 
     /// <summary>The articles of Zaujímavosti read so far (their history).</summary>
     public static string InterestsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "interests.json");

@@ -85,6 +85,7 @@ internal static class Output
         ReviewReasonKind.EpisodeAmongFilms => "meno vyzerá ako epizóda seriálu – medzi filmami by bol verziou filmu (--serial alebo --aj-tak)",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
         ReviewReasonKind.NotSorted => "súbor nie je v MOVIES ani v TVSHOWS – presuňte ho do jedného z nich a dajte Analyzovať",
+        ReviewReasonKind.InMegaBatch => $"v MEGA spracovaní ({reason.Detail}) – zapíše ho tá dávka",
         _ => reason.Kind + (reason.Slot is { } s ? " " + s : ""),
     };
 

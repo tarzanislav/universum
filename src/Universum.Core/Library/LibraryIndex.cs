@@ -117,6 +117,33 @@ public sealed class LibraryIndex
         return first;
     }
 
+    /// <summary>
+    /// The target signature of a result in the placement's folder – under any name, other decisions give another name –
+    /// made from this original after <paramref name="sinceUtc"/> and unchanged since; null when there is none (MEGA
+    /// spracovanie: a batch never adds to or replaces a result made after it was prepared – its decisions are older).
+    /// </summary>
+    public string? MadeSince(Placement placement, string sourceFingerprint, DateTime sinceUtc)
+    {
+        if (!Directory.Exists(placement.Directory))
+        {
+            return null;
+        }
+
+        lock (_entries)
+        {
+            foreach (var file in Directory.EnumerateFiles(placement.Directory, "*" + placement.Extension))
+            {
+                if (_entries.TryGetValue(Path.GetFullPath(file), out var entry) &&
+                    entry.Source == sourceFingerprint && entry.RecordedUtc > sinceUtc && Unchanged(entry, file))
+                {
+                    return entry.Target;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Records that <paramref name="resultPath"/> was made from an original with this fingerprint into this target.</summary>
     public void Record(string resultPath, string sourceFingerprint, string targetSignature)
     {

@@ -1909,6 +1909,14 @@ internal static class SelfTest
             "batch: the end of the run is shown boldly – " + batch.Finish?.Title + " | " + batch.Finish?.Detail);
         await Screenshot(window, "batch-done.png");
 
+        // owner, 29. 10. 2026: the run is a job of Fronta úloh with a line for every file in Výstup úloh
+        Check(services.Jobs.Jobs.OfType<Core.Jobs.BatchJob>().LastOrDefault() is { Status: Core.Jobs.JobStatus.Done } batchJob &&
+              batchJob.Messages.Count(m => m.Text.Contains(" · OK: ", StringComparison.Ordinal)) == 4 && batchJob.Outcome.StartsWith("4 z 4", StringComparison.Ordinal),
+            "batch: the run is in the job queue with its output – " + string.Join(" | ", services.Jobs.Jobs.OfType<Core.Jobs.BatchJob>().LastOrDefault()?.Messages.Select(m => m.Text) ?? []));
+        model.SelectedTool = model.Tools.First(t => t.Page == model.Queue);
+        await Screenshot(window, "batch-in-queue.png");
+        model.SelectedTool = model.Tools.First(t => t.Page == batch);
+
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(
             Core.Templates.BatchTemplate.FromTarget("Podľa skupiny A", batch.Items.First().Target))) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
         editor.Show();

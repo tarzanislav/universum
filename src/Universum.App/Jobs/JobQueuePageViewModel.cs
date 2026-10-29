@@ -87,7 +87,7 @@ public sealed class JobQueuePageViewModel : ObservableObject
             var jobs = Queue.Jobs;
             if (jobs.Count == 0)
             {
-                return "Fronta je prázdna. Úlohy pridáte tlačidlom Do fronty v Úprave hlavičky alebo v Pravidlách UNIVERSUM.";
+                return "Fronta je prázdna. Úlohy pridáte tlačidlom Do fronty (Single spracovanie, Úprava hlavičky, Zlučovanie); Hromadné spracovanie sem pridá svoj beh tlačidlom Spustiť.";
             }
 
             var waiting = jobs.Count(j => j.Status == JobStatus.Waiting);

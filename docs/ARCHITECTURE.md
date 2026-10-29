@@ -39,6 +39,7 @@ in next to it without changing the rules, planning or UI.
   a `RuleProfile` (preferred languages, keywords for forced / SDH / commentary) and languages chosen for `und`
   tracks. Result: `TargetState` (tracks in final order, flags, names, languages, issues). Blocking issues
   (undetermined language, several video tracks, no audio) stop automatic processing.
+  Forced subtitles are named "Forced", other audio and subtitle names are removed.
   Subtitles (owner, 29. 10. 2026): `RuleProfile.SubtitleLanguages` (cs, sk, en, pl, hu, ru) in that order, then the
   languages of the audio tracks; other subtitles are removed (`TargetState.RemovedByLanguage`) unless kept
   (`TrackDecisions.Kept`). With foreign audio the default subtitles get Default + Enabled and every other flag off.

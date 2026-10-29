@@ -182,6 +182,8 @@ internal static class SelfTest
         string RuleSubtitles() => string.Join(",", model.Rules.Plan!.Target.Tracks.Where(t => t.Type == TrackType.Subtitles)
             .Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
         Check(RuleSubtitles() == "cs!,cs,en", "rules: subtitles in the order of the rules – " + RuleSubtitles());
+        Check(model.Rules.Plan!.Target.For(3).Name == "Forced" && model.Rules.Plan.Target.For(4).Name is null,
+            "rules: forced subtitles are named Forced, the other names removed (owner, 29. 10. 2026)");
         model.Rules.MoveTrack(5, -1);
         Check(RuleSubtitles() == "cs!,en,cs" && model.Rules.Rows.Where(r => r.Target.Type == TrackType.Subtitles).Select(r => r.TrackId).SequenceEqual([3, 5, 4]),
             "rules: English subtitles moved up – " + RuleSubtitles());

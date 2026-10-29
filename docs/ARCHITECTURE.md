@@ -304,6 +304,14 @@ in next to it without changing the rules, planning or UI.
   prepared (`LibraryIndex.MadeSince` – newer decisions are never replaced or doubled) → skipped with the reason; the rest
   is planned again from the stored decisions (the same target) and written by `BatchRunner`. Retrying skipped files
   leaves out files taken meanwhile by another open batch or an unfinished job.
+- Completing and correcting (MEGA 2): Odoslať do MEGA can put the files into a waiting batch (`MegaStore.Put` – a file
+  the batch has gets the new decisions, a new one is added, a file of another open batch stays out; each file keeps the
+  profile it was planned with). Upraviť v Hromadnom spracovaní analyses the batch's files again and puts every stored
+  decision back (kinds, titles, episodes, languages as decisions for the file, forced, kept and ordered tracks, Aj tak,
+  the template); the batch is `IsBeingEdited` meanwhile (never started) and Uložiť do dávky saves it back.
+- "Už v knižnici" at the analysis: the page fingerprints in the background the originals whose library folder exists and
+  `BatchPlanner.MarkAlreadyInLibrary` marks those whose same result (same original, same target) is there – exactly
+  what a run would find.
 
 ## Updates (specification, section 4)
 

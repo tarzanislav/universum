@@ -31,9 +31,13 @@ public sealed class MegaPageViewModel : ObservableObject
                                                                    batch.Files.Any(f => f.State is MegaFileState.Skipped or MegaFileState.Failed or MegaFileState.Cancelled or MegaFileState.Waiting));
         MoveUpCommand = new RelayCommand(() => Move(-1), () => _selected is not null && Rows.IndexOf(_selected) > 0);
         MoveDownCommand = new RelayCommand(() => Move(1), () => _selected is not null && Rows.IndexOf(_selected) < Rows.Count - 1);
-        RemoveCommand = new RelayCommand(Remove, () => _selected?.Batch is { State: not MegaBatchState.Queued });
-        RemoveFileCommand = new RelayCommand(RemoveFile, () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed } && _selectedFile?.File.State == MegaFileState.Waiting);
+        RemoveCommand = new RelayCommand(Remove, () => _selected?.Batch is { State: not MegaBatchState.Queued, IsBeingEdited: false });
+        RemoveFileCommand = new RelayCommand(RemoveFile, () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } &&
+                                                              _selectedFile?.File.State == MegaFileState.Waiting);
         ClearFinishedCommand = new RelayCommand(ClearFinished, () => _services.Mega.Batches.Any(b => !b.IsOpen));
+        EditCommand = new RelayCommand(() => EditRequested?.Invoke(_selected!.Batch),
+            () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } batch &&
+                  batch.Files.Any(f => f.State == MegaFileState.Waiting));
         services.MegaChanged += Load;
         Load();
         _message = services.MegaProblem;
@@ -100,6 +104,12 @@ public sealed class MegaPageViewModel : ObservableObject
 
     public RelayCommand ClearFinishedCommand { get; }
 
+    /// <summary>Opens the selected batch in Hromadné spracovanie to be corrected or completed.</summary>
+    public RelayCommand EditCommand { get; }
+
+    /// <summary>The main window opens Hromadné spracovanie with the batch.</summary>
+    public event Action<MegaBatch>? EditRequested;
+
     /// <summary>Asks before something is removed (the self-test answers itself).</summary>
     public Func<string, bool> Confirm { get; set; } = question =>
         System.Windows.MessageBox.Show(question, "UNIVERSUM", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) == System.Windows.MessageBoxResult.Yes;
@@ -112,6 +122,12 @@ public sealed class MegaPageViewModel : ObservableObject
     {
         if (batch.State is not (MegaBatchState.Waiting or MegaBatchState.Missed))
         {
+            return;
+        }
+
+        if (batch.IsBeingEdited)
+        {
+            Message = $"{batch.Label} sa práve upravuje v Hromadnom spracovaní – spustí sa po uložení.";
             return;
         }
 
@@ -377,7 +393,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
-        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand })
+        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand })
         {
             command.NotifyCanExecuteChanged();
         }
@@ -414,6 +430,7 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
 
     public string State => Batch.State switch
     {
+        MegaBatchState.Waiting when Batch.IsBeingEdited => "upravuje sa v Hromadnom spracovaní",
         MegaBatchState.Waiting => Batch.Start switch
         {
             MegaStart.At when Batch.StartAt is { } at => "čaká na " + at.ToString("d. M. yyyy H:mm", CultureInfo.GetCultureInfo("sk-SK")),
@@ -431,7 +448,7 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
     public string Outcome => Batch.Outcome;
 
     /// <summary>The start can be changed while the batch waits.</summary>
-    public bool CanSchedule => Batch.State is MegaBatchState.Waiting or MegaBatchState.Missed;
+    public bool CanSchedule => Batch.State is MegaBatchState.Waiting or MegaBatchState.Missed && !Batch.IsBeingEdited;
 
     public MegaStart Start
     {

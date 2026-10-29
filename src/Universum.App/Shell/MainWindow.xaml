@@ -177,6 +177,8 @@
                 </StackPanel>
                 <WrapPanel Grid.Row="1" Margin="0,10,0,10">
                     <Button Content="Spustiť teraz" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" ToolTip="Pridá vybranú dávku do Fronty úloh a spustí ju" />
+                    <Button Content="Upraviť v Hromadnom spracovaní" Command="{Binding EditCommand}" Padding="12,4" Margin="0,0,8,0"
+                            ToolTip="Otvorí dávku so všetkými rozhodnutiami v Hromadnom spracovaní – opravíte ju a dáte Uložiť do dávky" />
                     <Button Content="Znova preskočené a chybné" Command="{Binding RetryCommand}" Padding="12,4" Margin="0,0,16,0"
                             ToolTip="Súbory dokončenej dávky, ktoré sa preskočili, nepodarili alebo zrušili, sa znova skontrolujú a zapíšu" />
                     <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Dávku vyššie (poradie pre „po predchádzajúcej dávke“)" />
@@ -1622,8 +1624,11 @@
                                 <Button Content="{Binding PauseText}" Command="{Binding PauseCommand}" Margin="0,0,6,0" Padding="10,4" />
                                 <Button Content="Zastaviť" Command="{Binding StopCommand}" Margin="0,0,6,0" Padding="10,4"
                                         ToolTip="Dokončí rozpracované súbory a ďalej nepokračuje" />
-                                <Button Content="Odoslať do MEGA" Command="{Binding SendToMegaCommand}" Margin="0,0,6,0" Padding="12,4"
-                                        ToolTip="Pripravené súbory uloží ako dávku MEGA spracovania – zapíšu sa neskôr (keď dávku spustíte, po predchádzajúcej dávke alebo v nastavenom čase)" />
+                                <ComboBox ItemsSource="{Binding MegaTargets}" SelectedItem="{Binding SelectedMegaTarget}" DisplayMemberPath="Label" MaxWidth="220" Margin="0,0,4,0"
+                                          FontSize="12" Visibility="{Binding IsEditingMega, Converter={StaticResource InverseBoolToVisibility}}"
+                                          ToolTip="Kam idú pripravené súbory: nová dávka, alebo doplniť čakajúcu dávku" />
+                                <Button Content="{Binding SendToMegaText}" Command="{Binding SendToMegaCommand}" Margin="0,0,6,0" Padding="12,4"
+                                        ToolTip="Pripravené súbory uloží do dávky MEGA spracovania – zapíšu sa neskôr (keď dávku spustíte, po predchádzajúcej dávke alebo v nastavenom čase)" />
                                 <Button Content="Spustiť" Command="{Binding RunCommand}" Padding="18,4" ToolTip="Spustí spracovanie ako úlohu vo Fronte úloh (priebeh aj výstup každého súboru uvidíte aj tam)" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">

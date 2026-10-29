@@ -89,6 +89,15 @@ public sealed class MegaFile
 
     public List<int> Order { get; init; } = [];
 
+    /// <summary>
+    /// The rules' profile with the template the file was planned with, when it differs from the batch's (a file added to
+    /// or changed in the batch later); null = <see cref="MegaBatch.Profile"/>.
+    /// </summary>
+    public RuleProfile? Profile { get; init; }
+
+    /// <summary>The user chose to write it although it waited for a check (Aj tak) – kept when the batch is edited.</summary>
+    public bool ProcessAnyway { get; init; }
+
     /// <summary>Where the result was planned when the batch was made (shown on the page).</summary>
     public string PlannedPath { get; init; } = "";
 
@@ -108,7 +117,7 @@ public sealed class MegaFile
     };
 
     /// <summary>A prepared file of Hromadné spracovanie (it has its place in the library and something to do).</summary>
-    public static MegaFile From(BatchItem item)
+    public static MegaFile From(BatchItem item, RuleProfile? profile = null)
     {
         if (!item.NeedsWork || item.Title is null)
         {
@@ -130,6 +139,8 @@ public sealed class MegaFile
             Kept = [.. item.Decisions.Kept],
             Order = [.. item.Decisions.Order],
             PlannedPath = item.PlannedPath ?? "",
+            ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
+            Profile = profile,
         };
     }
 }
@@ -157,6 +168,13 @@ public sealed class MegaBatch
     public required RuleProfile Profile { get; init; }
 
     public OriginalHandling Original { get; init; } = OriginalHandling.Keep;
+
+    /// <summary>The template of Hromadné spracovanie (JSON), so the batch opens again with it; null = rules only.</summary>
+    public string? TemplateJson { get; set; }
+
+    /// <summary>Opened in Hromadné spracovanie to be changed: it does not start meanwhile (not kept in the file).</summary>
+    [JsonIgnore]
+    public bool IsBeingEdited { get; set; }
 
     public List<MegaFile> Files { get; init; } = [];
 
@@ -203,11 +221,11 @@ public sealed class MegaStore
 
     public IReadOnlyList<MegaBatch> Batches => _batches;
 
-    /// <summary>Files of open batches with the batch they belong to.</summary>
-    public IReadOnlyDictionary<string, MegaBatch> Reserved()
+    /// <summary>Files of open batches with the batch they belong to (<paramref name="except"/> left out: it is being edited).</summary>
+    public IReadOnlyDictionary<string, MegaBatch> Reserved(MegaBatch? except = null)
     {
         var reserved = new Dictionary<string, MegaBatch>(Paths.Comparer);
-        foreach (var batch in _batches.Where(b => b.IsOpen))
+        foreach (var batch in _batches.Where(b => b.IsOpen && b != except))
         {
             foreach (var file in batch.Files.Where(f => f.State == MegaFileState.Waiting))
             {
@@ -219,11 +237,12 @@ public sealed class MegaStore
     }
 
     /// <summary>A new batch of prepared files; files already in an open batch are left out (returns null when none is left).</summary>
-    public MegaBatch? Add(string name, string libraryRoot, RuleProfile profile, OriginalHandling original, IEnumerable<BatchItem> items)
+    public MegaBatch? Add(
+        string name, string libraryRoot, RuleProfile profile, OriginalHandling original, IEnumerable<BatchItem> items, string? templateJson = null)
     {
         var reserved = Reserved();
         var files = items.Where(i => i.NeedsWork && i.Title is not null && !reserved.ContainsKey(System.IO.Path.GetFullPath(i.File.Path)))
-            .Select(MegaFile.From).ToList();
+            .Select(i => MegaFile.From(i)).ToList();
         if (files.Count == 0)
         {
             return null;
@@ -237,10 +256,48 @@ public sealed class MegaStore
             Profile = profile,
             Original = original,
             Files = files,
+            TemplateJson = templateJson,
         };
         _batches.Add(batch);
         Save();
         return batch;
+    }
+
+    /// <summary>
+    /// Puts prepared files into a waiting batch (owner, 29. 10. 2026: a batch is completed or corrected): a file the batch
+    /// has is replaced with its new decisions, a new one is added; files of another open batch stay out.
+    /// </summary>
+    /// <returns>The files added and the files changed.</returns>
+    /// <param name="profile">The rules' profile with the template the items were planned with (kept with each file).</param>
+    /// <param name="templateJson">The template, so the batch opens with it next time.</param>
+    public (int Added, int Changed) Put(MegaBatch batch, IEnumerable<BatchItem> items, RuleProfile profile, string? templateJson)
+    {
+        if (!batch.IsOpen || batch.State == MegaBatchState.Queued)
+        {
+            throw new InvalidOperationException("Only a waiting batch can be changed.");
+        }
+
+        var reserved = Reserved(batch);
+        var (added, changed) = (0, 0);
+        foreach (var item in items.Where(i => i.NeedsWork && i.Title is not null && !reserved.ContainsKey(System.IO.Path.GetFullPath(i.File.Path))))
+        {
+            var file = MegaFile.From(item, profile);
+            var at = batch.Files.FindIndex(f => Paths.Same(f.Path, file.Path));
+            if (at >= 0)
+            {
+                batch.Files[at] = file;
+                changed++;
+            }
+            else
+            {
+                batch.Files.Add(file);
+                added++;
+            }
+        }
+
+        batch.TemplateJson = templateJson;
+        Save();
+        return (added, changed);
     }
 
     public void Remove(MegaBatch batch)
@@ -287,7 +344,7 @@ public sealed class MegaStore
     {
         var due = new List<MegaBatch>();
         var missed = false;
-        foreach (var batch in _batches.Where(b => b is { State: MegaBatchState.Waiting, Start: MegaStart.At, StartAt: not null }))
+        foreach (var batch in _batches.Where(b => b is { State: MegaBatchState.Waiting, Start: MegaStart.At, StartAt: not null, IsBeingEdited: false }))
         {
             if (batch.StartAt!.Value > now)
             {

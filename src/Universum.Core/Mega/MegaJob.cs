@@ -55,13 +55,14 @@ public sealed class MegaJob(
             return (null, "súbor sa medzičasom zmenil (stopy, názvy, príznaky alebo tagy) – je to iný súbor, než ktorý sa pripravil");
         }
 
-        var target = UniversumRules.Apply(media, batch.Profile, file.Decisions());
+        var profile = file.Profile ?? batch.Profile;
+        var target = UniversumRules.Apply(media, profile, file.Decisions());
         if (target.IsBlocked)
         {
             return (null, "pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní");
         }
 
-        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, batch.Profile);
+        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile);
         var group = new BatchGroup("MEGA", 0);
         group.Files.Add(media);
         var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target), new TemplateMatch([], [], []),

@@ -1919,6 +1919,19 @@ internal static class SelfTest
         await Screenshot(window, "batch-in-queue.png");
         model.SelectedTool = model.Tools.First(t => t.Page == batch);
 
+        // owner, 29. 10. 2026: the originals already written are known at the next analysis ("už v knižnici")
+        await batch.AnalyzeAsync();
+        batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0)).ChosenLanguage = Languages.Czech;
+        batch.ConfirmTitlesCommand.Execute(null);
+        batch.SeriesTitle = "Seriál (2026)";
+        for (var wait = 0; wait < 100 && batch.Items.Count(i => i.AlreadyInLibraryAt is not null) < 3; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(batch.Items.Count(i => i.AlreadyInLibraryAt is not null) >= 3 && batch.Items.Count(i => i.NeedsWork) <= 1,
+            $"batch: the written originals are 'už v knižnici' at the analysis – {batch.Simulation}");
+
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(
             Core.Templates.BatchTemplate.FromTarget("Podľa skupiny A", batch.Items.First().Target))) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
         editor.Show();
@@ -1969,6 +1982,25 @@ internal static class SelfTest
         Check(megaBatch.StartAt is { } at && at > DateTime.Now && model.Mega.Selected.State.StartsWith("čaká na ", StringComparison.Ordinal),
             "mega: a time to start – " + model.Mega.Selected.State);
         await Screenshot(window, "mega.png");
+
+        // owner, 29. 10. 2026: the batch opens in Hromadné spracovanie with every decision, and is saved back
+        var planned = megaBatch.Files.ToDictionary(f => f.Path, f => f.PlannedPath);
+        model.Mega.EditCommand.Execute(null);
+        for (var wait = 0; wait < 300 && (!batch.IsEditingMega || batch.Busy || batch.IsAnalyzing || batch.Items.Count == 0); wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(model.SelectedTool.Page == batch && batch.IsEditingMega && megaBatch.IsBeingEdited && batch.SendToMegaText == "Uložiť do " + megaBatch.Label,
+            "mega: the batch is open in Hromadné spracovanie – " + batch.Summary);
+        Check(batch.Items.Count == planned.Count && batch.Items.All(i => i.NeedsWork && planned.TryGetValue(i.File.Path, out var place) && place == i.PlannedPath),
+            "mega: opened with every decision – the same places in the library: " + string.Join(" | ", batch.Items.Select(i => $"{i.Status} {i.PlannedPath}")));
+        await Screenshot(window, "mega-edit.png");
+        batch.SendToMegaCommand.Execute(null);
+        Check(!batch.IsEditingMega && !megaBatch.IsBeingEdited && megaBatch.Files.Count == planned.Count && model.SelectedTool.Page == model.Mega &&
+              batch.Items.All(i => i.Reasons.Any(r => r.Kind == Core.Batch.ReviewReasonKind.InMegaBatch)),
+            "mega: saved back into the batch – " + batch.RunState);
+        model.Mega.Selected = model.Mega.Rows.First(r => r.Batch == megaBatch);
         model.Mega.Selected.Start = Core.Mega.MegaStart.Manual;
         await model.Mega.StartAsync(megaBatch);
         for (var wait = 0; wait < 600 && model.Mega.LastJob is { IsFinished: false }; wait++)

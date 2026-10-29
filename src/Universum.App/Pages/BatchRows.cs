@@ -496,7 +496,8 @@ public sealed class FileRow : ObservableObject
     public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
 
     /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container.</summary>
-    public string Status => Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
+    public string Status => Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? "už v knižnici"
+        : Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
         ? $"nový MKV z {Item.File.ContainerName}"
         : Texts.Status(Item.Status);
 
@@ -559,3 +560,6 @@ public sealed record BatchFinish(BatchFinishKind Kind, string Title, string Deta
 
     public string Icon => Kind == BatchFinishKind.Done ? "\uE73E" : Kind == BatchFinishKind.Errors ? "\uE783" : "\uE7BA";
 }
+
+/// <summary>Where Odoslať do MEGA puts the files: a new batch (null) or a waiting one.</summary>
+public sealed record MegaTarget(string Label, Universum.Core.Mega.MegaBatch? Batch);

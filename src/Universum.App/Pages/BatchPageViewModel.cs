@@ -81,12 +81,14 @@ public sealed class BatchPageViewModel : ObservableObject
         // a batch of MEGA spracovanie added, finished or removed: its files are free again or taken
         services.MegaChanged += () =>
         {
+            RefreshMegaTargets();
             if (!Busy && _analysis is not null)
             {
                 Replan();
                 RefreshCommands();
             }
         };
+        RefreshMegaTargets();
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork) &&
                                                              _services.Settings.OriginalHandling is not null);
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
@@ -191,6 +193,7 @@ public sealed class BatchPageViewModel : ObservableObject
         _library = null;
         _only = null;
         _sentSeries = null;
+        StopEditing();
         _results = [];
         Finish = null;
         SelectedGroup = null;
@@ -313,9 +316,10 @@ public sealed class BatchPageViewModel : ObservableObject
         get => _services.Settings.BatchFolder;
         set
         {
-            // a folder chosen again means the whole folder, not the files sent from Novinky
+            // a folder chosen again means the whole folder, not the files sent from Novinky or of a MEGA batch
             _only = null;
             _sentSeries = null;
+            StopEditing();
             _services.Settings.BatchFolder = value;
             _services.Settings.Save();
             OnPropertyChanged();
@@ -654,6 +658,8 @@ public sealed class BatchPageViewModel : ObservableObject
         _analysis = null;
         _items = [];
         _library = null;
+        _fingerprintCancellation?.Cancel();
+        _fingerprints = new Dictionary<string, string>(Paths.Comparer);
         SlotRows.Clear();
         FileRows.Clear();
 
@@ -719,6 +725,7 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
             ApplySentSeries();
+            ApplyEditedBatch();
 
             // owner, 29. 10. 2026: a folder sorted into MOVIES and TVSHOWS – each group holds one title
             if (_library is { Mixed: true } sorted)
@@ -754,10 +761,19 @@ public sealed class BatchPageViewModel : ObservableObject
                 Summary = why + " · " + Summary;
             }
 
-            if (only is not null)
+            if (_editing is { } edited)
+            {
+                var missing = edited.Files.Count(f => !File.Exists(f.Path));
+                Summary = $"Upravujete {edited.Label} MEGA spracovania ({Texts.Count(edited.Files.Count, "súbor", "súbory", "súborov")}" +
+                          (missing > 0 ? $", {missing} chýba" : "") + $") – po úprave dajte Uložiť do {edited.Label}. · " + Summary;
+            }
+            else if (only is not null)
             {
                 Summary = $"Súbory poslané z Noviniek ({only.Count}) · " + Summary + " Celý priečinok spracujete po jeho výbere tlačidlom Priečinok….";
             }
+
+            // owner, 29. 10. 2026: what is already in the library is known at the analysis (in the background)
+            _ = CheckLibraryAsync();
 
             // the output folder was changed while the folder was read: its MOVIES / TVSHOWS were not left out
             if (_services.Library?.Root != libraryAtStart)
@@ -900,7 +916,11 @@ public sealed class BatchPageViewModel : ObservableObject
         BatchPlanner.Suggest(_analysis, _services.Profile);
         // owner, 29. 10. 2026: files of open MEGA batches are shown "v dávke N" and left to that batch
         _items = BatchPlanner.Plan(_analysis, Template, _services.Profile, _library,
-            _services.Mega.Reserved().ToDictionary(r => r.Key, r => r.Value.Label, Core.IO.Paths.Comparer));
+            _services.Mega.Reserved(_editing).ToDictionary(r => r.Key, r => r.Value.Label, Core.IO.Paths.Comparer));
+        if (_fingerprints.Count > 0)
+        {
+            _items = BatchPlanner.MarkAlreadyInLibrary(_items, _services.LibraryIndex, _fingerprints);
+        }
         foreach (var row in Groups)
         {
             var items = _items.Where(i => i.Group == row.Group).ToList();
@@ -1820,34 +1840,280 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var ready = _items.Where(i => i.NeedsWork).ToList();
         var waiting = _items.Count(i => i.Status == BatchStatus.NeedsReview && !i.Reasons.Any(r => r.Kind == ReviewReasonKind.InMegaBatch));
-        var titles = ready.Select(i => i.Title?.Name).OfType<string>().Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
-        var name = $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))}: " +
-                   string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? $" + {titles.Count - 3} ďalšie" : "");
-        if (!Confirm($"Odoslať do MEGA spracovania {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                     "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." +
-                     (waiting > 0 ? $"\n\n{Texts.Count(waiting, "súbor čaká", "súbory čakajú", "súborov čaká")} na kontrolu – tie ostanú tu." : "")))
+        var profile = Template.Apply(_services.Profile);
+        var template = Template.Slots.Count == 0 ? null : Template.ToJson();
+        var target = _editing ?? SelectedMegaTarget?.Batch;
+        var left = waiting > 0 ? $"\n\n{Texts.Count(waiting, "súbor čaká", "súbory čakajú", "súborov čaká")} na kontrolu – tie ostanú tu." : "";
+        try
+        {
+            if (target is not null)
+            {
+                // owner, 29. 10. 2026: a batch completed with new files or corrected – the same library only
+                if (!Paths.Same(Path.TrimEndingDirectorySeparator(target.LibraryRoot), Path.TrimEndingDirectorySeparator(_library.Layout.Root)))
+                {
+                    RunState = $"{target.Label} zapisuje do inej knižnice ({target.LibraryRoot}) – pošlite súbory do novej dávky.";
+                    return;
+                }
+
+                if (target.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed))
+                {
+                    RunState = $"{target.Label} už nečaká – pošlite súbory do novej dávky.";
+                    return;
+                }
+
+                if (!Confirm($"Uložiť do {target.Label} {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
+                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." + left))
+                {
+                    return;
+                }
+
+                var (added, changed) = _services.Mega.Put(target, ready, profile, template);
+                StopEditing();
+                RunState = $"{target.Label}: {Texts.Count(added, "pridaný súbor", "pridané súbory", "pridaných súborov")}, " +
+                           $"{Texts.Count(changed, "upravený", "upravené", "upravených")}.";
+            }
+            else
+            {
+                var titles = ready.Select(i => i.Title?.Name).OfType<string>().Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+                var name = $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))}: " +
+                           string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? $" + {titles.Count - 3} ďalšie" : "");
+                if (!Confirm($"Odoslať do MEGA spracovania {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
+                             "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." + left))
+                {
+                    return;
+                }
+
+                if (_services.Mega.Add(name, _library.Layout.Root, profile, handling, ready, template) is not { } batch)
+                {
+                    RunState = "Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.";
+                    return;
+                }
+
+                RunState = $"Odoslané do MEGA spracovania ako {batch.Label} ({Texts.Count(batch.Files.Count, "súbor", "súbory", "súborov")}).";
+            }
+
+            _services.NotifyMegaChanged();
+            Replan();
+            RefreshCommands();
+            MegaRequested?.Invoke();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            RunState = "Dávku sa nepodarilo uložiť: " + ex.Message;
+        }
+    }
+
+    /// <summary>Where Odoslať do MEGA puts the prepared files: a new batch, or a waiting one to be completed.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<MegaTarget> MegaTargets { get; } = [];
+
+    private MegaTarget? _megaTarget;
+
+    public MegaTarget? SelectedMegaTarget { get => _megaTarget; set => SetProperty(ref _megaTarget, value); }
+
+    /// <summary>A MEGA batch is open here to be corrected: the button saves it back.</summary>
+    public bool IsEditingMega => _editing is not null;
+
+    public string SendToMegaText => _editing is { } batch ? $"Uložiť do {batch.Label}" : "Odoslať do MEGA";
+
+    // the batch of MEGA spracovanie opened here to be corrected (it does not start meanwhile)
+    private Core.Mega.MegaBatch? _editing;
+
+    /// <summary>
+    /// Opens a waiting MEGA batch to be corrected (owner, 29. 10. 2026): its files are analysed again with every decision
+    /// stored with them – kinds, titles, episodes, languages, forced, kept and ordered tracks, Aj tak, the template.
+    /// </summary>
+    public async Task<bool> OpenMegaBatchAsync(Core.Mega.MegaBatch batch)
+    {
+        if (Busy || IsRunning || batch.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed) || batch.IsBeingEdited)
+        {
+            return false;
+        }
+
+        var files = batch.Files.Where(f => f.State == Core.Mega.MegaFileState.Waiting && File.Exists(f.Path)).Select(f => f.Path).ToList();
+        if (files.Count == 0)
+        {
+            return false;
+        }
+
+        Folder = CommonFolder(files);
+        _only = files;
+        _sentSeries = null;
+        _editing = batch;
+        batch.IsBeingEdited = true;
+        _services.NotifyMegaChanged();
+        _template = batch.TemplateJson is { } json ? TryTemplate(json) : BatchTemplate.RulesOnly;
+        OnPropertyChanged(nameof(Template));
+        OnPropertyChanged(nameof(TemplateDescription));
+        OnPropertyChanged(nameof(RemoveUnlisted));
+        OnEditingChanged();
+        await AnalyzeAsync();
+        return true;
+    }
+
+    private static BatchTemplate TryTemplate(string json)
+    {
+        try
+        {
+            return BatchTemplate.FromJson(json);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return BatchTemplate.RulesOnly;
+        }
+    }
+
+    // the decisions stored with the files of the batch being corrected, on the groups and the library of this analysis
+    private void ApplyEditedBatch()
+    {
+        if (_editing is null || _library is null || _analysis is null)
         {
             return;
         }
 
-        try
+        var stored = _editing.Files.ToDictionary(f => Path.GetFullPath(f.Path), Paths.Comparer);
+        var kinds = new List<MediaKind>();
+        foreach (var group in _analysis.Groups)
         {
-            if (_services.Mega.Add(name, _library.Layout.Root, Template.Apply(_services.Profile), handling, ready) is { } batch)
+            foreach (var media in group.Files)
             {
-                RunState = $"Odoslané do MEGA spracovania ako {batch.Label} ({Texts.Count(batch.Files.Count, "súbor", "súbory", "súborov")}).";
-                _services.NotifyMegaChanged();
-                Replan();
-                RefreshCommands();
-                MegaRequested?.Invoke();
-            }
-            else
-            {
-                RunState = "Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.";
+                if (!stored.TryGetValue(Path.GetFullPath(media.Path), out var file))
+                {
+                    continue;
+                }
+
+                var path = media.Path;
+                var slots = SlotKey.Of(media).ToDictionary(x => x.Track.Id, x => x.Key);
+                kinds.Add(file.Title.Kind);
+                _library.KindOfFile[path] = file.Title.Kind;
+                _library.ConfirmedKinds.Add(path);
+                if (file.Title.Kind == MediaKind.Movie)
+                {
+                    _library.Movies[path] = file.Title;
+                }
+                else
+                {
+                    _library.SeriesOfFile[path] = file.Title;
+                    _library.Series ??= file.Title;
+                    if (file.Episode is { } episode)
+                    {
+                        _library.Episodes[path] = episode;
+                    }
+                }
+
+                foreach (var (id, language) in file.Languages.Where(l => slots.ContainsKey(l.Key)))
+                {
+                    group.Decisions.SetFileLanguage(path, slots[id], language);
+                }
+
+                foreach (var (id, forced) in file.Forced.Where(f => slots.ContainsKey(f.Key)))
+                {
+                    group.Decisions.Forced[slots[id]] = forced;
+                }
+
+                group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));
+                if (file.Order.Count > 0 && group.Decisions.Order.Count == 0)
+                {
+                    group.Decisions.Order.AddRange(file.Order.Where(slots.ContainsKey).Select(id => slots[id]));
+                }
+
+                if (file.ProcessAnyway)
+                {
+                    group.Decisions.ProcessAnyway.Add(path);
+                }
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+
+        if (kinds.Count > 0)
         {
-            RunState = "Dávku sa nepodarilo uložiť: " + ex.Message;
+            _library.Kind = kinds.GroupBy(k => k).OrderByDescending(g => g.Count()).First().Key;
+        }
+    }
+
+    // the batch being corrected is let go (saved, another folder chosen, the queue cleared)
+    private void StopEditing()
+    {
+        if (_editing is null)
+        {
+            return;
+        }
+
+        _editing.IsBeingEdited = false;
+        _editing = null;
+        OnEditingChanged();
+        _services.NotifyMegaChanged();
+    }
+
+    private void OnEditingChanged()
+    {
+        OnPropertyChanged(nameof(IsEditingMega));
+        OnPropertyChanged(nameof(SendToMegaText));
+        RefreshMegaTargets();
+    }
+
+    private void RefreshMegaTargets()
+    {
+        var chosen = _megaTarget?.Batch;
+        MegaTargets.Clear();
+        MegaTargets.Add(new MegaTarget("do novej dávky", null));
+        foreach (var batch in _services.Mega.Batches.Where(b => b.State is Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed && !b.IsBeingEdited))
+        {
+            MegaTargets.Add(new MegaTarget($"doplniť {batch.Label}: {batch.Name}", batch));
+        }
+
+        SelectedMegaTarget = MegaTargets.FirstOrDefault(t => t.Batch == chosen) ?? MegaTargets[0];
+    }
+
+    private CancellationTokenSource? _fingerprintCancellation;
+    private Dictionary<string, string> _fingerprints = new(Paths.Comparer);
+
+    // the fingerprints of the originals to be written whose place in the library holds files: a result made from the
+    // same original into the same target is "už v knižnici" (the run would skip it anyway)
+    private async Task CheckLibraryAsync()
+    {
+        _fingerprintCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _fingerprintCancellation = cancellation;
+        var analysis = _analysis;
+        var paths = _items.Where(i => i.NeedsWork && i.Placement is { } placement && Directory.Exists(placement.Directory))
+            .Select(i => i.File.Path).Distinct(Paths.Comparer).ToList();
+        if (analysis is null || paths.Count == 0)
+        {
+            return;
+        }
+
+        var found = new Dictionary<string, string>(Paths.Comparer);
+        try
+        {
+            await Task.Run(async () =>
+            {
+                foreach (var path in paths)
+                {
+                    found[Path.GetFullPath(path)] = await LibraryIndex.FingerprintAsync(path, cancellation.Token);
+                }
+            }, cancellation.Token);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(_fingerprintCancellation, cancellation))
+            {
+                _fingerprintCancellation = null;
+            }
+        }
+
+        if (!ReferenceEquals(_analysis, analysis) || cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _fingerprints = found;
+        if (!Busy)
+        {
+            Replan();
+            RefreshCommands();
         }
     }
 

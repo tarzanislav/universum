@@ -85,6 +85,7 @@ public sealed class MainViewModel : ObservableObject
         Mux.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
+        Mega.EditRequested += batch => _ = EditMegaBatchAsync(batch);
     }
 
     /// <summary>
@@ -288,6 +289,16 @@ public sealed class MainViewModel : ObservableObject
         if (!sent)
         {
             System.Windows.MessageBox.Show("Spracovanie práve pracuje – pošlite titul znova po jeho skončení.", "UNIVERSUM");
+        }
+    }
+
+    /// <summary>A MEGA batch opened in Hromadné spracovanie to be corrected or completed.</summary>
+    private async Task EditMegaBatchAsync(Universum.Core.Mega.MegaBatch batch)
+    {
+        SelectedTool = Tools.First(t => t.Page == Batch);
+        if (!await Batch.OpenMegaBatchAsync(batch))
+        {
+            System.Windows.MessageBox.Show("Hromadné spracovanie práve pracuje (alebo dávka nemá čakajúce súbory) – skúste to po jeho skončení.", "UNIVERSUM");
         }
     }
 

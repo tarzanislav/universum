@@ -51,3 +51,33 @@ public static class EpisodeFinder
     private static bool SameTitle(string a, string b) =>
         a == b || (Math.Min(a.Length, b.Length) >= 6 && (a.StartsWith(b + " ", StringComparison.Ordinal) || b.StartsWith(a + " ", StringComparison.Ordinal)));
 }
+
+/// <summary>A film chosen by the user and the video files of the input folder that are it.</summary>
+public sealed record FilmFiles(FilmPremiere Film, IReadOnlyList<string> Files);
+
+/// <summary>
+/// Finds chosen films in the input folder: a file (not an episode) whose title is the film's original, English or
+/// Czech title – without case, diacritics and punctuation – and whose year, when the name has one, agrees (±1).
+/// Files are only read.
+/// </summary>
+public static class FilmFinder
+{
+    public static IReadOnlyList<FilmFiles> Find(IReadOnlyList<FilmPremiere> films, string folder, IEnumerable<string>? excludeDirectories = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (files, _) = BatchAnalyzer.FindFiles(folder, recursive: true, excludeDirectories, cancellationToken);
+        var guesses = files.Select(f => (Path: f, Guess: TitleGuess.ForFile(f))).Where(g => g.Guess.Episode is null && g.Guess.Title is not null).ToList();
+        return films.Select(f => new FilmFiles(f, guesses.Where(g => Matches(f, g.Guess)).Select(g => g.Path).ToList())).ToList();
+    }
+
+    public static bool Matches(FilmPremiere film, FileGuess guess)
+    {
+        if (guess.Episode is not null || guess.Title is not { } title || (title.Year is { } year && film.Year is { } released && Math.Abs(year - released) > 1))
+        {
+            return false;
+        }
+
+        var name = Words.Normalize(title.Name);
+        return name.Length > 0 && new[] { film.OriginalTitle, film.EnglishTitle, film.LocalTitle }.Select(Words.Normalize).Any(t => t.Length > 0 && t == name);
+    }
+}

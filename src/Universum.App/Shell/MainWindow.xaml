@@ -110,6 +110,8 @@
                     <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource NewsSubtitle}" />
                     <TextBlock Text="{Binding Rhythm, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold"
                                Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                    <TextBlock Text="{Binding Streaming, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold" Foreground="#2F9461"
+                               ToolTip="Kde sa dá titul legálne pozerať (SK, CZ) – údaje JustWatch cez TMDB" />
                 </StackPanel>
             </DockPanel>
         </DataTemplate>
@@ -1618,6 +1620,7 @@
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
                                             <TextBlock Text="{Binding NearestCode}" FontWeight="SemiBold" />
                                             <TextBlock Text="{Binding NearestNote}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
+                                            <TextBlock Text="{Binding FolderText}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" FontWeight="SemiBold" Foreground="#2F9461" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -2379,6 +2382,75 @@
                                                     <Setter TargetName="Day" Property="FontWeight" Value="Bold" />
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <!-- where the chosen titles can be watched legally; chosen titles already in the input folder -->
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Card}" Padding="20,14" BorderBrush="#664FB8B8">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#334FB8B8" Offset="0" />
+                                    <GradientStop Color="#1F63C48F" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="Skontrolovať" Command="{Binding Week.CheckWatchCommand}" Padding="10,2"
+                                            ToolTip="Zistí hneď, kde sa dajú vybrané tituly pozerať (inak raz denne pri spustení)" />
+                                    <TextBlock Text="Kde pozerať – vybrané tituly" FontWeight="SemiBold" FontSize="15" Foreground="#2E8F8F" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="Vybrané tituly zatiaľ nie sú na streamovacích službách na Slovensku ani v Česku (alebo ešte neboli skontrolované)."
+                                           Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding Week.NoOffers, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Week.Offers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,2">
+                                                <Border DockPanel.Dock="Right" CornerRadius="8" Background="#2E8F8F" Padding="7,0" VerticalAlignment="Center"
+                                                        Visibility="{Binding IsNew, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="NOVÉ" Foreground="White" FontSize="10.5" FontWeight="Bold" />
+                                                </Border>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Where}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Week.WatchStatus}" Style="{StaticResource Hint}" FontSize="12" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding Week.WatchAttribution}" Style="{StaticResource Hint}" FontSize="11" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,14" BorderBrush="#669CC25A">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#339CC25A" Offset="0" />
+                                    <GradientStop Color="#1FF2C14E" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <TextBlock Text="Pripravené vo vstupnom priečinku" FontWeight="SemiBold" FontSize="15" Foreground="#5E8A2A" Margin="0,0,0,8" />
+                                <TextBlock Text="Žiadny vybraný titul zatiaľ nie je vo vstupnom priečinku – UNIVERSUM ho stráži pri každom spustení."
+                                           Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding Week.HasFound, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Week.Found}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,2" ToolTip="{Binding Files}">
+                                                <Button DockPanel.Dock="Right" Content="Spracovať" Command="{Binding ProcessCommand}" Padding="10,2" VerticalAlignment="Center" />
+                                                <StackPanel Margin="0,0,8,0">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                                </StackPanel>
+                                            </DockPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

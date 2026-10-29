@@ -133,6 +133,9 @@ public sealed class MarkStore(string file)
 
     public TitleMark Get(string key) => Marks.TryGetValue(key, out var mark) ? mark : TitleMark.None;
 
+    /// <summary>The keys of the chosen titles (Vybrané).</summary>
+    public IReadOnlyList<string> Chosen => Marks.Where(m => m.Value.Chosen).Select(m => m.Key).ToList();
+
     public void Set(string key, TitleMark mark)
     {
         mark = mark with { Note = mark.Note.Trim() };

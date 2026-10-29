@@ -1107,13 +1107,27 @@ internal static class SelfTest
         await Screenshot(window, "novinky-history.png");
         page.ShowRecent = true;
 
+        // Kde pozerať: the chosen series and film on services in Slovakia; the chosen titles in the input folder
+        services.WatchForSelfTest = new Core.News.WatchProviders(new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000)));
+        Check(await services.Watchlist.CheckAsync() is null && services.Watchlist.Offered() is var offered &&
+              offered.Any(o => o.Title.Caption == "Invented Show (2026)" && o.Title.Text == "Vymyslené+ (SK)" && o.IsNew) &&
+              offered.Any(o => o.Title.Text == "Obchod (SK) – požičanie"),
+            "watch: where the chosen titles can be watched legally – " + string.Join(" | ", services.Watchlist.Offered().Select(o => $"{o.Title.Caption}: {o.Title.Text}")));
+        Check(model.Premieres.Tab(PremiereTab.SeriesDomestic).All.First(r => r.Caption == "Invented Show (2026)").Streaming == "▶ Vymyslené+ (SK)",
+            "watch: shown under the title in Premiéry");
+        await services.InputWatch.ScanAsync();
+        Check(services.InputWatch.Found.Any(f => f.Title == "Invented Show (2026)" && f.IsSeries && f.Files.Count == 1) &&
+              domestic.Rows.First(r => r.Caption == "Invented Show (2026)") is { FolderText: "✓ v priečinku: 1" } found && found.Episodes[0].State == "✓ vo vstupnom priečinku",
+            "input watch: the chosen series' episode found in the input folder – " + string.Join(" | ", services.InputWatch.Found.Select(f => $"{f.Title} {f.Detail}")));
+
         // the Dashboard's week: the chosen series' episodes and the premieres, the films of the week
         model.Open(model.Dashboard);
         await model.Dashboard.Week.RefreshAsync();
         Check(model.Dashboard.Week.Episodes.Any(e => e.Title == "Invented Show (2026)" && e.Chosen && e.IsToday) && model.Dashboard.Week.Films.Count >= 2 &&
-              model.Dashboard.Week.Films.Any(f => f.Chosen),
+              model.Dashboard.Week.Films.Any(f => f.Chosen) && model.Dashboard.Week.Offers.Count == 2 && model.Dashboard.Week.Found.Count >= 1,
             "dashboard: this week's episodes and films – " + string.Join(" | ", model.Dashboard.Week.Episodes.Select(e => $"{e.Day} {e.Title} {e.Detail}")));
         await Screenshot(window, "dashboard-week.png");
+        services.WatchForSelfTest = null;
         model.Open(page);
 
         var asked = news.Requests.Count;
@@ -1266,6 +1280,13 @@ internal static class SelfTest
 
         private static string? Tmdb(Uri uri)
         {
+            if (uri.AbsolutePath.EndsWith("/watch/providers", StringComparison.Ordinal))
+            {
+                return uri.AbsolutePath.StartsWith("/3/tv/", StringComparison.Ordinal)
+                    ? """{"results":{"SK":{"flatrate":[{"provider_name":"Vymyslené+"}]},"US":{"flatrate":[{"provider_name":"Inde"}]}}}"""
+                    : """{"results":{"SK":{"rent":[{"provider_name":"Obchod"}]}}}""";
+            }
+
             if (uri.AbsolutePath == "/3/search/tv")
             {
                 var query = System.Web.HttpUtility.ParseQueryString(uri.Query);

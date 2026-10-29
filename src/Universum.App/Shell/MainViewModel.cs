@@ -160,6 +160,7 @@ public sealed class MainViewModel : ObservableObject
         Dashboard.Shown();
         await handling;
         _ = DailyUpdateAsync();
+        _ = _services.InputWatch.ScanAsync();
 
         try
         {
@@ -269,7 +270,39 @@ public sealed class MainViewModel : ObservableObject
             await Interests.RefreshAsync();
         }
 
+        await _services.Watchlist.CheckAsync();
+        await _services.InputWatch.ScanAsync();
         await Dashboard.Week.RefreshAsync();
+    }
+
+    /// <summary>A chosen title found in the input folder goes to processing: one file to Single, several episodes to Hromadné.</summary>
+    public async Task ProcessFoundAsync(Pages.FoundInFolder found)
+    {
+        var sent = found switch
+        {
+            { IsSeries: true, Files.Count: > 1 } => await SendEpisodesToBatchAsync(found.Files, found.Title),
+            { IsSeries: true } => await SendEpisodeToSingleAsync(found.Files[0], found.Title, found.Episode),
+            _ => await SendFilmToSingleAsync(found.Files[0], found.Title),
+        };
+        if (!sent)
+        {
+            System.Windows.MessageBox.Show("Spracovanie práve pracuje – pošlite titul znova po jeho skončení.", "UNIVERSUM");
+        }
+    }
+
+    /// <summary>A chosen film from the input folder into Single spracovanie with its title; false while it is busy.</summary>
+    private async Task<bool> SendFilmToSingleAsync(string file, string title)
+    {
+        if (Rules.Busy)
+        {
+            return false;
+        }
+
+        Open(Rules);
+        await Rules.LoadAsync(file);
+        Rules.IsSeries = false;
+        Rules.TitleText = title;
+        return true;
     }
 
     public string MkvToolNixStatus { get => _mkvToolNixStatus; private set => SetProperty(ref _mkvToolNixStatus, value); }

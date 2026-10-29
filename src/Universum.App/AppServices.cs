@@ -308,6 +308,22 @@ public sealed class AppServices
     /// <summary>Raised when the kept premieres and news were forgotten.</summary>
     public event Action? NewsCleared;
 
+    /// <summary>Legal availability from TMDB (JustWatch data); null without TMDB.</summary>
+    public Universum.Core.News.WatchProviders? Watch => WatchForSelfTest ?? (Tmdb is { } tmdb ? new Universum.Core.News.WatchProviders(tmdb) : null);
+
+    /// <summary>The self-test's stand-in availability.</summary>
+    public Universum.Core.News.WatchProviders? WatchForSelfTest { get; set; }
+
+    /// <summary>Where the chosen titles can be watched legally (checked once a day).</summary>
+    public Pages.Watchlist Watchlist => _watchlist ??= new Pages.Watchlist(this);
+
+    private Pages.Watchlist? _watchlist;
+
+    /// <summary>The chosen titles found in the input folder.</summary>
+    public Pages.InputWatch InputWatch => _inputWatch ??= new Pages.InputWatch(this);
+
+    private Pages.InputWatch? _inputWatch;
+
     /// <summary>The sources of Zaujímavosti (added by the user; none in a new installation).</summary>
     public IReadOnlyList<Universum.Core.News.FeedSource> FeedSources => Settings.FeedSources ?? [];
 
@@ -563,6 +579,9 @@ public sealed class AppSettings
 
     /// <summary>The days read from the sources of news.</summary>
     public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");
+
+    /// <summary>Where the chosen titles can be watched legally, as last checked.</summary>
+    public static string AvailabilityFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "availability.json");
 
     /// <summary>The articles of Zaujímavosti read so far (their history).</summary>
     public static string InterestsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "interests.json");

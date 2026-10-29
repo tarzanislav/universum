@@ -81,6 +81,13 @@ public sealed class PremieresPageViewModel : ObservableObject
                 row.Poster.Reset();
             }
         };
+        services.Watchlist.Changed += () =>
+        {
+            foreach (var row in Tabs.SelectMany(t => t.All))
+            {
+                row.MarkChanged();
+            }
+        };
     }
 
     public IReadOnlyList<PremiereTabItem> Tabs { get; }
@@ -491,7 +498,7 @@ public sealed class PremiereTabItem : ObservableObject
 }
 
 /// <summary>A row of a Premiéry table: a film or a series premiere with its mark.</summary>
-public abstract class PremiereRow(MarkStore marks, string markKey) : MarkedRow(marks, markKey)
+public abstract class PremiereRow(MarkStore marks, string markKey, Watchlist watch) : MarkedRow(marks, markKey, watch)
 {
     /// <summary>The day of the premiere.</summary>
     public abstract DateOnly SortDate { get; }
@@ -531,7 +538,7 @@ public sealed class PremiereFilmRow : PremiereRow
     private readonly string _search;
 
     public PremiereFilmRow(FilmPremiere film, PremieresPageViewModel page)
-        : base(page.Services.Marks, MarkStore.Film(film.TmdbId))
+        : base(page.Services.Marks, MarkStore.Film(film.TmdbId), page.Services.Watchlist)
     {
         Film = film;
         Poster = new PosterThumb(page.Services, film.PosterPath, PosterSize.Small);
@@ -571,7 +578,7 @@ public sealed class PremiereSeriesRow : PremiereRow
     private readonly string _search;
 
     public PremiereSeriesRow(SeriesPremiereRow premiere, PremieresPageViewModel page)
-        : base(page.Services.Marks, MarkStore.Series(premiere.First))
+        : base(page.Services.Marks, MarkStore.Series(premiere.First), page.Services.Watchlist)
     {
         var first = premiere.First;
         Premiere = premiere;

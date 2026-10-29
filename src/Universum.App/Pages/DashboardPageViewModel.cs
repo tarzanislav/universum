@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Calendar;
 using Universum.Core.Jobs;
+using Universum.Core.News;
 using Universum.Core.Weather;
 
 namespace Universum.App.Pages;
@@ -73,7 +74,7 @@ public sealed class DashboardPageViewModel : ObservableObject
         Titles = new("", "Názvy titulov", () => _main.Open(_main.Settings));
         Tools = new("", "MKVToolNix a aktualizácie", () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
         Status = [Queue, Mux, Batch, Library, Titles, Tools];
-        Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres));
+        Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres), found => _main.ProcessFoundAsync(found));
 
         services.WeatherChanged += () =>
         {
@@ -215,6 +216,7 @@ public sealed class DashboardPageViewModel : ObservableObject
     public void Shown()
     {
         _ = Week.RefreshAsync();
+        _ = _services.InputWatch.ScanAsync();
         RefreshStatus();
         _ = CountLibraryAsync();
         _ = RefreshWeatherAsync(force: false);
@@ -424,15 +426,78 @@ public sealed class DashboardPageViewModel : ObservableObject
 /// <summary>A line of the week's overview: the day, the title and what comes.</summary>
 public sealed record WeekRow(string Day, string Title, string Detail, bool Chosen, bool IsToday);
 
+/// <summary>A chosen title on a streaming service, on the Dashboard.</summary>
+public sealed record OfferRow(string Title, string Where, bool IsNew);
+
+/// <summary>A chosen title found in the input folder, on the Dashboard; the button sends it to processing.</summary>
+public sealed class FoundRow(FoundInFolder found, Func<FoundInFolder, Task> process)
+{
+    public string Title => found.Title;
+
+    public string Detail => found.Detail;
+
+    public string Files => string.Join("\n", found.Files.Select(System.IO.Path.GetFileName));
+
+    public AsyncRelayCommand ProcessCommand { get; } = new(() => process(found));
+}
+
 /// <summary>
 /// The Dashboard's week (owner, 29. 10. 2026): which episodes of which series come this week and on which day – of the
-/// chosen series (Vybrané) and the premieres of new series and seasons – and the films premiering this week; from what
-/// Premiéry and Novinky have kept, nothing is asked here.
+/// chosen series (Vybrané) and the premieres of new series and seasons – and the films premiering this week; where
+/// the chosen titles can be watched legally; and the chosen titles already in the input folder. From what Premiéry,
+/// Novinky and the checks have kept, nothing is asked here.
 /// </summary>
-public sealed class WeekOverview(AppServices services, Action openNews, Action openPremieres) : ObservableObject
+public sealed class WeekOverview : ObservableObject
 {
+    private readonly AppServices _services;
+    private readonly Func<FoundInFolder, Task> _process;
     private IReadOnlyList<WeekRow> _episodes = [];
     private IReadOnlyList<WeekRow> _films = [];
+    private IReadOnlyList<OfferRow> _offers = [];
+    private IReadOnlyList<FoundRow> _found = [];
+    private string _watchStatus = "";
+
+    public WeekOverview(AppServices services, Action openNews, Action openPremieres, Func<FoundInFolder, Task> process)
+    {
+        _services = services;
+        _process = process;
+        OpenNewsCommand = new(openNews);
+        OpenPremieresCommand = new(openPremieres);
+        CheckWatchCommand = new AsyncRelayCommand(async () =>
+        {
+            WatchStatus = "Zisťujem, kde sa dajú vybrané tituly pozerať…";
+            WatchStatus = await _services.Watchlist.CheckAsync() ?? $"Skontrolované {DateTime.Now:H:mm}.";
+        });
+        _services.Watchlist.Changed += ShowOffers;
+        _services.InputWatch.Changed += ShowFound;
+        ShowOffers();
+    }
+
+    public IReadOnlyList<OfferRow> Offers { get => _offers; private set => SetProperty(ref _offers, value); }
+
+    public bool NoOffers => Offers.Count == 0;
+
+    public IReadOnlyList<FoundRow> Found { get => _found; private set => SetProperty(ref _found, value); }
+
+    public bool HasFound => Found.Count > 0;
+
+    public string WatchStatus { get => _watchStatus; private set => SetProperty(ref _watchStatus, value); }
+
+    public AsyncRelayCommand CheckWatchCommand { get; }
+
+    public string WatchAttribution => WatchProviders.Attribution;
+
+    private void ShowOffers()
+    {
+        Offers = _services.Watchlist.Offered().Select(o => new OfferRow(o.Title.Caption, o.Title.Text, o.IsNew)).ToList();
+        OnPropertyChanged(nameof(NoOffers));
+    }
+
+    private void ShowFound()
+    {
+        Found = _services.InputWatch.Found.Select(f => new FoundRow(f, _process)).ToList();
+        OnPropertyChanged(nameof(HasFound));
+    }
 
     public IReadOnlyList<WeekRow> Episodes { get => _episodes; private set => SetProperty(ref _episodes, value); }
 
@@ -442,16 +507,16 @@ public sealed class WeekOverview(AppServices services, Action openNews, Action o
 
     public bool NoFilms => Films.Count == 0;
 
-    public RelayCommand OpenNewsCommand { get; } = new(openNews);
+    public RelayCommand OpenNewsCommand { get; }
 
-    public RelayCommand OpenPremieresCommand { get; } = new(openPremieres);
+    public RelayCommand OpenPremieresCommand { get; }
 
     public async Task RefreshAsync()
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         var last = today.AddDays(6);
-        var marks = services.Marks;
-        var archive = await Task.Run(services.PremiereStore.Load);
+        var marks = _services.Marks;
+        var archive = await Task.Run(_services.PremiereStore.Load);
         Films = archive.Films.Where(f => f.Premiere >= today && f.Premiere <= last)
             .GroupBy(f => f.TmdbId).Select(g => g.OrderBy(f => f.Region).First())
             .Select(f => (Film: f, Chosen: marks.Get(Universum.Core.News.MarkStore.Film(f.TmdbId)).Chosen))
@@ -460,7 +525,7 @@ public sealed class WeekOverview(AppServices services, Action openNews, Action o
                 f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? "kino " + f.Film.PremiereNote : "svetová premiéra", f.Chosen, f.Film.Premiere == today))
             .ToList();
 
-        var schedule = await services.SeriesNews.ReadAsync(services.NewsSources, today, offline: true);
+        var schedule = await _services.SeriesNews.ReadAsync(_services.NewsSources, today, offline: true);
         Episodes = schedule.Episodes.Where(e => e.AirDate >= today && e.AirDate <= last)
             .Select(e => (Episode: e, Chosen: marks.Get(Universum.Core.News.MarkStore.Series(e)).Chosen))
             .Where(e => e.Chosen || e.Episode.IsPremiere)

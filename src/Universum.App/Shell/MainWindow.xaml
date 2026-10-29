@@ -1239,6 +1239,13 @@
                                             <StackPanel>
                                                 <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
                                                          ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
+                                                <!-- owner, 29. 10. 2026: a film exactly by its TMDB ID -->
+                                                <DockPanel Margin="0,2,0,0"
+                                                           Visibility="{Binding DataContext.IsMovies, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="TMDB ID:" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                    <TextBox Text="{Binding TmdbId, UpdateSourceTrigger=LostFocus}" FontSize="12"
+                                                             ToolTip="Presne podľa TMDB: číslo filmu (napr. 12345) alebo adresa z themoviedb.org; minisériál vložte ako adresu …/tv/…. Použije sa, keď pole opustíte." />
+                                                </DockPanel>
                                                 <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                                 <Button Content="Potvrdiť návrh" Command="{Binding ConfirmCommand}" Padding="8,2" Margin="0,2,0,0" FontSize="12" HorizontalAlignment="Left"
                                                         Visibility="{Binding IsUnverified, Converter={StaticResource BoolToVisibility}}"

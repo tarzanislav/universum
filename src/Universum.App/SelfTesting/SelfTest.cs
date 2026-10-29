@@ -1636,10 +1636,12 @@ internal static class SelfTest
             Requests.Add(request.RequestUri!.ToString());
             var histra = request.RequestUri.Host == "histra.net";
             var results = histra ? Histra : Tmdb;
+            // a title read by its ID (movie/9700) is the title itself, a search a list of results
+            var details = !histra && System.Text.RegularExpressions.Regex.IsMatch(request.RequestUri.AbsolutePath, @"/3/(movie|tv)/\d+$");
             return Task.FromResult(new System.Net.Http.HttpResponseMessage(histra ? HistraStatus : System.Net.HttpStatusCode.OK)
             {
                 RequestMessage = request,
-                Content = new System.Net.Http.StringContent("{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),
+                Content = new System.Net.Http.StringContent(details ? results : "{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),
             });
         }
     }
@@ -1812,6 +1814,17 @@ internal static class SelfTest
 
             Check(batch.Library!.TitleFor(chosenFile.Item.File.Path)?.FolderName == "The Golden Carp (2021)" && !chosenFile.HasCandidates,
                 "batch: a title chosen from the list, confirmed in HISTRA – " + batch.RunState);
+
+            // owner, 29. 10. 2026: a film exactly by its TMDB ID typed in the field TMDB ID
+            var byId = batch.FileRows[1];
+            byId.TmdbId = "tmdbid-9700";
+            for (var wait = 0; wait < 50 && batch.Library!.TitleFor(byId.Item.File.Path)?.TmdbId != 9700; wait++)
+            {
+                await Task.Delay(100);
+            }
+
+            Check(batch.Library!.TitleFor(byId.Item.File.Path) is { TmdbId: 9700 } exact && exact.FolderName.StartsWith("The Golden Carp (2021)", StringComparison.Ordinal),
+                "batch: a film named by its TMDB ID – " + batch.RunState);
             services.TitlesForSelfTest = null;
 
             Directory.Delete(speech, recursive: true);

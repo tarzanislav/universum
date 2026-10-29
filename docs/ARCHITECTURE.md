@@ -104,8 +104,8 @@ in next to it without changing the rules, planning or UI.
     beside it. "Vymazať frontu" (Single, Hromadné) and "Vymazať všetko" (Zlučovanie) forget what is not processed;
   - the end of a run is shown boldly (`BatchFinish`: done / with errors / stopped, counts, time); a film TMDB does not
     know as a film is looked for among series (TV films, miniseries): it goes among the films as "Name (Year)" without an
-    ID after the user confirms the warning at the file; a TMDB ID can be typed alone ("12345", "tmdbid-12345") or as an
-    address, also /tv/;
+    ID after the user confirms the warning at the file; a film is named exactly by its TMDB ID in the field TMDB ID at
+    the file ("12345", "tmdbid-12345" or an address, a miniseries by its /tv/ address) – also in the title field;
     "process anyway" lets a file through (a second version then gets a number, K1);
   - the kind film/series is only proposed (`LibraryJob.KindConfirmed`; batch: "Potvrdiť" / choosing a kind / accepting
     suggestions; CLI: `--film`, `--serial`, `--confirm-suggestions`); it is guessed from clear numbers (S01E04, 1x04)

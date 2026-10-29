@@ -398,6 +398,24 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
     public RelayCommand ConfirmSeriesCommand { get; }
 
+    /// <summary>A film named by its TMDB ID or address typed in the field TMDB ID at the file (also used by the self-test).</summary>
+    public void UseTmdbId(string path, string text)
+    {
+        if (_library is not { Kind: MediaKind.Movie })
+        {
+            return;
+        }
+
+        if (TitleGuess.ParseTmdb(text) is { } reference)
+        {
+            _ = NameFilmFromTmdbAsync(path, reference);
+        }
+        else
+        {
+            RunState = "TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….";
+        }
+    }
+
     /// <summary>Sets the naming of one file: a film title ("Creep (2004)") or an episode ("S01E04"); also used by the self-test.</summary>
     public void SetNaming(string path, string text)
     {
@@ -934,7 +952,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private async Task NameFilmFromTmdbAsync(string path, TmdbReference reference)
     {
-        if (_services.Tmdb is not { } tmdb)
+        if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
         {
             RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
             return;

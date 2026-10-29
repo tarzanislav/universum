@@ -292,6 +292,24 @@ public sealed class FileRow : ObservableObject
         set => page.SetNaming(Item.File.Path, value);
     }
 
+    /// <summary>
+    /// A TMDB ID or address typed for a film (owner, 29. 10. 2026: exact when the name finds nothing): the number is a
+    /// film's ID, a miniseries is given by its address (…/tv/…). Applied when the field is left; the field then clears.
+    /// </summary>
+    public string TmdbId
+    {
+        get => "";
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                page.UseTmdbId(Item.File.Path, value);
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>A suggestion waiting for confirmation, shown under the editable value.</summary>
     public string NamingSuggestion
     {

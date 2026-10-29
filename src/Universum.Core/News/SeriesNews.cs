@@ -79,10 +79,20 @@ public sealed record SeriesPremiereRow(SeriesEpisode First, string Periodicity, 
 /// Each day of each source is kept on the disk: a day read after it was over is final and never asked again (the
 /// history of Novinky), today is asked again after 6 hours, later days after a day; Obnoviť asks today and later days
 /// at once. A source that fails is reported and not asked again in this reading. The same episode from two sources is
-/// shown once (the one of the page, with the Czech title and TVmaze's IDs).
+/// shown once (the one of the page, with the Czech title and TVmaze's IDs). The episodes are sorted by the origin of the
+/// series (<see cref="Classify(SeriesEpisode)"/>); what the pages do not tell is looked up on TVmaze and kept in
+/// <paramref name="origins"/>.
 /// </summary>
-public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCache cache)
+public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCache cache, SeriesOrigins? origins = null)
 {
+    /// <summary>The name TVmaze's episodes carry as their source.</summary>
+    public const string TvMazeSource = "TVmaze";
+
+    /// <summary>At most this many series are looked up on TVmaze per reading (2 per second); the rest in later readings.</summary>
+    public const int MaxOriginLookups = 60;
+
+    private readonly SeriesOrigins _origins = origins ?? new SeriesOrigins(null);
+
     /// <summary>Days before and after today of a TVmaze source.</summary>
     public const int TvMazeDaysBack = 7;
 
@@ -139,7 +149,20 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
             }
         }
 
-        return new SeriesSchedule(Merge(episodes), problems);
+        var merged = Merge(episodes);
+        if (!offline)
+        {
+            try
+            {
+                await LearnOriginsAsync(merged, today, cancellationToken).ConfigureAwait(false);
+            }
+            catch (NewsSourceException)
+            {
+                // the origins not learnt now are asked in the next reading
+            }
+        }
+
+        return new SeriesSchedule(Classify(merged), problems);
     }
 
     /// <summary>The days before and after today a source is read.</summary>
@@ -153,7 +176,97 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
         today.AddDays(sources.Where(s => s.Enabled && s.Kind is NewsSourceKind.Page or NewsSourceKind.TvMaze).Select(s => Window(s).Ahead).DefaultIfEmpty(0).Max());
 
     /// <summary>All kept episodes aired before a day (the history of Novinky), one entry per episode.</summary>
-    public IReadOnlyList<SeriesEpisode> History(DateOnly before) => Merge(cache.Before(before));
+    public IReadOnlyList<SeriesEpisode> History(DateOnly before) => Classify(Merge(cache.Before(before)));
+
+    /// <summary>
+    /// The episodes by the origin of their series (owner, 29. 10. 2026): Czech and Slovak series are
+    /// <see cref="NewsRegion.Domestic"/>, all the others <see cref="NewsRegion.World"/>. A foreign series a page gives on a
+    /// Czech or Slovak channel (dubbed) is left out – its original airing is among the world's.
+    /// </summary>
+    public IReadOnlyList<SeriesEpisode> Classify(IEnumerable<SeriesEpisode> episodes) => episodes.Select(Classify).OfType<SeriesEpisode>().ToList();
+
+    /// <inheritdoc cref="Classify(IEnumerable{SeriesEpisode})"/>
+    public SeriesEpisode? Classify(SeriesEpisode episode)
+    {
+        if (episode.Origin is { } known)
+        {
+            return episode.Region == known ? episode : episode with { Region = known };
+        }
+
+        var home = IsHome(episode);
+        if (!home && episode.Source != TvMazeSource && episode.Region == NewsRegion.Domestic && episode.TvMaze is null)
+        {
+            return null;
+        }
+
+        var region = home ? NewsRegion.Domestic : NewsRegion.World;
+        return episode with { Region = region, Origin = region };
+    }
+
+    // what the sources tell (TVmaze: the language and the country of the original channel), else what TVmaze told when
+    // asked; else a guess: a series of TVmaze is foreign, one of a page is Czech or Slovak when it airs on a Czech or
+    // Slovak channel and has no original title of its own
+    private bool IsHome(SeriesEpisode episode)
+    {
+        if (HomeOrigin.IsHomeCountry(episode.Country) || HomeOrigin.IsHomeLanguage(episode.Language))
+        {
+            return true;
+        }
+
+        if (episode.Language.Length > 0)
+        {
+            return false;
+        }
+
+        if (_origins.Get(episode.SeriesKey) is { Home: { } home })
+        {
+            return home;
+        }
+
+        return episode.Source != TvMazeSource && episode.Region == NewsRegion.Domestic && !HasOwnOriginalTitle(episode);
+    }
+
+    private static bool HasOwnOriginalTitle(SeriesEpisode episode) => Words.Normalize(episode.OriginalTitle) != Words.Normalize(episode.Title);
+
+    // a series whose origin the sources did not tell: of a page (asked by its name, or by TVmaze's ID it got from TVmaze's
+    // entry), or of TVmaze without a language and a country (kept from before TVmaze's languages were read)
+    private bool NeedsLookup(SeriesEpisode episode, DateTime now) =>
+        episode.Origin is null && episode.Language.Length == 0 && episode.Country.Length == 0 &&
+        (episode.Source != TvMazeSource || episode.TvMaze is not null) && _origins.IsDue(episode.SeriesKey, now);
+
+    /// <summary>
+    /// Asks TVmaze for the origins of series the sources did not tell (at most <see cref="MaxOriginLookups"/>): premieres
+    /// first, then the series airing nearest today. Only the series' name or TVmaze ID is sent.
+    /// </summary>
+    public async Task LearnOriginsAsync(IReadOnlyList<SeriesEpisode> episodes, DateOnly today, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.Now;
+        var wanted = episodes.Where(e => NeedsLookup(e, now))
+            .OrderBy(e => e.IsPremiere ? 0 : 1).ThenBy(e => Math.Abs(e.AirDate.DayNumber - today.DayNumber))
+            .DistinctBy(e => e.SeriesKey).Take(MaxOriginLookups).ToList();
+        if (wanted.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var episode in wanted)
+            {
+                var show = episode.TvMaze is { } id
+                    ? await tvmaze.ShowAsync(id, cancellationToken).ConfigureAwait(false)
+                    : await tvmaze.FindAsync(episode.OriginalTitle, cancellationToken).ConfigureAwait(false);
+                var same = show is not null &&
+                           (episode.TvMaze is not null || Words.Normalize(show.Name) == Words.Normalize(episode.OriginalTitle) || Words.Normalize(show.Name) == Words.Normalize(episode.Title)) &&
+                           (episode.Year is null || show.Year is null || Math.Abs(show.Year.Value - episode.Year.Value) <= 1);
+                _origins.Set(episode.SeriesKey, same ? show!.IsHome : null, now);
+            }
+        }
+        finally
+        {
+            _origins.Save();
+        }
+    }
 
     private async Task<IReadOnlyList<SeriesEpisode>> ReadDayAsync(NewsSource source, DateOnly day, CancellationToken cancellationToken)
     {
@@ -184,7 +297,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
     {
         var merged = new Dictionary<string, SeriesEpisode>(StringComparer.Ordinal);
         var order = new List<string>();
-        foreach (var episode in episodes.OrderBy(e => e.AirDate).ThenBy(e => e.Source == "TVmaze" ? 1 : 0))
+        foreach (var episode in episodes.OrderBy(e => e.AirDate).ThenBy(e => e.Source == TvMazeSource ? 1 : 0))
         {
             var key = episode.Season is null
                 ? $"{episode.SeriesKey}|{episode.AirDate.DayNumber}|{episode.Channel}"
@@ -196,7 +309,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
                 continue;
             }
 
-            if (known.Source != "TVmaze" && episode.Source == "TVmaze")
+            if (known.Source != TvMazeSource && episode.Source == TvMazeSource)
             {
                 merged[key] = known with
                 {
@@ -204,6 +317,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
                     Tvdb = known.Tvdb ?? episode.Tvdb,
                     TvMaze = known.TvMaze ?? episode.TvMaze,
                     Country = known.Country.Length > 0 ? known.Country : episode.Country,
+                    Language = known.Language.Length > 0 ? known.Language : episode.Language,
                     ShowType = known.ShowType.Length > 0 ? known.ShowType : episode.ShowType,
                 };
             }

@@ -47,16 +47,44 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
         return document is null ? [] : ParseSeasonDates(document, season);
     }
 
-    /// <summary>The series named so (TVmaze's best match) with the year it started; null when TVmaze has none.</summary>
-    public async Task<(int Id, int? Year)?> FindAsync(string name, CancellationToken cancellationToken = default)
+    /// <summary>The series named so (TVmaze's best match); null when TVmaze has none.</summary>
+    public async Task<TvMazeShow?> FindAsync(string name, CancellationToken cancellationToken = default)
     {
         using var document = await GetAsync("singlesearch/shows?q=" + Uri.EscapeDataString(name), cancellationToken).ConfigureAwait(false);
-        if (document is null || document.RootElement.ValueKind != JsonValueKind.Object || Int(document.RootElement, "id") is not { } id)
+        return document is null ? null : ParseShow(document.RootElement);
+    }
+
+    /// <summary>A series by its TVmaze ID; null when TVmaze has none.</summary>
+    public async Task<TvMazeShow?> ShowAsync(int id, CancellationToken cancellationToken = default)
+    {
+        using var document = await GetAsync("shows/" + id.ToString(CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
+        return document is null ? null : ParseShow(document.RootElement);
+    }
+
+    /// <summary>A show: its ID, name, the year it started, its language and the country of its channel.</summary>
+    public static TvMazeShow? ParseShow(JsonElement show)
+    {
+        if (show.ValueKind != JsonValueKind.Object || Int(show, "id") is not { } id)
         {
             return null;
         }
 
-        return (id, Year(Text(document.RootElement, "premiered")));
+        return new TvMazeShow(id, WebText.Clean(Text(show, "name"), 300), Year(Text(show, "premiered")), WebText.Clean(Text(show, "language"), 40), CountryOf(show));
+    }
+
+    // the country of the show's channel or streaming service ("" when TVmaze gives none)
+    private static string CountryOf(JsonElement show)
+    {
+        foreach (var name in new[] { "network", "webChannel" })
+        {
+            if (show.TryGetProperty(name, out var channel) && channel.ValueKind == JsonValueKind.Object &&
+                channel.TryGetProperty("country", out var country) && country.ValueKind == JsonValueKind.Object && Text(country, "code") is { Length: > 0 } code)
+            {
+                return code;
+            }
+        }
+
+        return "";
     }
 
     public static IReadOnlyList<SeriesEpisode> ParseSchedule(JsonDocument document, TvMazeFilter filter, TimeZoneInfo zone)
@@ -102,7 +130,7 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
             var externals = show.TryGetProperty("externals", out var x) && x.ValueKind == JsonValueKind.Object ? x : default;
             episodes.Add(new SeriesEpisode
             {
-                Source = "TVmaze",
+                Source = SeriesNews.TvMazeSource,
                 Region = country is "CZ" or "SK" ? NewsRegion.Domestic : NewsRegion.World,
                 Title = WebText.Clean(name, 300),
                 OriginalTitle = WebText.Clean(name, 300),
@@ -112,6 +140,7 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
                 AirDate = day.Value,
                 Channel = channel.ValueKind == JsonValueKind.Object ? WebText.Clean(Text(channel, "name"), 100) : "",
                 Country = country,
+                Language = WebText.Clean(Text(show, "language"), 40),
                 Genres = show.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array
                     ? WebText.Clean(string.Join(", ", genres.EnumerateArray().Where(g => g.ValueKind == JsonValueKind.String).Select(g => g.GetString())), 200)
                     : "",
@@ -232,6 +261,13 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
 
     private static int? Year(string? date) =>
         date is { Length: >= 4 } && int.TryParse(date.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var year) ? year : null;
+}
+
+/// <summary>A show on TVmaze: its ID, name, the year it started, its original language and the country of its channel.</summary>
+public sealed record TvMazeShow(int Id, string Name, int? Year, string Language, string Country)
+{
+    /// <summary>A Czech or Slovak series.</summary>
+    public bool IsHome => HomeOrigin.IsHomeLanguage(Language) || HomeOrigin.IsHomeCountry(Country);
 }
 
 /// <summary>Which TVmaze shows are news for the user: popular enough (TVmaze's weight 0–100) and not of the skipped types.</summary>

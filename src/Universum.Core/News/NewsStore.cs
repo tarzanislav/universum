@@ -65,6 +65,18 @@ public sealed record PremiereArchive
         return [.. rows.Values];
     }
 
+    /// <summary>
+    /// The kept premieres by origin (owner, 29. 10. 2026; those kept before were sorted by where they aired): the films by
+    /// <see cref="FilmPremieres.Classify(IEnumerable{FilmPremiere})"/>, the series by <paramref name="classify"/>
+    /// (SeriesNews.Classify – a dubbed foreign series of a Czech or Slovak channel is left out).
+    /// </summary>
+    public PremiereArchive Classified(Func<SeriesEpisode, SeriesEpisode?> classify) => this with
+    {
+        Films = FilmPremieres.Classify(Films),
+        Series = Series.Select(r => classify(r.First) is { } first ? r with { First = first } : null).OfType<SeriesPremiereRow>()
+            .GroupBy(Key, StringComparer.Ordinal).Select(g => g.First()).ToList(),
+    };
+
     /// <summary>A premiere of a series: its region, series and season.</summary>
     public static string Key(SeriesPremiereRow row) => $"{row.First.Region}|{row.First.SeriesKey}|{row.First.Season}";
 }

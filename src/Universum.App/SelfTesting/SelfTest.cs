@@ -853,8 +853,8 @@ internal static class SelfTest
         Check(!page.HasProblems, "premieres: all sources read – " + page.Problems);
         Check(films.Count == 2 && films[0].IsToday && films[0].When == "DNES" && films[1].Caption == $"The Invented Premiere ({FakeNews.Day(3).Year})" &&
               films[1].Where == $"CZ · SK {FakeNews.Day(4).Day}. {FakeNews.Day(4).Month}." && films[1].Availability.StartsWith("VOD ", StringComparison.Ordinal) &&
-              films[1].Production == "USA, VB · Invented Pictures" && films[1].When == "o 3 dni",
-            "premieres: films in Czech and Slovak cinemas, the nearest first – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.When} {f.Where} {f.Production} {f.Availability}")));
+              films[1].Production == "ČR, SR · Invented Pictures" && films[1].When == "o 3 dni",
+            "premieres: Czech and Slovak films in the cinemas here, the nearest first – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.When} {f.Where} {f.Production} {f.Availability}")));
         Check(world.Count == 1 && world[0].Caption.StartsWith("Later Invented Film", StringComparison.Ordinal),
             "premieres: only coming films of the world, the past one is in the history – " + string.Join(" | ", world.Select(f => $"{f.Caption} {f.Date}")));
         Check(domesticSeries.Count == 1 && domesticSeries[0].Caption == "Invented Show (2026)" && domesticSeries[0].LocalTitle == "Vymyslený seriál" &&
@@ -1264,7 +1264,7 @@ internal static class SelfTest
 
             if (uri.AbsolutePath == "/singlesearch/shows")
             {
-                return uri.Query.Contains("Invented%20Show", StringComparison.Ordinal) ? """{"id":77,"name":"Invented Show","premiered":"2026-09-01"}""" : null;
+                return uri.Query.Contains("Invented%20Show", StringComparison.Ordinal) ? """{"id":77,"name":"Invented Show","premiered":"2026-09-01","language":"Czech","network":{"name":"ČT1","country":{"code":"CZ"}}}""" : null;
             }
 
             // a season: weekly for the streaming show, weekdays for the Czech one
@@ -1311,9 +1311,13 @@ internal static class SelfTest
                 "/3/movie/202" => ("Neskorší vymyslený film", "Later Invented Film", 10, 30, 30),
                 _ => ("", "", 0, 0, 0),
             };
+            // the films of the cinemas here are Czech and Slovak, the films of the world American and British
+            var countries = uri.AbsolutePath.StartsWith("/3/movie/10", StringComparison.Ordinal)
+                ? """[{"iso_3166_1":"CZ"},{"iso_3166_1":"SK"}]"""
+                : """[{"iso_3166_1":"US"},{"iso_3166_1":"GB"}]""";
             return title.Length == 0 ? null : $$$"""
                 {"title":"{{{title}}}","original_title":"{{{original}}}","release_date":"{{{Iso(release)}}}","poster_path":"/f{{{uri.AbsolutePath[^3..]}}}.jpg",
-                 "production_countries":[{"iso_3166_1":"US"},{"iso_3166_1":"GB"}],"production_companies":[{"name":"Invented Pictures"},{"name":"Second"}],
+                 "production_countries":{{{countries}}},"production_companies":[{"name":"Invented Pictures"},{"name":"Second"}],
                  "release_dates":{"results":[
                    {"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(cz)}}}T00:00:00.000Z"},{"type":4,"release_date":"{{{Iso(cz + 45)}}}T00:00:00.000Z"}]},
                    {"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(sk)}}}T00:00:00.000Z"}]},

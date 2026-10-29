@@ -160,8 +160,17 @@ in next to it without changing the rules, planning or UI.
   (the history of Novinky) and never asked again; today is asked again after 6 hours, the next week after a day, later
   days after three; Obnoviť asks today and later days at once; pages open with what is kept (`offline`). Web pages with
   Czech and Slovak channels are read at least 30 days ahead (`SeriesNews.PageDaysAhead`).
-- `News/FilmPremieres` – film premieres from TMDB (with the user's key): Czech and Slovak cinemas (theatrical release
-  dates of CZ and SK) and the most popular world premieres, with VOD (digital) and TV dates (CZ, else SK, else USA).
+- `News/Origins` – CZ/SK versus the world **by origin**, not by where a title airs (owner, 29. 10. 2026): `HomeOrigin`
+  (country CZ/SK or language Czech/Slovak). `SeriesNews.Classify` sorts episodes: TVmaze's language and the country of
+  the original channel; what a page does not tell is looked up on TVmaze (`LearnOriginsAsync`, at most 60 series per
+  reading, kept in `SeriesOrigins` – news/origins.json; not found asked again after 30 days); else a guess (a page's
+  series without an original title of its own on a Czech or Slovak channel is Czech or Slovak). A foreign series a page
+  gives on a Czech or Slovak channel (dubbed) is left out unless TVmaze has the same episode. Kept premieres are sorted
+  again on loading (`PremiereArchive.Classified`).
+- `News/FilmPremieres` – film premieres from TMDB (with the user's key): Czech and Slovak films (country of production or
+  original language) in the cinemas here, and the most popular world premieres without Czech and Slovak films – a foreign
+  film of the cinemas here is among the world's on its first release, its dates here as a note ("v kinách SK od 13. 11.");
+  with VOD (digital) and TV dates (CZ, else SK, else USA). `FilmPremieres.Classify` sorts films kept before by origin.
 - `News/NewsStore` – `PremiereStore`/`PremiereArchive`: every premiere read is kept; new reads are merged (what was read
   wins; kept films still to come that the popularity lists no longer give are checked by `FilmPremieres.RecheckAsync`;
   a kept series premiere still to come that the fully read schedule no longer has is dropped); past ones are the

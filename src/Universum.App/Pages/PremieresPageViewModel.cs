@@ -203,10 +203,10 @@ public sealed class PremieresPageViewModel : ObservableObject
         _ => "",
     } + SelectedTab.Tab switch
     {
-        PremiereTab.FilmDomestic => $"Premiéry v kinách na Slovensku a v Česku (sledované {FilmDaysAhead} dní dopredu), s dátumom na VOD a v TV. Zdroj: TMDB.",
-        PremiereTab.FilmWorld => $"Najpopulárnejšie filmy s prvou premiérou vo svete (sledované {FilmDaysAhead} dní dopredu). Zdroj: TMDB.",
-        PremiereTab.SeriesDomestic => $"Nové seriály a nové série na českých a slovenských staniciach a službách (sledované {SeriesNews.PageDaysAhead} dní dopredu, podľa zdrojov v Nastaveniach).",
-        _ => $"Nové seriály a nové série vo svete – stanice a streamovacie služby (sledované {SeriesNews.TvMazeDaysAhead} dní dopredu; TVmaze a zdroje v Nastaveniach).",
+        PremiereTab.FilmDomestic => $"Len české a slovenské filmy (aj koprodukcie) – premiéry v kinách na Slovensku a v Česku (sledované {FilmDaysAhead} dní dopredu), s dátumom na VOD a v TV. Zdroj: TMDB.",
+        PremiereTab.FilmWorld => $"Filmy sveta okrem českých a slovenských – najpopulárnejšie s prvou premiérou vo svete (sledované {FilmDaysAhead} dní dopredu); ak idú aj do našich kín, dátum je pri premiére. Zdroj: TMDB.",
+        PremiereTab.SeriesDomestic => $"Len české a slovenské seriály – nové seriály a nové série (sledované {SeriesNews.PageDaysAhead} dní dopredu, podľa zdrojov v Nastaveniach).",
+        _ => $"Seriály sveta okrem českých a slovenských – nové seriály a nové série na staniciach a streamovacích službách (sledované {SeriesNews.TvMazeDaysAhead} dní dopredu; TVmaze a zdroje v Nastaveniach).",
     };
 
     /// <summary>Why the chosen table is empty.</summary>
@@ -386,7 +386,7 @@ public sealed class PremieresPageViewModel : ObservableObject
             return;
         }
 
-        _archive = _services.PremiereStore.Load();
+        _archive = _services.PremiereStore.Load().Classified(_services.SeriesNews.Classify);
         Build();
         if (_archive.ReadAt is { } read)
         {

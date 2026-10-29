@@ -1760,7 +1760,8 @@
                                     <DataTemplate>
                                         <StackPanel VerticalAlignment="Center" Margin="6,0">
                                             <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Where}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
+                                            <TextBlock Text="{Binding Where}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" TextWrapping="Wrap" TextTrimming="None"
+                                                       ToolTip="{Binding Where}" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>

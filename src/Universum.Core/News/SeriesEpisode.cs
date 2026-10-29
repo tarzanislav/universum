@@ -4,7 +4,11 @@ using Universum.Core.Text;
 
 namespace Universum.Core.News;
 
-/// <summary>Where a premiere or an episode belongs: Czech and Slovak broadcasters and services, or the rest of the world.</summary>
+/// <summary>
+/// Where a premiere or an episode belongs: Czech and Slovak titles (by origin, see <see cref="HomeOrigin"/>), or all the
+/// others. As a source gives an episode, it is still where it airs (a Czech or Slovak channel, or not) – SeriesNews.Classify
+/// sorts it by origin.
+/// </summary>
 public enum NewsRegion
 {
     Domestic,
@@ -50,6 +54,12 @@ public sealed record SeriesEpisode
 
     /// <summary>The country of the channel (ISO code) when the source tells it.</summary>
     public string Country { get; init; } = "";
+
+    /// <summary>The original language of the series when the source tells it (TVmaze: "Czech", "English" …).</summary>
+    public string Language { get; init; } = "";
+
+    /// <summary>The region by origin once SeriesNews.Classify decided it (then <see cref="Region"/> is the same); null as a source gave it.</summary>
+    public NewsRegion? Origin { get; init; }
 
     public string Genres { get; init; } = "";
 

@@ -38,6 +38,15 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// <summary>Confirmed title of the series (one series per analysed folder).</summary>
     public TitleInfo? Series { get; set; }
 
+    /// <summary>
+    /// Files of further series in the same batch (owner, 29. 10. 2026: episodes of several series sent from Novinky at
+    /// once): each of them goes to its own series, the other files to <see cref="Series"/>.
+    /// </summary>
+    public Dictionary<string, TitleInfo> SeriesOfFile { get; } = new(Paths.Comparer);
+
+    /// <summary>The series of a file: its own (<see cref="SeriesOfFile"/>), else the series of the batch.</summary>
+    public TitleInfo? SeriesFor(string path) => SeriesOfFile.GetValueOrDefault(path) ?? Series;
+
     public TitleInfo? SeriesSuggestion { get; set; }
 
     /// <summary>Confirmed film titles by file path.</summary>
@@ -76,8 +85,9 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// False when TMDB lists the seasons of the series and does not know this episode; true when it does or nothing is
     /// known (no TMDB, another title, a season without an episode count).
     /// </summary>
-    public bool TmdbKnows(EpisodeNumber episode) =>
-        SeriesOnTmdb is not { } known || Series is null || known.Title.FolderName != Series.FolderName || TmdbSeasons.Has(known.Seasons, episode);
+    public bool TmdbKnows(EpisodeNumber episode, string? path = null) =>
+        SeriesOnTmdb is not { } known || (path is null ? Series : SeriesFor(path)) is not { } series || known.Title.FolderName != series.FolderName ||
+        TmdbSeasons.Has(known.Seasons, episode);
 
     /// <summary>
     /// Guesses everything from the names: a series when most files carry a clear episode number (S01E04, 1x04; the
@@ -220,7 +230,7 @@ public sealed class LibraryJob(LibraryLayout layout)
     private static int? SeasonFolderBelow(string root, string file) => EpisodeParser.SeasonOfPath(file, root);
 
     /// <summary>The title a file is stored under; null while it is not decided.</summary>
-    public TitleInfo? TitleFor(string path) => Kind == MediaKind.Series ? Series : Movies.GetValueOrDefault(path);
+    public TitleInfo? TitleFor(string path) => Kind == MediaKind.Series ? SeriesFor(path) : Movies.GetValueOrDefault(path);
 
     /// <summary>A suggested title waiting for confirmation, when there is no decided one.</summary>
     public TitleInfo? SuggestedTitleFor(string path) =>

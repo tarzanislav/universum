@@ -404,6 +404,14 @@ public sealed class NewsTests
         Assert.True(pieces[3].Link?.AbsoluteUri == "https://www.film.example/" && pieces[3].Text == "film.example", "www. without a scheme");
         Assert.True(pieces[4].Link is null && pieces[4].Text.Contains("ftp://", StringComparison.Ordinal), "only http and https become links");
         Assert.True(WebLinks.HasLinks("https://a.example") && !WebLinks.HasLinks("bez odkazu") && !WebLinks.HasLinks(null), "has links");
+        var named = WebLinks.Split("pozri [SerialZone](https://www.serial.example/serial/7-padu/) a [x] (nie)");
+        Assert.True(named.Count == 3 && named[1] is { Text: "SerialZone" } && named[1].Link?.AbsoluteUri == "https://www.serial.example/serial/7-padu/" &&
+                    named[2].Text == " a [x] (nie)", "a named link shows its name – " + string.Join(" | ", named));
+        var pasted = WebLinks.AsAddress("  https://www.serial.example/serial/7-padu/  ");
+        Assert.True(pasted is not null && WebLinks.SuggestName(pasted) == "serial.example" && WebLinks.AsAddress("text https://a.example") is null,
+            "a pasted address is recognised; its site is the suggested name");
+        Assert.Equal("[Serial 1](https://www.serial.example/serial/7-padu/)", WebLinks.Named(" Serial [1] ", pasted!), "the name without brackets");
+        Assert.Equal(pasted!.AbsoluteUri, WebLinks.Named("", pasted), "without a name the bare address");
         var longAddress = "https://long.example/" + new string('a', 80);
         Assert.Equal(WebLinks.ShownLength, WebLinks.Split(longAddress)[0].Text.Length, "a long address is shortened");
     }

@@ -884,8 +884,9 @@ internal static class SelfTest
         page.Filter = "teSim";
         Check(page.Tab(PremiereTab.FilmDomestic).Rows.Count == 1, "premieres: the note is searched too");
         page.Filter = "";
-        films[1].Note = "teším sa https://kino.example/vymyslena-premiera";
-        Check(films[1].HasLinks && services.Marks.Get(Core.News.MarkStore.Film(films[1].Film.TmdbId)).Note.EndsWith("vymyslena-premiera", StringComparison.Ordinal),
+        films[1].Note = "teším sa " + Core.Text.WebLinks.Named("Kino", new Uri("https://kino.example/vymyslena-premiera"));
+        Check(Core.Text.WebLinks.Split(films[1].Note).Any(p => p is { Text: "Kino", Link: not null }), "premieres: a link in the note shows its short name");
+        Check(films[1].HasLinks && services.Marks.Get(Core.News.MarkStore.Film(films[1].Film.TmdbId)).Note.Contains("vymyslena-premiera", StringComparison.Ordinal),
             "premieres: a web address in the note is kept and shown as a link");
         page.PosterScale = 2;
         Check(page.PosterWidth == 76 && page.PosterHeight == 114 && services.Settings.PremierePosterScale == 2, "premieres: posters up to twice as large, kept");
@@ -1104,6 +1105,26 @@ internal static class SelfTest
         Check(page.Waiting.Count == 0 && model.SelectedTool.Page == model.Rules && model.Rules.TitleText == "World Invented (2024)",
             "novinky: Skontrolovať znova finds the episode now in the folder – " + page.Status);
         Check(before.All(f => File.Exists(f.Key) && File.GetLastWriteTimeUtc(f.Key) == f.Value), "novinky: files in the input folder are only read");
+
+        // episodes of two series at once: one batch, each into its own series (owner, 29. 10. 2026)
+        model.Open(page);
+        domestic.Rows.First(r => r.Caption == "Domáci seriál (2020)").IsChecked = true;
+        page.Tabs[1].Rows.First(r => r.Caption == "World Invented (2024)").Episodes[0].IsChecked = true;
+        await page.SendAsync();
+        Check(model.SelectedTool.Page == model.Batch && model.Batch.ChosenFiles?.Count == 3 && model.Batch.SeriesTitle.StartsWith("Domáci seriál (2020)", StringComparison.Ordinal) &&
+              model.Batch.OtherSeries.Contains("World Invented (2024)", StringComparison.Ordinal) && page.Ready.Count == 0,
+            $"novinky: episodes of two series go to one batch – {page.Status} | {model.Batch.SeriesTitle} | {model.Batch.OtherSeries}");
+        await Screenshot(window, "novinky-batch-two.png");
+
+        // Vymazať frontu (owner, 29. 10. 2026): the analysed files and the opened file are forgotten, nothing on the disk changes
+        model.Batch.Confirm = _ => true;
+        model.Batch.ClearCommand.Execute(null);
+        Check(model.Batch.Groups.Count == 0 && model.Batch.ChosenFiles is null && model.Batch.OtherSeries.Length == 0 && model.Batch.Analysis is null,
+            "batch: Vymazať frontu forgets the files not processed – " + model.Batch.Summary);
+        model.Rules.Confirm = _ => true;
+        model.Rules.ClearCommand.Execute(null);
+        Check(model.Rules.FileName.Length == 0 && model.Rules.Plan is null && model.Rules.Rows.Count == 0, "single: Vymazať frontu forgets the opened file");
+        Check(before.All(f => File.Exists(f.Key)), "Vymazať frontu: the files stay on the disk");
 
         model.Open(page);
         page.ShowHistory = true;

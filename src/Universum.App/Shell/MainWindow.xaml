@@ -124,8 +124,8 @@
         <!-- a note; its web addresses are links (a click beside them edits the note, e.g. to add another link) -->
         <DataTemplate x:Key="NewsNoteCell">
             <Grid Margin="4,3" VerticalAlignment="Center">
-                <TextBox x:Name="Editor" Text="{Binding Note, UpdateSourceTrigger=LostFocus}" MinHeight="30" TextWrapping="Wrap"
-                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Webová adresa sa zmení na odkaz." />
+                <TextBox x:Name="Editor" Text="{Binding Note, UpdateSourceTrigger=LostFocus}" MinHeight="30" TextWrapping="Wrap" pages:NoteLinks.AskName="True"
+                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa dostane krátky názov a zmení sa na odkaz." />
                 <Border x:Name="Links" Visibility="Collapsed" MinHeight="30" Padding="10,5" CornerRadius="4" Cursor="IBeam"
                         Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1"
                         pages:NoteLinks.Editor="{Binding ElementName=Editor}"
@@ -231,6 +231,8 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Vymazať frontu" Command="{Binding ClearCommand}" Padding="12,6" Margin="8,0,0,0"
+                            ToolTip="Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)" />
                     <Button DockPanel.Dock="Right" Content="Otvoriť súbor…" Command="{Binding OpenCommand}" Padding="16,6" />
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="Single spracovanie" />
@@ -403,6 +405,9 @@
                         </Grid.RowDefinitions>
                         <DockPanel Margin="0,0,0,4">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Vymazať všetko" Padding="10,3" Margin="0,0,6,0"
+                                        Command="{Binding DataContext.ClearSourcesCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
+                                        ToolTip="Odstráni všetky zdrojové súbory zo Zlučovania (na disku sa nič nezmení)" />
                                 <Button Content="Informácie" Padding="10,3" Margin="0,0,6,0"
                                         Command="{Binding DataContext.ShowInfoCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
                                         ToolTip="Zobrazí vybraný zdrojový súbor (alebo súbor vybranej stopy) na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
@@ -1136,6 +1141,8 @@
                         <CheckBox Content="aj podpriečinky" IsChecked="{Binding Recursive}" VerticalAlignment="Center" Margin="0,0,12,0" />
                         <Button Content="Priečinok…" Command="{Binding ChooseFolderCommand}" Margin="0,0,8,0" Padding="12,5" />
                         <Button Content="Analyzovať" Command="{Binding AnalyzeCommand}" Padding="16,5" />
+                        <Button Content="Vymazať frontu" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0"
+                                ToolTip="Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)" />
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="Hromadné spracovanie" />
@@ -1399,6 +1406,8 @@
                                 <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" TextWrapping="Wrap" MaxWidth="360"
+                                           ToolTip="Epizódy ďalších seriálov poslané z Noviniek spolu s prvým – každá ide do priečinka svojho seriálu (vidno v stĺpci Cieľ v knižnici)" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <Button Content="Potvrdiť seriál" Command="{Binding ConfirmSeriesCommand}" Padding="10,3" Margin="0,0,12,0"
                                         Visibility="{Binding SeriesNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"

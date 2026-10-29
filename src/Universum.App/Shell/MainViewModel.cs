@@ -280,7 +280,7 @@ public sealed class MainViewModel : ObservableObject
     {
         var sent = found switch
         {
-            { IsSeries: true, Files.Count: > 1 } => await SendEpisodesToBatchAsync(found.Files, found.Title),
+            { IsSeries: true, Files.Count: > 1 } => await SendEpisodesToBatchAsync([(found.Title, found.Files)]),
             { IsSeries: true } => await SendEpisodeToSingleAsync(found.Files[0], found.Title, found.Episode),
             _ => await SendFilmToSingleAsync(found.Files[0], found.Title),
         };
@@ -493,8 +493,8 @@ public sealed class MainViewModel : ObservableObject
         return true;
     }
 
-    /// <summary>Episodes of one series from Novinky into Hromadné spracovanie; false while it is busy.</summary>
-    private async Task<bool> SendEpisodesToBatchAsync(IReadOnlyList<string> files, string seriesTitle)
+    /// <summary>Episodes of one or more series from Novinky into Hromadné spracovanie (one batch); false while it is busy.</summary>
+    private async Task<bool> SendEpisodesToBatchAsync(IReadOnlyList<(string Title, IReadOnlyList<string> Files)> series)
     {
         if (Batch.Busy || Batch.IsRunning)
         {
@@ -502,7 +502,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         Open(Batch);
-        await Batch.AnalyzeFilesAsync(files, seriesTitle);
+        await Batch.AnalyzeSeriesAsync(series);
         return true;
     }
 

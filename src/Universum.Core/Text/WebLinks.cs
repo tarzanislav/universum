@@ -2,17 +2,21 @@ using System.Text.RegularExpressions;
 
 namespace Universum.Core.Text;
 
-/// <summary>A piece of a note: plain text, or a web address (http or https only) with a short text to show.</summary>
+/// <summary>A piece of a note: plain text, or a web address (http or https only) with the text shown for it.</summary>
 public sealed record TextPiece(string Text, Uri? Link = null);
 
 /// <summary>
-/// The web addresses in a note (owner, 29. 10. 2026: an address typed into Poznámka becomes a link that opens the page).
-/// Only http and https addresses become links; a full stop, comma or bracket right after an address is not part of it.
+/// The web addresses in a note (owner, 29. 10. 2026: an address in Poznámka becomes a link that opens the page). A link
+/// can have a short name – written "[name](address)" – which is shown instead of the long address. Only http and https
+/// addresses become links; a full stop, comma or bracket right after a bare address is not part of it.
 /// </summary>
 public static partial class WebLinks
 {
-    /// <summary>The longest text shown for an address (the rest is "…"; the whole address is in the tooltip).</summary>
+    /// <summary>The longest text shown for an address without a name (the rest is "…"; the whole address is in the tooltip).</summary>
     public const int ShownLength = 48;
+
+    /// <summary>The longest name of a link.</summary>
+    public const int MaxNameLength = 80;
 
     public static bool HasLinks(string? text) => !string.IsNullOrEmpty(text) && Split(text).Any(p => p.Link is not null);
 
@@ -26,11 +30,11 @@ public static partial class WebLinks
         }
 
         var at = 0;
-        foreach (Match match in Address().Matches(text))
+        foreach (Match match in Link().Matches(text))
         {
-            var value = match.Value.TrimEnd('.', ',', ';', ':', '!', '?', ')', ']', '"', '\'', '»', '“');
-            if (!Uri.TryCreate(value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + value : value, UriKind.Absolute, out var uri) ||
-                uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps || uri.Host.Length == 0)
+            var named = match.Groups["name"].Success;
+            var value = named ? match.Groups["url"].Value : match.Value.TrimEnd('.', ',', ';', ':', '!', '?', ')', ']', '"', '\'', '»', '“');
+            if (ToUri(value) is not { } uri)
             {
                 continue;
             }
@@ -40,8 +44,8 @@ public static partial class WebLinks
                 pieces.Add(new TextPiece(text[at..match.Index]));
             }
 
-            pieces.Add(new TextPiece(Shown(value), uri));
-            at = match.Index + value.Length;
+            pieces.Add(new TextPiece(named ? match.Groups["name"].Value.Trim() : Shown(value), uri));
+            at = match.Index + (named ? match.Length : value.Length);
         }
 
         if (at < text.Length)
@@ -52,6 +56,34 @@ public static partial class WebLinks
         return pieces;
     }
 
+    /// <summary>The address when the text is one web address (pasted into a note), else null.</summary>
+    public static Uri? AsAddress(string? text) =>
+        text?.Trim() is { Length: > 0 } trimmed && !trimmed.Any(char.IsWhiteSpace) && Bare().Match(trimmed) is { Success: true, Index: 0 } match && match.Length == trimmed.Length
+            ? ToUri(trimmed)
+            : null;
+
+    /// <summary>A short name suggested for an address: the site without "www." ("serialzone.cz").</summary>
+    public static string SuggestName(Uri address) =>
+        address.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? address.Host[4..] : address.Host;
+
+    /// <summary>A link with its name as the note keeps it ("[name](address)"); without a name the bare address.</summary>
+    public static string Named(string? name, Uri address)
+    {
+        var clean = new string((name ?? "").Where(c => c is not ('[' or ']' or '\r' or '\n')).ToArray()).Trim();
+        if (clean.Length > MaxNameLength)
+        {
+            clean = clean[..MaxNameLength].TrimEnd();
+        }
+
+        return clean.Length == 0 ? address.AbsoluteUri : $"[{clean}]({address.AbsoluteUri})";
+    }
+
+    private static Uri? ToUri(string value) =>
+        Uri.TryCreate(value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + value : value, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && uri.Host.Length > 0
+            ? uri
+            : null;
+
     // without the scheme and "www.", shortened
     private static string Shown(string address)
     {
@@ -59,8 +91,11 @@ public static partial class WebLinks
         return shown.Length <= ShownLength ? shown.TrimEnd('/') : shown[..(ShownLength - 1)] + "…";
     }
 
+    [GeneratedRegex(@"\[(?<name>[^\[\]\r\n]{1,80})\]\((?<url>(?:https?://|www\.)[^\s()<>""]+)\)|(?:https?://|www\.)[^\s<>""]+", RegexOptions.IgnoreCase)]
+    private static partial Regex Link();
+
     [GeneratedRegex(@"(?:https?://|www\.)[^\s<>""]+", RegexOptions.IgnoreCase)]
-    private static partial Regex Address();
+    private static partial Regex Bare();
 
     [GeneratedRegex(@"^(?:https?://)?(?:www\.)?", RegexOptions.IgnoreCase)]
     private static partial Regex Scheme();

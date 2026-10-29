@@ -7,6 +7,7 @@ using Microsoft.Win32;
 using Universum.App.Templates;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
@@ -59,6 +60,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         _services = services;
         ChooseFolderCommand = new RelayCommand(ChooseFolder, () => !Busy);
+        ClearCommand = new RelayCommand(Clear, () => !Busy && !IsRunning);
         AnalyzeCommand = new AsyncRelayCommand(AnalyzeAsync, () => !Busy && Directory.Exists(Folder));
         ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions,
             () => !Busy && (SlotRows.Any(s => s.HasSuggestion || s.ForcedSuggested) || FileRows.Any(f => f.AudioSlots.Any(s => s.HasOwnSuggestion))));
@@ -143,6 +145,42 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public RelayCommand ChooseFolderCommand { get; }
 
+    /// <summary>Vymazať frontu (owner, 29. 10. 2026): forgets the analysed files not processed yet – nothing on the disk changes.</summary>
+    public RelayCommand ClearCommand { get; }
+
+    /// <summary>Asks before the analysed files are forgotten (the self-test answers itself).</summary>
+    public Func<string, bool> Confirm { get; set; } = question =>
+        System.Windows.MessageBox.Show(question, "UNIVERSUM", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) == System.Windows.MessageBoxResult.Yes;
+
+    private void Clear()
+    {
+        if (Busy || IsRunning || !Confirm("Vymazať frontu Hromadného spracovania?\n\nZabudnú sa analyzované súbory a rozhodnutia o nich (aj súbory poslané z Noviniek). Na disku sa nič nezmení."))
+        {
+            return;
+        }
+
+        _analysis = null;
+        _items = [];
+        _library = null;
+        _only = null;
+        _sentSeries = null;
+        _results = [];
+        SelectedGroup = null;
+        SlotRows.Clear();
+        FileRows.Clear();
+        Groups.Clear();
+        Simulation = "";
+        SummaryIsWarning = false;
+        Summary = "Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.";
+        OnPropertyChanged(nameof(SeriesTitle));
+        OnPropertyChanged(nameof(OtherSeries));
+        OnPropertyChanged(nameof(SeriesSuggestion));
+        OnPropertyChanged(nameof(IsSeries));
+        OnPropertyChanged(nameof(IsMovies));
+        OnPropertyChanged(nameof(ChosenFiles));
+        RefreshCommands();
+    }
+
     public AsyncRelayCommand AnalyzeCommand { get; }
 
     public RelayCommand ConfirmSuggestionsCommand { get; }
@@ -223,6 +261,7 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             // a folder chosen again means the whole folder, not the files sent from Novinky
             _only = null;
+            _sentSeries = null;
             _services.Settings.BatchFolder = value;
             _services.Settings.Save();
             OnPropertyChanged();
@@ -501,6 +540,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _analysisCancellation = null;
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
+            ApplySentSeries();
             IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
             _interrupted = _services.Library?.FindInterrupted() ?? Array.Empty<string>();
@@ -576,12 +616,62 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private IReadOnlyList<string>? _only;
 
+    // the files of further series sent from Novinky together with the first (path → "Title (Year)")
+    private Dictionary<string, string>? _sentSeries;
+
+    /// <summary>
+    /// Episodes of several series sent from Novinky – Seriály at once (owner, 29. 10. 2026): one batch, the first series
+    /// in the field Seriál, each further series' files go to their own series (shown beside the field).
+    /// </summary>
+    public async Task AnalyzeSeriesAsync(IReadOnlyList<(string Title, IReadOnlyList<string> Files)> series)
+    {
+        if (Busy || series.Count == 0)
+        {
+            return;
+        }
+
+        var further = new Dictionary<string, string>(Paths.Comparer);
+        foreach (var (title, files) in series.Skip(1))
+        {
+            foreach (var file in files.Where(f => !series[0].Files.Contains(f, Paths.Comparer)))
+            {
+                further[Path.GetFullPath(file)] = title;
+            }
+        }
+
+        await AnalyzeFilesAsync([.. series.SelectMany(s => s.Files).Distinct(Paths.Comparer)], series[0].Title, further);
+    }
+
+    /// <summary>The further series of the batch beside the field Seriál ("Ďalšie seriály: Sľub (2025)"), or empty.</summary>
+    public string OtherSeries => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
+        ? (library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1 ? "+ ďalší seriál: " : $"+ ďalšie seriály ({count}): ") +
+          string.Join(", ", library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
+        : "";
+
+    // the further series sent from Novinky, again after each analysis of the same files – keyed by the paths exactly as
+    // the analysis has them (the planner looks them up so)
+    private void ApplySentSeries()
+    {
+        if (_library is null || _analysis is null || _only is null || _sentSeries is null)
+        {
+            return;
+        }
+
+        foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
+        {
+            if (_sentSeries.TryGetValue(Path.GetFullPath(file.Path), out var title) && TitleGuess.Typed(MediaKind.Series, title) is { } series)
+            {
+                _library.SeriesOfFile[file.Path] = series;
+            }
+        }
+    }
+
     /// <summary>
     /// Episodes of one series sent from Novinky – Seriály: only these files are analysed (their common folder is the
     /// analysed one), the kind is series and the series' title is typed in (original title and year – confirmed on
-    /// TMDB and HISTRA as any other title).
+    /// TMDB and HISTRA as any other title). <paramref name="further"/>: files of other series sent at the same time.
     /// </summary>
-    public async Task AnalyzeFilesAsync(IReadOnlyList<string> files, string seriesTitle)
+    public async Task AnalyzeFilesAsync(IReadOnlyList<string> files, string seriesTitle, IReadOnlyDictionary<string, string>? further = null)
     {
         if (Busy || files.Count == 0)
         {
@@ -590,6 +680,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         Folder = CommonFolder(files);
         _only = files;
+        _sentSeries = further is { Count: > 0 } ? new Dictionary<string, string>(further, Paths.Comparer) : null;
         await AnalyzeAsync();
         if (_library is not null && _analysis is not null)
         {
@@ -649,6 +740,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Simulation = (_library is null ? "Bez výstupného priečinka – len simulácia pravidiel · " : $"Do knižnice {remux + header + place} súborov ({remux} nový súbor, {header} len hlavička, {place} bez zmeny obsahu) · ") +
                      $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
         OnPropertyChanged(nameof(SeriesTitle));
+        OnPropertyChanged(nameof(OtherSeries));
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(SeriesNeedsConfirmation));
         ConfirmSeriesCommand?.NotifyCanExecuteChanged();
@@ -1543,7 +1635,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         foreach (var command in new IRelayCommand[]
                  {
-                     ChooseFolderCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
+                     ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
                      DetectAudioAllCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,

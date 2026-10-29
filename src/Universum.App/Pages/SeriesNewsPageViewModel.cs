@@ -311,7 +311,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     public Func<string, string, string, Task<bool>> SendToSingle { get; set; } = (_, _, _) => Task.FromResult(false);
 
     /// <summary>Opens Hromadné spracovanie with the files of one series and its title; false when it is busy. Set by the main window.</summary>
-    public Func<IReadOnlyList<string>, string, Task<bool>> SendToBatch { get; set; } = (_, _) => Task.FromResult(false);
+    public Func<IReadOnlyList<(string Title, IReadOnlyList<string> Files)>, Task<bool>> SendToBatch { get; set; } = _ => Task.FromResult(false);
 
     /// <summary>Reading when the page is shown (the self-test switches it off).</summary>
     public static bool AutoLoad { get; set; } = true;
@@ -477,19 +477,31 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         }
         else
         {
-            foreach (var series in bySeries.Skip(1).Where(s => Ready.All(r => r.Title != s.Title)))
-            {
-                Ready.Add(new ReadySeriesRow(series.Title, series.Files, this));
-            }
-
+            // owner, 29. 10. 2026: all series in one batch (each episode into the folder of its series)
             var first = bySeries[0];
-            Status = await SendToBatch(first.Files, first.Title)
-                ? $"Odoslané do Hromadného spracovania: {first.Title} ({Texts.Count(first.Files.Count, "súbor", "súbory", "súborov")})." +
-                  (bySeries.Count > 1 ? $" Ďalšie seriály ({bySeries.Count - 1}) sú pripravené nižšie – Hromadné spracovanie spracuje jeden seriál naraz." : "") + waitingNote
-                : "Hromadné spracovanie práve pracuje – seriály sú pripravené nižšie, odošlite ich po jeho skončení." + waitingNote;
-            if (Status.StartsWith("Hromadné spracovanie práve", StringComparison.Ordinal) && Ready.All(r => r.Title != first.Title))
+            if (await SendToBatch([.. bySeries.Select(b => (b.Title, (IReadOnlyList<string>)b.Files))]))
             {
-                Ready.Insert(0, new ReadySeriesRow(first.Title, first.Files, this));
+                foreach (var series in bySeries)
+                {
+                    if (Ready.FirstOrDefault(r => r.Title == series.Title) is { } sent)
+                    {
+                        Ready.Remove(sent);
+                    }
+                }
+
+                Status = bySeries.Count == 1
+                    ? $"Odoslané do Hromadného spracovania: {first.Title} ({Texts.Count(first.Files.Count, "súbor", "súbory", "súborov")})." + waitingNote
+                    : $"Odoslané do Hromadného spracovania: {Texts.Count(bySeries.Count, "seriál", "seriály", "seriálov")}, {Texts.Count(files, "súbor", "súbory", "súborov")} " +
+                      $"({string.Join(", ", bySeries.Select(b => b.Title))})." + waitingNote;
+            }
+            else
+            {
+                foreach (var series in bySeries.Where(s => Ready.All(r => r.Title != s.Title)))
+                {
+                    Ready.Add(new ReadySeriesRow(series.Title, series.Files, this));
+                }
+
+                Status = "Hromadné spracovanie práve pracuje – seriály sú pripravené nižšie, odošlite ich po jeho skončení." + waitingNote;
             }
         }
 
@@ -498,7 +510,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 
     internal async Task SendReadyAsync(ReadySeriesRow row)
     {
-        if (await SendToBatch(row.Files, row.Title))
+        if (await SendToBatch([(row.Title, row.Files)]))
         {
             Ready.Remove(row);
             Status = $"Odoslané do Hromadného spracovania: {row.Title}.";

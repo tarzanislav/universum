@@ -3,7 +3,56 @@ using System.Text.RegularExpressions;
 namespace Universum.Core.Text;
 
 /// <summary>A piece of a note: plain text, or a web address (http or https only) with the text shown for it.</summary>
-public sealed record TextPiece(string Text, Uri? Link = null);
+public sealed record TextPiece(string Text, Uri? Link = null, bool Named = false);
+
+/// <summary>A link of a note: the word shown and the address hidden in it.</summary>
+public sealed record NamedLink(string Name, Uri Address);
+
+/// <summary>
+/// A note as the user sees it (owner, 29. 10. 2026): its text without any addresses, and its links as words – the
+/// address only hides in the word. Kept in one string: the text, then each link as "[word](address)".
+/// </summary>
+public sealed record NoteParts(string Text, IReadOnlyList<NamedLink> Links)
+{
+    /// <summary>The text and the links of a note (a bare address becomes a link named by its site).</summary>
+    public static NoteParts Parse(string? note)
+    {
+        var text = new System.Text.StringBuilder();
+        var links = new List<NamedLink>();
+        foreach (var piece in WebLinks.Split(note))
+        {
+            if (piece.Link is { } address)
+            {
+                var name = piece.Named ? piece.Text : WebLinks.SuggestName(address);
+                if (links.All(l => l.Address != address))
+                {
+                    links.Add(new NamedLink(name, address));
+                }
+            }
+            else
+            {
+                text.Append(piece.Text);
+            }
+        }
+
+        return new NoteParts(string.Join(' ', text.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), links);
+    }
+
+    /// <summary>The note to keep: the text, then the links.</summary>
+    public string Compose() =>
+        string.Join(' ', new[] { Text.Trim() }.Concat(Links.Select(l => WebLinks.Named(l.Name, l.Address))).Where(t => t.Length > 0));
+
+    public NoteParts WithText(string? text) => this with { Text = text ?? "" };
+
+    /// <summary>Adds a link (one with the same address is replaced, keeping its place).</summary>
+    public NoteParts WithLink(NamedLink link) =>
+        this with
+        {
+            Links = Links.Any(l => l.Address == link.Address) ? [.. Links.Select(l => l.Address == link.Address ? link : l)] : [.. Links, link],
+        };
+
+    public NoteParts WithoutLink(Uri address) => this with { Links = [.. Links.Where(l => l.Address != address)] };
+}
 
 /// <summary>
 /// The web addresses in a note (owner, 29. 10. 2026: an address in Poznámka becomes a link that opens the page). A link
@@ -44,7 +93,7 @@ public static partial class WebLinks
                 pieces.Add(new TextPiece(text[at..match.Index]));
             }
 
-            pieces.Add(new TextPiece(named ? match.Groups["name"].Value.Trim() : Shown(value), uri));
+            pieces.Add(named ? new TextPiece(match.Groups["name"].Value.Trim(), uri, Named: true) : new TextPiece(Shown(value), uri));
             at = match.Index + (named ? match.Length : value.Length);
         }
 

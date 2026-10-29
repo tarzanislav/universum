@@ -884,8 +884,15 @@ internal static class SelfTest
         page.Filter = "teSim";
         Check(page.Tab(PremiereTab.FilmDomestic).Rows.Count == 1, "premieres: the note is searched too");
         page.Filter = "";
-        films[1].Note = "teším sa " + Core.Text.WebLinks.Named("Kino", new Uri("https://kino.example/vymyslena-premiera"));
-        Check(Core.Text.WebLinks.Split(films[1].Note).Any(p => p is { Text: "Kino", Link: not null }), "premieres: a link in the note shows its short name");
+        // owner, 29. 10. 2026: a link is only a word beside the note's text, the address hides in it
+        films[1].AddLink("Kino", new Uri("https://kino.example/vymyslena-premiera"));
+        films[1].AddLink("  ", new Uri("https://www.trailer.example/vymyslena"));
+        Check(films[1].NoteText == "teším sa" && string.Join(", ", films[1].Links.Select(l => l.Name)) == "Kino, trailer.example",
+            "premieres: the note's text without addresses, its links as words – " + films[1].Note);
+        films[1].Links[1].RemoveCommand.Execute(null);
+        films[1].NoteText = "teším sa veľmi";
+        Check(films[1].Note == "teším sa veľmi [Kino](https://kino.example/vymyslena-premiera)" && films[1].Links.Count == 1,
+            "premieres: a link removed, the text changed, the other link kept – " + films[1].Note);
         Check(films[1].HasLinks && services.Marks.Get(Core.News.MarkStore.Film(films[1].Film.TmdbId)).Note.Contains("vymyslena-premiera", StringComparison.Ordinal),
             "premieres: a web address in the note is kept and shown as a link");
         page.PosterScale = 2;

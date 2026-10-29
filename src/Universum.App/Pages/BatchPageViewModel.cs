@@ -2070,16 +2070,19 @@ public sealed class BatchPageViewModel : ObservableObject
     // same original into the same target is "už v knižnici" (the run would skip it anyway)
     private async Task CheckLibraryAsync()
     {
+        // not disposed: a later analysis may still cancel it (it holds no timer)
         _fingerprintCancellation?.Cancel();
-        using var cancellation = new CancellationTokenSource();
-        _fingerprintCancellation = cancellation;
         var analysis = _analysis;
         var paths = _items.Where(i => i.NeedsWork && i.Placement is { } placement && Directory.Exists(placement.Directory))
             .Select(i => i.File.Path).Distinct(Paths.Comparer).ToList();
         if (analysis is null || paths.Count == 0)
         {
+            _fingerprintCancellation = null;
             return;
         }
+
+        var cancellation = new CancellationTokenSource();
+        _fingerprintCancellation = cancellation;
 
         var found = new Dictionary<string, string>(Paths.Comparer);
         try

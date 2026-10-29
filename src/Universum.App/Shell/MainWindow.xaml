@@ -1536,15 +1536,15 @@
                                  ToolTip="Hľadať seriál, stanicu alebo poznámku (bez diakritiky)" />
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
-                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
-                                    ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
-                            <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
-                                    Value="{Binding PosterScale}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
                         <WrapPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
+                                        ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
+                                <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
+                                        Value="{Binding PosterScale}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
                             <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0" />
@@ -1763,15 +1763,15 @@
                                  ToolTip="Hľadať názov, produkciu alebo poznámku (bez diakritiky)" />
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
-                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
-                                    ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
-                            <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
-                                    Value="{Binding PosterScale}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
                         <WrapPanel VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
+                                        ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
+                                <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
+                                        Value="{Binding PosterScale}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
                             <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0" />

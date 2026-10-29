@@ -289,6 +289,12 @@ public sealed class LibraryTests
         Assert.Equal(new TmdbReference(MediaKind.Movie, 8555), TitleGuess.ParseTmdb("https://www.themoviedb.org/movie/8555-creep"));
         Assert.Equal(new TmdbReference(MediaKind.Series, 227191), TitleGuess.ParseTmdb("themoviedb.org/tv/227191-nine-puzzles?language=cs-CZ"));
         Assert.Equal(new TmdbReference(null, 1083637), TitleGuess.ParseTmdb(" 1083637 "));
+        foreach (var form in new[] { "tmdbid-1083637", "[tmdbid-1083637]", "TMDB 1083637", "tmdb:1083637" })
+        {
+            Assert.Equal(new TmdbReference(null, 1083637), TitleGuess.ParseTmdb(form), "an ID typed alone: " + form);
+        }
+
+        Assert.Equal<TmdbReference?>(null, TitleGuess.ParseTmdb("Vymyslený film (2001) [tmdbid-12]"), "a title with an ID is a title, not an ID alone");
         Assert.Equal<TmdbReference?>(null, TitleGuess.ParseTmdb("https://example.com/movie/1"));
     }
 

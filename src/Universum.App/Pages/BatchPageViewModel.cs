@@ -165,6 +165,7 @@ public sealed class BatchPageViewModel : ObservableObject
         _only = null;
         _sentSeries = null;
         _results = [];
+        Finish = null;
         SelectedGroup = null;
         SlotRows.Clear();
         FileRows.Clear();
@@ -251,6 +252,23 @@ public sealed class BatchPageViewModel : ObservableObject
     public IReadOnlyList<BatchItem> Items => _items;
 
     public IReadOnlyList<ProcessingResult> Results => _results;
+
+    /// <summary>The end of the last run, shown boldly until the next analysis (owner, 29. 10. 2026); null while none.</summary>
+    public BatchFinish? Finish
+    {
+        get => _finish;
+        private set
+        {
+            if (SetProperty(ref _finish, value))
+            {
+                OnPropertyChanged(nameof(HasFinish));
+            }
+        }
+    }
+
+    public bool HasFinish => _finish is not null;
+
+    private BatchFinish? _finish;
 
     public BatchAnalysis? Analysis => _analysis;
 
@@ -380,6 +398,24 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
     public RelayCommand ConfirmSeriesCommand { get; }
 
+    /// <summary>A film named by its TMDB ID or address typed in the field TMDB ID at the file (also used by the self-test).</summary>
+    public void UseTmdbId(string path, string text)
+    {
+        if (_library is not { Kind: MediaKind.Movie })
+        {
+            return;
+        }
+
+        if (TitleGuess.ParseTmdb(text) is { } reference)
+        {
+            _ = NameFilmFromTmdbAsync(path, reference);
+        }
+        else
+        {
+            RunState = "TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….";
+        }
+    }
+
     /// <summary>Sets the naming of one file: a film title ("Creep (2004)") or an episode ("S01E04"); also used by the self-test.</summary>
     public void SetNaming(string path, string text)
     {
@@ -389,7 +425,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         // a film's TMDB address or ID: its title from TMDB (the address says film or series)
-        if (_library.Kind == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { Kind: not null } reference)
+        if (_library.Kind == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { } reference)
         {
             _ = NameFilmFromTmdbAsync(path, reference);
             return;
@@ -471,6 +507,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         Busy = true;
         _results = [];
+        Finish = null;
 
         // nothing of a previous folder stays ready to run while (or if) this one is read
         _analysis = null;
@@ -915,28 +952,24 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private async Task NameFilmFromTmdbAsync(string path, TmdbReference reference)
     {
-        if (_services.Tmdb is not { } tmdb)
+        if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
         {
             RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
             return;
         }
 
-        if (reference.Kind == MediaKind.Series)
-        {
-            RunState = "Adresa TMDB je seriál (/tv/) – zvoľte druh seriál a zadajte ju do poľa Seriál.";
-            return;
-        }
-
         try
         {
-            if (await tmdb.GetAsync(MediaKind.Movie, reference.Id) is { } film && _library is not null)
+            // a /tv/ address (a TV film or miniseries) is a film without an ID after confirmation; a bare ID is a film's
+            var kind = reference.Kind ?? MediaKind.Movie;
+            if (await tmdb.GetAsync(kind, reference.Id) is { } film && _library is not null)
             {
                 TmdbPicker.TrySaveCache(tmdb);
                 await ApplyFilmAsync(path, film);
             }
             else
             {
-                RunState = $"TMDB nepozná film {reference.Id}.";
+                RunState = $"TMDB nepozná {(reference.Kind == MediaKind.Series ? "seriál" : "film")} s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
             }
         }
         catch (TitleServiceException ex)
@@ -944,6 +977,16 @@ public sealed class BatchPageViewModel : ObservableObject
             RunState = ex.Message;
         }
     }
+
+    // a series of TMDB as a film of the library: its name and year, no ID (Jellyfin would take a series' ID for a film's)
+    private static TitleInfo? AsFilm(TmdbTitle show) =>
+        show.ToTitleInfo() is { } info ? new TitleInfo(MediaKind.Movie, info.Name, info.Year) : null;
+
+    // owner, 29. 10. 2026: the user is told it is a miniseries, the name has no season and episode, it cannot be a series
+    private static string MiniseriesNote(TmdbTitle show, TitleInfo asFilm) =>
+        $"POZOR: {show.Display} je na TMDB minisériál alebo TV seriál (TMDB {show.Id}), nie film. V mene súboru nie je číslo série a epizódy, " +
+        $"preto sa nedá spracovať ako seriál – uloží sa medzi filmy ako „{asFilm.FolderName}“ bez TMDB ID. Ak súhlasíte, potvrďte ho pri súbore; " +
+        "inak zvoľte druh seriál a doplňte čísla epizód.";
 
     /// <summary>A film chosen by the user for a file (its TMDB address, or one of the titles found for it).</summary>
     public async Task ChooseCandidateAsync(string path, TmdbTitle film)
@@ -966,6 +1009,23 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         if (_library is null)
         {
+            return;
+        }
+
+        // a TV film or miniseries (a series on TMDB) chosen for a film: among the films without an ID, after confirmation
+        if (film.Kind == MediaKind.Series)
+        {
+            if (AsFilm(film) is { } asFilm)
+            {
+                _library.ChosenTitles.Add(path);
+                _library.Movies.Remove(path);
+                _library.MovieSuggestions[path] = asFilm;
+                _library.UnverifiedTitles.Add(path);
+                _unverifiedNotes[path] = MiniseriesNote(film, asFilm);
+                RunState = _unverifiedNotes[path];
+            }
+
+            Replan();
             return;
         }
 
@@ -1093,6 +1153,21 @@ public sealed class BatchPageViewModel : ObservableObject
                 // also by a similar name; whatever is not the name and year as read waits for confirmation at the file
                 var results = await titles.SearchTolerantAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
                 _candidates[path] = results.Titles.Take(10).ToList();
+
+                // owner, 29. 10. 2026: no film of that name – a TV film or miniseries is looked for too (TMDB keeps them as
+                // series); it goes among the films without an ID, after the user confirms it at the file
+                if (results.Titles.Count == 0 && titles.Tmdb is not null &&
+                    await titles.SearchAsync(MediaKind.Series, guess.Name, guess.Year, _tmdbCancellation.Token) is { Titles.Count: > 0 } tv &&
+                    (tv.Best(guess.Name, guess.Year) ?? tv.OnlyOne(guess.Year)) is { } show && AsFilm(show) is { } asFilm)
+                {
+                    _candidates[path] = tv.Titles.Take(10).ToList();
+                    _library.MovieSuggestions[path] = asFilm;
+                    _library.UnverifiedTitles.Add(path);
+                    _unverifiedNotes[path] = MiniseriesNote(show, asFilm);
+                    found++;
+                    unverified++;
+                    continue;
+                }
                 var year = results.Loosened is null ? guess.Year : null;
                 var match = results.Best(guess.Name, year);
                 var doubts = new List<string>();
@@ -1152,7 +1227,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     _unverifiedNotes[path] = (results.Titles.Count == 1
                                                  ? $"{results.Source} našlo len {listed} – iný rok, než má súbor"
                                                  : $"{results.Source} našlo viac titulov ({listed}) a žiadny sa nevolá ako súbor") +
-                                             " – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok) alebo potvrďte návrh z mena súboru.";
+                                             " – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok), vložte TMDB ID (číslo alebo adresu z themoviedb.org) alebo potvrďte návrh z mena súboru.";
                     ambiguous++;
                 }
                 else if (results.FoundNowhere)
@@ -1160,7 +1235,8 @@ public sealed class BatchPageViewModel : ObservableObject
                     // found nowhere: the suggestion from the file's name stays and waits at the file for confirmation
                     _library.UnverifiedTitles.Add(path);
                     _unverifiedNotes[path] = (results.TmdbProblem is { } refused ? refused + " " : "") +
-                                             (titles.Tmdb is null ? "Katalóg HISTRA titul nenašiel" : "TMDB ani HISTRA titul nenašli") + " – návrh je z mena súboru.";
+                                             (titles.Tmdb is null ? "Katalóg HISTRA titul nenašiel" : "TMDB ani HISTRA titul nenašli") +
+                                             " – návrh je z mena súboru. Ak poznáte TMDB ID, vložte ho do poľa s názvom pri súbore (číslo alebo adresu z themoviedb.org).";
                     nowhere++;
                 }
             }
@@ -1394,6 +1470,8 @@ public sealed class BatchPageViewModel : ObservableObject
         _running = true;
         _control = new BatchControl();
         _cancellation = new CancellationTokenSource();
+        Finish = null;
+        var started = System.Diagnostics.Stopwatch.StartNew();
         RefreshCommands();
         try
         {
@@ -1425,6 +1503,13 @@ public sealed class BatchPageViewModel : ObservableObject
                        (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
                        (_control.StopAfterCurrent ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
             _ranSinceAnalysis = true;
+            var took = started.Elapsed;
+            var time = took.TotalMinutes >= 1 ? $"{(int)took.TotalHours}:{took.Minutes:00}:{took.Seconds:00}" : $"{Math.Max(1, (int)took.TotalSeconds)} s";
+            Finish = new BatchFinish(
+                failed > 0 ? BatchFinishKind.Errors : _control.StopAfterCurrent ? BatchFinishKind.Stopped : BatchFinishKind.Done,
+                (failed > 0 ? "HOTOVO S CHYBAMI" : _control.StopAfterCurrent ? "ZASTAVENÉ" : "HOTOVO") + $" – spracovanie skončilo o {DateTime.Now:H:mm}",
+                $"{Texts.Count(done, "súbor", "súbory", "súborov")} v knižnici" + (present > 0 ? $" · {present} tam už bolo" : "") +
+                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") + $" · trvanie {time}");
         }
         finally
         {

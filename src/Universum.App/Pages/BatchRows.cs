@@ -292,6 +292,24 @@ public sealed class FileRow : ObservableObject
         set => page.SetNaming(Item.File.Path, value);
     }
 
+    /// <summary>
+    /// A TMDB ID or address typed for a film (owner, 29. 10. 2026: exact when the name finds nothing): the number is a
+    /// film's ID, a miniseries is given by its address (…/tv/…). Applied when the field is left; the field then clears.
+    /// </summary>
+    public string TmdbId
+    {
+        get => "";
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                page.UseTmdbId(Item.File.Path, value);
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>A suggestion waiting for confirmation, shown under the editable value.</summary>
     public string NamingSuggestion
     {
@@ -384,4 +402,25 @@ public sealed class FileRow : ObservableObject
 
         OnPropertyChanged(string.Empty);
     }
+}
+
+/// <summary>How the last run of Hromadné spracovanie ended.</summary>
+public enum BatchFinishKind
+{
+    Done,
+    Errors,
+    Stopped,
+}
+
+/// <summary>The end of a run, shown boldly (owner, 29. 10. 2026): what happened, what came out, how long it took.</summary>
+public sealed record BatchFinish(BatchFinishKind Kind, string Title, string Detail)
+{
+    public string Background => Kind switch
+    {
+        BatchFinishKind.Done => "#2F9461",
+        BatchFinishKind.Errors => "#C0392B",
+        _ => "#D68910",
+    };
+
+    public string Icon => Kind == BatchFinishKind.Done ? "\uE73E" : Kind == BatchFinishKind.Errors ? "\uE783" : "\uE7BA";
 }

@@ -1636,10 +1636,12 @@ internal static class SelfTest
             Requests.Add(request.RequestUri!.ToString());
             var histra = request.RequestUri.Host == "histra.net";
             var results = histra ? Histra : Tmdb;
+            // a title read by its ID (movie/9700) is the title itself, a search a list of results
+            var details = !histra && System.Text.RegularExpressions.Regex.IsMatch(request.RequestUri.AbsolutePath, @"/3/(movie|tv)/\d+$");
             return Task.FromResult(new System.Net.Http.HttpResponseMessage(histra ? HistraStatus : System.Net.HttpStatusCode.OK)
             {
                 RequestMessage = request,
-                Content = new System.Net.Http.StringContent("{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),
+                Content = new System.Net.Http.StringContent(details ? results : "{\"results\":[" + results + "]}", Encoding.UTF8, "application/json"),
             });
         }
     }
@@ -1812,6 +1814,18 @@ internal static class SelfTest
 
             Check(batch.Library!.TitleFor(chosenFile.Item.File.Path)?.FolderName == "The Golden Carp (2021)" && !chosenFile.HasCandidates,
                 "batch: a title chosen from the list, confirmed in HISTRA – " + batch.RunState);
+
+            // owner, 29. 10. 2026: a film exactly by its TMDB ID typed in the field TMDB ID
+            var byId = batch.FileRows[1];
+            Check(batch.Library!.TitleFor(byId.Item.File.Path) is null, "batch: the second file has only a suggestion before");
+            byId.TmdbId = "tmdbid-9700";
+            for (var wait = 0; wait < 50 && batch.Library!.TitleFor(byId.Item.File.Path) is null; wait++)
+            {
+                await Task.Delay(100);
+            }
+
+            // the library names a film in Latin script without its ID (13.2); the title is the one of the ID
+            Check(batch.Library!.TitleFor(byId.Item.File.Path)?.FolderName == "The Golden Carp (2021)", "batch: a film named by its TMDB ID – " + batch.RunState);
             services.TitlesForSelfTest = null;
 
             Directory.Delete(speech, recursive: true);
@@ -1844,6 +1858,9 @@ internal static class SelfTest
         var shows = Path.Combine(model.Batch.Library!.Layout.Shows, "Seriál (2026)", "Season 01");
         Check(File.Exists(Path.Combine(shows, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")), "batch: episode 10 in Season 01");
         Check(File.Exists(Path.Combine(shows, "Seriál S01E01 - CZ SD H264 SMALL.mkv")), "batch: the loose file as episode 1");
+        Check(batch.Finish is { Kind: BatchFinishKind.Done } finish && finish.Title.StartsWith("HOTOVO", StringComparison.Ordinal) &&
+              finish.Detail.StartsWith("4 súbory v knižnici", StringComparison.Ordinal),
+            "batch: the end of the run is shown boldly – " + batch.Finish?.Title + " | " + batch.Finish?.Detail);
         await Screenshot(window, "batch-done.png");
 
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(

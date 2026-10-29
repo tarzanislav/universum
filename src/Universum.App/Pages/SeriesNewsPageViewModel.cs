@@ -186,6 +186,29 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>The size of the posters, 1× to 2× (owner, 29. 10. 2026; kept in the settings).</summary>
+    public double PosterScale
+    {
+        get => Math.Clamp(_services.Settings.NewsPosterScale, 1, 2);
+        set
+        {
+            value = Math.Round(Math.Clamp(value, 1, 2), 2);
+            if (Math.Abs(PosterScale - value) > 0.001)
+            {
+                _services.Settings.NewsPosterScale = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PosterWidth));
+                OnPropertyChanged(nameof(PosterHeight));
+            }
+        }
+    }
+
+    /// <summary>The width and height of a poster (2:3) at <see cref="PosterScale"/>.</summary>
+    public double PosterWidth => 38 * PosterScale;
+
+    public double PosterHeight => 57 * PosterScale;
+
     /// <summary>Posters of the series beside the titles (kept in the settings).</summary>
     public bool ShowPosters
     {

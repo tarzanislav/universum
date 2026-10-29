@@ -282,7 +282,8 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
             : [],
     });
 
-    // the details keep titles, poster, production and the release dates of CZ, SK and the USA
+    // the details keep titles, poster, production and the release dates of CZ, SK and the USA (with the service or channel),
+    // and premieres elsewhere that name their place
     private static string CompactDetails(JsonElement root) => JsonSerializer.Serialize(new
     {
         title = Text(root, "title"),
@@ -293,13 +294,16 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
         countries = Array(root, "production_countries").Select(c => Text(c, "iso_3166_1")).OfType<string>().ToList(),
         companies = Array(root, "production_companies").Select(c => Text(c, "name")).OfType<string>().Take(2).ToList(),
         dates = root.TryGetProperty("release_dates", out var releases)
-            ? Array(releases, "results").Where(r => Text(r, "iso_3166_1") is "CZ" or "SK" or "US")
+            ? Array(releases, "results")
                 .SelectMany(r => Array(r, "release_dates").Select(d => new
                 {
                     c = Text(r, "iso_3166_1"),
                     t = d.TryGetProperty("type", out var type) && type.TryGetInt32(out var number) ? number : 0,
                     d = Text(d, "release_date"),
-                })).ToList()
+                    n = Text(d, "note"),
+                }))
+                .Where(d => d.c is "CZ" or "SK" or "US" || d.t == 1 && !string.IsNullOrWhiteSpace(d.n))
+                .OrderBy(d => d.c is "CZ" or "SK" or "US" ? 0 : 1).ThenBy(d => d.d, StringComparer.Ordinal).Take(40).ToList()
             : [],
     });
 
@@ -316,7 +320,8 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
     private static DateOnly? Date(string? text) =>
         text is { Length: >= 10 } && DateOnly.TryParseExact(text[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : null;
 
-    private sealed record Release(string Country, int Type, DateOnly Date);
+    /// <summary>A release date of a country: its type (1 premiere, 2 limited, 3 cinemas, 4 digital, 5 physical, 6 TV) and the place, service or channel TMDB names.</summary>
+    private sealed record Release(string Country, int Type, DateOnly Date, string Note = "");
 
     private sealed record Details(int Id, string Title, string Original, DateOnly? Release, string? Poster, IReadOnlyList<string> Countries, IReadOnlyList<string> Companies, IReadOnlyList<Release> Dates)
     {
@@ -340,7 +345,7 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
                     ? companies.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => WebText.Clean(e.GetString(), 100)).ToList()
                     : [],
                 Array(root, "dates").Select(d => Date(Text(d, "d")) is { } day && Text(d, "c") is { } country && d.TryGetProperty("t", out var t) && t.TryGetInt32(out var type)
-                    ? new Release(country, type, day) : null).OfType<Release>().ToList())
+                    ? new Release(country, type, day, WebText.Clean(Text(d, "n"), 60)) : null).OfType<Release>().ToList())
             {
                 Language = WebText.Clean(Text(root, "original_language"), 10),
             };
@@ -365,24 +370,34 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
             Popularity = popularity,
         };
 
-        // VOD (digital, type 4) and TV (type 6): Czech, else Slovak, else the USA (marked)
+        // owner, 29. 10. 2026 – where it premieres: a festival or gala premiere (type 1, anywhere, with its place), the
+        // cinemas (types 3, then 2), VOD (digital, type 4) and TV (type 6) with the service or channel TMDB names – Czech,
+        // else Slovak, else the USA (marked)
         private string Availability()
         {
-            string? One(int type, string label)
+            string? One(int[] types, string label)
             {
                 foreach (var country in new[] { "CZ", "SK", "US" })
                 {
-                    if (Dates.Where(d => d.Country == country && d.Type == type).OrderBy(d => d.Date).FirstOrDefault() is { } release)
+                    foreach (var type in types)
                     {
-                        return $"{label} {release.Date.Day}. {release.Date.Month}. {release.Date.Year}" + (country == "US" ? " (USA)" : country == "SK" ? " (SK)" : "");
+                        if (Dates.Where(d => d.Country == country && d.Type == type).OrderBy(d => d.Date).FirstOrDefault() is { } release)
+                        {
+                            return Describe(label, release);
+                        }
                     }
                 }
 
                 return null;
             }
 
-            return string.Join(" · ", new[] { One(4, "VOD"), One(6, "TV") }.OfType<string>());
+            var gala = Dates.Where(d => d.Type == 1 && d.Note.Length > 0).OrderBy(d => d.Date).FirstOrDefault() is { } first ? Describe("premiéra", first) : null;
+            return string.Join(" · ", new[] { gala, One([3, 2], "kino"), One([4], "VOD"), One([6], "TV") }.OfType<string>());
         }
+
+        private static string Describe(string label, Release release) =>
+            $"{label} {release.Date.Day}. {release.Date.Month}. {release.Date.Year}" + (release.Note.Length > 0 ? " " + release.Note : "") +
+            (release.Country switch { "CZ" => "", "SK" => " (SK)", _ => $" ({CountryNames.Name(release.Country)})" });
     }
 }
 

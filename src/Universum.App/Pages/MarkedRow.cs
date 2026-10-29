@@ -24,6 +24,9 @@ public abstract class MarkedRow(MarkStore marks, string markKey, Watchlist? watc
         set => marks.Set(MarkKey, marks.Get(MarkKey) with { Note = value ?? "" });
     }
 
+    /// <summary>The note has web addresses – shown as links (beside them a click edits the note).</summary>
+    public bool HasLinks => Universum.Core.Text.WebLinks.HasLinks(Note);
+
     /// <summary>Where the title can be watched legally ("▶ Netflix (SK)"), when it is chosen and offered.</summary>
     public string Streaming => watch?.Text(MarkKey) ?? "";
 
@@ -32,6 +35,7 @@ public abstract class MarkedRow(MarkStore marks, string markKey, Watchlist? watc
     {
         OnPropertyChanged(nameof(IsChosen));
         OnPropertyChanged(nameof(Note));
+        OnPropertyChanged(nameof(HasLinks));
         OnPropertyChanged(nameof(Streaming));
     }
 }

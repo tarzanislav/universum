@@ -170,7 +170,12 @@ in next to it without changing the rules, planning or UI.
 - `News/FilmPremieres` – film premieres from TMDB (with the user's key): Czech and Slovak films (country of production or
   original language) in the cinemas here, and the most popular world premieres without Czech and Slovak films – a foreign
   film of the cinemas here is among the world's on its first release, its dates here as a note ("v kinách SK od 13. 11.");
-  with VOD (digital) and TV dates (CZ, else SK, else USA). `FilmPremieres.Classify` sorts films kept before by origin.
+  with where it premieres (column VOD / TV / kino): a festival or gala premiere anywhere with its place, the cinemas,
+  VOD and TV with the service or channel TMDB names (CZ, else SK, else USA). `FilmPremieres.Classify` sorts films kept
+  before by origin. A series' origin: an original title with letters only Czech or Slovak have (ě ř ů ď ť ň ľ ĺ ŕ) is
+  Czech or Slovak; a series TVmaze does not know is looked up on TMDB (`SeriesTmdb`, origin_country/original_language).
+- `Text/WebLinks` – the http/https addresses of a note; the app shows them as links (`Pages/NoteLinks`), a click beside
+  them edits the note. Premiéry and Novinky: poster size 1×–2× (`PosterScale`, kept in the settings).
 - `News/NewsStore` – `PremiereStore`/`PremiereArchive`: every premiere read is kept; new reads are merged (what was read
   wins; kept films still to come that the popularity lists no longer give are checked by `FilmPremieres.RecheckAsync`;
   a kept series premiere still to come that the fully read schedule no longer has is dropped); past ones are the

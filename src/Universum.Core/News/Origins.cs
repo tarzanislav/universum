@@ -12,6 +12,14 @@ public static class HomeOrigin
     public static bool IsHomeCountry(string? code) =>
         string.Equals(code, "CZ", StringComparison.OrdinalIgnoreCase) || string.Equals(code, "SK", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// A title with letters only Czech or Slovak have (ě ř ů, ď ť ň, ľ ĺ ŕ) – á, é, č, š, ž and the like are shared with
+    /// other languages and say nothing.
+    /// </summary>
+    public static bool HasHomeLetters(string? title) => title is not null && title.AsSpan().IndexOfAny(HomeLetters) >= 0;
+
+    private static readonly System.Buffers.SearchValues<char> HomeLetters = System.Buffers.SearchValues.Create("ěřůďťňľĺŕĚŘŮĎŤŇĽĹŔ");
+
     /// <summary>The original language: TVmaze names it in English ("Czech"), TMDB by its ISO code ("cs").</summary>
     public static bool IsHomeLanguage(string? language) => language is not null &&
         (language.Equals("Czech", StringComparison.OrdinalIgnoreCase) || language.Equals("Slovak", StringComparison.OrdinalIgnoreCase) ||

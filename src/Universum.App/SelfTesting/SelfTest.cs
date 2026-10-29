@@ -1817,14 +1817,15 @@ internal static class SelfTest
 
             // owner, 29. 10. 2026: a film exactly by its TMDB ID typed in the field TMDB ID
             var byId = batch.FileRows[1];
+            Check(batch.Library!.TitleFor(byId.Item.File.Path) is null, "batch: the second file has only a suggestion before");
             byId.TmdbId = "tmdbid-9700";
-            for (var wait = 0; wait < 50 && batch.Library!.TitleFor(byId.Item.File.Path)?.TmdbId != 9700; wait++)
+            for (var wait = 0; wait < 50 && batch.Library!.TitleFor(byId.Item.File.Path) is null; wait++)
             {
                 await Task.Delay(100);
             }
 
-            Check(batch.Library!.TitleFor(byId.Item.File.Path) is { TmdbId: 9700 } exact && exact.FolderName.StartsWith("The Golden Carp (2021)", StringComparison.Ordinal),
-                "batch: a film named by its TMDB ID – " + batch.RunState);
+            // the library names a film in Latin script without its ID (13.2); the title is the one of the ID
+            Check(batch.Library!.TitleFor(byId.Item.File.Path)?.FolderName == "The Golden Carp (2021)", "batch: a film named by its TMDB ID – " + batch.RunState);
             services.TitlesForSelfTest = null;
 
             Directory.Delete(speech, recursive: true);

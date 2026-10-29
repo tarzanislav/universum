@@ -160,6 +160,103 @@
                          ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa sa zmení na slovo-odkaz vedľa poznámky." />
             </DockPanel>
         </DataTemplate>
+        <!-- MEGA spracovanie (owner, 29. 10. 2026): batches written later, each with its start -->
+        <DataTemplate DataType="{x:Type pages:MegaPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="2*" MinHeight="150" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="3*" MinHeight="150" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource PageTitle}" Text="MEGA spracovanie" />
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </StackPanel>
+                <WrapPanel Grid.Row="1" Margin="0,10,0,10">
+                    <Button Content="Spustiť teraz" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" ToolTip="Pridá vybranú dávku do Fronty úloh a spustí ju" />
+                    <Button Content="Znova preskočené a chybné" Command="{Binding RetryCommand}" Padding="12,4" Margin="0,0,16,0"
+                            ToolTip="Súbory dokončenej dávky, ktoré sa preskočili, nepodarili alebo zrušili, sa znova skontrolujú a zapíšu" />
+                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Dávku vyššie (poradie pre „po predchádzajúcej dávke“)" />
+                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="Dávku nižšie" />
+                    <Button Content="Odstrániť dávku" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Súbory sa nemenia; nezapísané sa v Hromadnom spracovaní znova ukážu ako voľné" />
+                    <Button Content="Vyčistiť dokončené" Command="{Binding ClearFinishedCommand}" Padding="12,4" />
+                </WrapPanel>
+                <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Dávka" Binding="{Binding Label}" />
+                        <DataGridTextColumn Header="Čo obsahuje" Binding="{Binding Name}" Width="2*" />
+                        <DataGridTextColumn Header="Súbory" Binding="{Binding Count}" Width="Auto" />
+                        <DataGridTemplateColumn Header="Spustiť" Width="Auto" MinWidth="330">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" IsEnabled="{Binding CanSchedule}">
+                                        <ComboBox ItemsSource="{Binding StartChoices}" DisplayMemberPath="Value" SelectedValuePath="Key"
+                                                  SelectedValue="{Binding Start, UpdateSourceTrigger=PropertyChanged}" MinWidth="170" FontSize="12" />
+                                        <DatePicker SelectedDate="{Binding Date, UpdateSourceTrigger=PropertyChanged}" Margin="6,0,0,0" FontSize="12" Width="120"
+                                                    Visibility="{Binding IsAt, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBox Text="{Binding Time, UpdateSourceTrigger=LostFocus}" Margin="6,0,0,0" Width="56" FontSize="12" VerticalContentAlignment="Center"
+                                                 Visibility="{Binding IsAt, Converter={StaticResource BoolToVisibility}}" ToolTip="Čas spustenia, napr. 2:00" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Stav" Binding="{Binding State}" Width="*" MinWidth="140">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Výsledok" Binding="{Binding Outcome}" Width="2*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <DockPanel Grid.Row="3" Margin="0,12,0,6">
+                    <Button DockPanel.Dock="Right" Content="Vybrať súbor z dávky" Command="{Binding RemoveFileCommand}" Padding="12,4"
+                            ToolTip="Súbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný" />
+                    <TextBlock Text="Súbory vybranej dávky" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+                <DataGrid Grid.Row="4" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Súbor" Binding="{Binding Name}" Width="2*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding Folder}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="3*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding Target}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Stav" Binding="{Binding State}" Width="Auto" MinWidth="90" />
+                        <DataGridTextColumn Header="Poznámka" Binding="{Binding Note}" Width="2*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:PlaceholderPageViewModel}">
             <StackPanel Margin="32">
                 <TextBlock Style="{StaticResource PageTitle}" Text="{Binding Title}" />
@@ -1525,6 +1622,8 @@
                                 <Button Content="{Binding PauseText}" Command="{Binding PauseCommand}" Margin="0,0,6,0" Padding="10,4" />
                                 <Button Content="Zastaviť" Command="{Binding StopCommand}" Margin="0,0,6,0" Padding="10,4"
                                         ToolTip="Dokončí rozpracované súbory a ďalej nepokračuje" />
+                                <Button Content="Odoslať do MEGA" Command="{Binding SendToMegaCommand}" Margin="0,0,6,0" Padding="12,4"
+                                        ToolTip="Pripravené súbory uloží ako dávku MEGA spracovania – zapíšu sa neskôr (keď dávku spustíte, po predchádzajúcej dávke alebo v nastavenom čase)" />
                                 <Button Content="Spustiť" Command="{Binding RunCommand}" Padding="18,4" ToolTip="Spustí spracovanie ako úlohu vo Fronte úloh (priebeh aj výstup každého súboru uvidíte aj tam)" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">

@@ -1,0 +1,151 @@
+using Universum.Core.Batch;
+using Universum.Core.Execution;
+using Universum.Core.Jobs;
+using Universum.Core.Library;
+using Universum.Core.Media;
+using Universum.Core.Planning;
+using Universum.Core.Rules;
+using Universum.Core.Templates;
+
+namespace Universum.Core.Mega;
+
+/// <summary>
+/// A MEGA batch as a job of the job queue. Right before writing, every file is read again: a file that is missing,
+/// changed (size, time of the last change, tracks) or whose plan no longer holds is skipped and marked – never written
+/// with decisions made for another file. The rest is written by the <see cref="BatchRunner"/> as in Hromadné spracovanie.
+/// </summary>
+/// <param name="inspect">Reads a file (mkvmerge identification).</param>
+/// <param name="changed">Called after a file's state changed (the page saves the list).</param>
+public sealed class MegaJob(
+    MegaBatch batch, FileProcessor processor, Func<string, CancellationToken, Task<MediaFile>> inspect, Action<MegaBatch>? changed = null)
+    : Job($"MEGA {batch.Label}: {batch.Name}")
+{
+    public MegaBatch Batch { get; } = batch;
+
+    /// <summary>The file and its prepared item, or why it cannot be written now (null item).</summary>
+    public static async Task<(BatchItem? Item, string Problem)> CheckAsync(
+        MegaFile file, MegaBatch batch, Func<string, CancellationToken, Task<MediaFile>> inspect, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(file.Path))
+        {
+            return (null, "súbor chýba");
+        }
+
+        var info = new FileInfo(file.Path);
+        if (info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedUtc)
+        {
+            return (null, "súbor sa medzičasom zmenil (veľkosť alebo čas zmeny)");
+        }
+
+        MediaFile media;
+        try
+        {
+            media = await inspect(file.Path, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return (null, "súbor sa nedá prečítať: " + ex.Message);
+        }
+
+        if (MegaFile.TracksOf(media) != file.Tracks)
+        {
+            return (null, "zmenili sa stopy súboru");
+        }
+
+        var target = UniversumRules.Apply(media, batch.Profile, file.Decisions());
+        if (target.IsBlocked)
+        {
+            return (null, "pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní");
+        }
+
+        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, batch.Profile);
+        var group = new BatchGroup("MEGA", 0);
+        group.Files.Add(media);
+        var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target), new TemplateMatch([], [], []),
+            new Dictionary<SlotKey, LanguageEvidence>(), [])
+        {
+            Placement = placement,
+            Title = file.Title,
+            Episode = file.Episode,
+        };
+        return item.NeedsWork ? (item, "") : (null, "už je v knižnici");
+    }
+
+    protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
+    {
+        var waiting = Batch.Files.Where(f => f.State == MegaFileState.Waiting).ToList();
+        context.Log(JobSeverity.Info, $"MEGA {Batch.Label}: {waiting.Count} súborov – kontrola pred spustením.");
+        var items = new List<(BatchItem Item, MegaFile File)>();
+        var skipped = 0;
+        foreach (var file in waiting)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (item, problem) = await CheckAsync(file, Batch, inspect, cancellationToken).ConfigureAwait(false);
+            if (item is null)
+            {
+                skipped++;
+                file.State = problem == "už je v knižnici" ? MegaFileState.AlreadyInLibrary : MegaFileState.Skipped;
+                file.Note = problem;
+                context.Log(file.State == MegaFileState.AlreadyInLibrary ? JobSeverity.Info : JobSeverity.Warning,
+                    $"{(file.State == MegaFileState.AlreadyInLibrary ? "Už v knižnici" : "PRESKOČENÝ")}: {Path.GetFileName(file.Path)} – {problem}");
+                changed?.Invoke(Batch);
+            }
+            else
+            {
+                items.Add((item, file));
+            }
+        }
+
+        var byPath = items.ToDictionary(x => x.Item.File.Path, x => x.File, StringComparer.Ordinal);
+        IReadOnlyList<ProcessingResult> results = [];
+        if (items.Count > 0)
+        {
+            new LibraryLayout(Batch.LibraryRoot).EnsureCreated();
+            results = await BatchRunner.RunAsync(
+                items.Select(x => x.Item).ToList(), processor, new OutputOptions(Batch.Original),
+                new Reporter(context, (item, result) =>
+                {
+                    var file = byPath[item.File.Path];
+                    file.State = result.Status switch
+                    {
+                        ProcessingStatus.Done or ProcessingStatus.Unchanged => MegaFileState.Done,
+                        ProcessingStatus.AlreadyInLibrary => MegaFileState.AlreadyInLibrary,
+                        ProcessingStatus.Cancelled => MegaFileState.Cancelled,
+                        _ => MegaFileState.Failed,
+                    };
+                    file.Note = result.OutputPath ?? string.Join(" | ", result.Messages);
+                    changed?.Invoke(Batch);
+                }),
+                null, cancellationToken).ConfigureAwait(false);
+        }
+
+        var done = results.Count(r => r.Status == ProcessingStatus.Done);
+        var present = waiting.Count(f => f.State == MegaFileState.AlreadyInLibrary);
+        var failed = results.Count(r => r.Status == ProcessingStatus.Failed);
+        var problems = waiting.Count(f => f.State == MegaFileState.Skipped);
+        var cancelled = cancellationToken.IsCancellationRequested;
+        Outcome = $"{done} z {waiting.Count} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
+                  (problems > 0 ? $", {problems} preskočených pri kontrole" : "") + (failed > 0 ? $", {failed} s chybou" : "") +
+                  (cancelled ? " – zrušené." : ".");
+        return cancelled ? JobStatus.Cancelled
+            : failed + problems > 0 ? JobStatus.DoneWithWarnings
+            : JobStatus.Done;
+    }
+
+    /// <summary>A finished batch is not repeated from the queue: it is started again on the MEGA page.</summary>
+    internal override bool Reset() => false;
+
+    private sealed class Reporter(IJobContext context, Action<BatchItem, ProcessingResult> finished) : IProgress<BatchProgress>
+    {
+        public void Report(BatchProgress value)
+        {
+            context.Report(value.Total == 0 ? 0 : (value.Finished + (value.Result is null ? value.FileFraction : 0)) / value.Total);
+            if (value.Result is { } result)
+            {
+                var (severity, text) = BatchJob.Line(value.Item, result);
+                context.Log(severity, $"{value.Finished} / {value.Total} · {text}");
+                finished(value.Item, result);
+            }
+        }
+    }
+}

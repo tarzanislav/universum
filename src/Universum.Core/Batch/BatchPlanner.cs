@@ -18,7 +18,23 @@ public static class BatchPlanner
     public const double ForcedShare = 0.15;
 
     /// <param name="library">Titles and episodes for the library; without it the items have no place (rules only).</param>
-    public static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null, LibraryJob? library = null)
+    /// <param name="reserved">
+    /// Files (full paths) of open MEGA batches with the batch's name (owner, 29. 10. 2026): shown as "v dávke N" and never
+    /// written by this run – a file belongs to one batch only.
+    /// </param>
+    public static IReadOnlyList<BatchItem> Plan(
+        BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile = null, LibraryJob? library = null,
+        IReadOnlyDictionary<string, string>? reserved = null)
+    {
+        var items = Plan(analysis, template, profile, library);
+        return reserved is null || reserved.Count == 0
+            ? items
+            : items.Select(i => reserved.TryGetValue(Path.GetFullPath(i.File.Path), out var batch)
+                ? i with { Reasons = [.. i.Reasons, new ReviewReason(ReviewReasonKind.InMegaBatch, Detail: batch)] }
+                : i).ToList();
+    }
+
+    private static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile, LibraryJob? library)
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
         var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();

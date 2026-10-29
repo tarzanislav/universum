@@ -61,6 +61,9 @@ public enum ReviewReasonKind
     /// 29. 10. 2026 – the user tells films from series, nothing is guessed).
     /// </summary>
     NotSorted,
+
+    /// <summary>The file belongs to an open batch of MEGA spracovanie (owner, 29. 10. 2026); it is written by that batch.</summary>
+    InMegaBatch,
 }
 
 /// <summary>Why a file is not processed automatically.</summary>

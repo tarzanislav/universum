@@ -284,7 +284,8 @@ internal static class SelfTest
         editor.Library.TitleText = "Hlavička test (2026)";
         Check(editor.Rows.Count == 6, $"header editor: 6 tracks ({editor.Rows.Count})");
         Check(editor.Findings.Any(f => f.Contains("neurčený", StringComparison.Ordinal)), "header editor: check panel shows the undetermined language");
-        Check(!editor.SaveCommand.CanExecute(null), "header editor: nothing to save yet");
+        // owner, 29. 10. 2026: the File title of the file is removed by default – that alone is a change to save
+        Check(editor.Title.Length == 0 && editor.SaveCommand.CanExecute(null), "header editor: the File title is removed by default");
 
         editor.Rows[2].Language = editor.Rows[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
         editor.Rows[1].Name = "Originál";

@@ -412,6 +412,13 @@ public sealed class NewsTests
             "a pasted address is recognised; its site is the suggested name");
         Assert.Equal("[Serial 1](https://www.serial.example/serial/7-padu/)", WebLinks.Named(" Serial [1] ", pasted!), "the name without brackets");
         Assert.Equal(pasted!.AbsoluteUri, WebLinks.Named("", pasted), "without a name the bare address");
+        var note = NoteParts.Parse("pozrieť [SerialZone](https://www.serial.example/7/) s rodinou https://trailer.example/x [SerialZone](https://www.serial.example/7/)");
+        Assert.True(note.Text == "pozrieť s rodinou" && note.Links.Count == 2 && note.Links[0].Name == "SerialZone" && note.Links[1].Name == "trailer.example",
+            "a note: its text without addresses, its links as words (a bare address named by its site, the same link once) – " + note);
+        Assert.Equal("pozrieť s rodinou [SerialZone](https://www.serial.example/7/) [trailer.example](https://trailer.example/x)", note.Compose(), "kept: the text, then the links");
+        var changed = note.WithText(" iný text ").WithLink(new NamedLink("Trailer", new Uri("https://trailer.example/x"))).WithoutLink(new Uri("https://www.serial.example/7/"));
+        Assert.Equal("iný text [Trailer](https://trailer.example/x)", changed.Compose(), "the text changed, a link renamed and one removed");
+        Assert.Equal("", NoteParts.Parse("").Compose(), "an empty note");
         var longAddress = "https://long.example/" + new string('a', 80);
         Assert.Equal(WebLinks.ShownLength, WebLinks.Split(longAddress)[0].Text.Length, "a long address is shortened");
     }

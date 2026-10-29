@@ -121,26 +121,33 @@
             <CheckBox IsChecked="{Binding IsChosen, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" Padding="0"
                       ToolTip="Vybrané – titul, na ktorý sa teším (zobrazíte ich voľbou Zobraziť vybrané)" />
         </DataTemplate>
-        <!-- a note; its web addresses are links (a click beside them edits the note, e.g. to add another link) -->
+        <!-- a note: its text, and its links as words beside it (the address hides in the word; owner, 29. 10. 2026) -->
         <DataTemplate x:Key="NewsNoteCell">
-            <Grid Margin="4,3" VerticalAlignment="Center">
-                <TextBox x:Name="Editor" Text="{Binding Note, UpdateSourceTrigger=LostFocus}" MinHeight="30" TextWrapping="Wrap" pages:NoteLinks.AskName="True"
-                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa dostane krátky názov a zmení sa na odkaz." />
-                <Border x:Name="Links" Visibility="Collapsed" MinHeight="30" Padding="10,5" CornerRadius="4" Cursor="IBeam"
-                        Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1"
-                        pages:NoteLinks.Editor="{Binding ElementName=Editor}"
-                        ToolTip="Kliknutím na odkaz otvoríte stránku; kliknutím vedľa neho poznámku upravíte alebo pridáte ďalší odkaz">
-                    <TextBlock pages:NoteLinks.Text="{Binding Note}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                </Border>
-            </Grid>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding HasLinks}" Value="True">
-                    <Setter TargetName="Links" Property="Visibility" Value="Visible" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=Editor}" Value="True">
-                    <Setter TargetName="Links" Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
+            <DockPanel Margin="4,3" VerticalAlignment="Center">
+                <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Links}" VerticalAlignment="Center" MaxWidth="240" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="10" Padding="8,1,2,1" Margin="4,1,0,1" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                    ToolTip="{Binding ToolTip}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
+                                        <Hyperlink Command="{Binding OpenCommand}"><Run Text="{Binding Name, Mode=OneWay}" /></Hyperlink>
+                                    </TextBlock>
+                                    <Button Content="×" Command="{Binding RemoveCommand}" Padding="5,0" MinWidth="0" MinHeight="0" Margin="3,0,0,0"
+                                            Background="Transparent" BorderThickness="0" VerticalAlignment="Center" ToolTip="Odstrániť odkaz z poznámky" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBox Text="{Binding NoteText, UpdateSourceTrigger=LostFocus}" MinHeight="30" MinWidth="60" TextWrapping="Wrap" pages:NoteLinks.AskName="True"
+                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa sa zmení na slovo-odkaz vedľa poznámky." />
+            </DockPanel>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:PlaceholderPageViewModel}">
             <StackPanel Margin="32">

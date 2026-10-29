@@ -3,7 +3,7 @@
 Grafická nadstavba pre Windows nad nástrojmi [MKVToolNix](https://mkvtoolnix.download/) – úprava stôp
 v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý priečinok.
 
-> Stav: **skúšobné vydanie 0.3.3** – na skúšanie v praxi. Originálne súbory sa vždy zachovajú.
+> Stav: **skúšobné vydanie 0.3.4** – na skúšanie v praxi. Originálne súbory sa vždy zachovajú.
 
 ## Čo UNIVERSUM vie
 

@@ -102,6 +102,13 @@ in next to it without changing the rules, planning or UI.
   - several series in one batch (owner, 29. 10. 2026; episodes sent from Novinky): `LibraryJob.SeriesOfFile` gives the
     files of further series their own series (`SeriesFor`); the field Seriál is the first one, the others are shown
     beside it. "Vymazať frontu" (Single, Hromadné) and "Vymazať všetko" (Zlučovanie) forget what is not processed;
+  - a folder sorted by the user into MOVIES and TVSHOWS (owner, 29. 10. 2026 – the program creates both in the input
+    folder and never moves a file; `Library/TitleUnits`): everything below TVSHOWS is a series (each folder one series,
+    named by the folder; loose episodes by their names; episodes numbered "Name 01", "CF01", "Name 1" by
+    `TitleUnits.Sequence`), everything below MOVIES a film (numbered versions too) – the kind is certain; a file outside
+    both waits (`NotSorted`). `LibraryJob.KindFor`/`SeriesSuggestionOfFile`/`AcceptAll`, `BatchAnalysis.SplitBy` (one
+    group per title); the field Seriál, the TMDB search and "Prijať všetko v skupine" work on the selected group. A
+    numbered sequence never makes a folder a series by itself (versions of a film); in a series it gives the numbers;
   - the end of a run is shown boldly (`BatchFinish`: done / with errors / stopped, counts, time); a film TMDB does not
     know as a film is looked for among series (TV films, miniseries): it goes among the films as "Name (Year)" without an
     ID after the user confirms the warning at the file; a film is named exactly by its TMDB ID in the field TMDB ID at

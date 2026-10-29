@@ -160,6 +160,7 @@ public sealed class MainViewModel : ObservableObject
         Dashboard.Shown();
         await handling;
         _ = DailyUpdateAsync();
+        _services.EnsureSortingFolders();
         _ = _services.InputWatch.ScanAsync();
 
         try

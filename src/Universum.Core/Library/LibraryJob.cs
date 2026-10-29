@@ -18,6 +18,37 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// <summary>The analysed folder (one series, or films); season folders are looked for only below it.</summary>
     public string? Root { get; private set; }
 
+    /// <summary>
+    /// The titles of a folder the user sorted into MOVIES and TVSHOWS (owner, 29. 10. 2026; <see cref="TitleUnits"/>); null
+    /// when the folder is one title. Then each file has its own kind (<see cref="KindFor"/>) and series.
+    /// </summary>
+    public IReadOnlyList<TitleUnit>? Units { get; private set; }
+
+    /// <summary>The folder holds several titles, each file is named by its own (<see cref="Units"/>).</summary>
+    public bool Mixed => Units is not null;
+
+    /// <summary>The kind of each file of a folder of several titles (<see cref="Units"/>).</summary>
+    public Dictionary<string, MediaKind> KindOfFile { get; } = new(Paths.Comparer);
+
+    /// <summary>Files whose kind the user confirmed (a group accepted or its kind chosen).</summary>
+    public HashSet<string> ConfirmedKinds { get; } = new(Paths.Comparer);
+
+    /// <summary>Film or episode: the file's own kind in a folder of several titles, else the kind of the folder.</summary>
+    public MediaKind KindFor(string path) => KindOfFile.TryGetValue(path, out var kind) ? kind : Kind;
+
+    /// <summary>The kind of the file is decided (the folder's kind confirmed, or the file's).</summary>
+    public bool KindConfirmedFor(string path) => KindConfirmed || ConfirmedKinds.Contains(path);
+
+    /// <summary>Files lying outside MOVIES and TVSHOWS of a sorted folder: the user has to sort them (owner, 29. 10. 2026).</summary>
+    public HashSet<string> Unsorted { get; } = new(Paths.Comparer);
+
+    /// <summary>The series suggested for each file of a folder of several titles (its folder's name), to be confirmed.</summary>
+    public Dictionary<string, TitleInfo> SeriesSuggestionOfFile { get; } = new(Paths.Comparer);
+
+    /// <summary>The title a file belongs to: its own folder below the analysed one (or the file itself); the analysed folder for one title.</summary>
+    public string UnitOf(string path) =>
+        Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer))?.Folder ?? Root ?? "";
+
     /// <summary>Films or a series; setting it confirms it.</summary>
     public MediaKind Kind
     {
@@ -97,7 +128,11 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// season. The kind is only proposed: it has to be confirmed. Names in library form with a TMDB ID
     /// ("… (2025) [tmdbid-227191]") give confirmed titles.
     /// </summary>
-    public static LibraryJob Guess(LibraryLayout layout, BatchAnalysis analysis)
+    /// <param name="splitTitles">
+    /// A folder of several titles is split into them (<see cref="TitleUnits"/>); false for files sent as episodes of
+    /// known series (Novinky).
+    /// </param>
+    public static LibraryJob Guess(LibraryLayout layout, BatchAnalysis analysis, bool splitTitles = true)
     {
         var job = new LibraryJob(layout) { Root = analysis.Folder };
         var root = analysis.Folder;
@@ -147,6 +182,12 @@ public sealed class LibraryJob(LibraryLayout layout)
         var used = content.Select(f => EpisodeParser.FromPath(f, root)).OfType<EpisodeMatch>()
             .SelectMany(m => Enumerable.Range(m.Number.Episode, (m.Number.LastEpisode ?? m.Number.Episode) - m.Number.Episode + 1).Select(e => (m.Number.Season, e)))
             .ToHashSet();
+        // a numbered sequence ("Name 01", "CF01") gives its numbers when the folder is a series (only suggested: whether
+        // the folder holds a series or versions of a film the user decides – owner, 29. 10. 2026)
+        var sequence = content.Where(f => EpisodeParser.FromPath(f, root) is null)
+            .GroupBy(f => Path.GetDirectoryName(f)!, Paths.Comparer)
+            .SelectMany(g => TitleUnits.Sequence(g.ToList()))
+            .ToDictionary(x => x.Key, x => x.Value, Paths.Comparer);
         foreach (var file in content.Where(f => EpisodeParser.FromPath(f, root) is null))
         {
             var season = SeasonFolderBelow(root, file) ?? 1;
@@ -159,7 +200,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             }
 
             var next = 1;
-            if (BareNumber(Path.GetFileNameWithoutExtension(file)) is { } own && !used.Contains((season, own)))
+            if ((BareNumber(Path.GetFileNameWithoutExtension(file)) ?? sequence.GetValueOrDefault(file)) is > 0 and var own && !used.Contains((season, own)))
             {
                 next = own;
             }
@@ -187,7 +228,168 @@ public sealed class LibraryJob(LibraryLayout layout)
             }
         }
 
+        if (splitTitles)
+        {
+            job.ApplyUnits(TitleUnits.Split(root, files));
+        }
+
         return job;
+    }
+
+    /// <summary>
+    /// A folder sorted into MOVIES and TVSHOWS (owner, 29. 10. 2026): each file gets the kind of its folder (certain), the
+    /// episodes of a series its folder's name as the suggested series and the numbers of a numbered sequence as suggested
+    /// episodes (season from a season folder, else 1); titles and numbers wait for confirmation like any guess.
+    /// </summary>
+    private void ApplyUnits(IReadOnlyList<TitleUnit>? units)
+    {
+        Units = units;
+        if (units is null)
+        {
+            return;
+        }
+
+        foreach (var unit in units)
+        {
+            foreach (var file in unit.Files)
+            {
+                KindOfFile[file] = unit.Kind;
+
+                // sorted by the user into MOVIES or TVSHOWS: the kind is certain; outside them the user sorts the file
+                if (unit.Sorted)
+                {
+                    ConfirmedKinds.Add(file);
+                }
+                else
+                {
+                    Unsorted.Add(file);
+                }
+            }
+
+            if (unit.Kind != MediaKind.Series)
+            {
+                continue;
+            }
+
+            if (unit.Name is { } name)
+            {
+                foreach (var file in unit.Files)
+                {
+                    if (name.TmdbId is not null)
+                    {
+                        SeriesOfFile[file] = Title(MediaKind.Series, name);
+                    }
+                    else
+                    {
+                        SeriesSuggestionOfFile[file] = Title(MediaKind.Series, name);
+                    }
+                }
+            }
+
+            // numbers of a sequence ("Name 01"), then the next free numbers of the title's own seasons for files without one
+            var used = new HashSet<(int Season, int Episode)>();
+            foreach (var match in unit.Files.Select(f => EpisodeParser.FromPath(f, Root)).OfType<EpisodeMatch>())
+            {
+                for (var e = match.Number.Episode; e <= (match.Number.LastEpisode ?? match.Number.Episode); e++)
+                {
+                    used.Add((match.Number.Season, e));
+                }
+            }
+
+            foreach (var (file, number) in unit.Numbers)
+            {
+                var season = EpisodeParser.SeasonOfPath(file, Root) ?? 1;
+                EpisodeSuggestions[file] = new EpisodeNumber(season, number);
+                used.Add((season, number));
+            }
+
+            foreach (var file in unit.Files.Where(f => !EpisodeParser.IsExtra(f, Root) && !unit.Numbers.ContainsKey(f) && EpisodeParser.FromPath(f, Root) is null)
+                         .Order(NaturalComparer.Instance))
+            {
+                var season = EpisodeParser.SeasonOfPath(file, Root) ?? 1;
+                var next = 1;
+                while (used.Contains((season, next)))
+                {
+                    next++;
+                }
+
+                EpisodeSuggestions[file] = new EpisodeNumber(season, next);
+                used.Add((season, next));
+            }
+        }
+
+        // the analysed folder is no series of its own
+        Series = null;
+        SeriesSuggestion = null;
+
+        // the kind of the folder is the kind of most files (what the radio buttons show before a group is chosen)
+        _kind = KindOfFile.Values.Count(k => k == MediaKind.Series) * 2 > KindOfFile.Count ? MediaKind.Series : MediaKind.Movie;
+    }
+
+    /// <summary>
+    /// "Prijať všetko v skupine" (owner, 29. 10. 2026): the files' kind, title (also one HISTRA did not confirm) and
+    /// episode number as suggested – except the questions Season 00 or a regular season.
+    /// </summary>
+    public void AcceptAll(IEnumerable<string> paths)
+    {
+        // one title per folder: its kind is the folder's
+        if (!Mixed)
+        {
+            KindConfirmed = true;
+        }
+
+        foreach (var path in paths)
+        {
+            ConfirmedKinds.Add(path);
+            if (KindFor(path) == MediaKind.Series)
+            {
+                if (Mixed)
+                {
+                    if (!SeriesOfFile.ContainsKey(path) && SeriesSuggestionOfFile.TryGetValue(path, out var series))
+                    {
+                        SeriesOfFile[path] = series;
+                    }
+                }
+                else
+                {
+                    Series ??= SeriesSuggestion;
+                    SeriesUnverified = false;
+                }
+
+                if (EpisodeSuggestions.TryGetValue(path, out var number) && !SeasonQuestions.Contains(path))
+                {
+                    Episodes.TryAdd(path, number);
+                }
+            }
+            else if (!Movies.ContainsKey(path))
+            {
+                // a title the user chose stays; a suggestion (also one HISTRA did not confirm) is accepted
+                ConfirmTitle(path);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The kind of some files chosen by the user (a group of a folder of several titles): a series gets its folder's
+    /// name as the suggested series when it has none.
+    /// </summary>
+    public void SetKindOf(IReadOnlyCollection<string> paths, MediaKind kind)
+    {
+        foreach (var path in paths)
+        {
+            KindOfFile[path] = kind;
+            ConfirmedKinds.Add(path);
+            if (kind == MediaKind.Series && SeriesFor(path) is null && !SeriesSuggestionOfFile.ContainsKey(path) &&
+                Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer)) is { } unit)
+            {
+                var name = unit.Kind == MediaKind.Series ? unit.Name
+                    : File.Exists(unit.Folder) ? SeriesNameOfFiles([path], Root) : TitleGuess.FromName(Path.GetFileName(unit.Folder), MediaKind.Series);
+                if (name is not null)
+                {
+                    SeriesSuggestionOfFile[path] = Title(MediaKind.Series, name);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -230,11 +432,13 @@ public sealed class LibraryJob(LibraryLayout layout)
     private static int? SeasonFolderBelow(string root, string file) => EpisodeParser.SeasonOfPath(file, root);
 
     /// <summary>The title a file is stored under; null while it is not decided.</summary>
-    public TitleInfo? TitleFor(string path) => Kind == MediaKind.Series ? SeriesFor(path) : Movies.GetValueOrDefault(path);
+    public TitleInfo? TitleFor(string path) => KindFor(path) == MediaKind.Series ? SeriesFor(path) : Movies.GetValueOrDefault(path);
 
     /// <summary>A suggested title waiting for confirmation, when there is no decided one.</summary>
     public TitleInfo? SuggestedTitleFor(string path) =>
-        TitleFor(path) is not null ? null : Kind == MediaKind.Series ? SeriesSuggestion : MovieSuggestions.GetValueOrDefault(path);
+        TitleFor(path) is not null ? null
+        : KindFor(path) == MediaKind.Series ? SeriesSuggestionOfFile.GetValueOrDefault(path) ?? (Mixed ? null : SeriesSuggestion)
+        : MovieSuggestions.GetValueOrDefault(path);
 
     /// <summary>
     /// Episode of a file: set by the user, found in its name, or suggested (to be confirmed). A number from the name is
@@ -293,6 +497,11 @@ public sealed class LibraryJob(LibraryLayout layout)
         if (!SeriesUnverified)
         {
             Series ??= SeriesSuggestion;
+        }
+
+        foreach (var (path, series) in SeriesSuggestionOfFile)
+        {
+            SeriesOfFile.TryAdd(path, series);
         }
 
         foreach (var (path, title) in MovieSuggestions)

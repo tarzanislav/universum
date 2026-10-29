@@ -57,7 +57,32 @@ public sealed class AppServices
 
         Settings.InputDirectory = folder;
         Settings.Save();
+        EnsureSortingFolders();
         InputDirectoryChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Owner, 29. 10. 2026: the input folder holds MOVIES and TVSHOWS – the user sorts films and series into them, so
+    /// Hromadné spracovanie tells them apart for certain (nothing is moved by the program). Created when missing.
+    /// </summary>
+    public void EnsureSortingFolders()
+    {
+        if (InputDirectory is not { } folder || !Directory.Exists(folder))
+        {
+            return;
+        }
+
+        foreach (var name in new[] { Universum.Core.Library.TitleUnits.MoviesFolder, Universum.Core.Library.TitleUnits.ShowsFolder })
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(folder, name));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // a read-only folder: the user can create them
+            }
+        }
     }
 
     /// <summary>Raised when the input folder changes (all pages show the same one).</summary>

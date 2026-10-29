@@ -120,6 +120,7 @@ public static class Texts
         ReviewReasonKind.SeasonQuestion => (reason.Detail ?? "OTÁZKA: Season 00 alebo bežná sezóna?") + " – alebo tlačidlo „Špeciály do Season 00“",
         ReviewReasonKind.EpisodeAmongFilms => "meno vyzerá ako epizóda seriálu – medzi filmami by bol verziou filmu; zvoľte seriál alebo „spracovať aj tak“",
         ReviewReasonKind.PathTooLong => "cesta v knižnici je príliš dlhá",
+        ReviewReasonKind.NotSorted => "súbor nie je v MOVIES ani v TVSHOWS – presuňte ho do jedného z nich a dajte Analyzovať",
         _ => reason.Kind.ToString(),
     };
 }

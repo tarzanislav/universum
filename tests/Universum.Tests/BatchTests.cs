@@ -312,6 +312,92 @@ public sealed class BatchTests
     }
 
     [Test]
+    public void FolderSortedIntoMoviesAndShowsIsSplit()
+    {
+        // owner, 29. 10. 2026: the user sorts films into MOVIES and series into TVSHOWS (each series in its own folder,
+        // numbered without S01E01: "Name 1", "Name 01", "KM01"); versions of a film stay a film (all names invented)
+        using var work = new Work();
+        var root = Path.Combine(work.Path, "Vstup");
+        string P(params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        var river = new[] { P("TVSHOWS", "Vymyslená rieka (2021)", "Vymyslená rieka 1.mp4"), P("TVSHOWS", "Vymyslená rieka (2021)", "Vymyslená rieka 2.mp4"),
+            P("TVSHOWS", "Vymyslená rieka (2021)", "Vymyslená rieka 10.mp4") };
+        var cross = new[] { P("tvshows", "Krížová cesta", "Krížová cesta 01.avi"), P("tvshows", "Krížová cesta", "Krížová cesta 02.avi"),
+            P("tvshows", "Krížová cesta", "Krížová cesta 12.avi") };
+        var code = new[] { P("TVSHOWS", "Kódové meno (2019)", "KM01.mkv"), P("TVSHOWS", "Kódové meno (2019)", "KM02.mkv"), P("TVSHOWS", "Kódové meno (2019)", "KM10.mkv") };
+        var loose = new[] { P("TVSHOWS", "Vymysleny Zradca (2024) S01E05.mkv"), P("TVSHOWS", "Vymysleny Zradca (2024) S01E06.mkv") };
+        var versions = new[] { P("MOVIES", "Hraničný film (2018)", "Hranicny film 1.mkv"), P("MOVIES", "Hraničný film (2018)", "Hranicny film 2.mkv"),
+            P("MOVIES", "Hraničný film (2018)", "Hranicny film 3.mkv") };
+        var found = P("MOVIES", "Najdeny film (2019).mkv");
+        var unsorted = P("Nezaradeny 01.mkv");
+        var analysis = Synthetic(root, [.. river, .. cross, .. code, .. loose, .. versions, found, unsorted]);
+
+        Assert.Sequence([1, 2, 10], TitleUnits.Sequence(river).Values.Order(), "Name 1, 2, 10");
+        Assert.Sequence([1, 2, 10], TitleUnits.Sequence(code).Values.Order(), "KM01, KM02, KM10");
+        Assert.Equal(0, TitleUnits.Sequence([P("x", "Abc.mkv"), P("x", "Abd.mkv")]).Count, "no numbers");
+
+        var output = Path.Combine(work.Path, "OUTPUT");
+        var job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        Assert.True(job.Mixed && job.Units!.Count == 7, $"seven titles ({job.Units?.Count})");
+        string Kinds(params string[] paths) => string.Join(",", paths.Select(p => job.KindFor(p) == MediaKind.Series ? "S" : "F"));
+        Assert.Equal("S,S,S,S,S,S,S,S,S,S,S", Kinds([.. river, .. cross, .. code, .. loose]), "everything in TVSHOWS is a series");
+        Assert.Equal("F,F,F,F", Kinds([.. versions, found]), "everything in MOVIES is a film – numbered versions too");
+        Assert.True(job.KindConfirmedFor(river[0]) && job.KindConfirmedFor(found) && !job.KindConfirmedFor(unsorted) && job.Unsorted.Contains(unsorted),
+            "the kind of a sorted file is certain; an unsorted one waits");
+        Assert.Equal("Vymyslená rieka (2021)", job.SuggestedTitleFor(river[2])?.FolderName, "the series named by its folder");
+        Assert.Equal("Kódové meno (2019)", job.SuggestedTitleFor(code[0])?.FolderName, "also when the files carry only a code");
+        Assert.Equal((new EpisodeNumber(1, 10), true), job.EpisodeFor(river[2]), "the number of the sequence, to confirm");
+        Assert.Equal((new EpisodeNumber(1, 12), true), job.EpisodeFor(cross[2]));
+        Assert.Equal((new EpisodeNumber(1, 10), true), job.EpisodeFor(code[2]));
+        Assert.Equal((new EpisodeNumber(1, 6), false), job.EpisodeFor(loose[1]), "S01E06 as written");
+        Assert.True(job.UnitOf(loose[0]) == job.UnitOf(loose[1]) && job.SuggestedTitleFor(loose[0])?.Name == "Vymysleny Zradca", "loose episodes of one series together");
+        Assert.Equal("Hraničný film (2018)", job.SuggestedTitleFor(versions[2])?.FolderName, "a version named by its film's folder");
+
+        var split = analysis.SplitBy(job.UnitOf);
+        Assert.Equal(7, split.Groups.Count, "one group per title");
+        Assert.True(split.Groups.All(g => g.Files.Select(f => job.UnitOf(f.Path)).Distinct().Count() == 1), "no group mixes titles");
+
+        var items = BatchPlanner.Plan(split, BatchTemplate.RulesOnly, library: job);
+        ReviewReasonKind[] Reasons(string path) => [.. items.Single(i => Paths.Same(i.File.Path, path)).Reasons.Select(r => r.Kind)];
+        Assert.True(Reasons(unsorted).Contains(ReviewReasonKind.NotSorted) && !Reasons(river[0]).Contains(ReviewReasonKind.NotSorted), "an unsorted file waits to be sorted");
+        Assert.True(items.All(i => !i.Reasons.Any(r => r.Kind == ReviewReasonKind.KindNotConfirmed) || Paths.Same(i.File.Path, unsorted)),
+            "the sorted kinds need no confirmation");
+
+        var riverGroup = split.Groups.First(g => g.Files.Any(f => Paths.Same(f.Path, river[0])));
+        job.AcceptAll(riverGroup.Files.Select(f => f.Path).ToList());
+        items = BatchPlanner.Plan(split, BatchTemplate.RulesOnly, library: job);
+        string? Planned(string path) => items.Single(i => Paths.Same(i.File.Path, path)).PlannedPath;
+        Assert.Equal(Path.Combine(output, "TVSHOWS", "Vymyslená rieka (2021)", "Season 01"), Path.GetDirectoryName(Planned(river[2])), "a group accepted: into its series");
+        Assert.True(Planned(code[0]) is null && Reasons(code[0]).Contains(ReviewReasonKind.MissingTitle), "the other titles still wait");
+
+        job.ConfirmSuggestions();
+        items = BatchPlanner.Plan(split, BatchTemplate.RulesOnly, library: job);
+        Assert.True(Path.GetFileName(Planned(code[2]))?.StartsWith("Kódové meno S01E10", StringComparison.Ordinal) == true,
+            "named by the series and the number: " + Planned(code[2]) + " | " + string.Join(", ", Reasons(code[2])));
+        Assert.True(Planned(found)?.StartsWith(Path.Combine(output, "MOVIES", "Najdeny film (2019)"), StringComparison.Ordinal) == true,
+            "a film into the films: " + Planned(found) + " | " + string.Join(", ", Reasons(found)));
+        Assert.True(Planned(loose[0])?.StartsWith(Path.Combine(output, "TVSHOWS", "Vymysleny Zradca (2024)", "Season 01"), StringComparison.Ordinal) == true,
+            "loose episodes into their series: " + Planned(loose[0]) + " | " + string.Join(", ", Reasons(loose[0])));
+        Assert.True(Reasons(cross[0]).Contains(ReviewReasonKind.MissingTitle), "a series without a year waits for it (TMDB or typed)");
+        Assert.True(versions.All(v => Planned(v)?.StartsWith(Path.Combine(output, "MOVIES", "Hraničný film (2018)"), StringComparison.Ordinal) == true),
+            "the versions of a film into one film");
+        Assert.True(items.All(i => i.Reasons.All(r => r.Kind is not (ReviewReasonKind.OtherSeries or ReviewReasonKind.EpisodeAmongFilms))),
+            "the titles do not disturb each other – " + string.Join("; ", items.SelectMany(i => i.Reasons).Select(r => r.Kind).Distinct()));
+
+        // without MOVIES and TVSHOWS the folder is one title, as before
+        var classic = Synthetic(root, P("Season 1", "a.mkv"), P("Season 2", "b.mkv"));
+        Assert.True(!LibraryJob.Guess(new LibraryLayout(output), classic).Mixed, "season folders: one series");
+        Assert.True(!LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(root, "tvshows", "Krížová cesta"), cross)).Mixed,
+            "a series folder below TVSHOWS analysed on its own: one series");
+    }
+
+    [Test]
     public void FilmsAndEpisodesAreToldApart()
     {
         using var work = new Work();

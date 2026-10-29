@@ -27,6 +27,7 @@ public sealed class InputFolderViewModel : ObservableObject
             OnPropertyChanged(nameof(Folder));
             OnPropertyChanged(nameof(Display));
             OnPropertyChanged(nameof(IsSet));
+            OnPropertyChanged(nameof(SortingHint));
             OpenCommand.NotifyCanExecuteChanged();
             ClearCommand.NotifyCanExecuteChanged();
         };
@@ -41,6 +42,9 @@ public sealed class InputFolderViewModel : ObservableObject
         : "nie je nastavený – zvoľte ho tlačidlom Zmeniť…";
 
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
+
+    /// <summary>Owner, 29. 10. 2026: films go into MOVIES, series into TVSHOWS (each series in its own folder).</summary>
+    public string SortingHint => IsSet ? "Filmy dajte do priečinka MOVIES, seriály do TVSHOWS – každý seriál do vlastného priečinka." : "";
 
     public RelayCommand ChooseCommand { get; }
 

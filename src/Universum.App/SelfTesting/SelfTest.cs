@@ -1868,6 +1868,36 @@ internal static class SelfTest
         editor.Show();
         await Screenshot(editor, "template-editor.png");
         editor.Close();
+
+        // owner, 29. 10. 2026: the user sorts the input folder into MOVIES and TVSHOWS – each series folder, numbered
+        // without S01E01, is a series of its own, each film a film (invented names)
+        var sorted = Path.Combine(_outputDirectory, "zoradene");
+        var show = Path.Combine(sorted, "TVSHOWS", "Vymyslený seriál (2024)");
+        var film = Path.Combine(sorted, "MOVIES", "Vymyslený film (2020)");
+        Directory.CreateDirectory(show);
+        Directory.CreateDirectory(film);
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(show, "Vymysleny serial 01.mkv"), overwrite: true);
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(show, "Vymysleny serial 02.mkv"), overwrite: true);
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(film, "Vymyslený film 1080p.mkv"), overwrite: true);
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(film, "Vymyslený film 720p.mkv"), overwrite: true);
+        batch.Folder = sorted;
+        batch.Recursive = true;
+        await batch.AnalyzeAsync();
+        Check(batch.IsMixed && batch.Groups.Count == 2, $"batch: a sorted folder – one group per title ({batch.Groups.Count}) – {batch.Summary}");
+        batch.SelectedGroup = batch.Groups.First(g => g.Group.Files.Any(f => f.Path.Contains("TVSHOWS", StringComparison.Ordinal)));
+        Check(batch.IsSeries && !batch.CanChooseKind && batch.SeriesSuggestion.StartsWith("návrh: Vymyslený seriál (2024)", StringComparison.Ordinal) &&
+              batch.FileRows.All(f => f.NamingSuggestion.StartsWith("návrh: S01E0", StringComparison.Ordinal)),
+            $"batch: TVSHOWS – a series named by its folder, episodes by the numbers – {batch.SeriesSuggestion} | {string.Join(", ", batch.FileRows.Select(f => f.NamingSuggestion))}");
+        batch.AcceptGroupCommand.Execute(null);
+        Check(batch.SeriesTitle == "Vymyslený seriál (2024)" && batch.FileRows.Select(f => f.Naming).Order().SequenceEqual(["S01E01", "S01E02"]) &&
+              batch.Items.Where(i => i.File.Path.StartsWith(show, StringComparison.Ordinal))
+                  .All(i => i.PlannedPath?.Contains(Path.Combine("TVSHOWS", "Vymyslený seriál (2024)", "Season 01"), StringComparison.Ordinal) == true),
+            "batch: Prijať všetko v skupine – the series and its episodes accepted – " + batch.RunState);
+        await Screenshot(window, "batch-sorted-series.png");
+        batch.SelectedGroup = batch.Groups.First(g => g.Group.Files.Any(f => f.Path.Contains("MOVIES", StringComparison.Ordinal)));
+        Check(batch.IsMovies && batch.FileRows.All(f => f.IsFilm) && batch.Items.Where(i => i.File.Path.StartsWith(film, StringComparison.Ordinal))
+                  .All(i => i.Reasons.All(r => r.Kind != Core.Batch.ReviewReasonKind.KindNotConfirmed)),
+            "batch: MOVIES – the numbered versions stay a film, its kind certain");
     }
 
     private static async Task Screenshot(Window window, string fileName)

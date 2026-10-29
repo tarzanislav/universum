@@ -296,6 +296,17 @@ public sealed class BatchTests
         Assert.Sequence([], Kinds(P("Specials", "Vymysleny Serial E01.mkv")), "no count: not checked");
         Assert.Sequence([ReviewReasonKind.UnknownEpisode, ReviewReasonKind.OtherSeries], Kinds(P("Season 1", "Iny.Serial.S01E05.mkv")));
 
+        // a further series sent together from Novinky (owner, 29. 10. 2026): its file goes to its own series
+        var other = P("Season 1", "Iny.Serial.S01E05.mkv");
+        job.SeriesOfFile[other] = new TitleInfo(MediaKind.Series, "Iný seriál", 2021);
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([], Kinds(other), "no other series, no TMDB check of the first series");
+        Assert.Equal(Path.Combine(output, "TVSHOWS", "Iný seriál (2021)", "Season 01"), Path.GetDirectoryName(items.Single(i => Paths.Same(i.File.Path, other)).PlannedPath),
+            "into its own series");
+        Assert.True(items.Where(i => i.PlannedPath is not null && !Paths.Same(i.File.Path, other)).All(i => i.PlannedPath!.Contains("Vymyslený seriál (2024)", StringComparison.Ordinal)),
+            "the other files stay in the series of the batch");
+        job.SeriesOfFile.Clear();
+
         job.Series = new TitleInfo(MediaKind.Series, "Iný názov", 2024);
         Assert.True(job.TmdbKnows(new EpisodeNumber(9, 9)), "the seasons belong to the other title");
     }

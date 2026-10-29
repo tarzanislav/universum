@@ -24,6 +24,17 @@ public static class NoteLinks
 
     public static void SetText(DependencyObject element, string value) => element.SetValue(TextProperty, value);
 
+    /// <summary>On a TextBox: a web address pasted into it asks for a short name first.</summary>
+    public static readonly DependencyProperty AskNameProperty =
+        DependencyProperty.RegisterAttached("AskName", typeof(bool), typeof(NoteLinks), new PropertyMetadata(false, OnAskNameChanged));
+
+    public static bool GetAskName(DependencyObject element) => (bool)element.GetValue(AskNameProperty);
+
+    public static void SetAskName(DependencyObject element, bool value) => element.SetValue(AskNameProperty, value);
+
+    /// <summary>Asks for the name of a pasted link (the suggestion given); null keeps the bare address. The self-test answers itself.</summary>
+    public static Func<Uri, string, string?> AskForName { get; set; } = LinkNameWindow.Ask;
+
     public static TextBox? GetEditor(DependencyObject element) => (TextBox?)element.GetValue(EditorProperty);
 
     public static void SetEditor(DependencyObject element, TextBox? value) => element.SetValue(EditorProperty, value);
@@ -53,6 +64,44 @@ public static class NoteLinks
                 block.Inlines.Add(new Run(piece.Text));
             }
         }
+    }
+
+    private static void OnAskNameChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is TextBox box)
+        {
+            DataObject.RemovePastingHandler(box, OnPasting);
+            if (e.NewValue is true)
+            {
+                DataObject.AddPastingHandler(box, OnPasting);
+            }
+        }
+    }
+
+    // owner, 29. 10. 2026: a pasted address gets a short name ("[name](address)"), shown instead of the long address;
+    // the note is kept at once
+    private static void OnPasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (sender is not TextBox box || e.DataObject.GetData(DataFormats.UnicodeText) is not string text || Universum.Core.Text.WebLinks.AsAddress(text) is not { } address)
+        {
+            return;
+        }
+
+        e.CancelCommand();
+        var name = AskForName(address, Universum.Core.Text.WebLinks.SuggestName(address));
+        Insert(box, Universum.Core.Text.WebLinks.Named(name, address));
+    }
+
+    /// <summary>Puts a link at the caret of a note (a space apart from the text around it) and keeps the note.</summary>
+    public static void Insert(TextBox box, string link)
+    {
+        var at = box.SelectionStart;
+        var before = box.Text[..at];
+        var after = box.Text[(at + box.SelectionLength)..];
+        var insert = (before.Length > 0 && !char.IsWhiteSpace(before[^1]) ? " " : "") + link + (after.Length > 0 && !char.IsWhiteSpace(after[0]) ? " " : "");
+        box.Text = before + insert + after;
+        box.CaretIndex = before.Length + insert.Length;
+        box.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
     }
 
     private static void OnEditorChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)

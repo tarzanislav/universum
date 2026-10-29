@@ -76,6 +76,18 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     public Func<string, bool> Confirm { get; set; } = message =>
         MessageBox.Show(Application.Current.MainWindow!, message, "UNIVERSUM", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
 
+    /// <summary>Vymazať všetko (owner, 29. 10. 2026): removes all source files of the current settings, after asking.</summary>
+    public RelayCommand ClearSourcesCommand => _clearSources ??= new RelayCommand(() =>
+    {
+        if (Current is { Inputs.Count: > 0 } current &&
+            Confirm("Odstrániť všetky zdrojové súbory zo Zlučovania?\n\nZabudnú sa aj ich stopy a nastavenia. Na disku sa nič nezmení."))
+        {
+            current.RemoveAllSourcesCommand.Execute(null);
+        }
+    });
+
+    private RelayCommand? _clearSources;
+
     /// <summary>The Information page should show this file.</summary>
     public event Action<string>? InfoRequested;
 

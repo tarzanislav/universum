@@ -63,10 +63,16 @@ public static class BatchPlanner
     private static List<BatchItem> CheckEpisodes(List<BatchItem> items, LibraryJob library)
     {
         var added = items.Select(_ => new List<ReviewReason>()).ToList();
-        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path), library.Root);
+        // files of further series sent together (LibraryJob.SeriesOfFile) are named after their own series
+        var series = LibraryJob.SeriesNameOfFiles(items.Select(i => i.File.Path).Where(p => !library.SeriesOfFile.ContainsKey(p)), library.Root);
         for (var i = 0; i < items.Count; i++)
         {
             var path = items[i].File.Path;
+            if (library.SeriesOfFile.ContainsKey(path))
+            {
+                continue;
+            }
+
             var name = Path.GetFileNameWithoutExtension(path);
             // an episode named after another series, or a film in library form ("Okno (2014)") among the episodes
             var own = EpisodeParser.FromPath(path, library.Root) is not null ? TitleGuess.FromName(name, MediaKind.Series)
@@ -205,7 +211,7 @@ public static class BatchPlanner
             }
 
             episode = number;
-            if (!library.TmdbKnows(number) && !item.Group.Decisions.ProcessAnyway.Contains(path))
+            if (!library.TmdbKnows(number, path) && !item.Group.Decisions.ProcessAnyway.Contains(path))
             {
                 reasons.Add(new ReviewReason(ReviewReasonKind.UnknownEpisode));
             }

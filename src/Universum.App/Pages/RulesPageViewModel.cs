@@ -45,6 +45,7 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         _services = services;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
+        ClearCommand = new RelayCommand(Clear, () => !Busy);
         ApplyCommand = new AsyncRelayCommand(ApplyAsync, CanApply);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
         QueueCommand = new RelayCommand(Enqueue, CanApply);
@@ -60,6 +61,43 @@ public sealed class RulesPageViewModel : ObservableObject
     }
 
     public AsyncRelayCommand OpenCommand { get; }
+
+    /// <summary>Vymazať frontu (owner, 29. 10. 2026): forgets the opened file not processed yet – nothing on the disk changes.</summary>
+    public RelayCommand ClearCommand { get; }
+
+    /// <summary>Asks before the opened file is forgotten (the self-test answers itself).</summary>
+    public Func<string, bool> Confirm { get; set; } = question =>
+        System.Windows.MessageBox.Show(question, "UNIVERSUM", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) == System.Windows.MessageBoxResult.Yes;
+
+    private void Clear()
+    {
+        if (Busy || !Confirm("Vymazať frontu Single spracovania?\n\nZabudne sa otvorený súbor a jeho nastavenie. Na disku sa nič nezmení."))
+        {
+            return;
+        }
+
+        Result = "";
+        _undoRecord = null;
+        _languages.Clear();
+        _videoNames.Clear();
+        _file = null;
+        _plan = null;
+        _placement = null;
+        _tmdbTitle = null;
+        _titleText = "";
+        _episodeText = "";
+        _episodeNote = "";
+        Rows.Clear();
+        FileName = "";
+        Issues = "";
+        Target = "";
+        TitleNote = "";
+        Summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+        OnPropertyChanged(nameof(TitleText));
+        OnPropertyChanged(nameof(EpisodeText));
+        OnPropertyChanged(nameof(Plan));
+        RefreshCommands();
+    }
 
     public AsyncRelayCommand ApplyCommand { get; }
 
@@ -521,6 +559,7 @@ public sealed class RulesPageViewModel : ObservableObject
     private void RefreshCommands()
     {
         OpenCommand.NotifyCanExecuteChanged();
+        ClearCommand?.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         QueueCommand?.NotifyCanExecuteChanged();

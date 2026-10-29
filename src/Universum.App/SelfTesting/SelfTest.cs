@@ -852,7 +852,7 @@ internal static class SelfTest
         var worldSeries = page.Tab(PremiereTab.SeriesWorld).Rows.OfType<PremiereSeriesRow>().ToList();
         Check(!page.HasProblems, "premieres: all sources read – " + page.Problems);
         Check(films.Count == 2 && films[0].IsToday && films[0].When == "DNES" && films[1].Caption == $"The Invented Premiere ({FakeNews.Day(3).Year})" &&
-              films[1].Where == $"CZ · SK {FakeNews.Day(4).Day}. {FakeNews.Day(4).Month}." && films[1].Availability.StartsWith("VOD ", StringComparison.Ordinal) &&
+              films[1].Where == $"CZ · SK {FakeNews.Day(4).Day}. {FakeNews.Day(4).Month}." && films[1].Availability.Contains("VOD ", StringComparison.Ordinal) && films[1].Availability.StartsWith("kino ", StringComparison.Ordinal) &&
               films[1].Production == "ČR, SR · Invented Pictures" && films[1].When == "o 3 dni",
             "premieres: Czech and Slovak films in the cinemas here, the nearest first – " + string.Join(" | ", films.Select(f => $"{f.Caption} {f.Date} {f.When} {f.Where} {f.Production} {f.Availability}")));
         Check(world.Count == 1 && world[0].Caption.StartsWith("Later Invented Film", StringComparison.Ordinal),
@@ -884,10 +884,16 @@ internal static class SelfTest
         page.Filter = "teSim";
         Check(page.Tab(PremiereTab.FilmDomestic).Rows.Count == 1, "premieres: the note is searched too");
         page.Filter = "";
+        films[1].Note = "teším sa https://kino.example/vymyslena-premiera";
+        Check(films[1].HasLinks && services.Marks.Get(Core.News.MarkStore.Film(films[1].Film.TmdbId)).Note.EndsWith("vymyslena-premiera", StringComparison.Ordinal),
+            "premieres: a web address in the note is kept and shown as a link");
+        page.PosterScale = 2;
+        Check(page.PosterWidth == 76 && page.PosterHeight == 114 && services.Settings.PremierePosterScale == 2, "premieres: posters up to twice as large, kept");
 
         page.SelectedTab = page.Tab(PremiereTab.FilmDomestic);
         await WaitFor(() => films.All(f => f.Poster.Image is not null));
         await Screenshot(window, "premieres-films.png");
+        page.PosterScale = 1;
         page.SelectedTab = page.Tab(PremiereTab.SeriesWorld);
         await WaitFor(() => worldSeries.All(r => r.Poster.Image is not null));
         Check(worldSeries.All(r => r.Poster.Image is not null), "premieres: posters of the series found on TMDB");

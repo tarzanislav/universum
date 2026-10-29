@@ -89,7 +89,9 @@
         </Style>
         <DataTemplate x:Key="NewsTitleCell">
             <DockPanel Margin="6,4">
-                <Border DockPanel.Dock="Left" Width="38" Height="57" CornerRadius="4" Margin="0,0,10,0" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                <Border DockPanel.Dock="Left" CornerRadius="4" Margin="0,0,10,0" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                        Width="{Binding DataContext.PosterWidth, RelativeSource={RelativeSource AncestorType=DataGrid}, FallbackValue=38}"
+                        Height="{Binding DataContext.PosterHeight, RelativeSource={RelativeSource AncestorType=DataGrid}, FallbackValue=57}"
                         Visibility="{Binding DataContext.ShowPosters, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVisibility}}">
                     <Border CornerRadius="4">
                         <Border.Background>
@@ -119,9 +121,26 @@
             <CheckBox IsChecked="{Binding IsChosen, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="0" Padding="0"
                       ToolTip="Vybrané – titul, na ktorý sa teším (zobrazíte ich voľbou Zobraziť vybrané)" />
         </DataTemplate>
+        <!-- a note; its web addresses are links (a click beside them edits the note, e.g. to add another link) -->
         <DataTemplate x:Key="NewsNoteCell">
-            <TextBox Text="{Binding Note, UpdateSourceTrigger=LostFocus}" Margin="4,3" VerticalAlignment="Center" MinHeight="30"
-                     ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte" />
+            <Grid Margin="4,3" VerticalAlignment="Center">
+                <TextBox x:Name="Editor" Text="{Binding Note, UpdateSourceTrigger=LostFocus}" MinHeight="30" TextWrapping="Wrap"
+                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Webová adresa sa zmení na odkaz." />
+                <Border x:Name="Links" Visibility="Collapsed" MinHeight="30" Padding="10,5" CornerRadius="4" Cursor="IBeam"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1"
+                        pages:NoteLinks.Editor="{Binding ElementName=Editor}"
+                        ToolTip="Kliknutím na odkaz otvoríte stránku; kliknutím vedľa neho poznámku upravíte alebo pridáte ďalší odkaz">
+                    <TextBlock pages:NoteLinks.Text="{Binding Note}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </Border>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding HasLinks}" Value="True">
+                    <Setter TargetName="Links" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=Editor}" Value="True">
+                    <Setter TargetName="Links" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:PlaceholderPageViewModel}">
             <StackPanel Margin="32">
@@ -1516,8 +1535,17 @@
                         <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
                                  ToolTip="Hľadať seriál, stanicu alebo poznámku (bez diakritiky)" />
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
+                        <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
+                                    ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
+                            <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
+                                    Value="{Binding PosterScale}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                         <WrapPanel VerticalAlignment="Center">
-                            <RadioButton Content="Posledný týždeň" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
@@ -1734,8 +1762,17 @@
                         <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
                                  ToolTip="Hľadať názov, produkciu alebo poznámku (bez diakritiky)" />
                         <TextBlock DockPanel.Dock="Right" Text="Hľadať:" VerticalAlignment="Center" Margin="12,0,8,0" />
+                        <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
+                                    ToolTip="Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)">
+                            <TextBlock Text="Veľkosť POSTERU" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
+                                    Value="{Binding PosterScale}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
                         <WrapPanel VerticalAlignment="Center">
-                            <RadioButton Content="Posledný týždeň" IsChecked="{Binding ShowRecent}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
@@ -1775,7 +1812,7 @@
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                             <DataGridTextColumn Header="Deň" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
-                            <DataGridTextColumn Header="VOD / TV" Binding="{Binding Availability}" Width="1.4*" MinWidth="100" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="VOD / TV / kino" Binding="{Binding Availability}" Width="1.6*" MinWidth="120" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Vybrané" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
                             <DataGridTemplateColumn Header="Poznámky" Width="1.6*" MinWidth="120" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
                         </DataGrid.Columns>

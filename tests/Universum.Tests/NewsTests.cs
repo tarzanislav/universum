@@ -5,6 +5,7 @@ using Universum.Core.Html;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.News;
+using Universum.Core.Text;
 
 namespace Universum.Tests;
 
@@ -264,7 +265,7 @@ public sealed class NewsTests
             "/3/movie/14" => $$$"""{"title":"Hollywoodský vymyslený","original_title":"Hollywood Invented","release_date":"{{{Iso(5)}}}","production_countries":[{"iso_3166_1":"US"}],"release_dates":{"results":[{"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(12)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/15" => $$$"""{"title":"Pražský vymyslený","original_title":"Pražský vymyslený","original_language":"cs","release_date":"{{{Iso(4)}}}","release_dates":{"results":[{"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(4)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/16" => $$$"""{"title":"Brnenský vymyslený","original_title":"Brněnský vymyšlený","release_date":"{{{Iso(6)}}}","production_countries":[{"iso_3166_1":"CZ"}],"release_dates":{"results":[]}}""",
-            "/3/movie/11" => $$$"""{"title":"Vymyslený film","original_title":"Invented Film","release_date":"{{{Iso(-10)}}}","poster_path":"/a.jpg","production_countries":[{"iso_3166_1":"CZ"},{"iso_3166_1":"XX"}],"production_companies":[{"name":"Studio"}],"release_dates":{"results":[{"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(2)}}}T00:00:00.000Z"},{"type":4,"release_date":"{{{Iso(40)}}}T00:00:00.000Z"}]},{"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(9)}}}T00:00:00.000Z"},{"type":6,"release_date":"{{{Iso(90)}}}T00:00:00.000Z"}]}]}}""",
+            "/3/movie/11" => $$$"""{"title":"Vymyslený film","original_title":"Invented Film","release_date":"{{{Iso(-10)}}}","poster_path":"/a.jpg","production_countries":[{"iso_3166_1":"CZ"},{"iso_3166_1":"XX"}],"production_companies":[{"name":"Studio"}],"release_dates":{"results":[{"iso_3166_1":"CZ","release_dates":[{"type":3,"release_date":"{{{Iso(2)}}}T00:00:00.000Z"},{"type":4,"release_date":"{{{Iso(40)}}}T00:00:00.000Z","note":"Invented+"}]},{"iso_3166_1":"SK","release_dates":[{"type":3,"release_date":"{{{Iso(9)}}}T00:00:00.000Z"},{"type":6,"release_date":"{{{Iso(90)}}}T00:00:00.000Z","note":"Jednotka"}]},{"iso_3166_1":"IT","release_dates":[{"type":1,"release_date":"{{{Iso(-12)}}}T00:00:00.000Z","note":"Invented Festival"},{"type":3,"release_date":"{{{Iso(5)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/12" => $$$"""{"title":"Len v zahraničí","original_title":"Only Abroad","release_date":"{{{Iso(1)}}}","release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"type":3,"release_date":"{{{Iso(1)}}}T00:00:00.000Z"}]}]}}""",
             "/3/movie/13" => $$$"""{"title":"Soul","original_title":"서울","release_date":"{{{Iso(3)}}}","poster_path":"../x.jpg","release_dates":{"results":[{"iso_3166_1":"US","release_dates":[{"type":4,"release_date":"{{{Iso(20)}}}T00:00:00.000Z"}]}]}}""",
             _ => null,
@@ -285,7 +286,8 @@ public sealed class NewsTests
         Assert.Equal(new DateOnly(2026, 11, 3), film.Premiere, "the earlier of the Czech and Slovak premieres");
         Assert.Equal("CZ · SK 10. 11.", film.PremiereNote, "where");
         Assert.Equal("ČR, XX · Studio", film.Production, "production");
-        Assert.Equal("VOD 11. 12. 2026 · TV 30. 1. 2027 (SK)", film.Availability, "VOD here, TV in Slovakia");
+        Assert.Equal("premiéra 20. 10. 2026 Invented Festival (Taliansko) · kino 3. 11. 2026 · VOD 11. 12. 2026 Invented+ · TV 30. 1. 2027 Jednotka (SK)", film.Availability,
+            "where it premieres: a festival elsewhere, the cinemas and VOD here, TV in Slovakia – with the place, service and channel");
         Assert.Equal("Vymyslený film", film.LocalTitle, "Czech title");
         Assert.Equal(11, film.TmdbId, "TMDB ID");
 
@@ -376,6 +378,37 @@ public sealed class NewsTests
     }
 
     [Test]
+    public void CzechAndSlovakLettersTellTheOrigin()
+    {
+        var news = new SeriesNews(new WebPageClient(new Server().Http), new TvMazeClient(new Server().Http), new NewsCache(Path.GetTempPath()));
+        SeriesEpisode Episode(string title, string original) => new()
+        {
+            Source = "Vymyslený rozpis", Region = NewsRegion.World, Title = title, OriginalTitle = original, AirDate = new DateOnly(2026, 10, 29),
+        };
+
+        Assert.Equal<NewsRegion?>(NewsRegion.Domestic, news.Classify(Episode("7 pádů Vymyšleného", "7 pádů Vymyšleného"))?.Region,
+            "a Czech title on a service of no country (ů, ě)");
+        Assert.Equal<NewsRegion?>(NewsRegion.Domestic, news.Classify(Episode("Ľudia z vymysleného mesta", "Ľudia z vymysleného mesta"))?.Region, "Slovak (Ľ)");
+        Assert.Equal<NewsRegion?>(NewsRegion.World, news.Classify(Episode("Café Inventé", "Café Inventé"))?.Region, "accents of other languages say nothing");
+        Assert.Equal<NewsRegion?>(NewsRegion.World, news.Classify(Episode("Přátelé z výmyslu", "Invented Friends"))?.Region,
+            "a Czech title of a foreign series with its own original title");
+    }
+
+    [Test]
+    public void LinksInNotesAreFound()
+    {
+        var pieces = WebLinks.Split("pozrieť https://www.serial.example/serial/7-padu/, a tiež www.film.example (trailer) alebo ftp://x.example");
+        Assert.Equal(5, pieces.Count, "text, link, text, link, text – " + string.Join(" | ", pieces));
+        Assert.True(pieces[1].Link?.AbsoluteUri == "https://www.serial.example/serial/7-padu/" && pieces[1].Text == "serial.example/serial/7-padu",
+            "an https address without the comma after it, shown short");
+        Assert.True(pieces[3].Link?.AbsoluteUri == "https://www.film.example/" && pieces[3].Text == "film.example", "www. without a scheme");
+        Assert.True(pieces[4].Link is null && pieces[4].Text.Contains("ftp://", StringComparison.Ordinal), "only http and https become links");
+        Assert.True(WebLinks.HasLinks("https://a.example") && !WebLinks.HasLinks("bez odkazu") && !WebLinks.HasLinks(null), "has links");
+        var longAddress = "https://long.example/" + new string('a', 80);
+        Assert.Equal(WebLinks.ShownLength, WebLinks.Split(longAddress)[0].Text.Length, "a long address is shortened");
+    }
+
+    [Test]
     public void KeptFilmsAreSortedByOrigin()
     {
         FilmPremiere Old(int id, NewsRegion region, string production, string note, int day) => new()
@@ -405,11 +438,13 @@ public sealed class NewsTests
         var server = new Server();
         server.Handler = uri => uri.AbsolutePath == "/3/search/tv"
             ? uri.Query.Contains("first_air_date_year=2026", StringComparison.Ordinal)
-                ? """{"results":[{"id":5,"name":"Other Show","original_name":"Other Show","first_air_date":"2026-01-01","poster_path":"/o.jpg"},{"id":7,"name":"Invented Show","original_name":"Vymyšlený seriál","first_air_date":"2026-09-01","poster_path":"/p.jpg"}]}"""
+                ? """{"results":[{"id":5,"name":"Other Show","original_name":"Other Show","first_air_date":"2026-01-01","poster_path":"/o.jpg"},{"id":7,"name":"Invented Show","original_name":"Vymyšlený seriál","first_air_date":"2026-09-01","poster_path":"/p.jpg","origin_country":["CZ"],"original_language":"cs"}]}"""
                 : """{"results":[]}"""
             : null;
         var series = new SeriesTmdb(new TmdbClient(server.Http, "test-key", null, new RequestPacer(1000)));
-        Assert.Equal(new SeriesMatch(7, "/p.jpg"), await series.FindAsync("Vymyšlený seriál", 2026), "found by the original title and year");
+        var found = await series.FindAsync("Vymyšlený seriál", 2026);
+        Assert.True(found is { TmdbId: 7, PosterPath: "/p.jpg", Language: "cs", IsHome: true } && found.Countries.SequenceEqual(["CZ"]),
+            "found by the original title and year, with its origin");
         Assert.Equal<SeriesMatch?>(null, await series.FindAsync("Unknown", 2020), "nothing found");
         Assert.True(server.Requests.All(r => r.Contains("/3/search/tv?", StringComparison.Ordinal)), "only a search of series");
     }

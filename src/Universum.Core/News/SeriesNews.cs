@@ -80,10 +80,10 @@ public sealed record SeriesPremiereRow(SeriesEpisode First, string Periodicity, 
 /// history of Novinky), today is asked again after 6 hours, later days after a day; Obnoviť asks today and later days
 /// at once. A source that fails is reported and not asked again in this reading. The same episode from two sources is
 /// shown once (the one of the page, with the Czech title and TVmaze's IDs). The episodes are sorted by the origin of the
-/// series (<see cref="Classify(SeriesEpisode)"/>); what the pages do not tell is looked up on TVmaze and kept in
-/// <paramref name="origins"/>.
+/// series (<see cref="Classify(SeriesEpisode)"/>); what the pages do not tell is looked up on TVmaze (then on TMDB, when
+/// <paramref name="tmdb"/> gives a client) and kept in <paramref name="origins"/>.
 /// </summary>
-public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCache cache, SeriesOrigins? origins = null)
+public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCache cache, SeriesOrigins? origins = null, Func<SeriesTmdb?>? tmdb = null)
 {
     /// <summary>The name TVmaze's episodes carry as their source.</summary>
     public const string TvMazeSource = "TVmaze";
@@ -203,8 +203,8 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
         return episode with { Region = region, Origin = region };
     }
 
-    // what the sources tell (TVmaze: the language and the country of the original channel), else what TVmaze told when
-    // asked; else a guess: a series of TVmaze is foreign, one of a page is Czech or Slovak when it airs on a Czech or
+    // what the sources tell (TVmaze: the language and the country of the original channel), else an original title with
+    // Czech or Slovak letters, else what TVmaze or TMDB told when asked; else a guess: a series of TVmaze is foreign, one of a page is Czech or Slovak when it airs on a Czech or
     // Slovak channel and has no original title of its own
     private bool IsHome(SeriesEpisode episode)
     {
@@ -216,6 +216,13 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
         if (episode.Language.Length > 0)
         {
             return false;
+        }
+
+        // owner, 29. 10. 2026: a Czech or Slovak original title (letters only these languages have) is Czech or Slovak,
+        // wherever it airs
+        if (HomeOrigin.HasHomeLetters(episode.OriginalTitle))
+        {
+            return true;
         }
 
         if (_origins.Get(episode.SeriesKey) is { Home: { } home })
@@ -231,12 +238,13 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
     // a series whose origin the sources did not tell: of a page (asked by its name, or by TVmaze's ID it got from TVmaze's
     // entry), or of TVmaze without a language and a country (kept from before TVmaze's languages were read)
     private bool NeedsLookup(SeriesEpisode episode, DateTime now) =>
-        episode.Origin is null && episode.Language.Length == 0 && episode.Country.Length == 0 &&
+        episode.Origin is null && episode.Language.Length == 0 && episode.Country.Length == 0 && !HomeOrigin.HasHomeLetters(episode.OriginalTitle) &&
         (episode.Source != TvMazeSource || episode.TvMaze is not null) && _origins.IsDue(episode.SeriesKey, now);
 
     /// <summary>
-    /// Asks TVmaze for the origins of series the sources did not tell (at most <see cref="MaxOriginLookups"/>): premieres
-    /// first, then the series airing nearest today. Only the series' name or TVmaze ID is sent.
+    /// Asks TVmaze – and when it does not know the series, TMDB – for the origins of series the sources did not tell (at most
+    /// <see cref="MaxOriginLookups"/>): premieres first, then the series airing nearest today. Only the series' name (and
+    /// year) or TVmaze ID is sent.
     /// </summary>
     public async Task LearnOriginsAsync(IReadOnlyList<SeriesEpisode> episodes, DateOnly today, CancellationToken cancellationToken = default)
     {
@@ -259,7 +267,20 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
                 var same = show is not null &&
                            (episode.TvMaze is not null || Words.Normalize(show.Name) == Words.Normalize(episode.OriginalTitle) || Words.Normalize(show.Name) == Words.Normalize(episode.Title)) &&
                            (episode.Year is null || show.Year is null || Math.Abs(show.Year.Value - episode.Year.Value) <= 1);
-                _origins.Set(episode.SeriesKey, same ? show!.IsHome : null, now);
+                var home = same ? show!.IsHome : (bool?)null;
+                if (home is null && tmdb?.Invoke() is { } movies)
+                {
+                    try
+                    {
+                        home = (await movies.FindAsync(episode.OriginalTitle, episode.Year, cancellationToken).ConfigureAwait(false))?.IsHome;
+                    }
+                    catch (Library.TitleServiceException)
+                    {
+                        // TMDB is asked again with the next lookup
+                    }
+                }
+
+                _origins.Set(episode.SeriesKey, home, now);
             }
         }
         finally

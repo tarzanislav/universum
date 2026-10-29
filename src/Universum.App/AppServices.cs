@@ -261,7 +261,7 @@ public sealed class AppServices
     /// <summary>The schedule of series episodes from the sources of the settings (web pages by their rules, TVmaze).</summary>
     public Universum.Core.News.SeriesNews SeriesNews => SeriesNewsForSelfTest ?? (_seriesNews ??= new Universum.Core.News.SeriesNews(
         new Universum.Core.News.WebPageClient(NewsHttp), new Universum.Core.News.TvMazeClient(NewsHttp), NewsCache,
-        new Universum.Core.News.SeriesOrigins(Path.Combine(AppSettings.NewsCacheDirectory, "origins.json"))));
+        new Universum.Core.News.SeriesOrigins(Path.Combine(AppSettings.NewsCacheDirectory, "origins.json")), () => SeriesTmdb));
 
     /// <summary>The self-test's stand-in sources of series (invented pages and answers, nothing goes to the internet).</summary>
     public Universum.Core.News.SeriesNews? SeriesNewsForSelfTest { get; set; }
@@ -553,6 +553,12 @@ public sealed class AppSettings
 
     /// <summary>Novinky – Seriály show posters (of the whole series).</summary>
     public bool NewsPosters { get; set; } = true;
+
+    /// <summary>The size of the posters of Premiéry, 1× to 2×.</summary>
+    public double PremierePosterScale { get; set; } = 1;
+
+    /// <summary>The size of the posters of Novinky – Seriály, 1× to 2×.</summary>
+    public double NewsPosterScale { get; set; } = 1;
 
     /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
     public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }

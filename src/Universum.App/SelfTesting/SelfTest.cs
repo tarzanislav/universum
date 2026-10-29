@@ -1774,6 +1774,8 @@ internal static class SelfTest
             await batch.DetectAudioSelectedCommand.ExecuteAsync(null);
             var second = batch.FileRows[1].AudioSlots;
             Write($"speech, selected file ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState} | " + string.Join(" | ", second.Select(a => $"{a.Slot}: {a.Hint}")));
+            Check(second.All(a => a.SelectedChoice.Language is null && a.SelectedChoice.Display.StartsWith("návrh (", StringComparison.Ordinal)),
+                "batch: the file's list shows what applies without a choice – " + string.Join(" | ", second.Select(a => a.SelectedChoice.Display)));
             Check(second.Count == 3 && second.All(a => a.Hint.StartsWith("návrh:", StringComparison.Ordinal)) &&
                   batch.FileRows[0].AudioSlots.All(a => !a.Hint.StartsWith("návrh:", StringComparison.Ordinal)),
                 "batch: only the selected film was listened to, its own suggestions shown at it");
@@ -1784,6 +1786,8 @@ internal static class SelfTest
                   batch.RunState.Contains("3 už jazyk má", StringComparison.Ordinal),
                 "batch: the group's films each on their own, the film heard before not again – " + batch.RunState);
             batch.ConfirmSuggestionsCommand.Execute(null);
+            Check(batch.FileRows.All(f => f.AudioSlots[1].SelectedChoice.Language == Languages.English),
+                "batch: a language chosen for the file is shown in its list");
             Check(batch.FileRows.All(f => f.AudioSlots[1].ChosenLanguage == Languages.English),
                 "batch: Potvrdiť návrhy takes each film's own suggestion (English) – " + batch.RunState);
             await Screenshot(window, "batch-speech-files.png");

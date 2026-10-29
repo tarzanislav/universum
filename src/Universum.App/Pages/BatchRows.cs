@@ -197,6 +197,7 @@ public sealed class FileSlotRow : ObservableObject
         Key = key;
         Track = track;
         _changed = changed;
+        Choices = [new FileLanguageItem(null, ""), .. FileLanguageItem.All];
         Refresh();
     }
 
@@ -211,6 +212,29 @@ public sealed class FileSlotRow : ObservableObject
     public string Slot => Texts.Slot(Key);
 
     public IReadOnlyList<Language> LanguageChoices => Languages.All;
+
+    /// <summary>
+    /// The choices of the file's list (owner, 29. 10. 2026: an empty list looked as if no language were set): first
+    /// what applies without a choice for the file ("podľa skupiny (čeština)"), then the languages.
+    /// </summary>
+    public IReadOnlyList<FileLanguageItem> Choices { get; }
+
+    /// <summary>The item shown in the file's list; the first one while no language is chosen for the file.</summary>
+    public FileLanguageItem SelectedChoice
+    {
+        get => ChosenLanguage is { } language ? Choices.Skip(1).FirstOrDefault(c => c.Language == language) ?? Choices[0] : Choices[0];
+        set
+        {
+            // WPF may push null while the list is rebuilt – never read that as "back to the group"
+            if (value is null || value == SelectedChoice)
+            {
+                return;
+            }
+
+            ChosenLanguage = value.Language;
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>The language chosen for this file's track (empty: the group's, the name's or none).</summary>
     public Language? ChosenLanguage
@@ -253,9 +277,42 @@ public sealed class FileSlotRow : ObservableObject
     public void Refresh()
     {
         _evidence = BatchPlanner.Evidence(Track, Key, Group, Path);
+        Choices[0].Display = InheritedLabel();
         OnPropertyChanged(nameof(ChosenLanguage));
+        OnPropertyChanged(nameof(SelectedChoice));
         OnPropertyChanged(nameof(Hint));
         OnPropertyChanged(nameof(HasOwnSuggestion));
+    }
+
+    // what the file gets without its own choice; with a choice for the file the evidence is that choice, so the first
+    // item says only where it would go back to
+    private string InheritedLabel() => _evidence switch
+    {
+        null => "nevybraté – vyberte",
+        { Source: EvidenceSource.FileDecision } => "podľa skupiny",
+        { Confidence: Confidence.Medium } suggestion => $"návrh ({Name(suggestion.Language)}) – overte",
+        { Source: EvidenceSource.GroupDecision } known => $"podľa skupiny ({Name(known.Language)})",
+        { } known => $"automaticky ({Name(known.Language)})",
+    };
+
+    private static string Name(LanguageTag tag) => Languages.Find(tag.Primary)?.SlovakName ?? Texts.Language(tag);
+}
+
+/// <summary>One item of a file's language list: a language, or (null) what applies without a choice for the file.</summary>
+public sealed class FileLanguageItem(Language? language, string display) : ObservableObject
+{
+    private string _display = display;
+
+    /// <summary>The languages, shared by all lists.</summary>
+    public static readonly IReadOnlyList<FileLanguageItem> All =
+        [.. Universum.Core.Media.Languages.All.Select(l => new FileLanguageItem(l, l.SlovakName))];
+
+    public Language? Language { get; } = language;
+
+    public string Display
+    {
+        get => _display;
+        set => SetProperty(ref _display, value);
     }
 }
 

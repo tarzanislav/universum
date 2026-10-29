@@ -1278,8 +1278,8 @@
                                                         <StackPanel Margin="0,0,0,3">
                                                             <DockPanel>
                                                                 <TextBlock Text="{Binding Slot}" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                                                <ComboBox ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName" FontSize="12"
-                                                                          SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                                <ComboBox ItemsSource="{Binding Choices}" DisplayMemberPath="Display" FontSize="12"
+                                                                          SelectedItem="{Binding SelectedChoice, UpdateSourceTrigger=PropertyChanged}"
                                                                           ToolTip="Jazyk tejto stopy len pre tento súbor (prednosť pred voľbou pre skupinu)" />
                                                             </DockPanel>
                                                             <TextBlock Text="{Binding Hint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

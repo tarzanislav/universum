@@ -6,6 +6,17 @@
         Title="UNIVERSUM" Icon="pack://application:,,,/Assets/universum.ico" Width="1280" Height="820" MinWidth="980" MinHeight="600"
         WindowStartupLocation="CenterScreen" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
     <Window.Resources>
+        <!-- owner, 29. 10. 2026: a chosen row of any table stays readable – a light blue with dark text, never the theme's
+             dark selection (the tables of Premiéry and Novinky have their own) -->
+        <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#CFE3F8" />
+                    <Setter Property="BorderBrush" Value="#CFE3F8" />
+                    <Setter Property="Foreground" Value="#141414" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <!-- the tables of Premiéry and Novinky: sharp text, links right after the title, optional posters, Vybrané and a note -->
         <Style x:Key="NewsCell" TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -1240,8 +1251,7 @@
                                                 <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
                                                          ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
                                                 <!-- owner, 29. 10. 2026: a film exactly by its TMDB ID -->
-                                                <DockPanel Margin="0,2,0,0"
-                                                           Visibility="{Binding DataContext.IsMovies, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVisibility}}">
+                                                <DockPanel Margin="0,2,0,0" Visibility="{Binding IsFilm, Converter={StaticResource BoolToVisibility}}">
                                                     <TextBlock Text="TMDB ID:" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,4,0" />
                                                     <TextBox Text="{Binding TmdbId, UpdateSourceTrigger=LostFocus}" FontSize="12"
                                                              ToolTip="Presne podľa TMDB: číslo filmu (napr. 12345) alebo adresa z themoviedb.org; minisériál vložte ako adresu …/tv/…. Použije sa, keď pole opustíte." />
@@ -1406,9 +1416,11 @@
                             <Button Content="Priečinok…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" />
                         </WrapPanel>
                         <WrapPanel Margin="0,6,0,0">
-                            <TextBlock Text="Obsah:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton Content="filmy" IsChecked="{Binding IsMovies}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding KindLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton Content="filmy" IsChecked="{Binding IsMovies}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,12,0"
+                                         IsEnabled="{Binding CanChooseKind}" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,8,0"
+                                         IsEnabled="{Binding CanChooseKind}" />
                             <TextBlock Text="{Binding KindNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <Button Content="Potvrdiť" Command="{Binding ConfirmKindCommand}" Padding="10,3" Margin="0,0,20,0"
                                     Visibility="{Binding KindNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
@@ -1428,10 +1440,12 @@
                                         ToolTip="HISTRA tento seriál nepotvrdila – potvrďte ho, ak je správny (alebo zadajte iný)" />
                             </StackPanel>
                             <Button Content="Spresniť názvy" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
-                                    Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}"
+                                    Visibility="{Binding CanFindTitles, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Spresní navrhnuté názvy filmov podľa TMDB a overí ich v katalógu HISTRA; bez kľúča TMDB hľadá v HISTRA (len presná zhoda názvu a roku)" />
                             <Button Content="Prijať návrhy názvov" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
                                     ToolTip="Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)" />
+                            <Button Content="Prijať všetko v skupine" Command="{Binding AcceptGroupCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"
+                                    ToolTip="Pre vybranú skupinu naraz: druh, názov seriálu alebo filmu, čísla epizód aj jazyky stôp podľa návrhov (nie otázky Season 00 / bežná sezóna a návrhy s upozornením)" />
                             <Button Content="Špeciály do Season 00" Command="{Binding AnswerSpecialsCommand}" Padding="10,3" Margin="6,0,0,0"
                                     Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore." />
@@ -1480,6 +1494,7 @@
                         <TextBlock TextTrimming="CharacterEllipsis" ToolTip="{Binding Display}">
                             <Run Text="Vstupný priečinok: " FontWeight="SemiBold" /><Run Text="{Binding Display, Mode=OneWay}" />
                         </TextBlock>
+                        <TextBlock Text="{Binding SortingHint}" Style="{StaticResource Hint}" FontSize="11.5" />
                         <TextBlock Text="{Binding Message}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">

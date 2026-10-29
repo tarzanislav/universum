@@ -16,6 +16,27 @@ public sealed record BatchAnalysis(
     public int FileCount => Groups.Sum(g => g.Files.Count);
 
     public BatchGroup? GroupOf(string path) => Groups.FirstOrDefault(g => g.Files.Any(f => f.Path == path));
+
+    /// <summary>
+    /// The groups split by title (owner, 29. 10. 2026: a folder of several titles – each group holds the files of one
+    /// title only, so a group's decisions and "accept all" concern one series or film): files of the same structure and
+    /// the same title stay together, in the order of the groups. Only right after the analysis (no decisions are carried).
+    /// </summary>
+    public BatchAnalysis SplitBy(Func<string, string> titleOf)
+    {
+        var split = new List<BatchGroup>();
+        foreach (var group in Groups)
+        {
+            foreach (var title in group.Files.GroupBy(f => titleOf(f.Path), IO.Paths.Comparer))
+            {
+                var part = new BatchGroup(group.Signature, split.Count);
+                part.Files.AddRange(title);
+                split.Add(part);
+            }
+        }
+
+        return this with { Groups = split };
+    }
 }
 
 public static class BatchAnalyzer

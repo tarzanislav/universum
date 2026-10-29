@@ -22,7 +22,21 @@ public static class BatchPlanner
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);
         var items = analysis.Groups.SelectMany(g => g.Files.Select(f => PlanFile(f, g, template, effective, library))).ToList();
-        return library is null ? items : library.Kind == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
+        if (library is null)
+        {
+            return items;
+        }
+
+        if (!library.Mixed)
+        {
+            return library.Kind == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
+        }
+
+        // a folder of several titles (owner, 29. 10. 2026): the episodes and the films are checked each among their own
+        var series = items.Where(i => library.KindFor(i.File.Path) == MediaKind.Series).ToList();
+        var checkedItems = CheckEpisodes(series, library).Concat(CheckFilms(items.Where(i => library.KindFor(i.File.Path) != MediaKind.Series).ToList()))
+            .ToDictionary(i => i.File.Path, Paths.Comparer);
+        return items.Select(i => checkedItems[i.File.Path]).ToList();
     }
 
     /// <summary>
@@ -68,7 +82,8 @@ public static class BatchPlanner
         for (var i = 0; i < items.Count; i++)
         {
             var path = items[i].File.Path;
-            if (library.SeriesOfFile.ContainsKey(path))
+            // files of further series sent together, and the titles of a folder of several, are named by their own folder
+            if (library.SeriesOfFile.ContainsKey(path) || library.Mixed)
             {
                 continue;
             }
@@ -174,9 +189,16 @@ public static class BatchPlanner
     private static BatchItem Place(BatchItem item, LibraryJob library, RuleProfile profile, List<ReviewReason> reasons)
     {
         var path = item.File.Path;
-        if (!library.KindConfirmed)
+        var kind = library.KindFor(path);
+        if (!library.KindConfirmedFor(path))
         {
-            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: library.Kind == MediaKind.Series ? "seriál" : "filmy"));
+            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: kind == MediaKind.Series ? "seriál" : "filmy"));
+        }
+
+        // owner, 29. 10. 2026: in a folder sorted into MOVIES and TVSHOWS the user sorts every file (nothing is guessed)
+        if (library.Unsorted.Contains(path))
+        {
+            reasons.Add(new ReviewReason(ReviewReasonKind.NotSorted));
         }
 
         var anyway = item.Group.Decisions.ProcessAnyway.Contains(path);
@@ -186,7 +208,7 @@ public static class BatchPlanner
         }
 
         // films: an episode would become a version of a film
-        if (library.Kind == MediaKind.Movie && !anyway &&
+        if (kind == MediaKind.Movie && !anyway &&
             (LibraryJob.LooksLikeEpisode(path, library.Root) || EpisodeParser.SeasonOfPath(path, library.Root) is not null))
         {
             reasons.Add(new ReviewReason(ReviewReasonKind.EpisodeAmongFilms));

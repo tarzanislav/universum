@@ -100,7 +100,19 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    public string Evidence => Texts.Evidence(_evidence);
+    /// <summary>
+    /// What decides the language for the group; without a group decision the suggestions heard in the files themselves
+    /// are summed up (owner, 29. 10. 2026: "návrhy pri súboroch: angličtina 20×, čeština 2×") – each file has its own.
+    /// </summary>
+    public string Evidence => _evidence is null && FileSuggestions is { Length: > 0 } files
+        ? $"návrhy pri súboroch: {files} – potvrďte ich tlačidlom Potvrdiť návrhy (alebo vyberte jazyk pre celú skupinu)"
+        : Texts.Evidence(_evidence);
+
+    // the files' own suggestions for this track, by language: "angličtina 20×, čeština 2×"
+    private string FileSuggestions => string.Join(", ", Group.FileSuggestions.Values
+        .Select(s => s.TryGetValue(Key, out var suggestion) ? suggestion : null).OfType<LanguageEvidence>()
+        .GroupBy(s => s.Language.Primary).OrderByDescending(g => g.Count())
+        .Select(g => $"{Texts.Language(g.First().Language)} {g.Count()}×"));
 
     public bool HasSuggestion => _evidence is { Confidence: Confidence.Medium };
 
@@ -272,7 +284,7 @@ public sealed class FileRow : ObservableObject
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
 
-    /// <summary>Film title ("Creep (2004)") or episode ("S01E04"), editable; empty while undecided.</summary>
+    /// <summary>Film title ("Creep (2004)") or episode ("S01E04") by the file's own kind, editable; empty while undecided.</summary>
     public string Naming
     {
         get
@@ -282,7 +294,7 @@ public sealed class FileRow : ObservableObject
                 return "";
             }
 
-            if (library.Kind == MediaKind.Series)
+            if (library.KindFor(Item.File.Path) == MediaKind.Series)
             {
                 return library.EpisodeFor(Item.File.Path) is ({ } number, false) ? number.Tag : "";
             }
@@ -320,7 +332,7 @@ public sealed class FileRow : ObservableObject
                 return "";
             }
 
-            if (library.Kind == MediaKind.Series)
+            if (library.KindFor(Item.File.Path) == MediaKind.Series)
             {
                 return library.EpisodeFor(Item.File.Path) is ({ } number, true) ? "návrh: " + number.Tag : "";
             }
@@ -333,7 +345,10 @@ public sealed class FileRow : ObservableObject
 
     /// <summary>The titles found for the file at "Spresniť názvy", to choose from while its title is not decided.</summary>
     public IReadOnlyList<Universum.Core.Library.Tmdb.TmdbTitle> Candidates =>
-        page.Library is { Kind: MediaKind.Movie } library && library.TitleFor(Item.File.Path) is null ? page.CandidatesFor(Item.File.Path) : [];
+        IsFilm && page.Library is { } library && library.TitleFor(Item.File.Path) is null ? page.CandidatesFor(Item.File.Path) : [];
+
+    /// <summary>The file is a film (its own title and the field TMDB ID); an episode has its number.</summary>
+    public bool IsFilm => page.Library is { } library && library.KindFor(Item.File.Path) == MediaKind.Movie;
 
     public bool HasCandidates => Candidates.Count > 0;
 
@@ -352,7 +367,7 @@ public sealed class FileRow : ObservableObject
 
     /// <summary>The suggested title waits for this file's own confirmation (HISTRA did not confirm it).</summary>
     public bool IsUnverified =>
-        page.Library is { Kind: MediaKind.Movie } library && library.TitleFor(Item.File.Path) is null && page.UnverifiedNote(Item.File.Path) is not null;
+        IsFilm && page.Library is { } library && library.TitleFor(Item.File.Path) is null && page.UnverifiedNote(Item.File.Path) is not null;
 
     /// <summary>Confirms the suggested title HISTRA did not confirm.</summary>
     public CommunityToolkit.Mvvm.Input.RelayCommand ConfirmCommand => _confirm ??= new(() => page.ConfirmTitle(Item.File.Path));

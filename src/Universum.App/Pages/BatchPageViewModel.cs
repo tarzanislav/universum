@@ -85,13 +85,25 @@ public sealed class BatchPageViewModel : ObservableObject
         ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
         ConfirmSeriesCommand = new RelayCommand(() =>
         {
-            _library?.ConfirmSeries();
+            if (_library is { Mixed: true } library)
+            {
+                foreach (var path in SelectedFiles.Where(library.SeriesSuggestionOfFile.ContainsKey))
+                {
+                    library.SeriesOfFile.TryAdd(path, library.SeriesSuggestionOfFile[path]);
+                }
+            }
+            else
+            {
+                _library?.ConfirmSeries();
+            }
+
             OnLibraryChanged();
         }, () => !Busy && SeriesNeedsConfirmation);
+        AcceptGroupCommand = new RelayCommand(AcceptGroup, () => !Busy && !IsRunning && _library is not null && SelectedGroup is not null);
         AnswerSpecialsCommand = new RelayCommand(AnswerSpecials, () => !Busy && HasSpecialsQuestions);
         Tmdb = new TmdbPicker(services, () => MediaKind.Series,
-            () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : _library?.SeriesSuggestion?.FolderName ?? ""), ChooseTmdbSeries);
-        FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } && _services.Titles is not null);
+            () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : SuggestedSeries?.FolderName ?? ""), ChooseTmdbSeries);
+        FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
         services.TitlesChanged += () =>
         {
             Tmdb.Refresh();
@@ -133,9 +145,13 @@ public sealed class BatchPageViewModel : ObservableObject
         _library is { Kind: MediaKind.Series } library && library.OpenSeasonQuestions.Any(p => library.EpisodeSuggestions.TryGetValue(p, out var n) && n.Season == 0);
 
     /// <summary>"návrh – potvrďte" while the kind is only guessed from the names (specification 13.5).</summary>
-    public string KindNote => _library is { KindConfirmed: false } ? "(návrh podľa mien súborov – potvrďte)" : "";
+    public string KindNote => _library is { Mixed: true } library
+        ? SelectedFirst is not { } first ? ""
+            : library.Unsorted.Contains(first) ? "⚠ súbor nie je v MOVIES ani v TVSHOWS – presuňte ho a dajte Analyzovať"
+            : library.KindFor(first) == MediaKind.Series ? "(podľa priečinka TVSHOWS)" : "(podľa priečinka MOVIES)"
+        : _library is { KindConfirmed: false } ? "(návrh podľa mien súborov – potvrďte)" : "";
 
-    public bool KindNeedsConfirmation => _library is { KindConfirmed: false };
+    public bool KindNeedsConfirmation => _library is { KindConfirmed: false, Mixed: false };
 
     /// <summary>Looking up the series title on TMDB.</summary>
     public TmdbPicker Tmdb { get; }
@@ -306,6 +322,17 @@ public sealed class BatchPageViewModel : ObservableObject
             if (SetProperty(ref _selectedGroup, value))
             {
                 ShowGroup();
+                if (IsMixed)
+                {
+                    foreach (var name in new[] { nameof(IsMovies), nameof(IsSeries), nameof(SeriesTitle), nameof(SeriesSuggestion), nameof(SeriesNeedsConfirmation), nameof(KindNote), nameof(CanFindTitles) })
+                    {
+                        OnPropertyChanged(name);
+                    }
+
+                    ConfirmSeriesCommand?.NotifyCanExecuteChanged();
+                }
+
+                AcceptGroupCommand?.NotifyCanExecuteChanged();
             }
         }
     }
@@ -354,24 +381,85 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public bool IsMovies
     {
-        get => _library?.Kind != MediaKind.Series;
+        get => _library is { Mixed: true } library ? SelectedFirst is not { } first || library.KindFor(first) != MediaKind.Series : _library?.Kind != MediaKind.Series;
         set => SetKind(value, MediaKind.Movie);
     }
 
     public bool IsSeries
     {
-        get => _library?.Kind == MediaKind.Series;
+        get => _library is { Mixed: true } library ? SelectedFirst is { } first && library.KindFor(first) == MediaKind.Series : _library?.Kind == MediaKind.Series;
         set => SetKind(value, MediaKind.Series);
     }
 
-    /// <summary>Title of the series as in the library ("Nine Puzzles (2025) [tmdbid-227191]"); for films each file has its own.</summary>
+    /// <summary>A folder sorted into MOVIES and TVSHOWS (owner, 29. 10. 2026): the kind comes from the folder, per group.</summary>
+    public bool IsMixed => _library?.Mixed == true;
+
+    /// <summary>The kind can be chosen (not in a sorted folder – there the user sorts the files into MOVIES or TVSHOWS).</summary>
+    public bool CanChooseKind => !IsMixed;
+
+    /// <summary>"Spresniť názvy": films, and in a sorted folder the series of TVSHOWS too.</summary>
+    public bool CanFindTitles => IsMovies || IsMixed;
+
+    /// <summary>"Obsah:" – of the selected group in a sorted folder.</summary>
+    public string KindLabel => IsMixed ? "Obsah skupiny:" : "Obsah:";
+
+    // the files of the selected group
+    private IReadOnlyList<string> SelectedFiles => SelectedGroup?.Group.Files.Select(f => f.Path).ToList() ?? [];
+
+    private string? SelectedFirst => SelectedGroup?.Group.Files.FirstOrDefault()?.Path;
+
+    // the series suggested for the selected group (sorted folder) or for the folder
+    private TitleInfo? SuggestedSeries => _library is { Mixed: true } library
+        ? SelectedFirst is { } first ? library.SeriesSuggestionOfFile.GetValueOrDefault(first) : null
+        : _library?.SeriesSuggestion;
+
+    /// <summary>
+    /// Title of the series as in the library ("Nine Puzzles (2025) [tmdbid-227191]"); for films each file has its own. In
+    /// a sorted folder the series of the selected group.
+    /// </summary>
     public string SeriesTitle
     {
-        get => _library?.Series?.FolderName ?? "";
+        get => _library is { Mixed: true } library
+            ? SelectedFirst is { } first ? library.SeriesOfFile.GetValueOrDefault(first)?.FolderName ?? "" : ""
+            : _library?.Series?.FolderName ?? "";
         set
         {
             if (_library is null)
             {
+                return;
+            }
+
+            if (_library.Mixed)
+            {
+                // a series' address or ID: its title from TMDB; a film's address does not belong among the series
+                if (TitleGuess.ParseTmdb(value) is { } address)
+                {
+                    if (address.Kind == MediaKind.Movie)
+                    {
+                        RunState = "Toto je adresa filmu – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.";
+                        OnPropertyChanged();
+                        return;
+                    }
+
+                    UseTmdbReference(address, value);
+                    return;
+                }
+
+                _typedTmdb = null;
+                var typed = TitleGuess.Typed(MediaKind.Series, value);
+                foreach (var path in SelectedFiles)
+                {
+                    if (typed is null)
+                    {
+                        _library.SeriesOfFile.Remove(path);
+                    }
+                    else
+                    {
+                        _library.SeriesOfFile[path] = typed;
+                    }
+                }
+
+                Replan();
                 return;
             }
 
@@ -388,12 +476,45 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    public string SeriesSuggestion => _library is { Series: null, SeriesSuggestion: { } suggestion } library
-        ? "návrh: " + suggestion.FolderName + (library.SeriesUnverified ? " ⚠ " + _seriesNote : "")
-        : "";
+    public string SeriesSuggestion => _library is { Mixed: true } mixed
+        ? SeriesTitle.Length == 0 && SuggestedSeries is { } groupSuggestion
+            ? "návrh: " + groupSuggestion.FolderName + (groupSuggestion.Problem is { } problem ? $" ⚠ {problem} – nájdite ho cez TMDB alebo Spresniť názvy" : "")
+            : ""
+        : _library is { Series: null, SeriesSuggestion: { } suggestion } library
+            ? "návrh: " + suggestion.FolderName + (library.SeriesUnverified ? " ⚠ " + _seriesNote : "")
+            : "";
 
-    /// <summary>The suggested series waits for its own confirmation (HISTRA did not confirm it).</summary>
-    public bool SeriesNeedsConfirmation => _library is { Series: null, SeriesUnverified: true, SeriesSuggestion: not null };
+    /// <summary>The suggested series waits for its own confirmation (HISTRA did not confirm it; in a sorted folder any suggestion).</summary>
+    public bool SeriesNeedsConfirmation => _library is { Mixed: true }
+        ? SeriesTitle.Length == 0 && SuggestedSeries is { Problem: null }
+        : _library is { Series: null, SeriesUnverified: true, SeriesSuggestion: not null };
+
+    /// <summary>
+    /// "Prijať všetko v skupine" (owner, 29. 10. 2026): the group's kind, title, episode numbers and track languages as
+    /// suggested – except the questions Season 00 or a regular season and the doubtful language suggestions.
+    /// </summary>
+    public RelayCommand AcceptGroupCommand { get; }
+
+    private void AcceptGroup()
+    {
+        if (_library is null || SelectedGroup is null)
+        {
+            return;
+        }
+
+        _library.AcceptAll(SelectedFiles);
+        foreach (var path in SelectedFiles)
+        {
+            _unverifiedNotes.Remove(path);
+        }
+
+        // the languages of the group (Potvrdiť návrhy) – it plans again
+        ConfirmSuggestions();
+        OnPropertyChanged(nameof(SeriesTitle));
+        OnPropertyChanged(nameof(SeriesSuggestion));
+        RunState = $"Skupina {SelectedGroup.Label} ({SelectedGroup.Title}): návrhy prijaté." +
+                   (_library.SeasonQuestions.Any(SelectedFiles.Contains) ? " Otázky Season 00 / bežná sezóna ostali na vás." : "");
+    }
 
     /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
     public RelayCommand ConfirmSeriesCommand { get; }
@@ -401,7 +522,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>A film named by its TMDB ID or address typed in the field TMDB ID at the file (also used by the self-test).</summary>
     public void UseTmdbId(string path, string text)
     {
-        if (_library is not { Kind: MediaKind.Movie })
+        if (_library is null || _library.KindFor(path) != MediaKind.Movie)
         {
             return;
         }
@@ -425,13 +546,13 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         // a film's TMDB address or ID: its title from TMDB (the address says film or series)
-        if (_library.Kind == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { } reference)
+        if (_library.KindFor(path) == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { } reference)
         {
             _ = NameFilmFromTmdbAsync(path, reference);
             return;
         }
 
-        if (_library.Kind == MediaKind.Series)
+        if (_library.KindFor(path) == MediaKind.Series)
         {
             if (EpisodeNumber.TryParse(text) is { } number)
             {
@@ -576,8 +697,14 @@ public sealed class BatchPageViewModel : ObservableObject
 
             _analysisCancellation = null;
             OnPropertyChanged(nameof(IsAnalyzing));
-            _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis) : null;
+            _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
             ApplySentSeries();
+
+            // owner, 29. 10. 2026: a folder sorted into MOVIES and TVSHOWS – each group holds one title
+            if (_library is { Mixed: true } sorted)
+            {
+                _analysis = _analysis.SplitBy(sorted.UnitOf);
+            }
             IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
             _interrupted = _services.Library?.FindInterrupted() ?? Array.Empty<string>();
@@ -784,6 +911,12 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(KindNote));
         OnPropertyChanged(nameof(KindNeedsConfirmation));
         OnPropertyChanged(nameof(HasSpecialsQuestions));
+        OnPropertyChanged(nameof(IsMixed));
+        OnPropertyChanged(nameof(CanChooseKind));
+        OnPropertyChanged(nameof(KindLabel));
+        OnPropertyChanged(nameof(IsMovies));
+        OnPropertyChanged(nameof(IsSeries));
+        OnPropertyChanged(nameof(CanFindTitles));
         RefreshCommands();
     }
 
@@ -854,6 +987,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsMovies));
         OnPropertyChanged(nameof(IsSeries));
+        OnPropertyChanged(nameof(CanFindTitles));
         Replan();
         _ = LoadSeriesSeasonsAsync();
     }
@@ -905,7 +1039,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void SetKind(bool selected, MediaKind kind)
     {
-        if (!selected || _library is null || _library.Kind == kind)
+        // in a sorted folder the folder decides (the user moves the file)
+        if (!selected || _library is null || _library.Mixed || _library.Kind == kind)
         {
             return;
         }
@@ -921,7 +1056,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        if (reference.Kind is { } kind && (kind != _library.Kind || !_library.KindConfirmed))
+        if (!_library.Mixed && reference.Kind is { } kind && (kind != _library.Kind || !_library.KindConfirmed))
         {
             _library.Kind = kind;
             OnLibraryChanged();
@@ -1061,6 +1196,30 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        // a sorted folder: the series of the selected group
+        if (_library.Mixed)
+        {
+            var (seriesText, seriesNote) = TmdbPicker.TitleText(title);
+            if (title.Kind == MediaKind.Series && TitleGuess.Typed(MediaKind.Series, seriesText) is { } groupSeries)
+            {
+                foreach (var path in SelectedFiles)
+                {
+                    _library.SeriesOfFile[path] = groupSeries;
+                }
+
+                RunState = seriesNote.Length > 0 ? seriesNote : $"Skupina {SelectedGroup?.Label}: {title.Display}";
+            }
+            else
+            {
+                RunState = "Toto je film – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.";
+            }
+
+            OnPropertyChanged(nameof(SeriesTitle));
+            OnPropertyChanged(nameof(SeriesSuggestion));
+            Replan();
+            return;
+        }
+
         var (text, note) = TmdbPicker.TitleText(title);
         if (title.Kind == MediaKind.Movie)
         {
@@ -1132,7 +1291,8 @@ public sealed class BatchPageViewModel : ObservableObject
         // asked by the title read from the name, never by an earlier suggestion of the service (owner's review 28. 10.:
         // a second run would otherwise confirm a title the name never matched)
         var pending = _analysis.Groups.SelectMany(g => g.Files)
-            .Where(f => !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path))
+            .Where(f => _library.KindFor(f.Path) == MediaKind.Movie && !_library.Unsorted.Contains(f.Path) &&
+                        !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path))
             .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
@@ -1241,7 +1401,29 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
             }
 
-            RunState = $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
+            // a sorted folder (owner, 29. 10. 2026): each series of TVSHOWS by its folder's name, as a series on TMDB
+            var seriesFound = 0;
+            var seriesAsked = 0;
+            foreach (var unit in _library.Units?.Where(u => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } &&
+                                                            !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? [])
+            {
+                seriesAsked++;
+                RunState = $"{service}: seriál {unit.Name!.Name}…";
+                var results = await titles.SearchTolerantAsync(MediaKind.Series, unit.Name.Name, unit.Name.Year, _tmdbCancellation.Token);
+                if ((results.Best(unit.Name.Name, results.Loosened is null ? unit.Name.Year : null) ?? results.OnlyOne(unit.Name.Year)) is { } show &&
+                    TitleGuess.Typed(MediaKind.Series, TmdbPicker.TitleText(show).Text) is { } info)
+                {
+                    foreach (var file in unit.Files)
+                    {
+                        _library.SeriesSuggestionOfFile[file] = info;
+                    }
+
+                    seriesFound++;
+                }
+            }
+
+            RunState = (seriesAsked > 0 ? $"Seriály: nájdené {seriesFound} z {seriesAsked} – návrh potvrďte pri skupine (Potvrdiť seriál alebo Prijať všetko v skupine). " : "") +
+                       $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
                        (unverified > 0 ? $", {unverified} čaká na potvrdenie (⚠ pri súbore – názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila)" : "") +
                        (ambiguous > 0 ? $", {ambiguous} majú viac možných titulov (⚠ pri súbore – vyberte správny)" : "") +
                        (nowhere > 0 ? $", {nowhere} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)" : "") +
@@ -1724,7 +1906,7 @@ public sealed class BatchPageViewModel : ObservableObject
                      DetectAudioAllCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
-                     AnswerSpecialsCommand, ConfirmSeriesCommand,
+                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

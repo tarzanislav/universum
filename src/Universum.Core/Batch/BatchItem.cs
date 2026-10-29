@@ -55,6 +55,12 @@ public enum ReviewReasonKind
 
     /// <summary>The path in the library would be too long for Windows.</summary>
     PathTooLong,
+
+    /// <summary>
+    /// In a folder sorted into MOVIES and TVSHOWS, a file lying outside both: the user puts it into one of them (owner,
+    /// 29. 10. 2026 – the user tells films from series, nothing is guessed).
+    /// </summary>
+    NotSorted,
 }
 
 /// <summary>Why a file is not processed automatically.</summary>

@@ -1124,7 +1124,9 @@ internal static class SelfTest
         await services.InputWatch.ScanAsync();
         Check(services.InputWatch.Found.Any(f => f.Title == "Invented Show (2026)" && f.IsSeries && f.Files.Count == 1) &&
               domestic.Rows.First(r => r.Caption == "Invented Show (2026)") is { FolderText: "✓ v priečinku: 1" } found && found.Episodes[0].State == "✓ vo vstupnom priečinku",
-            "input watch: the chosen series' episode found in the input folder – " + string.Join(" | ", services.InputWatch.Found.Select(f => $"{f.Title} {f.Detail}")));
+            "input watch: an episode found in the input folder – " + string.Join(" | ", services.InputWatch.Found.Select(f => $"{f.Title} {f.Detail}")));
+        Check(services.InputWatch.Found.Any(f => f.Title == "Domáci seriál (2020)" && f.IsSeries) && !services.Marks.Get(Core.News.MarkStore.Series(home.Episodes[0].Episode)).Chosen,
+            "input watch: episodes of series not chosen are found too (owner, 29. 10. 2026)");
 
         // the Dashboard's week: the chosen series' episodes and the premieres, the films of the week
         model.Open(model.Dashboard);

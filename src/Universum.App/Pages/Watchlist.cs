@@ -100,12 +100,13 @@ public sealed class Watchlist(AppServices services)
     }
 }
 
-/// <summary>A chosen title found in the input folder: what it is and its files.</summary>
+/// <summary>A title found in the input folder (an episode of a series of Novinky, or a chosen film): what it is and its files.</summary>
 public sealed record FoundInFolder(string Title, string Detail, IReadOnlyList<string> Files, bool IsSeries, string Episode, IReadOnlyList<SeriesEpisode> Episodes);
 
 /// <summary>
-/// Watches the input folder for the chosen titles (Vybrané): the aired episodes of the chosen series (the last month)
-/// and the chosen films – checked at the start, when Novinky or the Dashboard is shown and when the folder changes.
+/// Watches the input folder: the aired episodes (the last month) of every series of Novinky – chosen or not (owner,
+/// 29. 10. 2026) – and the chosen films (Vybrané); checked at the start, when Novinky or the Dashboard is shown and when
+/// the folder changes.
 /// Files are only read.
 /// </summary>
 public sealed class InputWatch(AppServices services)
@@ -138,7 +139,7 @@ public sealed class InputWatch(AppServices services)
         var schedule = (await services.SeriesNews.ReadAsync(services.NewsSources, today, offline: true)).Episodes;
         var history = services.SeriesNews.History(today.AddDays(-SeriesNewsPageViewModel.RecentDays)).Where(e => e.AirDate >= today.AddDays(-DaysBack));
         var episodes = SeriesNews.Merge(schedule.Concat(history))
-            .Where(e => e.AirDate <= today && e.AirDate >= today.AddDays(-DaysBack) && e.Code.Length > 0 && chosen.Contains(MarkStore.Series(e))).ToList();
+            .Where(e => e.AirDate <= today && e.AirDate >= today.AddDays(-DaysBack) && e.Code.Length > 0).ToList();
         var films = services.PremiereStore.Load().Films.Where(f => chosen.Contains(MarkStore.Film(f.TmdbId))).DistinctBy(f => f.TmdbId).ToList();
         var excluded = services.Library?.ResultFolders;
         try

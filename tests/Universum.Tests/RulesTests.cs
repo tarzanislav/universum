@@ -137,6 +137,18 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void SegmentTitleIsAlwaysRemoved()
+    {
+        // owner, 29. 10. 2026: the "File title" would stand for the file's name – always removed (a header edit is enough)
+        var file = File(Video(0, "Ab12Cd34"), Audio(1, "cze", null), Subs(2, "cze", null, isDefault: false)) with { Title = "Epizoda 7" };
+        var target = UniversumRules.Apply(file);
+        var plan = EditPlan.For(target);
+        Assert.True(target.TitleChanged && target.ResultTitle is null, "the title goes");
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method, "only the header");
+        Assert.True(plan.Changes.Any(c => c.Kind == ChangeKind.Title), "listed as a change");
+    }
+
+    [Test]
     public void HeaderOnlyChanges()
     {
         var file = File(Video(0, "Ab12Cd34"), Audio(1, "cze", "Dabing"), Audio(2, "eng", null, isDefault: true));

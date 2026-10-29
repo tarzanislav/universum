@@ -82,14 +82,20 @@ public static class NoteLinks
     // the note is kept at once
     private static void OnPasting(object sender, DataObjectPastingEventArgs e)
     {
-        if (sender is not TextBox box || e.DataObject.GetData(DataFormats.UnicodeText) is not string text || Universum.Core.Text.WebLinks.AsAddress(text) is not { } address)
+        if (sender is not TextBox box || !e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
+            e.SourceDataObject.GetData(DataFormats.UnicodeText, true) is not string text || Universum.Core.Text.WebLinks.AsAddress(text) is not { } address)
         {
             return;
         }
 
+        // the paste is cancelled and the name asked after it (not inside the paste command)
         e.CancelCommand();
-        var name = AskForName(address, Universum.Core.Text.WebLinks.SuggestName(address));
-        Insert(box, Universum.Core.Text.WebLinks.Named(name, address));
+        box.Dispatcher.BeginInvoke(() =>
+        {
+            var name = AskForName(address, Universum.Core.Text.WebLinks.SuggestName(address));
+            Insert(box, Universum.Core.Text.WebLinks.Named(name, address));
+            box.Focus();
+        });
     }
 
     /// <summary>Puts a link at the caret of a note (a space apart from the text around it) and keeps the note.</summary>

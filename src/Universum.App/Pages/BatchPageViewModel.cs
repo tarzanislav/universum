@@ -154,7 +154,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Clear()
     {
-        if (Busy || !Confirm("Vymazať frontu Hromadného spracovania?\n\nZabudnú sa analyzované súbory a rozhodnutia o nich (aj súbory poslané z Noviniek). Na disku sa nič nezmení."))
+        if (Busy || IsRunning || !Confirm("Vymazať frontu Hromadného spracovania?\n\nZabudnú sa analyzované súbory a rozhodnutia o nich (aj súbory poslané z Noviniek). Na disku sa nič nezmení."))
         {
             return;
         }
@@ -648,19 +648,20 @@ public sealed class BatchPageViewModel : ObservableObject
           string.Join(", ", library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
         : "";
 
-    // the further series sent from Novinky, again after each analysis of the same files
+    // the further series sent from Novinky, again after each analysis of the same files – keyed by the paths exactly as
+    // the analysis has them (the planner looks them up so)
     private void ApplySentSeries()
     {
-        if (_library is null || _only is null || _sentSeries is null)
+        if (_library is null || _analysis is null || _only is null || _sentSeries is null)
         {
             return;
         }
 
-        foreach (var (path, title) in _sentSeries)
+        foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
         {
-            if (TitleGuess.Typed(MediaKind.Series, title) is { } series)
+            if (_sentSeries.TryGetValue(Path.GetFullPath(file.Path), out var title) && TitleGuess.Typed(MediaKind.Series, title) is { } series)
             {
-                _library.SeriesOfFile[path] = series;
+                _library.SeriesOfFile[file.Path] = series;
             }
         }
     }

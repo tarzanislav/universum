@@ -1429,6 +1429,18 @@
                                     Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore." />
                         </WrapPanel>
+                        <!-- the end of a run, boldly (owner, 29. 10. 2026) -->
+                        <Border Margin="0,8,0,0" CornerRadius="6" Padding="14,8" Background="{Binding Finish.Background, FallbackValue=Transparent}"
+                                Visibility="{Binding HasFinish, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="{Binding Finish.Icon}" FontSize="26" Foreground="White"
+                                           VerticalAlignment="Center" Margin="0,0,14,0" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Finish.Title}" FontSize="18" FontWeight="Bold" Foreground="White" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Finish.Detail}" FontSize="13" Foreground="White" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
                         <DockPanel Margin="0,8,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Uložiť správu…" Command="{Binding SaveReportCommand}" Margin="0,0,6,0" Padding="10,4" />

@@ -102,6 +102,10 @@ in next to it without changing the rules, planning or UI.
   - several series in one batch (owner, 29. 10. 2026; episodes sent from Novinky): `LibraryJob.SeriesOfFile` gives the
     files of further series their own series (`SeriesFor`); the field Seriál is the first one, the others are shown
     beside it. "Vymazať frontu" (Single, Hromadné) and "Vymazať všetko" (Zlučovanie) forget what is not processed;
+  - the end of a run is shown boldly (`BatchFinish`: done / with errors / stopped, counts, time); a film TMDB does not
+    know as a film is looked for among series (TV films, miniseries): it goes among the films as "Name (Year)" without an
+    ID after the user confirms the warning at the file; a TMDB ID can be typed alone ("12345", "tmdbid-12345") or as an
+    address, also /tv/;
     "process anyway" lets a file through (a second version then gets a number, K1);
   - the kind film/series is only proposed (`LibraryJob.KindConfirmed`; batch: "Potvrdiť" / choosing a kind / accepting
     suggestions; CLI: `--film`, `--serial`, `--confirm-suggestions`); it is guessed from clear numbers (S01E04, 1x04)

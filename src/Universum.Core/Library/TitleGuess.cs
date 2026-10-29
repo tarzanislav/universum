@@ -34,13 +34,21 @@ public static partial class TitleGuess
         ["episode", "epizoda", "dil", "diel", "cast", "folge", "odcinek", "ep", "season", "seria", "serie", "series", "sezona", "rada", "staffel", "sezon"],
         StringComparer.Ordinal);
 
-    /// <summary>"8555", "https://www.themoviedb.org/movie/8555-creep", "themoviedb.org/tv/227191-nine-puzzles?language=cs".</summary>
+    /// <summary>
+    /// "8555", "tmdbid-8555", "[tmdbid-8555]", "tmdb 8555", "https://www.themoviedb.org/movie/8555-creep",
+    /// "themoviedb.org/tv/227191-nine-puzzles?language=cs".
+    /// </summary>
     public static TmdbReference? ParseTmdb(string? text)
     {
         var trimmed = text?.Trim() ?? "";
         if (int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var bare) && bare > 0)
         {
             return new TmdbReference(null, bare);
+        }
+
+        if (TmdbIdOnly().Match(trimmed) is { Success: true } only && Id(only.Groups["id"].Value) is { } onlyId)
+        {
+            return new TmdbReference(null, onlyId);
         }
 
         var match = TmdbUrl().Match(trimmed);
@@ -280,6 +288,9 @@ public static partial class TitleGuess
 
     // a TMDB ID; an ID too long for a number is no ID
     private static int? Id(string digits) => int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : null;
+
+    [GeneratedRegex(@"^[\[{(]?tmdb(?:id)?\s*[-:=]?\s*(?<id>\d+)[\]})]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex TmdbIdOnly();
 
     [GeneratedRegex(@"themoviedb\.org/(?:[a-z]{2}(?:-[A-Z]{2})?/)?(?<kind>movie|tv)/(?<id>\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TmdbUrl();

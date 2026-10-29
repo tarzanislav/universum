@@ -1844,6 +1844,9 @@ internal static class SelfTest
         var shows = Path.Combine(model.Batch.Library!.Layout.Shows, "Seriál (2026)", "Season 01");
         Check(File.Exists(Path.Combine(shows, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")), "batch: episode 10 in Season 01");
         Check(File.Exists(Path.Combine(shows, "Seriál S01E01 - CZ SD H264 SMALL.mkv")), "batch: the loose file as episode 1");
+        Check(batch.Finish is { Kind: BatchFinishKind.Done } finish && finish.Title.StartsWith("HOTOVO", StringComparison.Ordinal) &&
+              finish.Detail.StartsWith("4 súbory v knižnici", StringComparison.Ordinal),
+            "batch: the end of the run is shown boldly – " + batch.Finish?.Title + " | " + batch.Finish?.Detail);
         await Screenshot(window, "batch-done.png");
 
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(

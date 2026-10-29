@@ -385,3 +385,24 @@ public sealed class FileRow : ObservableObject
         OnPropertyChanged(string.Empty);
     }
 }
+
+/// <summary>How the last run of Hromadné spracovanie ended.</summary>
+public enum BatchFinishKind
+{
+    Done,
+    Errors,
+    Stopped,
+}
+
+/// <summary>The end of a run, shown boldly (owner, 29. 10. 2026): what happened, what came out, how long it took.</summary>
+public sealed record BatchFinish(BatchFinishKind Kind, string Title, string Detail)
+{
+    public string Background => Kind switch
+    {
+        BatchFinishKind.Done => "#2F9461",
+        BatchFinishKind.Errors => "#C0392B",
+        _ => "#D68910",
+    };
+
+    public string Icon => Kind == BatchFinishKind.Done ? "\uE73E" : Kind == BatchFinishKind.Errors ? "\uE783" : "\uE7BA";
+}

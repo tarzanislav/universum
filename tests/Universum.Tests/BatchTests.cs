@@ -665,6 +665,71 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task MegaBatchIsCompletedAndCorrected()
+    {
+        // owner, 29. 10. 2026: a waiting batch can be completed with new files and its files corrected
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        var series = analysis.Groups[0];
+        series.Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var ready = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork).ToList();
+        var episodes = ready.Where(i => i.File.Path.Contains("Sezóna", StringComparison.Ordinal)).ToList();
+        var others = ready.Except(episodes).ToList();
+        var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
+        var first = store.Add("Prvá", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [episodes[0]])!;
+        var second = store.Add("Druhá", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [episodes[1]])!;
+
+        // corrected: Slovak audio for the group; the file of the other batch stays out, new files are added
+        series.Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
+        var corrected = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork).ToList();
+        var profile = RuleProfile.Default with { SubtitleLanguages = ["cs", "sk", "en"] };
+        var (added, changed) = store.Put(first, corrected, profile, null);
+        Assert.Equal(1, changed, "its file got the new decisions");
+        Assert.Equal(corrected.Count - 2, added, "the other files added, the file of the second batch left out");
+        Assert.True(second.Files.Count == 1 && !first.Files.Any(f => f.Path == episodes[1].File.Path), "a file stays in one batch");
+        var file = first.Files.Single(f => f.Path == episodes[0].File.Path);
+        Assert.True(file.Languages.Values.Any(l => l.Primary == "sk") && file.Profile == profile, "new decisions and the profile they were planned with");
+        Assert.True(new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json")).Batches[0].Files.Count == first.Files.Count, "saved");
+        Assert.True(others.Count > 0, "fixture has more files");
+    }
+
+    [Test]
+    public async Task AlreadyInLibraryIsKnownAtTheAnalysis()
+    {
+        // owner, 29. 10. 2026: an original whose result is already in the library is shown so before the run
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library);
+        var written = items.First(i => i.NeedsWork && i.File.Path.EndsWith("Seriál E2.mkv", StringComparison.Ordinal));
+        var index = new LibraryIndex(Path.Combine(work.Path, "library-index.json"));
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(work.Path, "_journal"), index);
+        Assert.Equal(ProcessingStatus.Done, (await BatchRunner.RunAsync([written], processor, new OutputOptions(OriginalHandling.Keep)))[0].Status, "written");
+
+        var fingerprints = new Dictionary<string, string>(Paths.Comparer);
+        foreach (var item in items.Where(i => i.NeedsWork))
+        {
+            fingerprints[Path.GetFullPath(item.File.Path)] = await LibraryIndex.FingerprintAsync(item.File.Path);
+        }
+
+        var marked = BatchPlanner.MarkAlreadyInLibrary(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library), index, fingerprints);
+        var again = marked.Single(i => i.File.Path == written.File.Path);
+        Assert.True(again is { Status: BatchStatus.Unchanged, NeedsWork: false, AlreadyInLibraryAt: not null }, "already in the library: " + again.Status);
+        Assert.True(marked.Where(i => i.File.Path != written.File.Path).All(i => i.AlreadyInLibraryAt is null), "the others are not");
+
+        // other decisions: another result, not the same – it is written
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
+        var changed = BatchPlanner.MarkAlreadyInLibrary(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library), index, fingerprints);
+        Assert.True(changed.Single(i => i.File.Path == written.File.Path) is { NeedsWork: true, AlreadyInLibraryAt: null }, "other decisions are written");
+    }
+
+    [Test]
     public async Task RunWritesSeriesIntoTheLibrary()
     {
         using var work = await SeriesFolderAsync();

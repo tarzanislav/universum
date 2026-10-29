@@ -95,8 +95,16 @@ public sealed record BatchItem(
 
     public EpisodeNumber? Episode { get; init; }
 
+    /// <summary>
+    /// The same result made from this original is already in the library (owner, 29. 10. 2026: known at the analysis,
+    /// not only when writing); the file is not written again.
+    /// </summary>
+    public string? AlreadyInLibraryAt { get; init; }
+
     public BatchStatus Status => Reasons.Count > 0
         ? BatchStatus.NeedsReview
+        : AlreadyInLibraryAt is not null
+        ? BatchStatus.Unchanged
         : Plan.Method switch
         {
             WriteMethod.None => Placement is null || Placement.Holds(File.Path, FileSize) ? BatchStatus.Unchanged : BatchStatus.Place,

@@ -34,6 +34,20 @@ public static class BatchPlanner
                 : i).ToList();
     }
 
+    /// <summary>
+    /// Marks the files whose result is already in the library – made from the same original (by its fingerprint) into the
+    /// same target and unchanged since, exactly as a run would find it (owner, 29. 10. 2026: shown at the analysis).
+    /// </summary>
+    /// <param name="fingerprints">Fingerprints of the originals (full path → <see cref="LibraryIndex.FingerprintAsync"/>).</param>
+    public static IReadOnlyList<BatchItem> MarkAlreadyInLibrary(IReadOnlyList<BatchItem> items, LibraryIndex index, IReadOnlyDictionary<string, string> fingerprints) =>
+        items.Select(i => i.NeedsWork && i.Placement is { } placement &&
+                          fingerprints.TryGetValue(Path.GetFullPath(i.File.Path), out var fingerprint) &&
+                          index.FindPrevious(placement, fingerprint, LibraryIndex.TargetSignature(i.Target)) is { } found &&
+                          found.Target == LibraryIndex.TargetSignature(i.Target)
+                ? i with { AlreadyInLibraryAt = found.Path }
+                : i)
+            .ToList();
+
     private static IReadOnlyList<BatchItem> Plan(BatchAnalysis analysis, BatchTemplate template, RuleProfile? profile, LibraryJob? library)
     {
         var effective = template.Apply(profile ?? RuleProfile.Default);

@@ -10,6 +10,9 @@ namespace Universum.Core.Rules;
 /// </summary>
 public static class UniversumRules
 {
+    /// <summary>The track name of forced subtitles (owner, 29. 10. 2026).</summary>
+    public const string ForcedName = "Forced";
+
     private const string NameAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     public static TargetState Apply(MediaFile file, RuleProfile? profile = null, TrackDecisions? decisions = null)
@@ -117,9 +120,10 @@ public static class UniversumRules
             }
         }
 
-        // owner, 29. 10. 2026: the subtitles shown with foreign audio are default and enabled, every other flag is off
+        // owner, 29. 10. 2026: the subtitles shown with foreign audio are default and enabled, every other flag is off;
+        // forced subtitles are named "Forced" (the other names are removed)
         return subtitles.Select(s => new TrackTarget(
-            s.Track, null, s.Language,
+            s.Track, s.Role == TrackRole.Forced ? ForcedName : null, s.Language,
             ReferenceEquals(s, defaultSubtitle)
                 ? new TrackFlags(Default: true, Enabled: true)
                 : s.Track.Flags with

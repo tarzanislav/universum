@@ -32,7 +32,11 @@ public sealed class RulesTests
         AssertFlags(target.For(3), true, true, "CZ forced subtitles: forced, default and enabled");
         AssertFlags(target.For(4), false, false, "CZ full subtitles: no default with Czech audio");
         AssertFlags(target.For(5), false, false, "EN subtitles");
-        Assert.True(target.Tracks.Where(t => t.Type != TrackType.Video).All(t => t.Name is null), "audio and subtitle names cleared");
+        Assert.True(target.Tracks.Where(t => t.Type != TrackType.Video && t.TrackId != 3).All(t => t.Name is null), "audio and subtitle names cleared");
+        Assert.Equal("Forced", target.For(3).Name, "forced subtitles are named Forced (owner, 29. 10. 2026)");
+        Assert.Equal("Forced", UniversumRules.Apply(file with { Tracks = file.Tracks.Select(t => t.Id == 3 ? t with { Name = "Forced", Flags = t.Flags with { Forced = true } } : t).ToList() },
+            decisions: new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [2] = LanguageTag.FromCode("cs"), [3] = LanguageTag.FromCode("cs") } }).For(3).Name,
+            "and stay so on the next pass");
         Assert.Equal("cs", target.For(2).Language.Primary, "resolved language");
         Assert.True(target.TagsChanged, "tags removed");
         Assert.Equal(WriteMethod.Remux, EditPlan.For(target).Method, "order change needs a new file");

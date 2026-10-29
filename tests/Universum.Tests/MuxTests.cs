@@ -31,6 +31,8 @@ public sealed class MuxTests
         Assert.True(text.Contains("--track-name 0:Slovenské --language 0:sk --default-track-flag 0:0", StringComparison.Ordinal), "second file's track");
         Assert.True(text.EndsWith("--track-order 0:0,0:2,1:0", StringComparison.Ordinal), "order across files");
         Assert.True(arguments.IndexOf("film.mkv") < arguments.IndexOf("sub.srt"), "files in order");
+        var untitled = string.Join(" ", MuxArguments.Build(spec with { Title = null }, "tmp.mkv"));
+        Assert.True(untitled.StartsWith("--gui-mode --output tmp.mkv --title  ", StringComparison.Ordinal), "no title typed: none taken from the files – " + untitled);
     }
 
     [Test]

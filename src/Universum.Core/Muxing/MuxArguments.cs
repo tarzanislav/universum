@@ -9,11 +9,8 @@ public static class MuxArguments
 {
     public static IReadOnlyList<string> Build(MuxSpec spec, string outputPath)
     {
-        var arguments = new List<string> { "--gui-mode", "--output", outputPath };
-        if (!string.IsNullOrEmpty(spec.Title))
-        {
-            arguments.AddRange(["--title", spec.Title]);
-        }
+        // owner, 29. 10. 2026: no segment title unless the user typed one – mkvmerge would take it from the first file
+        var arguments = new List<string> { "--gui-mode", "--output", outputPath, "--title", spec.Title ?? "" };
 
         var fileIds = spec.FileIds();
         for (var index = 0; index < spec.Sources.Count; index++)

@@ -45,7 +45,7 @@ public sealed class ProcessorTests
             written.Tracks.Select(t => t.Type == TrackType.Video ? "video" : $"{t.Type.ToString().ToLowerInvariant()} {t.Language.Primary}"), "result tracks");
         Assert.True(!written.HasTags, "no tags, no statistics tags");
         Assert.Equal(2, written.ChapterEntries, "chapters kept");
-        Assert.Equal("Invented.Film.2026.1080p", written.Title, "title untouched");
+        Assert.Equal<string?>(null, written.Title, "the segment title removed (owner, 29. 10. 2026)");
 
         // idempotent: the result already matches the rules and is in its place
         var again = EditPlan.For(UniversumRules.Apply(written));

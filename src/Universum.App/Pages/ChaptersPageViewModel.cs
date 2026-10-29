@@ -133,7 +133,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
 
     /// <summary>The file with the chapters of the list (tracks unchanged); null without a file.</summary>
     public TargetState? Target() =>
-        _file is null ? null : ManualTarget.Create(_file, ManualTarget.AsIs(_file)) with { NewChapters = Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList() };
+        _file is null ? null : ManualTarget.Create(_file, ManualTarget.AsIs(_file), title: "") with { NewChapters = Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList() };
 
     public async Task LoadAsync(string path)
     {

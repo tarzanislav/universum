@@ -32,6 +32,9 @@ in next to it without changing the rules, planning or UI.
 
 ## Rules, planning and writing
 
+- Segment title ("File title" in MKVToolNix): always removed (owner, 29. 10. 2026 – it would stand for the file's name);
+  `UniversumRules` sets `NewTitle = ""`, Zlučovanie never takes a source's title (`--title ""` unless typed), the header
+  and chapter editors start without it.
 - `Rules/UniversumRules` – the track rules of the specification (section 6) as a pure function of the file,
   a `RuleProfile` (preferred languages, keywords for forced / SDH / commentary) and languages chosen for `und`
   tracks. Result: `TargetState` (tracks in final order, flags, names, languages, issues). Blocking issues

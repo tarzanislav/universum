@@ -244,7 +244,8 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
                 Rows.Add(new HeaderRow(track, Choices, Recalculate));
             }
 
-            _title = file?.Title ?? "";
+            // owner, 29. 10. 2026: the segment title is removed unless the user types one
+            _title = "";
             _removeTags = false;
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(RemoveTags));

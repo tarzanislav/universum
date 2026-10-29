@@ -65,10 +65,13 @@ public static class UniversumRules
             issues.Add(new RuleIssue(RuleIssueKind.ContainerWarnings));
         }
 
+        // owner, 29. 10. 2026: the segment title ("File title" in MKVToolNix) is always removed – it would stand for the
+        // file's name in players and in MKVToolNix, the library names the file itself
         return new TargetState(file, targets, profile.RemoveTags, issues)
         {
             Removed = file.Tracks.Where(t => !kept(t)).ToList(),
             RepairIndex = missingIndex && profile.RepairIndex,
+            NewTitle = "",
         };
     }
 

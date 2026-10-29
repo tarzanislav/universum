@@ -1200,11 +1200,11 @@ public sealed class BatchPageViewModel : ObservableObject
         if (_library.Mixed)
         {
             var (seriesText, seriesNote) = TmdbPicker.TitleText(title);
-            if (title.Kind == MediaKind.Series && TitleGuess.Typed(MediaKind.Series, seriesText) is { } chosen)
+            if (title.Kind == MediaKind.Series && TitleGuess.Typed(MediaKind.Series, seriesText) is { } groupSeries)
             {
                 foreach (var path in SelectedFiles)
                 {
-                    _library.SeriesOfFile[path] = chosen;
+                    _library.SeriesOfFile[path] = groupSeries;
                 }
 
                 RunState = seriesNote.Length > 0 ? seriesNote : $"Skupina {SelectedGroup?.Label}: {title.Display}";

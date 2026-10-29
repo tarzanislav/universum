@@ -24,6 +24,13 @@ public sealed record RuleProfile
     /// </summary>
     public IReadOnlyList<string> OrderLanguages { get; init; } = [];
 
+    /// <summary>
+    /// Subtitle languages kept in the result, in this order (owner, 29. 10. 2026: CZ, SK, EN, PL, HU, RU). Subtitles in
+    /// another language are left out – except those in the language of one of the audio tracks, which follow the list.
+    /// Empty keeps all subtitles. A track the user keeps, a template's order and a manual order win.
+    /// </summary>
+    public IReadOnlyList<string> SubtitleLanguages { get; init; } = ["cs", "sk", "en", "pl", "hu", "ru"];
+
     /// <summary>Words in the original track name that mark forced subtitles (matched without case and diacritics).</summary>
     public IReadOnlyList<string> ForcedKeywords { get; init; } = ["forced", "vynucene", "vynutene", "nucene", "nutene"];
 
@@ -53,6 +60,27 @@ public sealed record RuleProfile
     public int Preference(string primaryLanguage) => IndexOf(PreferredLanguages, primaryLanguage);
 
     public bool IsPreferred(string primaryLanguage) => Preference(primaryLanguage) != int.MaxValue;
+
+    /// <summary>
+    /// The order of subtitle languages for a file whose audio is in <paramref name="audioLanguages"/>: the template's
+    /// order, the subtitle languages, then the audio languages. Without subtitle languages the order of the audio.
+    /// </summary>
+    public IReadOnlyList<string> SubtitleOrder(IEnumerable<string> audioLanguages) =>
+        SubtitleLanguages.Count == 0
+            ? (OrderLanguages.Count > 0 ? OrderLanguages : PreferredLanguages)
+            : OrderLanguages.Concat(SubtitleLanguages).Concat(audioLanguages).Select(l => l.ToLowerInvariant()).Distinct().ToList();
+
+    /// <summary>
+    /// Subtitles in this language stay: listed among the subtitle languages or in a template's order, or the language of
+    /// an audio track (always when <see cref="SubtitleLanguages"/> is empty).
+    /// </summary>
+    public bool KeepsSubtitles(string primaryLanguage, IEnumerable<string> audioLanguages) =>
+        SubtitleLanguages.Count == 0 || IndexOf(SubtitleLanguages, primaryLanguage) != int.MaxValue ||
+        IndexOf(OrderLanguages, primaryLanguage) != int.MaxValue ||
+        audioLanguages.Contains(primaryLanguage, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Position of a language in a list (lower first); int.MaxValue when it is not listed.</summary>
+    public static int PositionIn(IReadOnlyList<string> languages, string primaryLanguage) => IndexOf(languages, primaryLanguage);
 
     private static int IndexOf(IReadOnlyList<string> languages, string primaryLanguage)
     {

@@ -142,7 +142,7 @@ public static class BatchPlanner
             if (Evidence(track, key, group, file.Path) is { } found)
             {
                 evidence[key] = found;
-                if (found.IsUsable && track.Language.IsUndetermined)
+                if (found.IsUsable && (track.Language.IsUndetermined || found.Source is EvidenceSource.FileDecision or EvidenceSource.GroupDecision))
                 {
                     languages[track.Id] = found.Language;
                 }
@@ -154,12 +154,19 @@ public static class BatchPlanner
             }
         }
 
-        var decisions = new TrackDecisions { Languages = languages, Forced = forced };
+        var trackOf = SlotKey.Of(file).ToDictionary(x => x.Key, x => x.Track.Id);
+        var decisions = new TrackDecisions
+        {
+            Languages = languages,
+            Forced = forced,
+            Kept = group.Decisions.Kept.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
+            Order = group.Decisions.Order.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToList(),
+        };
         var target = UniversumRules.Apply(file, profile, decisions);
         var match = template.Evaluate(target);
         if (template.Unlisted == UnlistedTracks.Remove && match.Unlisted.Count > 0)
         {
-            decisions = decisions with { Removed = match.Unlisted.Select(t => t.TrackId).ToHashSet() };
+            decisions = decisions with { Removed = match.Unlisted.Select(t => t.TrackId).Where(id => !decisions.Kept.Contains(id)).ToHashSet() };
             target = UniversumRules.Apply(file, profile, decisions);
             match = template.Evaluate(target);
         }
@@ -249,17 +256,13 @@ public static class BatchPlanner
     }
 
     /// <summary>
-    /// Best evidence for a track language: the file itself, a decision for this file, a decision for the group, the
-    /// original track name, or a suggestion waiting for confirmation (this file's own first, then the group's).
+    /// Best evidence for a track language: a decision for this file, a decision for the group (owner, 29. 10. 2026: also
+    /// over a wrong language written in the file – "EN" that is Czech), the file itself, the original track name, or a
+    /// suggestion waiting for confirmation (this file's own first, then the group's).
     /// </summary>
     /// <param name="path">The file the track belongs to; null for the group as a whole (its first file's tracks).</param>
     public static LanguageEvidence? Evidence(MediaTrack track, SlotKey key, BatchGroup group, string? path = null)
     {
-        if (!track.Language.IsUndetermined)
-        {
-            return new LanguageEvidence(track.Language, Confidence.High, EvidenceSource.File);
-        }
-
         if (path is not null && group.Decisions.FileLanguage(path, key) is { } chosen)
         {
             return new LanguageEvidence(chosen, Confidence.Confirmed, EvidenceSource.FileDecision);
@@ -268,6 +271,11 @@ public static class BatchPlanner
         if (group.Decisions.Languages.TryGetValue(key, out var decided))
         {
             return new LanguageEvidence(decided, Confidence.Confirmed, EvidenceSource.GroupDecision);
+        }
+
+        if (!track.Language.IsUndetermined)
+        {
+            return new LanguageEvidence(track.Language, Confidence.High, EvidenceSource.File);
         }
 
         if (LanguageGuess.FromName(track.Name) is { } named)

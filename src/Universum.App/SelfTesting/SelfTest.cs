@@ -177,6 +177,22 @@ internal static class SelfTest
         await Screenshot(window, "rules-undetermined.png");
         model.Rules.ChooseLanguage(2, "cs");
         model.Rules.ChooseLanguage(3, "cs");
+
+        // owner, 29. 10. 2026: in Single spracovanie too – tracks moved up or down, a language written in the file corrected
+        string RuleSubtitles() => string.Join(",", model.Rules.Plan!.Target.Tracks.Where(t => t.Type == TrackType.Subtitles)
+            .Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
+        Check(RuleSubtitles() == "cs!,cs,en", "rules: subtitles in the order of the rules – " + RuleSubtitles());
+        model.Rules.MoveTrack(5, -1);
+        Check(RuleSubtitles() == "cs!,en,cs" && model.Rules.Rows.Where(r => r.Target.Type == TrackType.Subtitles).Select(r => r.TrackId).SequenceEqual([3, 5, 4]),
+            "rules: English subtitles moved up – " + RuleSubtitles());
+        await Screenshot(window, "rules-track-order.png");
+        model.Rules.MoveTrack(5, 1);
+        Check(RuleSubtitles() == "cs!,cs,en", "rules: and back – " + RuleSubtitles());
+        Check(model.Rules.Rows.First(r => r.TrackId == 1).ChosenLanguage == Languages.English, "rules: the file's language is shown in the list");
+        model.Rules.ChooseLanguage(1, "sk");
+        Check(model.Rules.Plan!.Target.For(1).Language.Primary == "sk", "rules: a language written in the file corrected");
+        model.Rules.ChooseLanguage(1, "en");
+        Check(model.Rules.Plan!.Target.For(1).Language.Primary == "en" && !model.Rules.Plan.Target.For(1).LanguageChanged, "rules: the file's own language again");
         model.Rules.KeepOriginal = true;
         services.SetOutputDirectory(library);
         Check(Directory.Exists(Path.Combine(library, "MOVIES")) && Directory.Exists(Path.Combine(library, "TVSHOWS")), "library: MOVIES and TVSHOWS created");
@@ -1849,6 +1865,31 @@ internal static class SelfTest
 
         var forcedSlot = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0));
         forcedSlot.ChosenLanguage = Languages.Czech;
+
+        // owner, 29. 10. 2026: the group's tracks in the order of the result, moved up or down within their type
+        string Order() => string.Join(",", batch.SlotRows.Select(s => s.Slot));
+        string Subtitles() => string.Join(",", batch.Items.First(i => i.Group == forcedSlot.Group).Target.Tracks
+            .Where(t => t.Type == TrackType.Subtitles).Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
+        var before = Order();
+        Check(batch.SlotRows[0].Key == new Core.Batch.SlotKey(TrackType.Audio, 1) && Subtitles() == "cs!,cs,en",
+            $"batch: the tracks shown in the order of the result – {before} | {Subtitles()}");
+        var english = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 2));
+        english.MoveUpCommand.Execute(null);
+        Check(Subtitles() == "cs!,en,cs" && Order() != before, $"batch: English subtitles moved up for all files – {Order()} | {Subtitles()}");
+        await Screenshot(window, "batch-track-order.png");
+        english.MoveDownCommand.Execute(null);
+        Check(Subtitles() == "cs!,cs,en" && Order() == before, $"batch: and back – {Order()} | {Subtitles()}");
+
+        // owner, 29. 10. 2026: a language written in the file can be corrected for the group ("EN" that is Czech)
+        var written = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Audio, 0));
+        Check(written.ChosenLanguage == Languages.English, "batch: the file's language is shown in the list");
+        written.ChosenLanguage = Languages.Slovak;
+        Check(batch.Items.Where(i => i.Group == forcedSlot.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Audio && t.Language.Primary == "sk")) &&
+              written.Evidence.StartsWith("vaša voľba (v súbore: angličtina", StringComparison.Ordinal),
+            "batch: the corrected language is used for all files – " + written.Evidence);
+        written.ChosenLanguage = Languages.English;
+        Check(!forcedSlot.Group.Decisions.Languages.ContainsKey(written.Key), "batch: the file's own language again needs no decision");
+
         batch.ConfirmTitlesCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");

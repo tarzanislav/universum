@@ -7,6 +7,9 @@ public enum ChangeKind
     Default,
     Enabled,
     Forced,
+
+    /// <summary>Hearing impaired, visual impaired, text descriptions, original or commentary flag.</summary>
+    OtherFlags,
     Position,
     Removed,
     Index,

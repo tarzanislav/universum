@@ -50,4 +50,11 @@ public sealed record UndoRecord
 
 /// <param name="Number">Matroska track number (stable for in-place edits).</param>
 /// <param name="Uid">Track UID: undo checks that the file is still the one that was edited.</param>
-public sealed record UndoTrack(int Number, string? Name, string Language, string? LanguageIetf, bool Default, bool Enabled, bool Forced, ulong? Uid = null);
+/// <param name="OtherFlags">Hearing impaired, visual impaired, text descriptions, original and commentary (records from
+/// before 0.3.7 do not have them – undo leaves those flags as they are).</param>
+public sealed record UndoTrack(
+    int Number, string? Name, string Language, string? LanguageIetf, bool Default, bool Enabled, bool Forced, ulong? Uid = null,
+    UndoFlags? OtherFlags = null);
+
+/// <summary>The flags beyond default, enabled and forced, as they were before the edit.</summary>
+public sealed record UndoFlags(bool HearingImpaired, bool VisualImpaired, bool TextDescriptions, bool Original, bool Commentary);

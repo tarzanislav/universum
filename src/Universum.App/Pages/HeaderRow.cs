@@ -130,7 +130,10 @@ public sealed class HeaderRow : ObservableObject
         $"V súbore: názov „{Source.Name}“, jazyk {LanguageChoice.Of(Source.Language).Display}, " +
         $"default {YesNo(Source.Flags.Default)}, enabled {YesNo(Source.Flags.Enabled)}, forced {YesNo(Source.Flags.Forced)}";
 
-    public TrackEdit ToEdit() => new(TrackId, Name.Length == 0 ? null : Name, Language.Tag, Source.Flags with { Default = IsDefault, Enabled = IsEnabled, Forced = IsForced });
+    public TrackEdit ToEdit() => new(TrackId, Name.Length == 0 ? null : Name, Language.Tag, (_ruleFlags ?? Source.Flags) with { Default = IsDefault, Enabled = IsEnabled, Forced = IsForced });
+
+    // the other flags the rules set (owner, 29. 10. 2026: the subtitles shown with foreign audio have no other flag)
+    private TrackFlags? _ruleFlags;
 
     /// <summary>Takes the values of a target track (the UNIVERSUM rules) without raising a change per value.</summary>
     public void Take(TrackTarget target)
@@ -140,6 +143,7 @@ public sealed class HeaderRow : ObservableObject
         _default = target.Flags.Default;
         _enabled = target.Flags.Enabled;
         _forced = target.Flags.Forced;
+        _ruleFlags = target.Flags;
         _removed = false;
         OnPropertyChanged(string.Empty);
     }

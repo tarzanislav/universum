@@ -168,6 +168,59 @@ public sealed class RulesTests
         AssertFlags(target.For(3), false, false, "Czech subtitles are not preferred in this profile");
     }
 
+    [Test]
+    public void SubtitlesKeptByLanguageListAndAudio()
+    {
+        // owner, 29. 10. 2026: CZ, SK, EN, PL, HU, RU in this order, then the audio's language; the rest is left out
+        var file = File(Video(0), Audio(1, "kor", null), Subs(2, "rus", null), Subs(3, "ger", null), Subs(4, "kor", null), Subs(5, "eng", null),
+            Subs(6, "cze", null), Subs(7, "fre", null), Subs(8, "slo", null), Subs(9, "und", null));
+        var target = UniversumRules.Apply(file, decisions: new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [9] = LanguageTag.FromCode("pl") } });
+        Assert.Sequence([0, 1, 6, 8, 5, 9, 2, 4], target.Tracks.Select(t => t.TrackId), "CZ, SK, EN, PL, RU, then Korean like the audio");
+        Assert.Sequence([3, 7], target.RemovedByLanguage.Select(t => t.Id), "German and French are left out");
+        Assert.Sequence([3, 7], target.Removed.Select(t => t.Id), "and removed from the result");
+        Assert.Equal(WriteMethod.Remux, EditPlan.For(target).Method, "removing tracks needs a new file");
+
+        var kept = UniversumRules.Apply(file, decisions: new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [9] = LanguageTag.FromCode("pl") }, Kept = new HashSet<int> { 3 } });
+        Assert.Sequence([7], kept.Removed.Select(t => t.Id), "a track the user keeps stays");
+
+        var undetermined = UniversumRules.Apply(file);
+        Assert.True(undetermined.Tracks.Any(t => t.TrackId == 9) && undetermined.IsBlocked, "an undetermined subtitle waits for its language, it is not removed");
+
+        var all = UniversumRules.Apply(file with { Tracks = file.Tracks.Where(t => t.Id != 9).ToList() }, RuleProfile.Default with { SubtitleLanguages = [] });
+        Assert.Equal(0, all.Removed.Count, "without subtitle languages every subtitle stays");
+    }
+
+    [Test]
+    public void ShownSubtitlesHaveNoOtherFlags()
+    {
+        // owner, 29. 10. 2026: with foreign audio the Czech subtitles are default and enabled, every other flag is No
+        var czech = Subs(2, "cze", null) with { Flags = new TrackFlags(Default: false, Enabled: false, Original: true, VisualImpaired: true) };
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), czech, Subs(3, "eng", null)));
+        Assert.Equal(new TrackFlags(Default: true, Enabled: true), target.For(2).Flags, "default, enabled, nothing else");
+        Assert.True(target.For(2).OtherFlagsChanged, "the other flags change");
+        var plan = EditPlan.For(target);
+        Assert.True(plan.Changes.Any(c => c.TrackId == 2 && c.Kind == ChangeKind.OtherFlags && c.Before == "visual impaired, original" && c.After == ""), "listed as a change");
+        var arguments = Universum.Core.MkvToolNix.MkvToolNixArguments.HeaderEdit(target, "test.mkv");
+        Assert.True(arguments.Contains("flag-original=0") && arguments.Contains("flag-visual-impaired=0") && !arguments.Contains("flag-commentary=0"),
+            "the header edit clears the flags set: " + string.Join(" ", arguments));
+        var remux = Universum.Core.MkvToolNix.MkvToolNixArguments.Remux(target, "test.mkv", "out.mkv");
+        Assert.True(remux.Contains("2:0") && remux.Contains("--original-flag") && remux.Count(a => a == "--original-flag") == 1,
+            "a new file clears them only at that track");
+    }
+
+    [Test]
+    public void TheUsersOrderWins()
+    {
+        // owner, 29. 10. 2026: tracks dragged up or down keep that order; tracks not named follow as the rules have them
+        var file = File(Video(0), Audio(1, "eng", null), Audio(2, "cze", null), Subs(3, "eng", null), Subs(4, "cze", null), Subs(5, "slo", null));
+        Assert.Sequence([0, 2, 1, 4, 5, 3], UniversumRules.Apply(file).Tracks.Select(t => t.TrackId), "rules");
+        var target = UniversumRules.Apply(file, decisions: new TrackDecisions { Order = [1, 3, 5] });
+        Assert.Sequence([0, 1, 2, 3, 5, 4], target.Tracks.Select(t => t.TrackId), "the user's order, the rest after it");
+        AssertFlags(target.For(1), true, false, "the first audio is the default one");
+        AssertFlags(target.For(1 + 1), false, false, "Czech audio second");
+        AssertFlags(target.For(4), false, false, "Czech audio is there: no full subtitles by default, as before");
+    }
+
     private static void AssertFlags(TrackTarget track, bool isDefault, bool forced, string what)
     {
         Assert.Equal(isDefault, track.Flags.Default, what + " – default");

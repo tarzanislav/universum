@@ -121,6 +121,94 @@ public partial class MainWindow : Window
         }
     }
 
+    // Hromadné spracovanie, Stopy skupiny: a track is dragged by its grip onto the place of another track of its type
+    private void OnSlotGripDown(object sender, MouseButtonEventArgs e) => _listDragStart = e.GetPosition(this);
+
+    private void OnSlotGripMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && sender is FrameworkElement { DataContext: SlotRow row } grip && !row.IsRemovedByLanguage &&
+            (e.GetPosition(this) - _listDragStart).Length > SystemParameters.MinimumVerticalDragDistance)
+        {
+            DragDrop.DoDragDrop(grip, new DataObject(typeof(SlotRow), row), DragDropEffects.Move);
+        }
+    }
+
+    private void OnSlotDragOver(object sender, DragEventArgs e)
+    {
+        // files dropped from Explorer go on to the window
+        if (!e.Data.GetDataPresent(typeof(SlotRow)))
+        {
+            return;
+        }
+
+        e.Effects = e.Data.GetData(typeof(SlotRow)) is SlotRow dragged && SlotUnder(e) is { } target &&
+                    target.Key.Type == dragged.Key.Type && !target.IsRemovedByLanguage
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnSlotDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(SlotRow)) is SlotRow dragged && SlotUnder(e) is { } target)
+        {
+            Model.Batch.MoveSlotTo(dragged, target);
+            e.Handled = true;
+        }
+    }
+
+    // Single spracovanie: the same for the tracks of the opened file
+    private void OnRuleGripDown(object sender, MouseButtonEventArgs e) => _listDragStart = e.GetPosition(this);
+
+    private void OnRuleGripMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && sender is FrameworkElement { DataContext: RuleRow { CanMove: true } row } grip &&
+            (e.GetPosition(this) - _listDragStart).Length > SystemParameters.MinimumVerticalDragDistance)
+        {
+            DragDrop.DoDragDrop(grip, new DataObject(typeof(RuleRow), row), DragDropEffects.Move);
+        }
+    }
+
+    private void OnRuleDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(RuleRow)))
+        {
+            return;
+        }
+
+        e.Effects = e.Data.GetData(typeof(RuleRow)) is RuleRow dragged && RowUnder<RuleRow>(e) is { CanMove: true } target &&
+                    target.Target.Type == dragged.Target.Type
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnRuleDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(RuleRow)) is RuleRow dragged && RowUnder<RuleRow>(e) is { } target)
+        {
+            Model.Rules.MoveTrackTo(dragged.TrackId, target.TrackId);
+            e.Handled = true;
+        }
+    }
+
+    // the item of the grid row under the mouse
+    private static T? RowUnder<T>(DragEventArgs e)
+        where T : class
+    {
+        for (var element = e.OriginalSource as DependencyObject; element is not null; element = System.Windows.Media.VisualTreeHelper.GetParent(element))
+        {
+            if (element is System.Windows.Controls.DataGridRow { DataContext: T row })
+            {
+                return row;
+            }
+        }
+
+        return null;
+    }
+
+    private static SlotRow? SlotUnder(DragEventArgs e) => RowUnder<SlotRow>(e);
+
     private void OnDragOver(object sender, DragEventArgs e)
     {
         e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;

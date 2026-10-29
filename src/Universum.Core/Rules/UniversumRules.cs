@@ -26,8 +26,17 @@ public static class UniversumRules
             issues.Add(new RuleIssue(RuleIssueKind.MultipleVideoTracks));
         }
 
-        var audio = Order(file.TracksOf(TrackType.Audio).Where(kept), t => AudioRole(t, profile), language, profile);
-        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(kept), t => SubtitleRole(t, language(t), profile, decisions), language, profile);
+        var audio = Order(file.TracksOf(TrackType.Audio).Where(kept), t => AudioRole(t, profile), language, profile.Priority, decisions);
+
+        // owner, 29. 10. 2026: subtitles in the profile's languages (CZ, SK, EN, PL, HU, RU) in that order, then those in
+        // the language of an audio track; the others are left out unless the user keeps them (an undetermined one waits)
+        var audioLanguages = audio.Where(a => !a.Language.IsUndetermined).Select(a => a.Language.Primary).ToList();
+        var subtitleOrder = profile.SubtitleOrder(audioLanguages);
+        var outOfList = file.TracksOf(TrackType.Subtitles).Where(kept)
+            .Where(t => language(t) is { IsUndetermined: false } tag && !profile.KeepsSubtitles(tag.Primary, audioLanguages) && !decisions.Kept.Contains(t.Id))
+            .Select(t => t.Id).ToHashSet();
+        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(t => kept(t) && !outOfList.Contains(t.Id)),
+            t => SubtitleRole(t, language(t), profile, decisions), language, l => RuleProfile.PositionIn(subtitleOrder, l), decisions);
         if (audio.Count == 0)
         {
             issues.Add(new RuleIssue(RuleIssueKind.NoAudio));
@@ -69,7 +78,8 @@ public static class UniversumRules
         // file's name in players and in MKVToolNix, the library names the file itself
         return new TargetState(file, targets, profile.RemoveTags, issues)
         {
-            Removed = file.Tracks.Where(t => !kept(t)).ToList(),
+            Removed = file.Tracks.Where(t => !kept(t) || outOfList.Contains(t.Id)).ToList(),
+            RemovedByLanguage = file.Tracks.Where(t => outOfList.Contains(t.Id)).ToList(),
             RepairIndex = missingIndex && profile.RepairIndex,
             NewTitle = "",
         };
@@ -107,27 +117,44 @@ public static class UniversumRules
             }
         }
 
+        // owner, 29. 10. 2026: the subtitles shown with foreign audio are default and enabled, every other flag is off
         return subtitles.Select(s => new TrackTarget(
             s.Track, null, s.Language,
-            s.Track.Flags with
-            {
-                Default = ReferenceEquals(s, defaultSubtitle) || defaultForced.Contains(s),
-                Enabled = true,
-                Forced = s.Role == TrackRole.Forced,
-            },
+            ReferenceEquals(s, defaultSubtitle)
+                ? new TrackFlags(Default: true, Enabled: true)
+                : s.Track.Flags with
+                {
+                    Default = defaultForced.Contains(s),
+                    Enabled = true,
+                    Forced = s.Role == TrackRole.Forced,
+                },
             s.Role));
     }
 
-    /// <summary>Preferred languages first (in profile order), then the rest in the original order; commentary last.</summary>
+    /// <summary>
+    /// Listed languages first (in the list's order), then the rest in the original order; commentary last. An order the
+    /// user gave wins (the tracks it does not name follow in the rules' order).
+    /// </summary>
     private static List<Classified> Order(
-        IEnumerable<MediaTrack> tracks, Func<MediaTrack, TrackRole> role, Func<MediaTrack, LanguageTag> language, RuleProfile profile) =>
-        tracks
+        IEnumerable<MediaTrack> tracks, Func<MediaTrack, TrackRole> role, Func<MediaTrack, LanguageTag> language,
+        Func<string, int> priority, TrackDecisions decisions)
+    {
+        var ordered = tracks
             .Select((t, index) => new Classified(t, language(t), role(t), index))
             .OrderBy(c => c.Role == TrackRole.Commentary ? 1 : 0)
-            .ThenBy(c => profile.Priority(c.Language.Primary))
+            .ThenBy(c => priority(c.Language.Primary))
             .ThenBy(c => c.Role switch { TrackRole.Forced => 0, TrackRole.Main => 1, _ => 2 })
             .ThenBy(c => c.Index)
             .ToList();
+        if (decisions.Order.Count == 0)
+        {
+            return ordered;
+        }
+
+        // a stable sort: the tracks the user placed by his order, the others after them as the rules have them
+        var position = decisions.Order.Select((id, at) => (id, at)).GroupBy(x => x.id).ToDictionary(g => g.Key, g => g.First().at);
+        return ordered.OrderBy(c => position.TryGetValue(c.Track.Id, out var at) ? at : int.MaxValue).ToList();
+    }
 
     private static TrackRole AudioRole(MediaTrack track, RuleProfile profile) =>
         track.Flags.Commentary || Words.ContainsAny(track.Name, profile.CommentaryKeywords) ? TrackRole.Commentary : TrackRole.Main;

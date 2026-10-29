@@ -39,6 +39,11 @@ in next to it without changing the rules, planning or UI.
   a `RuleProfile` (preferred languages, keywords for forced / SDH / commentary) and languages chosen for `und`
   tracks. Result: `TargetState` (tracks in final order, flags, names, languages, issues). Blocking issues
   (undetermined language, several video tracks, no audio) stop automatic processing.
+  Subtitles (owner, 29. 10. 2026): `RuleProfile.SubtitleLanguages` (cs, sk, en, pl, hu, ru) in that order, then the
+  languages of the audio tracks; other subtitles are removed (`TargetState.RemovedByLanguage`) unless kept
+  (`TrackDecisions.Kept`). With foreign audio the default subtitles get Default + Enabled and every other flag off.
+  `TrackDecisions.Order` (tracks dragged in Hromadné spracovanie, `GroupDecisions.Order`) wins over the rules' order;
+  a group's language choice also corrects a language written in the file.
 - `Rules/ManualTarget` – the header editor's target: every track with the name, language and flags the user set, in
   the chosen order, left-out audio/subtitles, tags and the segment title (`TargetState.NewTitle`). Never blocking.
 - `Rules/TargetChecks` – the Check panel: undetermined languages, several defaults of one kind, no enabled track,

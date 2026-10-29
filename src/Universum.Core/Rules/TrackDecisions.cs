@@ -18,6 +18,17 @@ public sealed record TrackDecisions
     /// <summary>Audio and subtitle tracks left out of the result.</summary>
     public IReadOnlySet<int> Removed { get; init; } = new HashSet<int>();
 
+    /// <summary>
+    /// Subtitle tracks kept although their language is not among the profile's subtitle languages (the user's choice).
+    /// </summary>
+    public IReadOnlySet<int> Kept { get; init; } = new HashSet<int>();
+
+    /// <summary>
+    /// The order the user gave the tracks (owner, 29. 10. 2026: tracks dragged up or down); tracks not listed follow in
+    /// the rules' order. Audio stays before subtitles.
+    /// </summary>
+    public IReadOnlyList<int> Order { get; init; } = [];
+
     /// <summary>Video names to reuse, so a preview does not change on every recalculation.</summary>
     public IReadOnlyDictionary<int, string> VideoNames { get; init; } = new Dictionary<int, string>();
 }

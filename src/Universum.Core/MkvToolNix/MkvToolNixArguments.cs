@@ -55,6 +55,11 @@ public static class MkvToolNixArguments
             AddFlag(arguments, "flag-default", track.Source.Flags.Default, track.Flags.Default);
             AddFlag(arguments, "flag-enabled", track.Source.Flags.Enabled, track.Flags.Enabled);
             AddFlag(arguments, "flag-forced", track.Source.Flags.Forced, track.Flags.Forced);
+            AddFlag(arguments, "flag-hearing-impaired", track.Source.Flags.HearingImpaired, track.Flags.HearingImpaired);
+            AddFlag(arguments, "flag-visual-impaired", track.Source.Flags.VisualImpaired, track.Flags.VisualImpaired);
+            AddFlag(arguments, "flag-text-descriptions", track.Source.Flags.TextDescriptions, track.Flags.TextDescriptions);
+            AddFlag(arguments, "flag-original", track.Source.Flags.Original, track.Flags.Original);
+            AddFlag(arguments, "flag-commentary", track.Source.Flags.Commentary, track.Flags.Commentary);
         }
 
         return arguments;
@@ -93,6 +98,16 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--default-track-flag", $"{id}:{Bit(track.Flags.Default)}"]);
             arguments.AddRange(["--track-enabled-flag", $"{id}:{Bit(track.Flags.Enabled)}"]);
             arguments.AddRange(["--forced-display-flag", $"{id}:{Bit(track.Flags.Forced)}"]);
+
+            // the other flags are written only when the rules change them (mkvmerge keeps them from the source otherwise)
+            if (track.OtherFlagsChanged)
+            {
+                arguments.AddRange(["--hearing-impaired-flag", $"{id}:{Bit(track.Flags.HearingImpaired)}"]);
+                arguments.AddRange(["--visual-impaired-flag", $"{id}:{Bit(track.Flags.VisualImpaired)}"]);
+                arguments.AddRange(["--text-descriptions-flag", $"{id}:{Bit(track.Flags.TextDescriptions)}"]);
+                arguments.AddRange(["--original-flag", $"{id}:{Bit(track.Flags.Original)}"]);
+                arguments.AddRange(["--commentary-flag", $"{id}:{Bit(track.Flags.Commentary)}"]);
+            }
         }
 
         if (target.ChaptersChanged)

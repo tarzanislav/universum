@@ -107,6 +107,7 @@ public static class MkvMergeIdentificationParser
             PixelDimensions = String(properties, "pixel_dimensions"),
             IsTextSubtitles = Bool(properties, "text_subtitles") ?? false,
             StatisticsFrames = Long(properties, "tag_number_of_frames"),
+            StatisticsBytes = Long(properties, "tag_number_of_bytes"),
             StatisticsBitsPerSecond = Long(properties, "tag_bps"),
             IndexEntries = Int(properties, "num_index_entries"),
             TagEntries = trackTags.GetValueOrDefault(id),

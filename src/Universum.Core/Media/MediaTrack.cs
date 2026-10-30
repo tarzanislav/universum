@@ -38,6 +38,9 @@ public sealed record MediaTrack
     /// <summary>Number of frames from the track statistics tags, when present.</summary>
     public long? StatisticsFrames { get; init; }
 
+    /// <summary>Number of bytes from the track statistics tags, when present.</summary>
+    public long? StatisticsBytes { get; init; }
+
     /// <summary>Bits per second from the track statistics tags, when present.</summary>
     public long? StatisticsBitsPerSecond { get; init; }
 

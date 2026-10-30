@@ -24,6 +24,11 @@ public sealed class RulesPageViewModel : ObservableObject
     private readonly Dictionary<int, LanguageTag> _languages = [];
     private readonly Dictionary<int, string> _videoNames = [];
     private readonly HashSet<int> _kept = [];
+    private readonly Dictionary<int, bool> _forced = [];
+
+    // the languages UNIVERSUM read from the subtitles' text (owner, 30. 10. 2026), applied unless the user chose another
+    private IReadOnlyDictionary<int, Core.Text.SubtitleLanguageResult> _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
+    private CancellationTokenSource? _subtitleReading;
     private readonly List<int> _order = [];
     private MediaFile? _file;
     private EditPlan? _plan;
@@ -84,6 +89,10 @@ public sealed class RulesPageViewModel : ObservableObject
         _videoNames.Clear();
         _kept.Clear();
         _order.Clear();
+        _forced.Clear();
+        _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
+        _subtitleReading?.Cancel();
+        _subtitleReading = null;
         _file = null;
         _plan = null;
         _placement = null;
@@ -224,6 +233,10 @@ public sealed class RulesPageViewModel : ObservableObject
         _videoNames.Clear();
         _kept.Clear();
         _order.Clear();
+        _forced.Clear();
+        _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
+        _subtitleReading?.Cancel();
+        _subtitleReading = null;
         _file = null;
         _plan = null;
         Rows.Clear();
@@ -241,6 +254,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             _file = await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path);
             Recalculate();
+            _ = ReadSubtitlesAsync(installation, _file);
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException)
         {
@@ -255,9 +269,12 @@ public sealed class RulesPageViewModel : ObservableObject
     /// </summary>
     public void ChooseLanguage(int trackId, string code)
     {
+        // the language that applies without a choice (read from the subtitles, else the file's) needs no choice
         var language = LanguageTag.FromCode(code);
-        if (_file?.Tracks.FirstOrDefault(t => t.Id == trackId) is { Language.IsUndetermined: false } track &&
-            string.Equals(track.Language.Primary, language.Primary, StringComparison.OrdinalIgnoreCase))
+        var automatic = _detected.TryGetValue(trackId, out var read) ? read.Language
+            : _file?.Tracks.FirstOrDefault(t => t.Id == trackId) is { Language.IsUndetermined: false } track ? track.Language.Primary
+            : null;
+        if (automatic is not null && string.Equals(automatic, language.Primary, StringComparison.OrdinalIgnoreCase))
         {
             _languages.Remove(trackId);
         }
@@ -321,8 +338,15 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
+        // the languages read from the subtitles, then the user's choices over them
+        var languages = _detected.ToDictionary(d => d.Key, d => LanguageTag.FromCode(d.Value.Language));
+        foreach (var (id, chosen) in _languages)
+        {
+            languages[id] = chosen;
+        }
+
         var target = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = _languages, VideoNames = _videoNames, Kept = _kept, Order = _order });
+            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -333,8 +357,19 @@ public sealed class RulesPageViewModel : ObservableObject
         for (var i = 0; i < target.Tracks.Count; i++)
         {
             var track = target.Tracks[i];
-            var chosen = _languages.TryGetValue(track.TrackId, out var tag) ? Languages.Find(tag.Primary) : null;
-            Rows.Add(new RuleRow(track, i + 1, chosen, LanguageChosen, Moved, KeepChanged, kept: _kept.Contains(track.TrackId)));
+            var chosen = _languages.TryGetValue(track.TrackId, out var tag) ? Languages.Find(tag.Primary)
+                : _detected.TryGetValue(track.TrackId, out var read) ? Languages.Find(read.Language)
+                : null;
+            Rows.Add(new RuleRow(track, i + 1, chosen, LanguageChosen, Moved, KeepChanged, kept: _kept.Contains(track.TrackId))
+            {
+                LanguageNote = !_languages.ContainsKey(track.TrackId) && _detected.TryGetValue(track.TrackId, out var note)
+                    ? $"návrh UNIVERSUM: {(note.Certain ? "isté" : "najpravdepodobnejšie")} – {note.Detail}"
+                    : "",
+                ForcedNote = track.Type != TrackType.Subtitles || _forced.ContainsKey(track.TrackId) || track.Source.Flags.Forced ? ""
+                    : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? "návrh UNIVERSUM: forced – " + amount
+                    : "",
+                ForcedChanged = ForcedChanged,
+            });
         }
 
         // owner, 29. 10. 2026: subtitles out of the language list are shown at the end – the user can keep them
@@ -353,6 +388,8 @@ public sealed class RulesPageViewModel : ObservableObject
         } + (target.RemovedByLanguage.Count > 0
                 ? " Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): " + string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))) + "."
                 : "")
+          + (target.RemovedEmpty.Count > 0 ? $" Odstránia sa prázdne titulkové stopy (bez titulkov): {target.RemovedEmpty.Count}." : "")
+          + (_subtitleReading is not null ? " Čítam titulky (jazyk každej titulkovej stopy)…" : "")
           + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
         UpdateTarget();
@@ -368,6 +405,79 @@ public sealed class RulesPageViewModel : ObservableObject
     }
 
     private void Moved(RuleRow row, int by) => Later(() => MoveTrack(row.TrackId, by));
+
+    private void ForcedChanged(RuleRow row, bool forced) => Later(() => ChooseForced(row.TrackId, forced));
+
+    /// <summary>Forced or not, as the user says (also used by the self-test); the rules' own answer needs no choice.</summary>
+    public void ChooseForced(int trackId, bool forced)
+    {
+        if (_file?.Tracks.FirstOrDefault(t => t.Id == trackId) is not { } track)
+        {
+            return;
+        }
+
+        _forced.Remove(trackId);
+        if (UniversumRules.IsForced(_file, track, _services.Profile) != forced)
+        {
+            _forced[trackId] = forced;
+        }
+
+        Recalculate();
+    }
+
+    // owner, 30. 10. 2026: the language of every text subtitle track, read in the background (Použiť waits for it)
+    private async Task ReadSubtitlesAsync(MkvToolNixInstallation installation, MediaFile file)
+    {
+        if (!file.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles))
+        {
+            return;
+        }
+
+        _subtitleReading?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _subtitleReading = cancellation;
+        RefreshCommands();
+        Recalculate();
+        try
+        {
+            string? ffmpeg;
+            try
+            {
+                ffmpeg = (await _services.SpeechAsync(cancellation.Token)).Ffmpeg;
+            }
+            catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
+            {
+                ffmpeg = null;
+            }
+
+            var found = await SubtitleText.DetectAsync(installation, _services.Runner, ffmpeg, file, cancellation.Token);
+            if (ReferenceEquals(_file, file))
+            {
+                _detected = found;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // another file was opened
+        }
+        finally
+        {
+            if (ReferenceEquals(_subtitleReading, cancellation))
+            {
+                _subtitleReading = null;
+            }
+
+            if (ReferenceEquals(_file, file))
+            {
+                Recalculate();
+            }
+
+            RefreshCommands();
+        }
+    }
+
+    /// <summary>The languages of the subtitles are being read (Použiť waits; the self-test waits for it).</summary>
+    public bool IsReadingSubtitles => _subtitleReading is not null;
 
     private void KeepChanged(RuleRow row, bool keep) => Later(() => KeepTrack(row.TrackId, keep));
 
@@ -489,7 +599,7 @@ public sealed class RulesPageViewModel : ObservableObject
     }
 
     private bool CanApply() =>
-        !Busy && _plan is not null && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null && _placement is not null &&
+        !Busy && _subtitleReading is null && _plan is not null && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null && _placement is not null &&
         File.Exists(_plan.Target.Source.Path) &&
         !(_plan.Method == WriteMethod.None && _placement.Holds(_plan.Target.Source.Path, SourceSize())) &&
         _placement.EstimatedPathLength(SourceSize()) <= LibraryNames.MaxPathLength;

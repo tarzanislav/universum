@@ -34,6 +34,32 @@ public sealed class RuleRow : ObservableObject
 
     public TrackTarget Target { get; }
 
+    /// <summary>The language is UNIVERSUM's suggestion read from the subtitles' text ("návrh UNIVERSUM: isté – ř, ě 12×").</summary>
+    public string LanguageNote { get; init; } = "";
+
+    public bool HasLanguageNote => LanguageNote.Length > 0;
+
+    /// <summary>The subtitles are forced by their small amount ("návrh UNIVERSUM: forced – 85 titulkov oproti 1 240 …").</summary>
+    public string ForcedNote { get; init; } = "";
+
+    /// <summary>Called when the user ticks or unticks Forced.</summary>
+    public Action<RuleRow, bool>? ForcedChanged { get; init; }
+
+    public bool IsSubtitles => Target.Type == TrackType.Subtitles && !IsRemovedByLanguage;
+
+    /// <summary>Forced as the rules have it; the user can change it (owner, 30. 10. 2026).</summary>
+    public bool IsForced
+    {
+        get => Target.Role == TrackRole.Forced;
+        set
+        {
+            if (value != IsForced)
+            {
+                ForcedChanged?.Invoke(this, value);
+            }
+        }
+    }
+
     public int TrackId => Target.TrackId;
 
     /// <summary>Position after applying the rules (1-based).</summary>

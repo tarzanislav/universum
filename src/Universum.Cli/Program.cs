@@ -104,11 +104,6 @@ if (options.ConfirmSuggestions)
         {
             group.Decisions.Languages.TryAdd(slot, evidence.Language);
         }
-
-        foreach (var slot in group.ForcedSuggestions)
-        {
-            group.Decisions.Forced.TryAdd(slot, true);
-        }
     }
 }
 

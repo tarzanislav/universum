@@ -15,7 +15,6 @@ namespace Universum.Core.Batch;
 public static class BatchPlanner
 {
     /// <summary>Share of subtitles below which a track is suggested as forced (compared with a full track).</summary>
-    public const double ForcedShare = 0.15;
 
     /// <param name="library">Titles and episodes for the library; without it the items have no place (rules only).</param>
     /// <param name="reserved">
@@ -175,7 +174,8 @@ public static class BatchPlanner
             if (Evidence(track, key, group, file.Path) is { } found)
             {
                 evidence[key] = found;
-                if (found.IsUsable && (track.Language.IsUndetermined || found.Source is EvidenceSource.FileDecision or EvidenceSource.GroupDecision))
+                if (found.IsUsable && (track.Language.IsUndetermined ||
+                                       found.Source is EvidenceSource.FileDecision or EvidenceSource.GroupDecision or EvidenceSource.SubtitleAnalysis))
                 {
                     languages[track.Id] = found.Language;
                 }
@@ -306,6 +306,12 @@ public static class BatchPlanner
             return new LanguageEvidence(decided, Confidence.Confirmed, EvidenceSource.GroupDecision);
         }
 
+        // the language read from the subtitles' text wins over the one written in the file (often Czech and Slovak mixed up)
+        if (group.Detected.TryGetValue(key, out var detected))
+        {
+            return detected;
+        }
+
         if (!track.Language.IsUndetermined)
         {
             return new LanguageEvidence(track.Language, Confidence.High, EvidenceSource.File);
@@ -325,7 +331,8 @@ public static class BatchPlanner
     }
 
     /// <summary>
-    /// Fills <see cref="BatchGroup.Suggestions"/> and <see cref="BatchGroup.ForcedSuggestions"/> (specification 7.3, 7.4); call
+    /// Fills <see cref="BatchGroup.Suggestions"/> (specification 7.3; forced subtitles are recognised by the rules,
+    /// <see cref="Rules.ForcedSubtitles"/>); call
     /// again after decisions change, so a decision in one group can suggest languages for another:
     /// undetermined tracks resembling a track with a known language elsewhere in the folder, and subtitles with very
     /// few entries compared with a full track of the same language. Suggestions are never used without confirmation.
@@ -357,7 +364,6 @@ public static class BatchPlanner
                 group.Suggestions.Remove(key);
             }
 
-            group.ForcedSuggestions.Clear();
             var representative = group.Representative;
             foreach (var (key, track) in SlotKey.Of(representative))
             {
@@ -374,31 +380,6 @@ public static class BatchPlanner
                 }
             }
 
-            SuggestForced(group, representative, profile);
-        }
-    }
-
-    private static void SuggestForced(BatchGroup group, MediaFile file, RuleProfile profile)
-    {
-        var subtitles = SlotKey.Of(file).Where(x => x.Key.Type == TrackType.Subtitles)
-            .Select(x => (x.Key, x.Track, Language: Evidence(x.Track, x.Key, group)?.Language))
-            .ToList();
-        foreach (var (key, track, language) in subtitles)
-        {
-            if (language is not { } tag || !profile.IsPreferred(tag.Primary) || track.Flags.Forced ||
-                Words.ContainsAny(track.Name, profile.ForcedKeywords) || group.Decisions.Forced.ContainsKey(key) || track.StatisticsFrames is not { } frames)
-            {
-                continue;
-            }
-
-            var full = subtitles.Where(s => s.Key != key && s.Language?.Primary == tag.Primary && s.Track.StatisticsFrames is > 0)
-                .Select(s => s.Track.StatisticsFrames!.Value)
-                .DefaultIfEmpty(0)
-                .Max();
-            if (full > 0 && frames < full * ForcedShare)
-            {
-                group.ForcedSuggestions.Add(key);
-            }
         }
     }
 

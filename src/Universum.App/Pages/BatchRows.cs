@@ -186,7 +186,6 @@ public sealed class SlotRow : ObservableObject
 
     public bool IsSubtitles => Key.Type == TrackType.Subtitles;
 
-    public bool ForcedSuggested => Group.ForcedSuggestions.Contains(Key);
 
     /// <summary>Forced decision for the group: true / false, or null = by the file (flag and name).</summary>
     public bool? Forced
@@ -208,21 +207,23 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    public string ForcedHint => ForcedSuggested ? "návrh: forced (málo titulkov)" : Track.Flags.Forced ? "forced v súbore" : "";
+    /// <summary>
+    /// Why the subtitles are forced without a choice of the user (owner, 30. 10. 2026: also by their small amount –
+    /// UNIVERSUM's suggestion, changed with the check box).
+    /// </summary>
+    public string ForcedHint => !IsSubtitles || Group.Decisions.Forced.ContainsKey(Key) ? ""
+        : Track.Flags.Forced ? "forced v súbore"
+        : Core.Text.Words.ContainsAny(Track.Name, RuleProfile.Default.ForcedKeywords) ? "forced podľa názvu"
+        : ForcedSubtitles.ByAmount(Group.Representative, Track) is { } amount ? $"NÁVRH UNIVERSUM: forced – {amount}"
+        : "";
 
-    /// <summary>Accepts the suggestion (language and/or forced) as the group's decision.</summary>
+    /// <summary>Accepts the language suggestion as the group's decision.</summary>
     public bool ConfirmSuggestion()
     {
         var changed = false;
         if (_evidence is { Confidence: Confidence.Medium, NeedsOwnConfirmation: false } suggestion)
         {
             Group.Decisions.Languages[Key] = suggestion.Language;
-            changed = true;
-        }
-
-        if (ForcedSuggested && !Group.Decisions.Forced.ContainsKey(Key))
-        {
-            Group.Decisions.Forced[Key] = true;
             changed = true;
         }
 

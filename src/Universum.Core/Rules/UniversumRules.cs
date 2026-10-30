@@ -35,11 +35,14 @@ public static class UniversumRules
         // the language of an audio track; the others are left out unless the user keeps them (an undetermined one waits)
         var audioLanguages = audio.Where(a => !a.Language.IsUndetermined).Select(a => a.Language.Primary).ToList();
         var subtitleOrder = profile.SubtitleOrder(audioLanguages);
+        // owner, 30. 10. 2026: a subtitle track without a single subtitle is removed
+        var empty = file.TracksOf(TrackType.Subtitles).Where(kept).Where(ForcedSubtitles.IsEmpty).Select(t => t.Id).ToHashSet();
         var outOfList = file.TracksOf(TrackType.Subtitles).Where(kept)
-            .Where(t => language(t) is { IsUndetermined: false } tag && !profile.KeepsSubtitles(tag.Primary, audioLanguages) && !decisions.Kept.Contains(t.Id))
+            .Where(t => !empty.Contains(t.Id) && language(t) is { IsUndetermined: false } tag && !profile.KeepsSubtitles(tag.Primary, audioLanguages) &&
+                        !decisions.Kept.Contains(t.Id))
             .Select(t => t.Id).ToHashSet();
-        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(t => kept(t) && !outOfList.Contains(t.Id)),
-            t => SubtitleRole(t, language(t), profile, decisions), language, l => RuleProfile.PositionIn(subtitleOrder, l), decisions);
+        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(t => kept(t) && !outOfList.Contains(t.Id) && !empty.Contains(t.Id)),
+            t => SubtitleRole(file, t, profile, decisions), language, l => RuleProfile.PositionIn(subtitleOrder, l), decisions);
         if (audio.Count == 0)
         {
             issues.Add(new RuleIssue(RuleIssueKind.NoAudio));
@@ -81,57 +84,59 @@ public static class UniversumRules
         // file's name in players and in MKVToolNix, the library names the file itself
         return new TargetState(file, targets, profile.RemoveTags, issues)
         {
-            Removed = file.Tracks.Where(t => !kept(t) || outOfList.Contains(t.Id)).ToList(),
+            Removed = file.Tracks.Where(t => !kept(t) || outOfList.Contains(t.Id) || empty.Contains(t.Id)).ToList(),
             RemovedByLanguage = file.Tracks.Where(t => outOfList.Contains(t.Id)).ToList(),
+            RemovedEmpty = file.Tracks.Where(t => empty.Contains(t.Id)).ToList(),
             RepairIndex = missingIndex && profile.RepairIndex,
             NewTitle = "",
         };
     }
 
+    /// <summary>
+    /// The flags of the subtitles (owner, 29. and 30. 10. 2026):
+    /// <list type="bullet">
+    /// <item>Forced subtitles are active only in Czech or Slovak – the Czech ones when both exist, else the Slovak ones:
+    /// Default, Enabled and Forced on, every other flag off. Forced subtitles of other languages (and the Slovak ones
+    /// beside Czech) are named "Forced" too, but Default and Forced off.</item>
+    /// <item>With audio in Czech or Slovak the active forced subtitles are the default ones; with foreign audio only the
+    /// full subtitles in the best preferred language are (Default and Enabled on, every other flag off) and the active
+    /// forced ones keep Forced on, not Default – unless there are no full ones, then the forced ones are default.</item>
+    /// <item>Every other subtitle track: Default off, Enabled on, Forced off; subtitles for the hearing impaired keep
+    /// their flag on.</item>
+    /// </list>
+    /// </summary>
     private static IEnumerable<TrackTarget> SubtitleTargets(
         List<Classified> audio, Classified? defaultAudio, List<Classified> subtitles, RuleProfile profile, List<RuleIssue> issues)
     {
         var preferredAudio = audio.Any(a => a.Role != TrackRole.Commentary && profile.IsPreferred(a.Language.Primary));
-        Classified? defaultSubtitle;
-        var defaultForced = new HashSet<Classified>();
-
-        if (preferredAudio)
+        var activeForced = subtitles.Where(s => s.Role == TrackRole.Forced && profile.IsPreferred(s.Language.Primary))
+            .OrderBy(s => profile.Preference(s.Language.Primary)).ThenBy(s => s.Index).FirstOrDefault();
+        Classified? defaultSubtitle = null;
+        if (!preferredAudio)
         {
-            // viewers understand the audio: only forced subtitles are shown, preferably those in the audio's language
-            defaultSubtitle = null;
-            var forced = subtitles.Where(s => s.Role == TrackRole.Forced).ToList();
-            var matching = forced.FirstOrDefault(s => defaultAudio is not null &&
-                string.Equals(s.Language.Primary, defaultAudio.Language.Primary, StringComparison.OrdinalIgnoreCase));
-            if ((matching ?? forced.FirstOrDefault()) is { } chosen)
-            {
-                defaultForced.Add(chosen);
-            }
-        }
-        else
-        {
-            // foreign audio: full subtitles in the best preferred language; forced ones stay forced but not default
+            // foreign audio: full subtitles in the best preferred language
             defaultSubtitle = subtitles
                 .Where(s => s.Role == TrackRole.Main && profile.IsPreferred(s.Language.Primary))
                 .OrderBy(s => profile.Preference(s.Language.Primary))
                 .FirstOrDefault();
-            if (defaultSubtitle is null && subtitles.Count > 0)
+            if (defaultSubtitle is null && activeForced is null && subtitles.Count > 0)
             {
                 issues.Add(new RuleIssue(RuleIssueKind.NoPreferredSubtitles));
             }
         }
 
-        // owner, 29. 10. 2026: the subtitles shown with foreign audio are default and enabled, every other flag is off;
-        // forced subtitles are named "Forced" (the other names are removed)
+        var forcedIsDefault = defaultSubtitle is null;
         return subtitles.Select(s => new TrackTarget(
             s.Track, s.Role == TrackRole.Forced ? ForcedName : null, s.Language,
-            ReferenceEquals(s, defaultSubtitle)
-                ? new TrackFlags(Default: true, Enabled: true)
-                : s.Track.Flags with
-                {
-                    Default = defaultForced.Contains(s),
-                    Enabled = true,
-                    Forced = s.Role == TrackRole.Forced,
-                },
+            ReferenceEquals(s, defaultSubtitle) ? new TrackFlags(Default: true, Enabled: true)
+            : ReferenceEquals(s, activeForced) ? new TrackFlags(Default: forcedIsDefault, Enabled: true, Forced: true)
+            : s.Track.Flags with
+            {
+                Default = false,
+                Enabled = true,
+                Forced = false,
+                HearingImpaired = s.Role == TrackRole.HearingImpaired || (s.Role != TrackRole.Forced && s.Track.Flags.HearingImpaired),
+            },
             s.Role));
     }
 
@@ -163,18 +168,16 @@ public static class UniversumRules
     private static TrackRole AudioRole(MediaTrack track, RuleProfile profile) =>
         track.Flags.Commentary || Words.ContainsAny(track.Name, profile.CommentaryKeywords) ? TrackRole.Commentary : TrackRole.Main;
 
-    private static TrackRole SubtitleRole(MediaTrack track, LanguageTag language, RuleProfile profile, TrackDecisions decisions)
+    private static TrackRole SubtitleRole(MediaFile file, MediaTrack track, RuleProfile profile, TrackDecisions decisions)
     {
         if (track.Flags.Commentary || Words.ContainsAny(track.Name, profile.CommentaryKeywords))
         {
             return TrackRole.Commentary;
         }
 
-        // forced subtitles are honoured only in the preferred languages (specification: Czech and Slovak)
-        var forced = decisions.Forced.TryGetValue(track.Id, out var confirmed)
-            ? confirmed
-            : track.Flags.Forced || Words.ContainsAny(track.Name, profile.ForcedKeywords);
-        if (profile.IsPreferred(language.Primary) && forced)
+        // forced subtitles of every language are recognised – by the user's choice, the flag, the name, or their small
+        // amount (owner, 30. 10. 2026); which of them are active decides SubtitleTargets
+        if (IsForced(file, track, profile, decisions))
         {
             return TrackRole.Forced;
         }
@@ -183,6 +186,12 @@ public static class UniversumRules
             ? TrackRole.HearingImpaired
             : TrackRole.Main;
     }
+
+    /// <summary>The subtitles are forced: the user's choice, else the flag, the name or the small amount (in this order).</summary>
+    public static bool IsForced(MediaFile file, MediaTrack track, RuleProfile profile, TrackDecisions? decisions = null) =>
+        decisions?.Forced.TryGetValue(track.Id, out var confirmed) == true
+            ? confirmed
+            : track.Flags.Forced || Words.ContainsAny(track.Name, profile.ForcedKeywords) || ForcedSubtitles.ByAmount(file, track) is not null;
 
     /// <summary>A name already made of the required random characters is kept, so the rules are idempotent.</summary>
     private static string VideoName(MediaTrack video, RuleProfile profile)

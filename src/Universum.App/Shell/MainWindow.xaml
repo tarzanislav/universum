@@ -424,6 +424,8 @@
                                         <ComboBox Visibility="{Binding CanChooseLanguage, Converter={StaticResource BoolToVisibility}}"
                                                   ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
                                                   DisplayMemberPath="SlovakName" MinWidth="160" ToolTip="Jazyk stopy – neurčený, alebo nesprávny jazyk zapísaný v súbore" />
+                                        <TextBlock Text="{Binding LanguageNote}" FontSize="11" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   Visibility="{Binding HasLanguageNote, Converter={StaticResource BoolToVisibility}}" />
                                         <CheckBox Visibility="{Binding CanKeep, Converter={StaticResource BoolToVisibility}}" IsChecked="{Binding KeepChecked, UpdateSourceTrigger=PropertyChanged}"
                                                   FontSize="11.5" Margin="0,2,0,0" ToolTip="Tieto titulky ponechať, hoci ich jazyk nie je v zozname titulkov (Nastavenia)">
                                             <TextBlock Text="{Binding ResultNote}" TextWrapping="Wrap" FontWeight="SemiBold" MaxWidth="260" />
@@ -444,7 +446,22 @@
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Default" Binding="{Binding DefaultAfter}" />
                         <DataGridTextColumn Header="Enabled" Binding="{Binding EnabledAfter}" />
-                        <DataGridTextColumn Header="Forced" Binding="{Binding ForcedAfter}" />
+                        <!-- owner, 30. 10. 2026: forced also by the small amount of subtitles – UNIVERSUM's suggestion, changed here -->
+                        <DataGridTemplateColumn Header="Forced" Width="Auto" MinWidth="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <CheckBox IsChecked="{Binding IsForced, UpdateSourceTrigger=PropertyChanged}" MinWidth="0" Margin="0,0,4,0"
+                                                      Visibility="{Binding IsSubtitles, Converter={StaticResource BoolToVisibility}}"
+                                                      ToolTip="Forced titulky (aktívne len CZ, inak SK; ostatné dostanú len názov Forced)" />
+                                            <TextBlock Text="{Binding ForcedAfter}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding ForcedNote}" FontSize="11" TextWrapping="Wrap" MaxWidth="220" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Iné príznaky" Binding="{Binding OtherFlagsAfter}" />
                         <DataGridTextColumn Header="Rola" Binding="{Binding Role}" />
                     </DataGrid.Columns>
@@ -1463,8 +1480,8 @@
                                         </ContextMenu>
                                     </Button.ContextMenu>
                                 </Button>
-                                <Button Content="Rozpoznať jazyk titulkov" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="Prečíta textové titulky prvého súboru skupiny (číta celý súbor, môže chvíľu trvať)" />
+                                <Button Content="Prečítať titulky znova" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
+                                        ToolTip="Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám (začiatok filmu, pri forced celá stopa). Tu ho prečíta znova pre vybranú skupinu." />
                                 <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
                             </WrapPanel>
                         </DockPanel>

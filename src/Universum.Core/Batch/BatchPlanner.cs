@@ -57,9 +57,12 @@ public static class BatchPlanner
             return items;
         }
 
-        if (!library.Mixed)
+        // one kind for all files: checked as before; films and series together (a sorted folder, a MEGA batch opened again)
+        // are checked each among their own – a film is never taken for an episode of another series
+        var kinds = items.Select(i => library.KindFor(i.File.Path)).Distinct().ToList();
+        if (!library.Mixed && kinds.Count <= 1)
         {
-            return library.Kind == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
+            return (kinds.Count == 1 ? kinds[0] : library.Kind) == MediaKind.Series ? CheckEpisodes(items, library) : CheckFilms(items);
         }
 
         // a folder of several titles (owner, 29. 10. 2026): the episodes and the films are checked each among their own

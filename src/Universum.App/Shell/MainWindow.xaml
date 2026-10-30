@@ -1588,12 +1588,30 @@
                                 <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="TMDB ID:" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <TextBox Text="{Binding SeriesTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center"
+                                         ToolTip="Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho" />
                                 <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" TextWrapping="Wrap" MaxWidth="360"
                                            ToolTip="Epizódy ďalších seriálov poslané z Noviniek spolu s prvým – každá ide do priečinka svojho seriálu (vidno v stĺpci Cieľ v knižnici)" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <Button Content="Potvrdiť seriál" Command="{Binding ConfirmSeriesCommand}" Padding="10,3" Margin="0,0,12,0"
                                         Visibility="{Binding SeriesNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
                                         ToolTip="HISTRA tento seriál nepotvrdila – potvrďte ho, ak je správny (alebo zadajte iný)" />
+                            </StackPanel>
+                            <!-- owner, 30. 10. 2026: films have the same row as a series – title, TMDB, TMDB ID -->
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Film:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding FilmTitle, UpdateSourceTrigger=LostFocus}" Width="230" Margin="0,0,6,0" IsEnabled="{Binding CanNameFilm}"
+                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB. Platí pre film vybranej skupiny (aj jeho verzie)." />
+                                <Button Content="TMDB" Command="{Binding FilmTmdb.SearchCommand}" ToolTip="{Binding FilmTmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0"
+                                        IsEnabled="{Binding CanNameFilm}" />
+                                <ComboBox ItemsSource="{Binding FilmTmdb.Results}" SelectedItem="{Binding FilmTmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
+                                          IsDropDownOpen="{Binding FilmTmdb.IsOpen}" Visibility="{Binding FilmTmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="TMDB ID:" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
+                                <TextBox Text="{Binding FilmTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center" IsEnabled="{Binding CanNameFilm}"
+                                         ToolTip="Číslo filmu na TMDB (napr. 1629051) alebo adresa themoviedb.org/movie/… – názov sa načíta presne podľa neho, aj pri filme v inom písme" />
+                                <TextBlock Text="{Binding FilmSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
+                                <TextBlock Text="{Binding FilmHint}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="360" />
                             </StackPanel>
                             <Button Content="Spresniť názvy" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
                                     Visibility="{Binding CanFindTitles, Converter={StaticResource BoolToVisibility}}"

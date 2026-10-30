@@ -14,7 +14,9 @@
                 <Viewbox Stretch="Uniform">
                     <Grid Width="{Binding FrameWidth}" Height="{Binding FrameHeight}">
                         <Image Source="{Binding Picture}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear" />
-                        <player:SubtitleOverlay Primary="{Binding PrimaryText}" Secondary="{Binding SecondaryText}" />
+                        <player:SubtitleOverlay Primary="{Binding PrimaryText}" Secondary="{Binding SecondaryText}"
+                                                PrimaryPicture="{Binding PrimaryPicture}" PrimaryPicturePlace="{Binding PrimaryPicturePlace}"
+                                                SecondaryPicture="{Binding SecondaryPicture}" SecondaryPicturePlace="{Binding SecondaryPicturePlace}" />
                     </Grid>
                 </Viewbox>
                 <TextBlock Text="{Binding Message}" Foreground="#DDFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"

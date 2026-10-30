@@ -85,6 +85,28 @@ public partial class MainWindow : Window
 
     // Novinky: an opened series shows the tree of its episodes (a binding of the row itself – a style's would lose to
     // the grid's details mode)
+    // Časy titulkov: only the text of a subtitle that can be changed (subtitles read as text, no repair of the whole text)
+    private void OnCueBeginningEdit(object sender, System.Windows.Controls.DataGridBeginningEditEventArgs e) =>
+        e.Cancel = e.Row.Item is not SubtitlePreviewRow { IsEditable: true };
+
+    // the row's edit ends with the text's, before the list is made anew with the changed text
+    private void OnCueCellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction == System.Windows.Controls.DataGridEditAction.Commit && sender is System.Windows.Controls.DataGrid grid)
+        {
+            Dispatcher.BeginInvoke(() => grid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true));
+        }
+    }
+
+    // the subtitle chosen (also when the list was made anew) is in sight
+    private void OnCueSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid { SelectedItem: { } chosen } grid)
+        {
+            grid.ScrollIntoView(chosen);
+        }
+    }
+
     private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
         e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,
             new System.Windows.Data.Binding(nameof(NewsSeriesRow.IsExpanded)) { Converter = new System.Windows.Controls.BooleanToVisibilityConverter() });

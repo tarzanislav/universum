@@ -36,6 +36,7 @@ public sealed class SubtitleRow : ObservableObject
     private string _secondTarget = "";
     private string _syncNote = "";
     private SubtitleDocument? _document;
+    private readonly Dictionary<int, string?> _cueEdits = [];
 
     public SubtitleRow(MediaTrack track, SubtitleDocument? document, string? externalPath, LanguageTag language, string? name, bool forced, bool hearingImpaired,
         string note, Action changed)
@@ -222,7 +223,58 @@ public sealed class SubtitleRow : ObservableObject
     public bool FixTimes { get => _fixTimes; set => Set(ref _fixTimes, value); }
 
     /// <summary>The text has to be read and written anew (an external text file always; a track of the video for a change of the text).</summary>
-    public bool NeedsText => IsText && (IsExternal || ToSrt || RemoveHearingImpaired || RemoveFormatting || FixTimes);
+    public bool NeedsText => IsText && (IsExternal || ToSrt || RemoveHearingImpaired || RemoveFormatting || FixTimes || TextEdited);
+
+    /// <summary>
+    /// Texts of single subtitles changed in Časy titulkov (owner, 30. 10. 2026), by their place in the subtitles as read;
+    /// null = the subtitle is left out.
+    /// </summary>
+    public IReadOnlyDictionary<int, string?> CueEdits => _cueEdits;
+
+    /// <summary>Some subtitle's text was changed or left out.</summary>
+    public bool TextEdited => _cueEdits.Count > 0;
+
+    /// <summary>Single subtitles can be changed in the list (text read, no repair of the whole text that would renumber them).</summary>
+    public bool CanEditCues => IsText && Document is not null && !RemoveHearingImpaired && !RemoveFormatting && !FixTimes;
+
+    /// <summary>Changes the text of the subtitle at <paramref name="index"/> (null or empty: leaves it out; the text as read: no change).</summary>
+    public void EditCue(int index, string? text)
+    {
+        if (Document is not { } document || index < 0 || index >= document.Cues.Count)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            text = null;
+        }
+
+        if (text is not null && text == document.Cues[index].Text)
+        {
+            _cueEdits.Remove(index);
+        }
+        else
+        {
+            _cueEdits[index] = text;
+        }
+
+        Changed();
+        OnPropertyChanged(nameof(TextEdited));
+    }
+
+    /// <summary>The changes of single subtitles as saved (Uložiť prácu), or none.</summary>
+    public void SetCueEdits(IReadOnlyDictionary<int, string?>? edits)
+    {
+        _cueEdits.Clear();
+        foreach (var (index, text) in edits ?? new Dictionary<int, string?>())
+        {
+            _cueEdits[index] = text;
+        }
+
+        Changed();
+        OnPropertyChanged(nameof(TextEdited));
+    }
 
     /// <summary>What is wrong with the values typed (null when nothing).</summary>
     public string? Problem =>
@@ -321,6 +373,13 @@ public sealed class SubtitleRow : ObservableObject
             return null;
         }
 
+        // the texts changed by hand first (by the place of each subtitle as read)
+        if (_cueEdits.Count > 0)
+        {
+            document = document.With(document.Cues.Select((cue, index) => _cueEdits.TryGetValue(index, out var text) ? text is null ? null : cue with { Text = text } : cue)
+                .OfType<SubtitleCue>());
+        }
+
         if (RemoveHearingImpaired)
         {
             document = SubtitleCleanup.RemoveHearingImpaired(document);
@@ -400,6 +459,7 @@ public sealed class SubtitleRow : ObservableObject
         RemoveHearingImpaired = RemoveHearingImpaired,
         RemoveFormatting = RemoveFormatting,
         FixTimes = FixTimes,
+        Texts = _cueEdits.Count == 0 ? null : new Dictionary<int, string?>(_cueEdits),
     };
 
     /// <summary>The values saved before (the saved work of the video).</summary>
@@ -422,6 +482,7 @@ public sealed class SubtitleRow : ObservableObject
         RemoveHearingImpaired = state.RemoveHearingImpaired;
         RemoveFormatting = state.RemoveFormatting;
         FixTimes = state.FixTimes;
+        SetCueEdits(state.Texts);
     }
 
     /// <summary>

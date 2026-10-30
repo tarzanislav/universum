@@ -40,6 +40,9 @@ public sealed record StudioTrackState
     public bool RemoveFormatting { get; init; }
 
     public bool FixTimes { get; init; }
+
+    /// <summary>Texts of single subtitles changed by hand (by their place in the subtitles as read; null = left out).</summary>
+    public Dictionary<int, string?>? Texts { get; init; }
 }
 
 /// <summary>The work on the subtitles of one video, saved to go on later (owner, 30. 10. 2026: Uložiť prácu).</summary>

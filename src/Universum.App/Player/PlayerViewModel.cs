@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Media;
 using Universum.Core.Playback;
+using Universum.Core.Subtitles.Pictures;
 using Universum.Core.Subtitles.Sync;
 using Universum.Platform.Windows;
 
@@ -27,6 +28,10 @@ public sealed class PlayerViewModel : ObservableObject
     private TimeSpan _shownTime = TimeSpan.MinValue;
     private SubtitleTimeline _primary = SubtitleTimeline.Empty;
     private SubtitleTimeline _secondary = SubtitleTimeline.Empty;
+    private PictureTimeline _primaryPictures = PictureTimeline.Empty;
+    private PictureTimeline _secondaryPictures = PictureTimeline.Empty;
+    private (PictureCue? Cue, ImageSource? Image, Rect Place) _primaryPicture;
+    private (PictureCue? Cue, ImageSource? Image, Rect Place) _secondaryPicture;
     private string _primaryText = "";
     private string _secondaryText = "";
     private string _message = "Otvorte video – prehrá sa tu s titulkami.";
@@ -53,8 +58,10 @@ public sealed class PlayerViewModel : ObservableObject
         PlayPauseCommand = new AsyncRelayCommand(PlayPauseAsync, () => IsOpen);
         SeekByCommand = new AsyncRelayCommand<string>(by => double.TryParse(by, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
             ? SeekAsync(Now + TimeSpan.FromSeconds(seconds)) : Task.CompletedTask, _ => IsOpen);
-        PreviousSubtitleCommand = new AsyncRelayCommand(() => _primary.Previous(Now) is { } cue ? SeekAsync(cue.Start) : Task.CompletedTask, () => IsOpen);
-        NextSubtitleCommand = new AsyncRelayCommand(() => _primary.Next(Now) is { } cue ? SeekAsync(cue.Start) : Task.CompletedTask, () => IsOpen);
+        PreviousSubtitleCommand = new AsyncRelayCommand(() => (_primary.Previous(Now)?.Start ?? _primaryPictures.Previous(Now)?.Start) is { } at ? SeekAsync(at) : Task.CompletedTask,
+            () => IsOpen);
+        NextSubtitleCommand = new AsyncRelayCommand(() => (_primary.Next(Now)?.Start ?? _primaryPictures.Next(Now)?.Start) is { } at ? SeekAsync(at) : Task.CompletedTask,
+            () => IsOpen);
     }
 
     /// <summary>The picture (BGRA from FFmpeg, 1280 × 720 with black bars).</summary>
@@ -125,6 +132,16 @@ public sealed class PlayerViewModel : ObservableObject
 
     /// <summary>The subtitles compared with, now (top of the picture).</summary>
     public string SecondaryText { get => _secondaryText; private set => SetProperty(ref _secondaryText, value); }
+
+    /// <summary>Picture subtitles edited (PGS), now, and where they stand on the picture.</summary>
+    public ImageSource? PrimaryPicture => _primaryPicture.Image;
+
+    public Rect PrimaryPicturePlace => _primaryPicture.Place;
+
+    /// <summary>Picture subtitles compared with, now.</summary>
+    public ImageSource? SecondaryPicture => _secondaryPicture.Image;
+
+    public Rect SecondaryPicturePlace => _secondaryPicture.Place;
 
     /// <summary>Over the picture: nothing open, FFmpeg's problem …</summary>
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
@@ -227,6 +244,10 @@ public sealed class PlayerViewModel : ObservableObject
             FramesShown = 0;
             PrimaryText = "";
             SecondaryText = "";
+            _primaryPicture = (null, null, Rect.Empty);
+            _secondaryPicture = (null, null, Rect.Empty);
+            OnPropertyChanged(nameof(PrimaryPicture));
+            OnPropertyChanged(nameof(SecondaryPicture));
             AudioTracks = [];
             OnPropertyChanged(nameof(AudioTracks));
             OnPropertyChanged(nameof(IsOpen));
@@ -242,6 +263,14 @@ public sealed class PlayerViewModel : ObservableObject
     {
         _primary = primary;
         _secondary = secondary;
+        ShowSubtitles(Now);
+    }
+
+    /// <summary>The picture subtitles to show (PGS, with their changes of time): edited, and compared with.</summary>
+    public void SetPictures(PictureTimeline primary, PictureTimeline secondary)
+    {
+        _primaryPictures = primary;
+        _secondaryPictures = secondary;
         ShowSubtitles(Now);
     }
 
@@ -328,6 +357,8 @@ public sealed class PlayerViewModel : ObservableObject
 
     private void ShowSubtitles(TimeSpan now)
     {
+        ShowPicture(ref _primaryPicture, _primaryPictures, now, nameof(PrimaryPicture), nameof(PrimaryPicturePlace));
+        ShowPicture(ref _secondaryPicture, _secondaryPictures, now, nameof(SecondaryPicture), nameof(SecondaryPicturePlace));
         var primary = string.Join("\n", _primary.At(now).Select(c => c.Text));
         if (primary != _primaryText)
         {
@@ -339,6 +370,31 @@ public sealed class PlayerViewModel : ObservableObject
         {
             SecondaryText = secondary;
         }
+    }
+
+    // the picture subtitle shown now, drawn once (UNIVERSUM decodes it) and placed on the picture: its canvas (the video's
+    // size) fitted into the frame as the film is
+    private void ShowPicture(ref (PictureCue? Cue, ImageSource? Image, Rect Place) shown, PictureTimeline pictures, TimeSpan now, string image, string place)
+    {
+        var cue = pictures.Cues.Count == 0 ? null : pictures.At(now).LastOrDefault();
+        if (ReferenceEquals(cue, shown.Cue))
+        {
+            return;
+        }
+
+        shown = (cue, null, Rect.Empty);
+        if (cue is not null && PgsReader.Render(cue) is { } drawn && cue.CanvasWidth > 0 && cue.CanvasHeight > 0)
+        {
+            var bitmap = BitmapSource.Create(drawn.Width, drawn.Height, 96, 96, PixelFormats.Bgra32, null, drawn.Bgra, drawn.Width * 4);
+            bitmap.Freeze();
+            var scale = Math.Min((double)FrameWidth / cue.CanvasWidth, (double)FrameHeight / cue.CanvasHeight);
+            var left = (FrameWidth - (cue.CanvasWidth * scale)) / 2;
+            var top = (FrameHeight - (cue.CanvasHeight * scale)) / 2;
+            shown = (cue, bitmap, new Rect(left + (drawn.X * scale), top + (drawn.Y * scale), drawn.Width * scale, drawn.Height * scale));
+        }
+
+        OnPropertyChanged(image);
+        OnPropertyChanged(place);
     }
 
     private async Task PlayPauseAsync()

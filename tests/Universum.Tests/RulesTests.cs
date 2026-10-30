@@ -140,6 +140,22 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void TrackNamesWrittenByTheUser()
+    {
+        // owner, 30. 10. 2026: Track name – a name written for audio or subtitles wins over the rules' (also over Forced)
+        var file = File(Video(0), Audio(1, "cze", "AC3 5.1"), Subs(2, "cze", "Forced"), Subs(3, "eng", null));
+        var rules = UniversumRules.Apply(file);
+        Assert.True(rules.For(1).Name is null && rules.For(2).Name == "Forced", "the rules' names");
+        var named = UniversumRules.Apply(file, decisions: new TrackDecisions
+        {
+            Names = new Dictionary<int, string> { [0] = "nie pre video", [1] = "Český dabing", [2] = "", [3] = "English SDH" },
+        });
+        Assert.True(named.For(1).Name == "Český dabing" && named.For(2).Name is null && named.For(2).Role == TrackRole.Forced && named.For(3).Name == "English SDH",
+            "written names win; empty = no name; still forced");
+        Assert.True(named.For(0).Name != "nie pre video", "the video is named by the rules (not a track name of this kind)");
+    }
+
+    [Test]
     public void ForcedByTheAmountOfSubtitles()
     {
         // owner, 30. 10. 2026: without the word Forced, the small number of subtitles (and bytes) tells forced subtitles

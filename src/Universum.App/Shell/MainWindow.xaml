@@ -441,7 +441,12 @@
                                 <DataTemplate>
                                     <StackPanel>
                                         <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding NameAfter}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding NameAfter}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                   Visibility="{Binding CanName, Converter={StaticResource InverseBoolToVisibility}}" />
+                                        <!-- owner, 30. 10. 2026: Track name – the name can be written or added to -->
+                                        <TextBox Text="{Binding EditedName, UpdateSourceTrigger=LostFocus}" FontWeight="SemiBold" MinWidth="120"
+                                                 Visibility="{Binding CanName, Converter={StaticResource BoolToVisibility}}"
+                                                 ToolTip="Názov stopy vo výsledku – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu" />
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -1248,9 +1253,9 @@
                             <WrapPanel>
                                 <TextBlock Text="Jazyk:" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}" DisplayMemberPath="Display" Width="170" Margin="0,0,12,0" />
-                                <TextBlock Text="Názov:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="140"
-                                         ToolTip="Pri pravidlách UNIVERSUM dáva názvy pravidlo (forced = „Forced“, inak bez názvu)" />
+                                <TextBlock Text="Názov stopy:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="170"
+                                         ToolTip="Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (forced = „Forced“, inak bez názvu); môžete doň dopísať, prázdny = bez názvu" />
                             </WrapPanel>
                             <WrapPanel Margin="0,6,0,0">
                                 <CheckBox Content="Forced" IsChecked="{Binding Forced}" Margin="0,0,16,0" />
@@ -1916,6 +1921,15 @@
                                 <DataGridTextColumn Header="Stopa" Binding="{Binding Slot}" />
                                 <DataGridTextColumn Header="Kodek" Binding="{Binding Codec}" Width="70" />
                                 <DataGridTextColumn Header="Názov v súbore" Binding="{Binding Name}" Width="*" MinWidth="80" />
+                                <!-- owner, 30. 10. 2026: Track name – written for the whole group, it wins over the rules' name -->
+                                <DataGridTemplateColumn Header="Názov stopy" Width="*" MinWidth="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding TrackName, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding CanName}" VerticalAlignment="Center"
+                                                     ToolTip="Názov stopy vo výsledku pre celú skupinu – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="Jazyk" Width="150">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>

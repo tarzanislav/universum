@@ -538,7 +538,11 @@ public sealed class BatchTests
             FileTimings = { [added] = SubtitleTiming.Delay(-200) },
             Removed = [2],
             Added = [new StudioFile(added, LanguageTag.FromCode("cs"), true, false, "S_TEXT/UTF8", "SubRip/SRT", true, 1)],
+            Names = { [3] = "Vlastný názov titulkov" },
+            FileNames = { [added] = "Pridané v štúdiu" },
         };
+        // owner, 30. 10. 2026: Track name for the whole group (audio) and in the studio (subtitles)
+        group.Decisions.Names[new SlotKey(TrackType.Audio, 0)] = "Originálny zvuk";
         var library = Library(work.Path, analysis);
         var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single();
         var external = item.File.Tracks.SingleOrDefault(t => t.ExternalFile == added);
@@ -554,12 +558,18 @@ public sealed class BatchTests
                     stored.Decisions().Timings[3] == SubtitleTiming.Delay(1500) && stored.Forced[external!.Id],
             "the MEGA batch holds the times, the edits and the added file – forced, as added");
         Assert.True(item.Target.For(external!.Id) is { Role: TrackRole.Forced }, "the added file is forced subtitles in the plan");
+        Assert.True(item.Target.Tracks.First(t => t.Type == TrackType.Audio).Name == "Originálny zvuk" && item.Target.For(3).Name == "Vlastný názov titulkov" &&
+                    item.Target.For(external.Id).Name == "Pridané v štúdiu" && stored.Names.Count == 3 && stored.Decisions().Names[3] == "Vlastný názov titulkov",
+            "the names written: the group's audio, the studio's subtitles (also over Forced); MEGA keeps them");
 
         // written: the added file is a track, the English subtitles are left out
         var result = (await RunAsync(work.Path, [item])).Single();
         Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
         var written = await (await InspectorAsync()).InspectAsync(result.OutputPath!);
         Assert.Equal("cs,cs,cs", string.Join(",", written.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary)), "Czech, Czech forced and the added Czech file");
+        Assert.True(written.TracksOf(TrackType.Audio).First().Name == "Originálny zvuk" && written.TracksOf(TrackType.Subtitles).Any(t => t.Name == "Vlastný názov titulkov") &&
+                    written.TracksOf(TrackType.Subtitles).Any(t => t.Name == "Pridané v štúdiu"),
+            "the names written into the file – " + string.Join(" | ", written.Tracks.Select(t => t.Name)));
     }
 
     [Test]

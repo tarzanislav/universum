@@ -66,6 +66,15 @@ public static class UniversumRules
         targets.AddRange(SubtitleTargets(audio, defaultAudio, subtitles, profile, issues)
             .Select(s => decisions.Timings.TryGetValue(s.TrackId, out var timing) && !timing.IsNone ? s with { Timing = timing } : s));
 
+        // the names the user wrote win over the rules' (owner, 30. 10. 2026)
+        for (var i = 0; i < targets.Count; i++)
+        {
+            if (targets[i].Type is TrackType.Audio or TrackType.Subtitles && decisions.Names.TryGetValue(targets[i].TrackId, out var written))
+            {
+                targets[i] = targets[i] with { Name = written.Length == 0 ? null : written };
+            }
+        }
+
         // other track types (rare) keep their position at the end and their properties
         targets.AddRange(file.Tracks.Where(t => t.Type == TrackType.Other)
             .Select(t => new TrackTarget(t, t.Name, t.Language, t.Flags, TrackRole.Main)));

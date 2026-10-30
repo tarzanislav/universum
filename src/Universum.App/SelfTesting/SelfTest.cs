@@ -210,6 +210,16 @@ internal static class SelfTest
         Check(model.Rules.Plan!.Target.For(1).Language.Primary == "sk", "rules: a language written in the file corrected");
         model.Rules.ChooseLanguage(1, "en");
         Check(model.Rules.Plan!.Target.For(1).Language.Primary == "en" && !model.Rules.Plan.Target.For(1).LanguageChanged, "rules: the file's own language again");
+
+        // owner, 30. 10. 2026: Track name – written in Single spracovanie, it wins over the rules' name; the rules' one again
+        Check(model.Rules.Rows.First(r => r.TrackId == 3) is { CanName: true, EditedName: "Forced" }, "rules: the name to write is the result's");
+        model.Rules.ChooseName(3, "Forced – vymyslené");
+        model.Rules.ChooseName(1, " Vymyslený zvuk ");
+        Check(model.Rules.Plan!.Target.For(3).Name == "Forced – vymyslené" && model.Rules.Plan.Target.For(1).Name == "Vymyslený zvuk" &&
+              model.Rules.Rows.First(r => r.TrackId == 1).EditedName == "Vymyslený zvuk", "rules: the names written are used");
+        model.Rules.ChooseName(3, "Forced");
+        model.Rules.ChooseName(1, "");
+        Check(model.Rules.Plan!.Target.For(3).Name == "Forced" && model.Rules.Plan.Target.For(1).Name is null, "rules: the rules' name again, an empty one = no name");
         model.Rules.KeepOriginal = true;
         services.SetOutputDirectory(library);
         Check(Directory.Exists(Path.Combine(library, "MOVIES")) && Directory.Exists(Path.Combine(library, "TVSHOWS")), "library: MOVIES and TVSHOWS created");
@@ -1818,7 +1828,11 @@ internal static class SelfTest
         Check(slovak is { Language.Tag.Primary: "sk" } && slovak.Note.Contains("Windows-1250", StringComparison.Ordinal), "subtitles: Slovak file in Windows-1250 – " + slovak?.Note);
         Check(english is { Format: "WebVTT", Language.Tag.Primary: "en" }, "subtitles: English WebVTT by the title words – " + english?.Note);
         page.SelectedRow = slovak;
-        slovak!.FpsFrom = Core.Subtitles.FrameRate.All.Single(r => r.Label == "25");
+        // owner, 30. 10. 2026: Track name – the rules' name shown until the user writes his own
+        Check(slovak!.Name.Length == 0 && page.Target()!.Tracks.All(t => t.Type != TrackType.Subtitles || t.TrackId == 3 || t.Name is null), "studio: the rules' names shown – " + slovak.Name);
+        slovak.Name = "Slovenské – vymyslené";
+        Check(page.Target()!.Tracks.Any(t => t.TrackId == slovak.Track.Id && t.Name == "Slovenské – vymyslené"), "studio: the name written wins over the rules'");
+        slovak.FpsFrom = Core.Subtitles.FrameRate.All.Single(r => r.Label == "25");
         slovak.FpsTo = Core.Subtitles.FrameRate.All.Single(r => r.Label == "23,976");
         slovak.DelayText = "250";
         Check(page.Preview.Count == 1 && page.Preview[0].After == "0:00:00,771", "subtitles: 25 → 23,976 FPS and +250 ms in the preview – " + string.Join(" | ", page.Preview.Select(p => p.After)));
@@ -1885,7 +1899,7 @@ internal static class SelfTest
         if (result is not null)
         {
             var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(result);
-            Check(written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "sk") && written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "en"),
+            Check(written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "sk" && t.Name == "Slovenské – vymyslené") && written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "en"),
                 "subtitles: Slovak and English added – " + string.Join(", ", written.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary)));
         }
 
@@ -1895,7 +1909,7 @@ internal static class SelfTest
         await page.LoadAsync([video]);
         var restored = page.Rows.FirstOrDefault(r => r.ExternalPath?.EndsWith(".sk.srt", StringComparison.Ordinal) == true);
         Check(page.HasWork && page.WorkNote.StartsWith("Obnovená uložená práca", StringComparison.Ordinal) && page.Rows.Count == 5 &&
-              restored is { FpsFrom.Label: "25", FpsTo.Label: "23,976", DelayText: "250", TextEdited: true },
+              restored is { FpsFrom.Label: "25", FpsTo.Label: "23,976", DelayText: "250", TextEdited: true, WrittenName: "Slovenské – vymyslené" },
             $"studio: the work comes back with the video, the changed text too – {page.WorkNote} | {restored?.Summary}");
         page.DiscardWorkCommand.Execute(null);
         Check(!page.HasWork && services.StudioWork.Load(video) is null, "studio: the work discarded");
@@ -2103,6 +2117,18 @@ internal static class SelfTest
               written.Evidence.StartsWith("vaša voľba (v súbore: angličtina", StringComparison.Ordinal),
             "batch: the corrected language is used for all files – " + written.Evidence);
         written.ChosenLanguage = Languages.English;
+
+        // owner, 30. 10. 2026: Track name for the whole group – audio and subtitles
+        Check(written.CanName && written.TrackName.Length == 0 && forcedSlot.TrackName == "Forced", $"batch: the names the result gets – „{written.TrackName}“, „{forcedSlot.TrackName}“");
+        written.TrackName = "Vymyslený zvuk";
+        forcedSlot.TrackName = "Forced CZ";
+        Check(batch.Items.Where(i => i.Group == forcedSlot.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Audio && t.Name == "Vymyslený zvuk") &&
+                                                                         i.Target.Tracks.Any(t => t.Type == TrackType.Subtitles && t.Name == "Forced CZ")),
+            "batch: the names written are used for all files of the group");
+        written.TrackName = "";
+        forcedSlot.TrackName = "Forced";
+        Check(!forcedSlot.Group.Decisions.Names.ContainsKey(forcedSlot.Key) && batch.Items.Where(i => i.Group == forcedSlot.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Subtitles && t.Name == "Forced")),
+            "batch: the rules' name again needs no decision");
         Check(!forcedSlot.Group.Decisions.Languages.ContainsKey(written.Key), "batch: the file's own language again needs no decision");
 
         batch.ConfirmTitlesCommand.Execute(null);

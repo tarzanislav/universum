@@ -32,6 +32,12 @@ public sealed record TrackDecisions
     /// <summary>New times of subtitle tracks (Úprava titulkostopy: Zmena FPS, rýchlosti, Posun – owner, 30. 10. 2026).</summary>
     public IReadOnlyDictionary<int, Subtitles.SubtitleTiming> Timings { get; init; } = new Dictionary<int, Subtitles.SubtitleTiming>();
 
+    /// <summary>
+    /// Names of audio and subtitle tracks written by the user (owner, 30. 10. 2026: Track name everywhere tracks are
+    /// edited); they win over the rules' name ("Forced", none). Empty: no name.
+    /// </summary>
+    public IReadOnlyDictionary<int, string> Names { get; init; } = new Dictionary<int, string>();
+
     /// <summary>Video names to reuse, so a preview does not change on every recalculation.</summary>
     public IReadOnlyDictionary<int, string> VideoNames { get; init; } = new Dictionary<int, string>();
 }

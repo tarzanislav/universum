@@ -19,6 +19,9 @@ public sealed class SubtitleRow : ObservableObject
     private bool _include = true;
     private LanguageChoice _language;
     private string _name;
+    private readonly string _initialName;
+    private bool _nameWritten;
+    private string _defaultName;
     private bool _forced;
     private bool _hearingImpaired;
     private FrameRate? _fpsFrom;
@@ -52,6 +55,8 @@ public sealed class SubtitleRow : ObservableObject
         LanguageChoices = LanguageChoice.Common.Any(c => c.Same(language)) ? LanguageChoice.Common : [LanguageChoice.Of(language), .. LanguageChoice.Common];
         _language = LanguageChoices.First(c => c.Same(language));
         _name = name ?? "";
+        _initialName = _name;
+        _defaultName = _name;
         _forced = forced;
         _hearingImpaired = hearingImpaired;
         InitialForced = forced;
@@ -137,7 +142,50 @@ public sealed class SubtitleRow : ObservableObject
 
     public LanguageChoice Language { get => _language; set => Set(ref _language, value); }
 
-    public string Name { get => _name; set => Set(ref _name, value); }
+    /// <summary>
+    /// Track name: the name the result gets (owner, 30. 10. 2026) – the rules' or the file's until the user writes his own,
+    /// which wins over them; empty = no name.
+    /// </summary>
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            if (value != _name)
+            {
+                // the name the result would have anyway again: no name of the user's
+                _nameWritten = value.Trim() != _defaultName;
+                Set(ref _name, value);
+            }
+        }
+    }
+
+    /// <summary>A name the user wrote before (a saved work, a task): it counts as written, also when it is the default one.</summary>
+    public void WriteName(string name)
+    {
+        _nameWritten = true;
+        if (!Set(ref _name, name, nameof(Name)))
+        {
+            Changed();
+        }
+    }
+
+    /// <summary>The name the user wrote (trimmed), or null.</summary>
+    public string? WrittenName => _nameWritten ? _name.Trim() : null;
+
+    /// <summary>The name in the file (or of the external file's track).</summary>
+    public string InitialName => _initialName;
+
+    /// <summary>The name the result would get without the user's (the rules' or the batch's); shown while he has written none.</summary>
+    public void ShowName(string? name)
+    {
+        _defaultName = name ?? "";
+        if (!_nameWritten && _name != _defaultName)
+        {
+            _name = _defaultName;
+            OnPropertyChanged(nameof(Name));
+        }
+    }
 
     public bool Forced { get => _forced; set => Set(ref _forced, value); }
 
@@ -504,7 +552,8 @@ public sealed class SubtitleRow : ObservableObject
         ExternalFile = ExternalPath,
         Include = Include,
         Language = Language.Tag.Ietf ?? Language.Tag.Legacy,
-        Name = Name,
+        Name = WrittenName,
+        NameWritten = _nameWritten,
         Forced = Forced,
         HearingImpaired = HearingImpaired,
         FpsFrom = FpsFrom?.Label,
@@ -528,7 +577,11 @@ public sealed class SubtitleRow : ObservableObject
             Language = language;
         }
 
-        Name = state.Name ?? "";
+        if (state.Name is { } written && (state.NameWritten || written != _initialName))
+        {
+            WriteName(written);
+        }
+
         Forced = state.Forced;
         HearingImpaired = state.HearingImpaired;
         FpsFrom = FrameRate.All.FirstOrDefault(r => r.Label == state.FpsFrom);

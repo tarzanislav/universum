@@ -524,6 +524,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     private void Clear()
     {
         _file = null;
+        _batchNames = [];
         SyncReference = null;
         Proposal = null;
         _speech = null;
@@ -562,10 +563,30 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         OnPropertyChanged(nameof(Blocked));
         OnPropertyChanged(nameof(IsVideo));
         OnPropertyChanged(nameof(IsFiles));
+        ShowNames();
         UpdatePreview();
         RefreshPlayer();
         Library?.Update();
         RefreshCommands();
+    }
+
+    // the names the tracks would get without the user's (the rules' or, in a task, the batch's) shown in their rows
+    private void ShowNames()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+
+        var target = Build(_file, Rows.ToDictionary(r => r, r => r.Track), names: false).Target;
+
+        foreach (var row in Rows)
+        {
+            if (target.Tracks.FirstOrDefault(t => t.TrackId == row.Track.Id) is { } track)
+            {
+                row.ShowName(track.Name);
+            }
+        }
     }
 
     private void UpdatePreview()
@@ -656,6 +677,22 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             _ => i.Kind.ToString(),
         }).Distinct()) + " Určte ho v Úprave hlavičky alebo v Single spracovaní – alebo vypnite pravidlá (stopy ostanú, ako sú).";
 
+    // the names of the result: the batch's for the video's own tracks (a task), the ones the user wrote over them
+    private Dictionary<int, string> NamesOf(Dictionary<int, SubtitleRow> rowOf, bool written)
+    {
+        var names = rowOf.Where(r => r.Value is { Include: true, IsExternal: false } && _batchNames.ContainsKey(r.Value.Track.Id))
+            .ToDictionary(r => r.Key, r => _batchNames[r.Value.Track.Id]);
+        if (written)
+        {
+            foreach (var (id, row) in rowOf.Where(r => r.Value is { Include: true, WrittenName: not null }))
+            {
+                names[id] = row.WrittenName!;
+            }
+        }
+
+        return names;
+    }
+
     private bool CanSave() =>
         !_busy && Rows.Count > 0 && Rows.All(r => r.Problem is null) && Blocked.Length == 0 &&
         (_file is null
@@ -666,7 +703,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     public TargetState? Target() => _file is null ? null : Build(_file, Rows.ToDictionary(r => r, r => r.Track)).Target;
 
     // the target state of the video: the rows' tracks (an external file or a rewritten track of the video by its track)
-    private (TargetState Target, HashSet<int> Replaced) Build(MediaFile file, IReadOnlyDictionary<SubtitleRow, MediaTrack> written)
+    // names: with the names the user wrote (false: what the tracks would be called without them)
+    private (TargetState Target, HashSet<int> Replaced) Build(MediaFile file, IReadOnlyDictionary<SubtitleRow, MediaTrack> written, bool names = true)
     {
         var tracks = new List<MediaTrack>();
         var replaced = new HashSet<int>();
@@ -705,6 +743,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 Forced = rowOf.Where(r => r.Value is { Include: true, ForcedDecision: not null }).ToDictionary(r => r.Key, r => r.Value.ForcedDecision!.Value),
                 Removed = removed,
                 Kept = rowOf.Where(r => r.Value.Include).Select(r => r.Key).ToHashSet(),
+                Names = NamesOf(rowOf, names),
             };
             target = UniversumRules.Apply(augmented, _services.Profile, decisions);
 
@@ -719,7 +758,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         else
         {
             var edits = tracks.Where(t => !removed.Contains(t.Id)).Select(t => rowOf.TryGetValue(t.Id, out var row)
-                ? new TrackEdit(t.Id, row.Name, row.Language.Tag, t.Flags with { Forced = row.Forced, HearingImpaired = row.HearingImpaired })
+                ? new TrackEdit(t.Id, (names ? row.WrittenName : null) ?? row.InitialName, row.Language.Tag, t.Flags with { Forced = row.Forced, HearingImpaired = row.HearingImpaired })
                 : new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList();
             target = ManualTarget.Create(augmented, edits, removed, title: "");
         }

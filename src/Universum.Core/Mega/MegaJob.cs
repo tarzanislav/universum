@@ -125,7 +125,7 @@ public sealed class MegaJob(
         {
             new LibraryLayout(Batch.LibraryRoot).EnsureCreated();
             results = await BatchRunner.RunAsync(
-                items.Select(x => x.Item).ToList(), processor, new OutputOptions(Batch.Original),
+                items.Select(x => x.Item).ToList(), processor, new OutputOptions(Batch.Originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep, MoveIntoLibrary: false),
                 new Reporter(context, (item, result) =>
                 {
                     var file = byPath[item.File.Path];
@@ -137,6 +137,8 @@ public sealed class MegaJob(
                         _ => MegaFileState.Failed,
                     };
                     file.Note = result.OutputPath ?? string.Join(" | ", result.Messages);
+                    file.ResultPath = result.Status is ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary ? result.OutputPath : null;
+                    file.OriginalRemoved = result.Messages.Contains(FileProcessor.OriginalRecycledMessage);
                     changed?.Invoke(Batch);
                 }),
                 null, cancellationToken).ConfigureAwait(false);

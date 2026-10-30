@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Jobs;
+using Universum.Core.Execution;
 using Universum.Core.Jobs;
 using Universum.Core.Mega;
 
@@ -35,6 +36,8 @@ public sealed class MegaPageViewModel : ObservableObject
         RemoveFileCommand = new RelayCommand(RemoveFile, () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } &&
                                                               _selectedFile?.File.State == MegaFileState.Waiting);
         ClearFinishedCommand = new RelayCommand(ClearFinished, () => _services.Mega.Batches.Any(b => !b.IsOpen));
+        DeleteOriginalsCommand = new AsyncRelayCommand(DeleteOriginalsAsync, () => _selected?.Batch is { Originals: not OriginalsMode.Keep, State: not MegaBatchState.Queued } batch &&
+                                                                                   !batch.IsOpen && Originals(batch).Count > 0);
         EditCommand = new RelayCommand(() => EditRequested?.Invoke(_selected!.Batch),
             () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } batch &&
                   batch.Files.Any(f => f.State == MegaFileState.Waiting));
@@ -104,6 +107,40 @@ public sealed class MegaPageViewModel : ObservableObject
 
     public RelayCommand ClearFinishedCommand { get; }
 
+    /// <summary>
+    /// Zmazať originály of a finished batch sent with "zmazať ručne" (owner, 30. 10. 2026): the originals of its results
+    /// in the library go to the Recycle Bin.
+    /// </summary>
+    public AsyncRelayCommand DeleteOriginalsCommand { get; private set; } = null!;
+
+    private static IReadOnlyList<WrittenOriginal> Originals(MegaBatch batch) =>
+        batch.Files.Where(f => !f.OriginalRemoved && f.ResultPath is not null && f.State is MegaFileState.Done or MegaFileState.AlreadyInLibrary && File.Exists(f.Path))
+            .Select(f => new WrittenOriginal(f.Path, f.Size, f.ModifiedUtc, f.ResultPath!)).ToList();
+
+    private async Task DeleteOriginalsAsync()
+    {
+        if (_selected?.Batch is not { } batch || Originals(batch) is not { Count: > 0 } originals ||
+            !Confirm($"Zmazať {Texts.Count(originals.Count, "originál", "originály", "originálov")} dávky {batch.Label}?\n\n" +
+                     "Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od prípravy dávky nezmenil; " +
+                     "súbory v knižnici sa nikdy nemažú."))
+        {
+            return;
+        }
+
+        var layout = new Core.Library.LibraryLayout(batch.LibraryRoot);
+        var (removed, kept) = await Task.Run(() => OriginalCleanup.Remove(originals, new Platform.Windows.WindowsRecycleBin(), layout.HoldsResult));
+        foreach (var file in batch.Files.Where(f => removed.Contains(f.Path, Core.IO.Paths.Comparer)))
+        {
+            file.OriginalRemoved = true;
+            file.Note = (file.ResultPath ?? file.Note) + " · originál v Koši";
+        }
+
+        Message = $"{batch.Label}: do Koša {Texts.Count(removed.Count, "originál", "originály", "originálov")}" +
+                  (kept.Count > 0 ? $" · ostalo {kept.Count}: " + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "");
+        Saved(batch);
+        _services.NotifyMegaChanged();
+    }
+
     /// <summary>Opens the selected batch in Hromadné spracovanie to be corrected or completed.</summary>
     public RelayCommand EditCommand { get; }
 
@@ -144,7 +181,7 @@ public sealed class MegaPageViewModel : ObservableObject
         }
 
         var inspector = _services.Inspector(installation);
-        var job = new MegaJob(batch, _services.Processor(installation), (path, token) => inspector.InspectAsync(path, token), b => JobRow.OnUi(() => Saved(b)));
+        var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals == OriginalsMode.DeleteAutomatically), (path, token) => inspector.InspectAsync(path, token), b => JobRow.OnUi(() => Saved(b)));
         job.Changed += j =>
         {
             if (j.IsFinished)
@@ -393,7 +430,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
-        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand })
+        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand, DeleteOriginalsCommand })
         {
             command.NotifyCanExecuteChanged();
         }
@@ -446,6 +483,14 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
     };
 
     public string Outcome => Batch.Outcome;
+
+    /// <summary>What happens with the originals, as chosen in Hromadné spracovanie when the batch was sent.</summary>
+    public string Originals => Batch.Originals switch
+    {
+        OriginalsMode.DeleteAutomatically => "mazať automaticky",
+        OriginalsMode.DeleteManually => "mazať ručne",
+        _ => "zachovať",
+    };
 
     /// <summary>The start can be changed while the batch waits.</summary>
     public bool CanSchedule => Batch.State is MegaBatchState.Waiting or MegaBatchState.Missed && !Batch.IsBeingEdited;

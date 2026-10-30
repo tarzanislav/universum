@@ -338,15 +338,80 @@ public sealed class ProcessorTests
     }
 
     [Test]
-    public async Task NoRecycleBinMeansNothingIsWritten()
+    public async Task NoRecycleBinKeepsTheOriginal()
     {
+        // owner, 30. 10. 2026: never deleted permanently – without a Recycle Bin the result is written and the original stays
         using var work = new WorkFolder();
         var (processor, inspector) = await CreateAsync(work, new FolderRecycleBin(Path.Combine(work.Path, "bin")) { Available = false });
         var original = work.Copy("sk-cz-mixed.mkv");
+        var bytes = await System.IO.File.ReadAllBytesAsync(original);
         var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original)));
         var result = await processor.ProcessAsync(plan, work.Movie(plan), Delete);
-        Assert.Equal(ProcessingStatus.Failed, result.Status);
-        Assert.Equal(1, Directory.EnumerateFiles(work.Path, "*", SearchOption.AllDirectories).Count(), "only the untouched original");
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.True(System.IO.File.Exists(result.OutputPath!) && (await System.IO.File.ReadAllBytesAsync(original)).SequenceEqual(bytes), "result written, original untouched");
+        Assert.True(result.Messages.Single().StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal), "and said so: " + string.Join("; ", result.Messages));
+    }
+
+    [Test]
+    public async Task BatchDeleteWritesANewFileFirst()
+    {
+        // owner, 30. 10. 2026: Hromadné spracovanie deletes an original only after a new verified file is in the library –
+        // also when only the header changes (never moved and edited) – and the original goes to the Recycle Bin untouched
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var file = work.Copy("cz-only.mkv");
+        await new ProcessRunner().RunAsync(new ProcessRequest((await TestData.RequireMkvToolNixAsync()).ToolPath(MkvToolNixTool.MkvPropEdit),
+            [file, "--edit", "track:a1", "--set", "name=Dabing CZ"]));
+        var bytes = await System.IO.File.ReadAllBytesAsync(file);
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file)));
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method, "only the header changes");
+
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), new OutputOptions(OriginalHandling.Delete, MoveIntoLibrary: false));
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        Assert.True(result.UndoRecordPath is null && !System.IO.File.Exists(file) && bin.Recycled.Count == 1, "a new file, the original recycled");
+        Assert.True(result.Messages.Contains(FileProcessor.OriginalRecycledMessage), "said so");
+        var recycled = Path.Combine(work.Path, "bin", Path.GetFileName(file));
+        Assert.True((await System.IO.File.ReadAllBytesAsync(recycled)).SequenceEqual(bytes), "the original in the Recycle Bin is untouched");
+        Assert.True((await inspector.InspectAsync(result.OutputPath!)).TracksOf(TrackType.Audio).Single().Name is null, "the result is edited");
+    }
+
+    [Test]
+    public async Task ManualCleanupRemovesOnlySafeOriginals()
+    {
+        // owner, 30. 10. 2026: Zmazať originály – only originals whose result is in the library and that did not change;
+        // nothing in the library itself; into the Recycle Bin only
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var results = new List<ProcessingResult>();
+        foreach (var name in new[] { "sk-cz-mixed.mkv", "en-only-cz-subs.mkv", "cz-only.mkv" })
+        {
+            var original = work.Copy(name);
+            var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(original)));
+            var title = new TitleInfo(MediaKind.Movie, "Vymyslený film " + results.Count, 2026);
+            results.Add(await processor.ProcessAsync(plan, work.Layout.Place(plan.Target, title, null, RuleProfile.Default), Keep));
+        }
+
+        Assert.True(results.All(r => r.Status == ProcessingStatus.Done && System.IO.File.Exists(r.SourcePath)), "written, originals kept: " + string.Join("; ", results.SelectMany(r => r.Messages)));
+        var originals = OriginalCleanup.Collect(results);
+        Assert.Equal(3, originals.Count, "three originals with their results");
+
+        // one changed after the run, one whose result was removed from the library
+        System.IO.File.SetLastWriteTimeUtc(results[1].SourcePath, DateTime.UtcNow.AddMinutes(5));
+        System.IO.File.Delete(results[2].OutputPath!);
+        var (removed, kept) = OriginalCleanup.Remove(originals, bin, work.Layout.HoldsResult);
+        Assert.Sequence([results[0].SourcePath], removed, "only the safe original");
+        Assert.True(!System.IO.File.Exists(results[0].SourcePath) && bin.Recycled.Count == 1 && System.IO.File.Exists(results[0].OutputPath!), "in the Recycle Bin, the result stays");
+        Assert.True(kept.Count == 2 && kept.Any(k => k.Contains("zmenil", StringComparison.Ordinal)) && kept.Any(k => k.Contains("výsledok", StringComparison.Ordinal)),
+            "the others stay with the reason: " + string.Join("; ", kept));
+
+        // a file of the library is never removed, nor an original that cannot go to the Recycle Bin
+        var inLibrary = new WrittenOriginal(results[0].OutputPath!, new FileInfo(results[0].OutputPath!).Length, System.IO.File.GetLastWriteTimeUtc(results[0].OutputPath!), results[0].OutputPath!);
+        var noBin = OriginalCleanup.Collect([results[1]]).Select(o => o with { ModifiedUtc = System.IO.File.GetLastWriteTimeUtc(o.Source) }).ToList();
+        var (removedNow, keptNow) = OriginalCleanup.Remove([inLibrary, .. noBin], new FolderRecycleBin(Path.Combine(work.Path, "bin2")) { Available = false }, work.Layout.HoldsResult);
+        Assert.True(removedNow.Count == 0 && System.IO.File.Exists(inLibrary.Source) && keptNow.Count == 2 && keptNow.Any(k => k.Contains("Kôš", StringComparison.Ordinal)),
+            "nothing removed: " + string.Join("; ", keptNow));
     }
 
     [Test]

@@ -54,7 +54,10 @@ public sealed class BatchJob(
         var name = Path.GetFileName(item.File.Path);
         return result.Status switch
         {
-            ProcessingStatus.Done => (JobSeverity.Info, $"OK: {name} → {result.OutputPath}"),
+            ProcessingStatus.Done when result.Messages.FirstOrDefault(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)) is { } kept =>
+                (JobSeverity.Warning, $"OK: {name} → {result.OutputPath} · originál ostal ({kept[FileProcessor.OriginalKeptPrefix.Length..]})"),
+            ProcessingStatus.Done => (JobSeverity.Info, $"OK: {name} → {result.OutputPath}" +
+                                                         (result.Messages.Contains(FileProcessor.OriginalRecycledMessage) ? " · originál v Koši" : "")),
             ProcessingStatus.AlreadyInLibrary => (JobSeverity.Info, $"Už v knižnici: {name} ({result.OutputPath})"),
             ProcessingStatus.Unchanged => (JobSeverity.Info, $"Bez zmien: {name}"),
             ProcessingStatus.Cancelled => (JobSeverity.Warning, $"Zrušené: {name} – originál ostal nezmenený"),

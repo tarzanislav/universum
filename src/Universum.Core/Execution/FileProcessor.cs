@@ -57,9 +57,9 @@ public sealed class FileProcessor(
     private readonly MkvMergeInspector _inspector = new(installation, runner);
 
     /// <summary>
-    /// Whether <see cref="OriginalHandling.Delete"/> is honoured. Off by default: until the program is proven in practice
-    /// originals are always kept (the owner's decision of 26 October 2026); "delete" then means "keep". Only the tests of
-    /// the delete route switch it on.
+    /// Whether <see cref="OriginalHandling.Delete"/> is honoured. Off by default – "delete" then means "keep" (the owner's
+    /// decision of 26 October 2026). Since 30 October 2026 only Hromadné spracovanie (and its MEGA batches) switches it
+    /// on, when the user chose to delete the originals.
     /// </summary>
     public bool DeleteOriginalsAllowed { get; init; }
 
@@ -139,7 +139,7 @@ public sealed class FileProcessor(
                 temporary = TemporaryPath(placement.Directory, source);
                 result = await ReworkInLibraryAsync(plan, placement, temporary, progress, cancellationToken);
             }
-            else if (plan.Method != WriteMethod.Remux && output.Original == OriginalHandling.Delete &&
+            else if (plan.Method != WriteMethod.Remux && output.Original == OriginalHandling.Delete && output.MoveIntoLibrary &&
                      Paths.SameVolume(source, placement.Directory) && CanEditInPlace(source))
             {
                 result = await MoveIntoLibraryAsync(plan, placement, cancellationToken);
@@ -513,6 +513,12 @@ public sealed class FileProcessor(
         }
     }
 
+    /// <summary>The original went to the Recycle Bin after its result was verified in the library.</summary>
+    public const string OriginalRecycledMessage = "the original went to the Recycle Bin";
+
+    /// <summary>Start of the message of an original that was to be deleted but stays.</summary>
+    public const string OriginalKeptPrefix = "the original stays in place: ";
+
     /// <summary>Message of a failed edit after which the original state was restored.</summary>
     public const string RestoredMessage = "the original was restored";
 
@@ -532,10 +538,13 @@ public sealed class FileProcessor(
         EditPlan plan, Placement placement, OutputOptions output, string temporary, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var source = plan.Target.Source.Path;
+        var messages = new List<string>();
         if (output.Original == OriginalHandling.Delete && recycleBin.CannotRecycle(source) is { } reason)
         {
-            // the original would be deleted permanently; the specification allows only the Recycle Bin
-            return Result(plan, ProcessingStatus.Failed, null, null, [$"the original cannot go to the Recycle Bin ({reason}); choose to keep it"]);
+            // the original would be deleted permanently – never; the result is written and the original stays (owner,
+            // 30. 10. 2026: a drive without a Recycle Bin does not stop the batch)
+            output = output with { Original = OriginalHandling.Keep };
+            messages.Add($"{OriginalKeptPrefix}it cannot go to the Recycle Bin ({reason})");
         }
 
         Directory.CreateDirectory(placement.Directory);
@@ -545,18 +554,18 @@ public sealed class FileProcessor(
             return Result(plan, ProcessingStatus.Failed, null, null, problems);
         }
 
-        // the result is in place before the original is touched
+        // the result is in place (written and verified) before the original is touched
         var final = MoveToFreeName(temporary, placement);
-        var messages = new List<string>();
         if (output.Original == OriginalHandling.Delete)
         {
             try
             {
                 recycleBin.MoveToRecycleBin(source);
+                messages.Add(OriginalRecycledMessage);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                messages.Add("the original stays in place: " + ex.Message);
+                messages.Add(OriginalKeptPrefix + ex.Message);
             }
         }
 

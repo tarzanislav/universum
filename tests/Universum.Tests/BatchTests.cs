@@ -538,9 +538,9 @@ public sealed class BatchTests
 
         var file = Path.Combine(work.Path, "mega", "mega.json");
         var store = new Universum.Core.Mega.MegaStore(file);
-        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, ready)!;
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, ready)!;
         Assert.True(batch is { Number: 1, Label: "Dávka 1", State: Universum.Core.Mega.MegaBatchState.Waiting } && batch.Files.Count == 5, "batch 1 with five files");
-        Assert.True(store.Add("Again", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, ready) is null, "a file belongs to one open batch only");
+        Assert.True(store.Add("Again", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, ready) is null, "a file belongs to one open batch only");
         Assert.Equal(5, store.Reserved().Count, "its files are reserved");
 
         var replanned = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library,
@@ -589,7 +589,7 @@ public sealed class BatchTests
         library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
         var ready = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork).ToList();
         var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
-        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, ready)!;
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, ready)!;
 
         var changed = batch.Files.First(f => f.Path.EndsWith("Seriál E3.mkv", StringComparison.Ordinal)).Path;
         File.SetLastWriteTimeUtc(changed, File.GetLastWriteTimeUtc(changed).AddMinutes(1));
@@ -617,6 +617,36 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task MegaBatchDeletesOriginalsWhenSentSo()
+    {
+        // owner, 30. 10. 2026: a batch takes over "zmazať automaticky" – each original to the Recycle Bin right after its result
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var ready = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork && i.File.Path.Contains("Sezóna", StringComparison.Ordinal)).ToList();
+        var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalsMode.DeleteAutomatically, ready)!;
+        Assert.Equal(OriginalsMode.DeleteAutomatically, new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json")).Batches[0].Originals, "kept with the batch");
+
+        var bin = new RecordingRecycleBin(Path.Combine(work.Path, "bin"));
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), bin, Path.Combine(work.Path, "_journal")) { DeleteOriginalsAllowed = true };
+        var inspector = await InspectorAsync();
+        var queue = new Universum.Core.Jobs.JobQueue();
+        var job = new Universum.Core.Mega.MegaJob(batch, processor, (path, token) => inspector.InspectAsync(path, token));
+        queue.Add(job);
+        await queue.Start();
+
+        Assert.Equal(Universum.Core.Jobs.JobStatus.Done, job.Status, string.Join(" | ", job.Messages.Select(m => m.Text)));
+        Assert.True(batch.Files.All(f => f.State == Universum.Core.Mega.MegaFileState.Done && f.OriginalRemoved && !File.Exists(f.Path) && File.Exists(f.ResultPath!)),
+            "results in the library, originals in the Recycle Bin");
+        Assert.Equal(ready.Count, bin.Recycled.Count, "only the batch's originals");
+        Assert.True(job.Messages.Count(m => m.Text.EndsWith("originál v Koši", StringComparison.Ordinal)) == ready.Count, "said in the output");
+    }
+
+    [Test]
     public async Task MegaNeverWritesAnotherFileOrOlderDecisions()
     {
         // review of 29. 10. 2026: a file replaced by another one with the same tracks is not the prepared file, and a
@@ -638,7 +668,7 @@ public sealed class BatchTests
         File.Move(replaced.File.Path + ".new", replaced.File.Path, overwrite: true);
         File.SetLastWriteTimeUtc(replaced.File.Path, time);
         var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
-        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [replaced, processed])!;
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [replaced, processed])!;
 
         // meanwhile the episode 10 is processed in Hromadné spracovanie with other decisions (Slovak audio)
         var index = new LibraryIndex(Path.Combine(work.Path, "library-index.json"));
@@ -679,8 +709,8 @@ public sealed class BatchTests
         var episodes = ready.Where(i => i.File.Path.Contains("Sezóna", StringComparison.Ordinal)).ToList();
         var others = ready.Except(episodes).ToList();
         var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
-        var first = store.Add("Prvá", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [episodes[0]])!;
-        var second = store.Add("Druhá", library.Layout.Root, RuleProfile.Default, OriginalHandling.Keep, [episodes[1]])!;
+        var first = store.Add("Prvá", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [episodes[0]])!;
+        var second = store.Add("Druhá", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [episodes[1]])!;
 
         // corrected: Slovak audio for the group; the file of the other batch stays out, new files are added
         series.Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
@@ -1003,6 +1033,20 @@ public sealed class BatchTests
         public string Path => System.IO.Path.Combine(_directory.FullName, "Práca");
 
         public void Dispose() => _directory.Delete(recursive: true);
+    }
+
+    private sealed class RecordingRecycleBin(string folder) : IRecycleBin
+    {
+        public List<string> Recycled { get; } = [];
+
+        public string? CannotRecycle(string path) => null;
+
+        public void MoveToRecycleBin(string path)
+        {
+            Directory.CreateDirectory(folder);
+            File.Move(path, Path.Combine(folder, Recycled.Count + "-" + Path.GetFileName(path)));
+            Recycled.Add(path);
+        }
     }
 
     private sealed class NoRecycleBin : IRecycleBin

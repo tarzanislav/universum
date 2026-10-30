@@ -2028,6 +2028,22 @@ internal static class SelfTest
         await Screenshot(window, "mega-done.png");
         model.Mega.ClearFinishedCommand.Execute(null);
         Check(!services.Mega.Batches.Contains(megaBatch), "mega: finished batches cleared");
+
+        // owner, 30. 10. 2026: Zmazať originály – the originals of the page's runs to the Recycle Bin after the run; the
+        // library is never touched (on a drive without a Recycle Bin they stay and the page says why)
+        Check(!batch.CanDeleteOriginals && !batch.DeleteOriginalsCommand.CanExecute(null), "batch: originals kept – nothing to delete");
+        batch.DeleteManually = true;
+        Check(batch.CanDeleteOriginals && batch.DeleteOriginalsCommand.CanExecute(null) && batch.DeleteOriginalsText.StartsWith("Zmazať originály (", StringComparison.Ordinal),
+            "batch: Zmazať originály offered after the runs – " + batch.DeleteOriginalsText);
+        await Screenshot(window, "batch-delete-originals.png");
+        await batch.DeleteOriginalsCommand.ExecuteAsync(null);
+        var (removedOriginals, keptOriginals) = batch.LastCleanup;
+        Check(removedOriginals.Count + keptOriginals.Count >= 4 && removedOriginals.All(f => !File.Exists(f)) &&
+              keptOriginals.All(k => k.Contains("Kôš", StringComparison.Ordinal)) &&
+              File.Exists(Path.Combine(shows, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")) && File.Exists(Path.Combine(shows, "Seriál S01E01 - CZ SD H264 SMALL.mkv")),
+            $"batch: originals to the Recycle Bin ({removedOriginals.Count}), kept only without a Recycle Bin ({keptOriginals.Count}), the library intact – {batch.RunState}");
+        batch.KeepOriginal = true;
+        Check(services.Settings.BatchOriginals == Core.Execution.OriginalsMode.Keep && !batch.CanDeleteOriginals, "batch: back to keeping the originals");
     }
 
     private static async Task Screenshot(Window window, string fileName)

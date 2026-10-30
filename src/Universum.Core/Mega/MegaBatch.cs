@@ -106,6 +106,12 @@ public sealed class MegaFile
     /// <summary>Why it was skipped, the tool's message, or where the result is.</summary>
     public string Note { get; set; } = "";
 
+    /// <summary>The result in the library after the run (written now, or the same stream found there).</summary>
+    public string? ResultPath { get; set; }
+
+    /// <summary>The original went to the Recycle Bin (during the run or with Zmazať originály).</summary>
+    public bool OriginalRemoved { get; set; }
+
     /// <summary>The decisions for the rules.</summary>
     public TrackDecisions Decisions() => new()
     {
@@ -167,7 +173,11 @@ public sealed class MegaBatch
 
     public required RuleProfile Profile { get; init; }
 
-    public OriginalHandling Original { get; init; } = OriginalHandling.Keep;
+    /// <summary>
+    /// The originals as chosen in Hromadné spracovanie when the batch was sent (owner, 30. 10. 2026: the batch takes the
+    /// setting over) – kept, deleted right after each result, or deleted with Zmazať originály after the batch.
+    /// </summary>
+    public OriginalsMode Originals { get; init; } = OriginalsMode.Keep;
 
     /// <summary>The template of Hromadné spracovanie (JSON), so the batch opens again with it; null = rules only.</summary>
     public string? TemplateJson { get; set; }
@@ -238,7 +248,7 @@ public sealed class MegaStore
 
     /// <summary>A new batch of prepared files; files already in an open batch are left out (returns null when none is left).</summary>
     public MegaBatch? Add(
-        string name, string libraryRoot, RuleProfile profile, OriginalHandling original, IEnumerable<BatchItem> items, string? templateJson = null)
+        string name, string libraryRoot, RuleProfile profile, OriginalsMode originals, IEnumerable<BatchItem> items, string? templateJson = null)
     {
         var reserved = Reserved();
         var files = items.Where(i => i.NeedsWork && i.Title is not null && !reserved.ContainsKey(System.IO.Path.GetFullPath(i.File.Path)))
@@ -254,7 +264,7 @@ public sealed class MegaStore
             Name = name,
             LibraryRoot = libraryRoot,
             Profile = profile,
-            Original = original,
+            Originals = originals,
             Files = files,
             TemplateJson = templateJson,
         };

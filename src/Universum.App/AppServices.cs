@@ -115,8 +115,12 @@ public sealed class AppServices
     public LibraryIndex LibraryIndex => _libraryIndex ??= new LibraryIndex(AppSettings.LibraryIndexFile);
 
     /// <summary>Writes into the library with the Windows Recycle Bin and the undo journal.</summary>
-    public FileProcessor Processor(MkvToolNixInstallation installation) =>
-        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex);
+    /// <param name="deleteOriginals">
+    /// The originals may go to the Recycle Bin – only Hromadné spracovanie and its MEGA batches, when the user chose it
+    /// (owner, 30. 10. 2026); every other tool keeps them.
+    /// </param>
+    public FileProcessor Processor(MkvToolNixInstallation installation, bool deleteOriginals = false) =>
+        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex) { DeleteOriginalsAllowed = deleteOriginals };
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private TmdbClient? _tmdb;
@@ -586,6 +590,9 @@ public sealed class AppSettings
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }
 
+    /// <summary>What Hromadné spracovanie does with the originals (owner, 30. 10. 2026; kept by default).</summary>
+    public OriginalsMode BatchOriginals { get; set; } = OriginalsMode.Keep;
+
     /// <summary>Last folder of the batch page.</summary>
     public string? BatchFolder { get; set; }
 
@@ -688,7 +695,7 @@ public sealed class AppSettings
             var path = Path.Combine(Directory, "settings.json");
             var settings = File.Exists(path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path)) ?? new() : new();
 
-            // originals are always kept until the program is proven in practice (owner's decision, 26 October 2026)
+            // originals are always kept outside Hromadné spracovanie (owner's decisions of 26 and 30 October 2026)
             settings.OriginalHandling = Universum.Core.Execution.OriginalHandling.Keep;
             return settings;
         }

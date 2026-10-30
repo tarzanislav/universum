@@ -180,6 +180,32 @@ public sealed class PlayerTests
         }
     }
 
+    [Test]
+    public void SavedWorkOfTheStudio()
+    {
+        // owner, 30. 10. 2026: Uložiť prácu – kept for the same, unchanged video only
+        var folder = Directory.CreateTempSubdirectory("universum-studio-").FullName;
+        try
+        {
+            var video = Path.Combine(folder, "Vymyslený film.mkv");
+            File.WriteAllBytes(video, new byte[100]);
+            var store = new StudioWorkStore(Path.Combine(folder, "studio"));
+            Assert.True(store.Load(video) is null, "nothing saved yet");
+            store.Save(video, [new StudioTrackState { TrackId = 3, FpsFrom = "25", FpsTo = "23,976", Delay = "250" }, new StudioTrackState { ExternalFile = "x.srt", Include = false }],
+                new DateTime(2026, 10, 30, 20, 0, 0, DateTimeKind.Utc));
+            var work = store.Load(video);
+            Assert.True(work is { Tracks: [{ TrackId: 3, FpsFrom: "25", Delay: "250" }, { ExternalFile: "x.srt", Include: false }] }, "the values come back");
+            File.WriteAllBytes(video, new byte[101]);
+            Assert.True(store.Load(video) is null, "another video under the same name: not its work");
+            store.Delete(video);
+            Assert.True(Directory.GetFiles(store.Folder).Length == 0, "deleted");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     // a clock the test moves; the sound is only counted
     private sealed class CountingAudioOutput : IAudioOutput
     {

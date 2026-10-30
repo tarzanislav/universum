@@ -95,6 +95,7 @@ public sealed class BatchPageViewModel : ObservableObject
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
                                                              _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
+        EditInStudioCommand = new RelayCommand(EditInStudio, () => !Busy && !IsRunning && _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
@@ -289,6 +290,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (SetProperty(ref _selectedFile, value))
             {
                 ShowInfoCommand.NotifyCanExecuteChanged();
+                EditInStudioCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -298,6 +300,48 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>The Information page should show this file.</summary>
     public event Action<string>? InfoRequested;
+
+    /// <summary>Úprava titulkostopy for the selected file (owner, 30. 10. 2026: Upraviť v štúdiu → Uložiť do úlohy).</summary>
+    public RelayCommand EditInStudioCommand { get; }
+
+    /// <summary>
+    /// The studio should open a file of the batch: the file as the analysis has it (with the subtitle files found with
+    /// it) and its edits so far.
+    /// </summary>
+    public event Action<MediaFile, StudioEdits?>? StudioRequested;
+
+    private void EditInStudio()
+    {
+        if (_selectedFile?.Item is not { } item || item.Group.Files.FirstOrDefault(f => Paths.Same(f.Path, item.File.Path)) is not { } analysed)
+        {
+            return;
+        }
+
+        StudioRequested?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path));
+    }
+
+    /// <summary>Uložiť do úlohy: the studio's edits of a file of the batch (none: forgotten); the plan is computed again.</summary>
+    public void SaveStudio(string path, StudioEdits edits)
+    {
+        if (_analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path))) is not { } group)
+        {
+            RunState = "Súbor už nie je v Hromadnom spracovaní – analyzujte priečinok znova.";
+            return;
+        }
+
+        var key = group.Files.First(f => Paths.Same(f.Path, path)).Path;
+        if (edits.IsEmpty)
+        {
+            group.Decisions.Studio.Remove(key);
+        }
+        else
+        {
+            group.Decisions.Studio[key] = edits;
+        }
+
+        Replan();
+        RunState = $"{Path.GetFileName(path)}: úprava titulkostopy v úlohe – {edits.Describe()}.";
+    }
 
     /// <summary>The analysed files, by group (for the Information page).</summary>
     public IEnumerable<KnownFile> KnownFiles =>
@@ -2554,6 +2598,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     group.Decisions.ProcessAnyway.Add(path);
                 }
+
+                if (file.Studio is { } studio)
+                {
+                    group.Decisions.Studio[path] = studio;
+                }
             }
         }
 
@@ -2867,7 +2916,7 @@ public sealed class BatchPageViewModel : ObservableObject
         foreach (var command in new IRelayCommand[]
                  {
                      ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
-                     DetectAudioAllCommand, EditTemplateCommand,
+                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,

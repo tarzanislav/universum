@@ -359,6 +359,72 @@ public sealed class SubtitleRow : ObservableObject
     }
 
     /// <summary>
+    /// Sets the times to <paramref name="timing"/> (a task of Hromadné spracovanie opened again): a change of frame rate as
+    /// Zmena FPS, any other factor as Zmena rýchlosti, and the shift.
+    /// </summary>
+    public void SetTiming(SubtitleTiming timing)
+    {
+        var rates = FrameRate.All.SelectMany(from => FrameRate.All.Where(to => to != from).Select(to => (From: from, To: to)))
+            .FirstOrDefault(p => SubtitleTiming.Fps(p.From, p.To) is var fps && fps.Numerator == timing.Numerator && fps.Denominator == timing.Denominator);
+        FpsFrom = rates.From;
+        FpsTo = rates.To;
+        SpeedText = rates.From is not null || timing.Numerator == timing.Denominator ? "0"
+            : (((decimal)timing.Denominator / timing.Numerator - 1) * 100).ToString("0.######", Slovak);
+        DelayText = timing.DelayMilliseconds.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Chooses a language of the list (one that is not in it leaves the language as it is).</summary>
+    public void Choose(LanguageTag language)
+    {
+        if (LanguageChoices.FirstOrDefault(c => c.Same(language)) is { } choice)
+        {
+            Language = choice;
+        }
+    }
+
+    /// <summary>The values of the row (Uložiť prácu).</summary>
+    public StudioTrackState State() => new()
+    {
+        TrackId = IsExternal ? null : Track.Id,
+        ExternalFile = ExternalPath,
+        Include = Include,
+        Language = Language.Tag.Ietf ?? Language.Tag.Legacy,
+        Name = Name,
+        Forced = Forced,
+        HearingImpaired = HearingImpaired,
+        FpsFrom = FpsFrom?.Label,
+        FpsTo = FpsTo?.Label,
+        Speed = SpeedText,
+        Delay = DelayText,
+        ToSrt = ToSrt,
+        RemoveHearingImpaired = RemoveHearingImpaired,
+        RemoveFormatting = RemoveFormatting,
+        FixTimes = FixTimes,
+    };
+
+    /// <summary>The values saved before (the saved work of the video).</summary>
+    public void Restore(StudioTrackState state)
+    {
+        Include = state.Include;
+        if (state.Language is { Length: > 0 } code && LanguageChoices.FirstOrDefault(c => c.Same(LanguageTag.FromCode(code))) is { } language)
+        {
+            Language = language;
+        }
+
+        Name = state.Name ?? "";
+        Forced = state.Forced;
+        HearingImpaired = state.HearingImpaired;
+        FpsFrom = FrameRate.All.FirstOrDefault(r => r.Label == state.FpsFrom);
+        FpsTo = FrameRate.All.FirstOrDefault(r => r.Label == state.FpsTo);
+        SpeedText = state.Speed;
+        DelayText = state.Delay;
+        ToSrt = state.ToSrt;
+        RemoveHearingImpaired = state.RemoveHearingImpaired;
+        RemoveFormatting = state.RemoveFormatting;
+        FixTimes = state.FixTimes;
+    }
+
+    /// <summary>
     /// The result of automatic sync: a change of the frame rate it found as Zmena FPS, any other change of speed as
     /// Zmena rýchlosti, and the delay.
     /// </summary>

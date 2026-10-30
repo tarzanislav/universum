@@ -93,7 +93,20 @@ public sealed class MainViewModel : ObservableObject
         Mux.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
+        Batch.StudioRequested += (file, edits) => _ = EditInStudioAsync(file, edits);
         Mega.EditRequested += batch => _ = EditMegaBatchAsync(batch);
+    }
+
+    // owner, 30. 10. 2026: Upraviť v štúdiu – a file of Hromadné spracovanie in Úprava titulkostopy, back with Uložiť do úlohy
+    private async Task EditInStudioAsync(Core.Media.MediaFile file, Core.Batch.StudioEdits? edits)
+    {
+        var batch = Tools.First(t => t.Page == Batch);
+        SelectedTool = Tools.First(t => t.Page == Subtitles);
+        await Subtitles.EditForBatchAsync(file, edits, saved =>
+        {
+            Batch.SaveStudio(file.Path, saved);
+            SelectedTool = batch;
+        }, () => SelectedTool = batch);
     }
 
     /// <summary>

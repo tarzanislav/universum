@@ -1809,6 +1809,17 @@ internal static class SelfTest
                 "subtitles: Slovak and English added – " + string.Join(", ", written.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary)));
         }
 
+        // owner, 30. 10. 2026: Uložiť prácu – the values of the subtitles come back when the video is opened again
+        page.SaveWorkCommand.Execute(null);
+        Check(page.HasWork && page.WorkNote.StartsWith("Práca je uložená", StringComparison.Ordinal), "studio: the work saved – " + page.WorkNote);
+        await page.LoadAsync([video]);
+        var restored = page.Rows.FirstOrDefault(r => r.ExternalPath?.EndsWith(".sk.srt", StringComparison.Ordinal) == true);
+        Check(page.HasWork && page.WorkNote.StartsWith("Obnovená uložená práca", StringComparison.Ordinal) && page.Rows.Count == 5 &&
+              restored is { FpsFrom.Label: "25", FpsTo.Label: "23,976", DelayText: "250" },
+            $"studio: the work comes back with the video – {page.WorkNote} | {restored?.Summary}");
+        page.DiscardWorkCommand.Execute(null);
+        Check(!page.HasWork && services.StudioWork.Load(video) is null, "studio: the work discarded");
+
         // subtitle files alone: a new SRT in UTF-8 next to them, the original stays
         page.ClearCommand.Execute(null);
         await page.LoadAsync([vtt]);
@@ -2052,6 +2063,23 @@ internal static class SelfTest
 
         Check(batch.Items.Count(i => i.AlreadyInLibraryAt is not null) >= 3 && batch.Items.Count(i => i.NeedsWork) <= 1,
             $"batch: the written originals are 'už v knižnici' at the analysis – {batch.Simulation}");
+
+        // owner, 30. 10. 2026: Upraviť v štúdiu – a file of the batch in Úprava titulkostopy, back with Uložiť do úlohy
+        var studioItem = batch.Items.First(i => i.Target.Tracks.Any(t => t.Type == TrackType.Subtitles && !t.IsAdded && t.Source.IsTextSubtitles));
+        var studioTrack = studioItem.Target.Tracks.First(t => t.Type == TrackType.Subtitles && !t.IsAdded && t.Source.IsTextSubtitles).TrackId;
+        batch.SelectedGroup = batch.Groups.First(g => g.Group == studioItem.Group);
+        batch.SelectedFile = batch.FileRows.First(f => f.Item.File.Path == studioItem.File.Path);
+        batch.EditInStudioCommand.Execute(null);
+        await WaitFor(() => model.Subtitles.IsTask && model.SelectedTool.Page == model.Subtitles && model.Subtitles.Rows.Any(r => !r.IsExternal && r.Track.Id == studioTrack));
+        model.Subtitles.Rows.First(r => !r.IsExternal && r.Track.Id == studioTrack).DelayText = "1500";
+        await Screenshot(window, "studio-task.png");
+        model.Subtitles.SaveToTaskCommand.Execute(null);
+        var studied = batch.Items.First(i => i.File.Path == studioItem.File.Path);
+        Check(model.SelectedTool.Page == batch && studied.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500) &&
+              batch.RunState.Contains("úprava titulkostopy v úlohe", StringComparison.Ordinal),
+            $"batch: Upraviť v štúdiu → Uložiť do úlohy – the new times in the task ({studied.Target.For(studioTrack).Timing?.MkvMergeValue}) – {batch.RunState}");
+        batch.SaveStudio(studioItem.File.Path, new Core.Batch.StudioEdits());
+        Check(batch.Items.First(i => i.File.Path == studioItem.File.Path).Target.For(studioTrack).Timing is null, "batch: the edits of the studio forgotten again");
 
         var editor = new Templates.TemplateEditorWindow(new Templates.TemplateEditorViewModel(
             Core.Templates.BatchTemplate.FromTarget("Podľa skupiny A", batch.Items.First().Target))) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };

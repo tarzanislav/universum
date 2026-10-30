@@ -7,6 +7,7 @@ using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Core.Rules;
+using Universum.Core.Subtitles;
 using Universum.Core.Templates;
 using Universum.Core.Text;
 
@@ -517,6 +518,47 @@ public sealed class BatchTests
         Assert.Equal("5 z 5 súborov v knižnici.", job.Outcome, "outcome in the queue");
         Assert.Equal(1.0, job.Progress, "progress");
         Assert.True(!queue.Retry(job), "a finished run is not repeated from the queue (the page analyses again)");
+    }
+
+    [Test]
+    public async Task StudioEditsGoIntoTheBatchAndMega()
+    {
+        // owner, 30. 10. 2026: Upraviť v štúdiu → Uložiť do úlohy – new times, a track left out, a subtitle file added
+        using var work = new Work();
+        var film = Path.Combine(work.Path, "Vymysleny Studiovy Film (2026).mkv");
+        File.Copy(TestData.Media("en-only-cz-subs.mkv"), film);
+        var added = Path.Combine(work.Path, "pridane v studiu.srt");
+        await File.WriteAllTextAsync(added, "1\r\n00:00:00,500 --> 00:00:01,000\r\nPridaný titulok.\r\n");
+        var analysis = await AnalyzeAsync(work.Path);
+        var group = analysis.Groups.Single();
+        Assert.True(group.Files.Single().Tracks.All(t => t.ExternalFile is null), "the analysis does not take the file (another name)");
+        group.Decisions.Studio[group.Files.Single().Path] = new StudioEdits
+        {
+            Timings = { [3] = SubtitleTiming.Delay(1500) },
+            FileTimings = { [added] = SubtitleTiming.Delay(-200) },
+            Removed = [2],
+            Added = [new StudioFile(added, LanguageTag.FromCode("cs"), false, false, "S_TEXT/UTF8", "SubRip/SRT", true, 1)],
+        };
+        var library = Library(work.Path, analysis);
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single();
+        var external = item.File.Tracks.SingleOrDefault(t => t.ExternalFile == added);
+        Assert.True(external is not null && item.Target.For(3).Timing == SubtitleTiming.Delay(1500) && item.Target.For(external.Id).Timing == SubtitleTiming.Delay(-200) &&
+                    item.Target.Removed.Any(t => t.Id == 2) && item.NeedsWork,
+            $"the plan: the file added, new times, track 2 left out – {string.Join(", ", item.Target.Tracks.Select(t => $"{t.TrackId}:{t.Timing?.MkvMergeValue}"))}");
+
+        // a MEGA batch keeps them (also to be opened again in Hromadné spracovanie)
+        var file = Path.Combine(work.Path, "mega", "mega.json");
+        new Universum.Core.Mega.MegaStore(file).Add("Štúdio", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [item]);
+        var stored = new Universum.Core.Mega.MegaStore(file).Batches.Single().Files.Single();
+        Assert.True(stored.Timings.Count == 2 && stored.Studio is { Added.Count: 1, Removed: [2] } && stored.Externals.Any(e => e.Path == added) &&
+                    stored.Decisions().Timings[3] == SubtitleTiming.Delay(1500),
+            "the MEGA batch holds the times, the edits and the added file");
+
+        // written: the added file is a track, the English subtitles are left out
+        var result = (await RunAsync(work.Path, [item])).Single();
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var written = await (await InspectorAsync()).InspectAsync(result.OutputPath!);
+        Assert.Equal("cs,cs,cs", string.Join(",", written.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary)), "Czech, Czech forced and the added Czech file");
     }
 
     [Test]

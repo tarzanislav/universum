@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.Input;
+using Universum.Core.Batch;
+using Universum.Core.IO;
+using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Playback;
 using Universum.Core.Subtitles;
@@ -17,6 +20,35 @@ public sealed partial class SubtitlesPageViewModel
     private bool _compare;
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
+    private (string Path, IReadOnlyList<MediaTrack> Externals, Action<StudioEdits> Save, Action Leave)? _task;
+    private bool _openingTask;
+    private bool _hasWork;
+    private string _workNote = "";
+
+    /// <summary>The studio edits a file of Hromadné spracovanie (Upraviť v štúdiu): the changes go into the task.</summary>
+    public bool IsTask => _task is not null;
+
+    public string TaskText => _task is { } task
+        ? $"Úloha Hromadného spracovania: {System.IO.Path.GetFileName(task.Path)}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, " +
+          "ich jazyk a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Opravy textu sa v úlohe nepoužijú."
+        : "";
+
+    /// <summary>Uložiť do úlohy: the edits go back to Hromadné spracovanie.</summary>
+    public RelayCommand SaveToTaskCommand { get; private set; } = null!;
+
+    /// <summary>Back to Hromadné spracovanie without saving.</summary>
+    public RelayCommand LeaveTaskCommand { get; private set; } = null!;
+
+    /// <summary>Uložiť prácu: the values of every track kept for this video, to go on later.</summary>
+    public RelayCommand SaveWorkCommand { get; private set; } = null!;
+
+    /// <summary>Forgets the saved work of this video (the page keeps its values).</summary>
+    public RelayCommand DiscardWorkCommand { get; private set; } = null!;
+
+    /// <summary>Work is saved for the open video.</summary>
+    public bool HasWork { get => _hasWork; private set => SetProperty(ref _hasWork, value); }
+
+    public string WorkNote { get => _workNote; private set => SetProperty(ref _workNote, value); }
 
     /// <summary>The player of the studio.</summary>
     public Player.PlayerViewModel Player { get; }
@@ -65,6 +97,234 @@ public sealed partial class SubtitlesPageViewModel
 
     /// <summary>The player goes to a subtitle of the list (double click).</summary>
     public AsyncRelayCommand<SubtitlePreviewRow> SeekToCueCommand { get; }
+
+    private void CreateTaskCommands()
+    {
+        SaveToTaskCommand = new RelayCommand(SaveToTask, () => !_busy && _task is not null);
+        LeaveTaskCommand = new RelayCommand(() =>
+        {
+            var leave = _task?.Leave;
+            EndTask();
+            leave?.Invoke();
+        }, () => _task is not null);
+        SaveWorkCommand = new RelayCommand(SaveWork, () => !_busy && _file is not null && Rows.Count > 0 && _task is null);
+        DiscardWorkCommand = new RelayCommand(() =>
+        {
+            if (_file is not null)
+            {
+                _services.StudioWork.Delete(_file.Path);
+            }
+
+            HasWork = false;
+            WorkNote = "Uložená práca je zahodená – hodnoty na stránke ostali.";
+            RefreshCommands();
+        }, () => HasWork);
+    }
+
+    /// <summary>
+    /// Upraviť v štúdiu (owner, 30. 10. 2026): a file of Hromadné spracovanie as the analysis has it (with the subtitle
+    /// files found with it) and its edits so far; <paramref name="save"/> gets the edits (Uložiť do úlohy).
+    /// </summary>
+    public async Task EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Action<StudioEdits> save, Action leave)
+    {
+        _openingTask = true;
+        try
+        {
+            await LoadVideoAsync(analysed.Path);
+        }
+        finally
+        {
+            _openingTask = false;
+        }
+
+        if (_file is null)
+        {
+            return;
+        }
+
+        // the subtitle files the analysis found with the video, with its languages
+        var externals = analysed.Tracks.Where(t => t.ExternalFile is not null).ToList();
+        await AddFilesAsync([.. externals.Select(t => t.ExternalFile!).Where(File.Exists)]);
+        foreach (var track in externals)
+        {
+            RowOf(track.ExternalFile!)?.Choose(track.Language);
+        }
+
+        if (edits is not null)
+        {
+            await AddFilesAsync([.. edits.Added.Select(a => a.Path).Where(File.Exists)]);
+            foreach (var file in edits.Added)
+            {
+                if (RowOf(file.Path) is { } row)
+                {
+                    row.Choose(file.Language);
+                    row.Forced = file.Forced;
+                    row.HearingImpaired = file.HearingImpaired;
+                }
+            }
+
+            foreach (var row in Rows)
+            {
+                if (row.ExternalPath is not { } path)
+                {
+                    if (edits.Timings.TryGetValue(row.Track.Id, out var timing))
+                    {
+                        row.SetTiming(timing);
+                    }
+
+                    if (edits.Languages.TryGetValue(row.Track.Id, out var language))
+                    {
+                        row.Choose(language);
+                    }
+
+                    row.Include = !edits.Removed.Contains(row.Track.Id);
+                    continue;
+                }
+
+                if (edits.FileTimings.FirstOrDefault(t => Paths.Same(t.Key, path)).Value is { } fileTiming)
+                {
+                    row.SetTiming(fileTiming);
+                }
+
+                if (edits.FileLanguages.FirstOrDefault(l => Paths.Same(l.Key, path)) is { Key: not null } fileLanguage)
+                {
+                    row.Choose(fileLanguage.Value);
+                }
+
+                row.Include = !edits.RemovedFiles.Any(r => Paths.Same(r, path));
+            }
+        }
+
+        _task = (analysed.Path, externals, save, leave);
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        RefreshCommands();
+    }
+
+    private SubtitleRow? RowOf(string externalFile) => Rows.FirstOrDefault(r => r.ExternalPath is { } path && Paths.Same(path, externalFile));
+
+    private void SaveToTask()
+    {
+        if (_task is not { } task)
+        {
+            return;
+        }
+
+        if (Rows.FirstOrDefault(r => r.Include && r.Problem is not null) is { } wrong)
+        {
+            LiveStatus = $"{wrong.Source}: {wrong.Problem}";
+            return;
+        }
+
+        if (Rows.Any(r => r.Include && (r.RemoveHearingImpaired || r.RemoveFormatting || r.FixTimes || (!r.IsExternal && r.ToSrt))))
+        {
+            LiveStatus = "Opravy textu (konverzia stopy, prvky pre nepočujúcich, formátovanie, prekrývanie) sa v úlohe nepoužijú – zrušte ich, " +
+                         "alebo uložte video hneď tlačidlom Uložiť.";
+            return;
+        }
+
+        var edits = new StudioEdits();
+        foreach (var row in Rows)
+        {
+            var timing = row.Timing;
+            if (row.ExternalPath is not { } path)
+            {
+                if (!row.Include)
+                {
+                    edits.Removed.Add(row.Track.Id);
+                }
+
+                if (!timing.IsNone)
+                {
+                    edits.Timings[row.Track.Id] = timing;
+                }
+
+                if (!row.Language.Same(row.Track.Language))
+                {
+                    edits.Languages[row.Track.Id] = row.Language.Tag;
+                }
+
+                continue;
+            }
+
+            if (task.Externals.FirstOrDefault(t => Paths.Same(t.ExternalFile!, path)) is { } found)
+            {
+                if (!row.Include)
+                {
+                    edits.RemovedFiles.Add(path);
+                }
+
+                if (!row.Language.Same(found.Language))
+                {
+                    edits.FileLanguages[path] = row.Language.Tag;
+                }
+            }
+            else if (row.Include)
+            {
+                edits.Added.Add(new StudioFile(path, row.Language.Tag, row.Forced, row.HearingImpaired, row.Track.CodecId ?? "", row.Track.Codec,
+                    row.Track.IsTextSubtitles, row.Track.StatisticsFrames));
+            }
+
+            if (!timing.IsNone && row.Include)
+            {
+                edits.FileTimings[path] = timing;
+            }
+        }
+
+        EndTask();
+        task.Save(edits);
+    }
+
+    private void EndTask()
+    {
+        _task = null;
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        RefreshCommands();
+    }
+
+    private void SaveWork()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var work = _services.StudioWork.Save(_file.Path, Rows.Select(r => r.State()).ToList(), DateTime.UtcNow);
+            HasWork = true;
+            WorkNote = $"Práca je uložená ({work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            WorkNote = "Prácu sa nepodarilo uložiť: " + ex.Message;
+        }
+
+        RefreshCommands();
+    }
+
+    // the work saved for the video opened (not when a task of Hromadné spracovanie opens it)
+    private async Task RestoreWorkAsync()
+    {
+        HasWork = false;
+        WorkNote = "";
+        if (_openingTask || _file is null || _services.StudioWork.Load(_file.Path) is not { } work)
+        {
+            return;
+        }
+
+        await AddFilesAsync([.. work.Tracks.Select(t => t.ExternalFile).OfType<string>().Where(p => File.Exists(p) && RowOf(p) is null)]);
+        foreach (var state in work.Tracks)
+        {
+            var row = state.TrackId is { } id ? Rows.FirstOrDefault(r => !r.IsExternal && r.Track.Id == id) : state.ExternalFile is { } path ? RowOf(path) : null;
+            row?.Restore(state);
+        }
+
+        HasWork = true;
+        WorkNote = $"Obnovená uložená práca z {work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}.";
+        RefreshCommands();
+    }
 
     // the subtitles of the player: the selected ones as they will be, and the ones compared with
     private void RefreshPlayer()

@@ -10,6 +10,7 @@ using Universum.Core.MkvToolNix;
 using Universum.Core.Rules;
 using Universum.Core.Processes;
 using Universum.Core.Speech;
+using Universum.Core.Subtitles;
 using Universum.Core.Weather;
 using Universum.Platform.Windows;
 
@@ -279,6 +280,11 @@ public sealed class AppServices
     public SeriesMemory SeriesMemory => _seriesMemory ??= new(AppSettings.SeriesMemoryFile);
 
     private SeriesMemory? _seriesMemory;
+
+    /// <summary>The saved work of Úprava titulkostopy (Uložiť prácu; owner, 30. 10. 2026).</summary>
+    public StudioWorkStore StudioWork => _studioWork ??= new(AppSettings.StudioWorkDirectory);
+
+    private StudioWorkStore? _studioWork;
 
     /// <summary>Napovedkyňa for one file (Single spracovanie, the tools): the remembered series its names point to, or null.</summary>
     public TitleInfo? RememberedSeriesFor(string path)
@@ -789,6 +795,9 @@ public sealed class AppSettings
 
     /// <summary>The user's marks of titles (chosen, notes).</summary>
     public static string MarksFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news-marks.json");
+
+    /// <summary>The saved work of Úprava titulkostopy (one file a video).</summary>
+    public static string StudioWorkDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "studio");
 
     /// <summary>Napovedkyňa: the series processed before and their titles.</summary>
     public static string SeriesMemoryFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "napovedkyna.json");

@@ -1346,40 +1346,56 @@
                 </Grid>
                 <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0">
                     <StackPanel>
-                        <StackPanel Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
-                            <WrapPanel DataContext="{Binding Library}">
-                                <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="subtitlesKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
-                                <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="subtitlesKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
-                                <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
-                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
-                                <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
-                                <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
-                                          IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
-                                        Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
-                                <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
-                                    <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                    <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
-                                </StackPanel>
-                                <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
-                            </WrapPanel>
-                            <TextBlock TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}" Margin="0,4,0,4">
-                                <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
-                                <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            </TextBlock>
-                            <CheckBox Content="Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)" IsChecked="{Binding UseRules}" Margin="0,0,0,6" />
-                            <TextBlock Text="{Binding Blocked}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
-                        </StackPanel>
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />
-                            <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding OutputFormat}" Width="90" Margin="0,0,8,0" VerticalAlignment="Top"
-                                      Visibility="{Binding IsFiles, Converter={StaticResource BoolToVisibility}}" ToolTip="Formát nových súborov titulkov" />
-                            <StackPanel Margin="0,0,16,0">
-                                <TextBlock Style="{StaticResource Hint}" Text="Video: nový súbor v knižnici (mkvmerge, časy cez --sync). Súbory titulkov: nové SRT alebo WebVTT vedľa pôvodných. Originály ostanú nezmenené." TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                        <!-- Upraviť v štúdiu: a file of Hromadné spracovanie – the changes go back into the task -->
+                        <DockPanel Visibility="{Binding IsTask, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Content="Späť bez uloženia" Command="{Binding LeaveTaskCommand}" Padding="12,6" Margin="0,0,8,0" />
+                                <Button Content="Uložiť do úlohy" Command="{Binding SaveToTaskCommand}" Padding="16,6" FontWeight="SemiBold" />
                             </StackPanel>
+                            <TextBlock Text="{Binding TaskText}" TextWrapping="Wrap" Margin="0,0,16,0" />
                         </DockPanel>
+                        <StackPanel Visibility="{Binding IsTask, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
+                                <WrapPanel DataContext="{Binding Library}">
+                                    <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="subtitlesKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
+                                    <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="subtitlesKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
+                                    <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
+                                             ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                    <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                    <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
+                                              IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
+                                            Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
+                                        <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                        <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                    </StackPanel>
+                                    <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
+                                </WrapPanel>
+                                <TextBlock TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}" Margin="0,4,0,4">
+                                    <Run Text="Výsledok (nový súbor v knižnici, originál ostane):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
+                                    <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </TextBlock>
+                                <CheckBox Content="Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)" IsChecked="{Binding UseRules}" Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding Blocked}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                            </StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />
+                                <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding OutputFormat}" Width="90" Margin="0,0,8,0" VerticalAlignment="Top"
+                                          Visibility="{Binding IsFiles, Converter={StaticResource BoolToVisibility}}" ToolTip="Formát nových súborov titulkov" />
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource Hint}" Text="Video: nový súbor v knižnici (mkvmerge, časy cez --sync). Súbory titulkov: nové SRT alebo WebVTT vedľa pôvodných. Originály ostanú nezmenené." TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
+                                        <Button Content="Uložiť prácu" Command="{Binding SaveWorkCommand}" Padding="10,2" Margin="0,0,6,0"
+                                                ToolTip="Hodnoty všetkých titulkov tohto videa sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)" />
+                                        <Button Content="Zahodiť prácu" Command="{Binding DiscardWorkCommand}" Padding="10,2" Margin="0,0,8,0" />
+                                        <TextBlock Text="{Binding WorkNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -1742,6 +1758,8 @@
                         <DockPanel Margin="0,0,0,6">
                             <Button DockPanel.Dock="Right" Content="Informácie" Command="{Binding ShowInfoCommand}" Padding="10,3"
                                     ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
+                            <Button DockPanel.Dock="Right" Content="Upraviť v štúdiu" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                                    ToolTip="Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
                             <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
                         <DataGrid Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
@@ -1750,6 +1768,7 @@
                                 <ContextMenu>
                                     <MenuItem Header="Rozpoznať jazyk audiostôp vybraných súborov" Command="{Binding DetectAudioSelectedCommand}" />
                                     <MenuItem Header="Informácie o súbore" Command="{Binding ShowInfoCommand}" />
+                                    <MenuItem Header="Upraviť v štúdiu (titulky)" Command="{Binding EditInStudioCommand}" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>

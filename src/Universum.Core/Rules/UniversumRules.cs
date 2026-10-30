@@ -63,7 +63,8 @@ public static class UniversumRules
             a.Track.Flags with { Default = ReferenceEquals(a, defaultAudio), Enabled = true, Forced = false },
             a.Role)));
 
-        targets.AddRange(SubtitleTargets(audio, defaultAudio, subtitles, profile, issues));
+        targets.AddRange(SubtitleTargets(audio, defaultAudio, subtitles, profile, issues)
+            .Select(s => decisions.Timings.TryGetValue(s.TrackId, out var timing) && !timing.IsNone ? s with { Timing = timing } : s));
 
         // other track types (rare) keep their position at the end and their properties
         targets.AddRange(file.Tracks.Where(t => t.Type == TrackType.Other)

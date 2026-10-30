@@ -68,6 +68,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         RemoveCommand = new RelayCommand(Remove, () => !_busy && _selected is { IsExternal: true });
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         Player = new Player.PlayerViewModel(services);
+        CreateTaskCommands();
         StartsNowCommand = new RelayCommand(StartsNow, () => Player.IsOpen && _selected is not null);
         MarkFirstCommand = new RelayCommand(() => MarkPoint(first: true), () => Player.IsOpen && _selected is not null);
         MarkSecondCommand = new RelayCommand(() => MarkPoint(first: false), () => Player.IsOpen && _selected is not null);
@@ -334,6 +335,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             _busy = false;
             Changed();
         }
+
+        await RestoreWorkAsync();
     }
 
     // owner, bod 5: subtitle files lying with the video that belong to it
@@ -489,6 +492,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         Preview = [];
         CompareRow = null;
         _ = Player.CloseAsync();
+        HasWork = false;
+        WorkNote = "";
+        if (_task is not null)
+        {
+            EndTask();
+        }
         SelectedRow = null;
         Result = "";
         _nextId = FirstExternalId;
@@ -767,6 +776,10 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         MarkFirstCommand?.NotifyCanExecuteChanged();
         MarkSecondCommand?.NotifyCanExecuteChanged();
         StopSyncCommand?.NotifyCanExecuteChanged();
+        SaveToTaskCommand?.NotifyCanExecuteChanged();
+        LeaveTaskCommand?.NotifyCanExecuteChanged();
+        SaveWorkCommand?.NotifyCanExecuteChanged();
+        DiscardWorkCommand?.NotifyCanExecuteChanged();
         ApplyProposalCommand?.NotifyCanExecuteChanged();
     }
 

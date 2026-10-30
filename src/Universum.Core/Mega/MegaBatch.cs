@@ -89,6 +89,12 @@ public sealed class MegaFile
 
     public List<int> Order { get; init; } = [];
 
+    /// <summary>New times of subtitle tracks (by track ID, also the external files' – their IDs are kept in <see cref="Externals"/>).</summary>
+    public Dictionary<int, Subtitles.SubtitleTiming> Timings { get; init; } = [];
+
+    /// <summary>The edits of Úprava titulkostopy, to be opened again in Hromadné spracovanie; null = none.</summary>
+    public StudioEdits? Studio { get; init; }
+
     /// <summary>
     /// The rules' profile with the template the file was planned with, when it differs from the batch's (a file added to
     /// or changed in the batch later); null = <see cref="MegaBatch.Profile"/>.
@@ -126,6 +132,7 @@ public sealed class MegaFile
         Removed = Removed.ToHashSet(),
         Kept = Kept.ToHashSet(),
         Order = Order,
+        Timings = Timings,
     };
 
     /// <summary>A prepared file of Hromadné spracovanie (it has its place in the library and something to do).</summary>
@@ -150,6 +157,8 @@ public sealed class MegaFile
             Removed = [.. item.Decisions.Removed],
             Kept = [.. item.Decisions.Kept],
             Order = [.. item.Decisions.Order],
+            Timings = item.Decisions.Timings.ToDictionary(),
+            Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
             Profile = profile,

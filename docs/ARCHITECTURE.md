@@ -61,8 +61,17 @@ in next to it without changing the rules, planning or UI.
     also an exception, restores the header and moves it back;
   - otherwise the result is written as `*.universum-tmp`, flushed, read back, verified and renamed, and only then is
     the original sent to the Recycle Bin;
-  - originals are always kept: `FileProcessor.DeleteOriginalsAllowed` is off, so "delete" means "keep" (owner's
-    decision of 26 October 2026, until the program is proven in practice); the apps offer no delete;
+  - originals are kept everywhere except Hromadné spracovanie (owner's decisions of 26 and 30 October 2026):
+    `FileProcessor.DeleteOriginalsAllowed` is off for every other tool, so "delete" means "keep". In Hromadné
+    spracovanie (`OriginalsMode`, kept with each MEGA batch) the user chooses: keep; delete automatically – each
+    original to the Recycle Bin right after its result is written and verified (`OutputOptions.MoveIntoLibrary` false:
+    always a new file first, the original is never moved and edited); or delete manually – after the run
+    `OriginalCleanup` sends the originals of results in the library to the Recycle Bin – only when the library index
+    confirms that the result is a file made from exactly this original (`LibraryIndex.IsMadeFrom`, fingerprint read
+    again) and unchanged since. A file the index knows as a result (also of an earlier library) or one in MOVIES /
+    TVSHOWS is never removed, in either mode. A run with automatic deleting is confirmed each time; a MEGA batch is
+    completed only with the same choice. Never permanently: an original that cannot go to the Recycle Bin stays and
+    the output says so;
   - every tool writes its result as a new file into the library, named by the rules (`LibraryTargetPicker` in the
     app: film/series, title, episode, TMDB): rules, batch, header editor, chapter editor (`TargetState.NewChapters`)
     and multiplexer (`MuxSpec.Placement`, name chosen after writing by the size class); `Placement.InPlace` /

@@ -176,6 +176,19 @@ public sealed class LibraryIndex
         }
     }
 
+    /// <summary>
+    /// True when <paramref name="resultPath"/> is a result UNIVERSUM made from an original with this fingerprint and it has
+    /// not changed since (Zmazať originály: the original may go only when its copy in the library is surely made from it).
+    /// </summary>
+    public bool IsMadeFrom(string resultPath, string sourceFingerprint)
+    {
+        lock (_entries)
+        {
+            return File.Exists(resultPath) && _entries.TryGetValue(Path.GetFullPath(resultPath), out var entry) &&
+                   entry.Source == sourceFingerprint && Unchanged(entry, resultPath);
+        }
+    }
+
     /// <summary>A library result was reworked: it may have a new path, size and target; it still comes from the same original.</summary>
     public void Replace(string oldPath, string newPath, string targetSignature)
     {

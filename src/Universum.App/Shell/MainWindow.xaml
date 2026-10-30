@@ -183,6 +183,8 @@
                             ToolTip="Súbory dokončenej dávky, ktoré sa preskočili, nepodarili alebo zrušili, sa znova skontrolujú a zapíšu" />
                     <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Dávku vyššie (poradie pre „po predchádzajúcej dávke“)" />
                     <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="Dávku nižšie" />
+                    <Button Content="Zmazať originály" Command="{Binding DeleteOriginalsCommand}" Padding="12,4" Margin="0,0,8,0"
+                            ToolTip="Dávka odoslaná so „zmazať ručne“: originály jej zapísaných súborov do Koša Windows" />
                     <Button Content="Odstrániť dávku" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Súbory sa nemenia; nezapísané sa v Hromadnom spracovaní znova ukážu ako voľné" />
                     <Button Content="Vyčistiť dokončené" Command="{Binding ClearFinishedCommand}" Padding="12,4" />
                 </WrapPanel>
@@ -192,6 +194,7 @@
                         <DataGridTextColumn Header="Dávka" Binding="{Binding Label}" />
                         <DataGridTextColumn Header="Čo obsahuje" Binding="{Binding Name}" Width="2*" />
                         <DataGridTextColumn Header="Súbory" Binding="{Binding Count}" Width="Auto" />
+                        <DataGridTextColumn Header="Originály" Binding="{Binding Originals}" Width="Auto" />
                         <DataGridTemplateColumn Header="Spustiť" Width="Auto" MinWidth="330">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -452,7 +455,7 @@
                             <TextBlock Text="Originál:" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
                             <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
                             <RadioButton Content="vymazať (zatiaľ vypnuté)" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
-                                         ToolTip="Zatiaľ vypnuté: kým program v praxi neodladíme, originály sa vždy zachovajú." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
+                                         ToolTip="Single spracovanie originály vždy zachová – mazanie originálov je len v Hromadnom spracovaní." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
                             <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
                                 <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
@@ -1563,9 +1566,15 @@
                     <StackPanel>
                         <WrapPanel>
                             <TextBlock Text="Originál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" GroupName="batchOriginal" Margin="0,0,12,0" />
-                            <RadioButton Content="vymazať (zatiaľ vypnuté)" IsChecked="{Binding DeleteOriginal}" GroupName="batchOriginal" Margin="0,0,20,0"
-                                         ToolTip="Zatiaľ vypnuté: kým program v praxi neodladíme, originály sa vždy zachovajú." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
+                            <!-- owner, 30. 10. 2026: deleting originals – only here; always into the Recycle Bin -->
+                            <RadioButton Content="zachovať" IsChecked="{Binding KeepOriginal}" GroupName="batchOriginal" Margin="0,0,12,0" IsEnabled="{Binding IsIdle}" />
+                            <RadioButton Content="zmazať automaticky" IsChecked="{Binding DeleteAutomatically}" GroupName="batchOriginal" Margin="0,0,12,0" IsEnabled="{Binding IsIdle}"
+                                         ToolTip="Každý originál ide do Koša hneď po zapísaní a overení nového súboru v knižnici – priebežne, súbor po súbore" />
+                            <RadioButton Content="zmazať ručne" IsChecked="{Binding DeleteManually}" GroupName="batchOriginal" Margin="0,0,8,0" IsEnabled="{Binding IsIdle}"
+                                         ToolTip="Počas spracovania sa nič nemaže; po dokončení pošle originály do Koša tlačidlo Zmazať originály" />
+                            <Button Content="{Binding DeleteOriginalsText}" Command="{Binding DeleteOriginalsCommand}" Padding="10,3" Margin="0,0,20,0"
+                                    Visibility="{Binding CanDeleteOriginals, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Originály spracovaných súborov do Koša Windows – len tie, ktorých výsledok je v knižnici a ktoré sa od spracovania nezmenili" />
                             <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <Run Text="Knižnica:" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>

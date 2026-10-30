@@ -73,7 +73,8 @@ public sealed class BatchPageViewModel : ObservableObject
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
         SaveTemplateCommand = new RelayCommand(SaveTemplate, () => !Busy && Template.Slots.Count > 0);
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
-        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork) && _services.Settings.OriginalHandling is not null);
+        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork));
+        DeleteOriginalsCommand = new AsyncRelayCommand(DeleteOriginalsAsync, () => !Busy && !_running && Originals != OriginalsMode.Keep && PendingOriginals().Count > 0);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
         StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null || _speechCancellation is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
@@ -89,8 +90,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         };
         RefreshMegaTargets();
-        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork) &&
-                                                             _services.Settings.OriginalHandling is not null);
+        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
@@ -199,6 +199,7 @@ public sealed class BatchPageViewModel : ObservableObject
         _only = null;
         _sentSeries = null;
         StopEditing();
+        _written.Clear();
         _results = [];
         Finish = null;
         SelectedGroup = null;
@@ -392,16 +393,115 @@ public sealed class BatchPageViewModel : ObservableObject
         set => Template = Template with { Unlisted = value ? UnlistedTracks.Remove : UnlistedTracks.Keep };
     }
 
+    /// <summary>What happens with the originals (owner, 30. 10. 2026 – only in Hromadné spracovanie; MEGA batches take it over).</summary>
+    public OriginalsMode Originals => _services.Settings.BatchOriginals;
+
     public bool KeepOriginal
     {
-        get => _services.Settings.OriginalHandling == OriginalHandling.Keep;
-        set => SetHandling(value, OriginalHandling.Keep);
+        get => Originals == OriginalsMode.Keep;
+        set => SetOriginals(value, OriginalsMode.Keep);
     }
 
-    public bool DeleteOriginal
+    /// <summary>Each original goes to the Recycle Bin right after its result is written and verified.</summary>
+    public bool DeleteAutomatically
     {
-        get => _services.Settings.OriginalHandling == OriginalHandling.Delete;
-        set => SetHandling(value, OriginalHandling.Delete);
+        get => Originals == OriginalsMode.DeleteAutomatically;
+        set => SetOriginals(value, OriginalsMode.DeleteAutomatically);
+    }
+
+    /// <summary>The originals stay during the run; Zmazať originály sends them to the Recycle Bin after it.</summary>
+    public bool DeleteManually
+    {
+        get => Originals == OriginalsMode.DeleteManually;
+        set => SetOriginals(value, OriginalsMode.DeleteManually);
+    }
+
+    /// <summary>Zmazať originály – enabled after a run (never during it).</summary>
+    public AsyncRelayCommand DeleteOriginalsCommand { get; }
+
+    public bool CanDeleteOriginals => Originals != OriginalsMode.Keep;
+
+    /// <summary>The choice of the originals can change only between runs.</summary>
+    public bool IsIdle => !_running;
+
+    public string DeleteOriginalsText => PendingOriginals().Count is var count and > 0 ? $"Zmazať originály ({count})" : "Zmazať originály";
+
+    // the originals of results in the library: written by the runs of this page, and found already in the library at
+    // the analysis – each one only while it is still in its place
+    private readonly List<WrittenOriginal> _written = [];
+
+    private List<WrittenOriginal> PendingOriginals()
+    {
+        // the newest entry of an original first (a later run of the same original made the result that counts)
+        var pending = Enumerable.Reverse(_written).Where(o => File.Exists(o.Source)).ToList();
+        foreach (var item in _items.Where(i => i.AlreadyInLibraryAt is not null))
+        {
+            if (_fingerprints.TryGetValue(Path.GetFullPath(item.File.Path), out var fingerprint) &&
+                OriginalCleanup.FromFingerprint(item.File.Path, fingerprint, item.AlreadyInLibraryAt!) is { } found && File.Exists(found.Source))
+            {
+                pending.Add(found);
+            }
+        }
+
+        return pending.DistinctBy(o => Path.GetFullPath(o.Source), Paths.Comparer).ToList();
+    }
+
+    private async Task DeleteOriginalsAsync()
+    {
+        var pending = PendingOriginals();
+        var folders = pending.Select(o => Path.GetDirectoryName(o.Source) ?? "").Distinct(Paths.Comparer).ToList();
+        if (pending.Count == 0 ||
+            !Confirm($"Zmazať {Texts.Count(pending.Count, "originál", "originály", "originálov")}?\n\n" +
+                     $"Z priečinkov: {string.Join(", ", folders.Take(3))}{(folders.Count > 3 ? $" + {folders.Count - 3} ďalšie" : "")}\n\n" +
+                     "Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od spracovania nezmenil; " +
+                     "súbory v knižnici (MOVIES, TVSHOWS) sa nikdy nemažú."))
+        {
+            return;
+        }
+
+        Busy = true;
+        RefreshCommands();
+        try
+        {
+            var library = _services.Library;
+            var index = _services.LibraryIndex;
+            var (removed, kept) = await Task.Run(() => OriginalCleanup.RemoveAsync(pending, index, new WindowsRecycleBin(), path => library?.HoldsResult(path) == true));
+            _written.RemoveAll(o => removed.Contains(o.Source, Paths.Comparer));
+            RunState = $"Do Koša: {Texts.Count(removed.Count, "originál", "originály", "originálov")}" +
+                       (kept.Count > 0 ? $" · ostalo {kept.Count}: " + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "") +
+                       (removed.Count > 0 ? " · Pre ďalšiu prácu s priečinkom dajte Analyzovať." : "");
+            LastCleanup = (removed, kept);
+            if (removed.Count > 0)
+            {
+                _needsAnalysis = true;
+            }
+        }
+        finally
+        {
+            Busy = false;
+            OnPropertyChanged(nameof(DeleteOriginalsText));
+            RefreshCommands();
+        }
+    }
+
+    /// <summary>The originals removed and kept by the last Zmazať originály (the self-test reads it).</summary>
+    public (IReadOnlyList<string> Removed, IReadOnlyList<string> Kept) LastCleanup { get; private set; } = ([], []);
+
+    private void SetOriginals(bool selected, OriginalsMode mode)
+    {
+        if (!selected || _running)
+        {
+            return;
+        }
+
+        _services.Settings.BatchOriginals = mode;
+        _services.Settings.Save();
+        foreach (var name in new[] { nameof(Originals), nameof(KeepOriginal), nameof(DeleteAutomatically), nameof(DeleteManually), nameof(CanDeleteOriginals), nameof(DeleteOriginalsText) })
+        {
+            OnPropertyChanged(name);
+        }
+
+        RefreshCommands();
     }
 
     public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
@@ -1149,6 +1249,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Simulation = (_library is null ? "Bez výstupného priečinka – len simulácia pravidiel · " : $"Do knižnice {remux + header + place} súborov ({remux} nový súbor, {header} len hlavička, {place} bez zmeny obsahu) · ") +
                      $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
         OnFilmChanged();
+        OnPropertyChanged(nameof(DeleteOriginalsText));
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
         OnPropertyChanged(nameof(SeriesSuggestion));
@@ -1980,25 +2081,38 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private async Task RunAsync()
     {
-        if (_services.CurrentMkvToolNix is not { } installation || _services.Settings.OriginalHandling is not { } handling || _analysis is null || _library is null)
+        if (_services.CurrentMkvToolNix is not { } installation || _analysis is null || _library is null)
         {
             return;
         }
 
+        // owner, 30. 10. 2026: deleted automatically = each original to the Recycle Bin right after its verified result;
+        // the choice is kept between starts, so each run with it is confirmed
+        var originals = Originals;
+        if (originals == OriginalsMode.DeleteAutomatically &&
+            !Confirm($"Spustiť so ZMAZANÍM ORIGINÁLOV?\n\nKaždý originál pôjde do Koša Windows hneď po zapísaní a overení nového súboru v knižnici " +
+                     $"({Texts.Count(_items.Count(i => i.NeedsWork), "súbor", "súbory", "súborov")}). Ak ich chcete ponechať, zvoľte Originál: zachovať."))
+        {
+            return;
+        }
+
+        var handling = originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep;
+
         Busy = true;
         _running = true;
+        OnPropertyChanged(nameof(IsIdle));
         Finish = null;
         var started = System.Diagnostics.Stopwatch.StartNew();
         RefreshCommands();
         try
         {
-            var processor = _services.Processor(installation);
+            var processor = _services.Processor(installation, deleteOriginals: handling == OriginalHandling.Delete);
             _library.Layout.EnsureCreated();
 
             // owner, 29. 10. 2026: the run is a job of the job queue – seen in Fronta úloh and Výstup úloh
             var job = new Core.Jobs.BatchJob(
                 $"Hromadné spracovanie: {Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))} → knižnica",
-                _items, processor, new OutputOptions(handling),
+                _items, processor, new OutputOptions(handling, MoveIntoLibrary: false),
                 new Progress<BatchProgress>(p =>
                 {
                     Progress = p.Total == 0 ? 0 : (p.Finished + (p.Result is null ? p.FileFraction : 0)) / p.Total;
@@ -2022,6 +2136,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
             await finished.Task;
             _results = job.Results;
+            _written.AddRange(OriginalCleanup.Collect(_results));
+            var recycled = _results.Count(r => r.Messages.Contains(FileProcessor.OriginalRecycledMessage));
+            var stayed = _results.Count(r => r.Messages.Any(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)));
             var cache = _services.Inspector(installation);
             foreach (var result in _results.Where(r => r.Status == ProcessingStatus.Done))
             {
@@ -2052,20 +2169,26 @@ public sealed class BatchPageViewModel : ObservableObject
                 failed > 0 || broken ? BatchFinishKind.Errors : stopped ? BatchFinishKind.Stopped : BatchFinishKind.Done,
                 (broken ? "CHYBA" : failed > 0 ? "HOTOVO S CHYBAMI" : cancelled ? "ZRUŠENÉ" : stopped ? "ZASTAVENÉ" : "HOTOVO") + $" – spracovanie skončilo o {DateTime.Now:H:mm}",
                 $"{Texts.Count(done, "súbor", "súbory", "súborov")} v knižnici" + (present > 0 ? $" · {present} tam už bolo" : "") +
-                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") + $" · trvanie {time} · úloha {job.Id} vo Fronte úloh");
+                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") +
+                (recycled > 0 ? $" · {Texts.Count(recycled, "originál", "originály", "originálov")} v Koši" : "") +
+                (stayed > 0 ? $" · {stayed} originálov ostalo (Kôš nie je k dispozícii – pozri Výstup úloh)" : "") +
+                (originals == OriginalsMode.DeleteManually && PendingOriginals().Count > 0 ? " · originály zmažete tlačidlom Zmazať originály" : "") +
+                $" · trvanie {time} · úloha {job.Id} vo Fronte úloh");
         }
         finally
         {
             _running = false;
             Busy = false;
             OnPropertyChanged(nameof(PauseText));
+            OnPropertyChanged(nameof(DeleteOriginalsText));
+            OnPropertyChanged(nameof(IsIdle));
             RefreshCommands();
         }
     }
 
     private void SendToMega()
     {
-        if (_analysis is null || _library is null || _services.Settings.OriginalHandling is not { } handling)
+        if (_analysis is null || _library is null)
         {
             return;
         }
@@ -2093,8 +2216,17 @@ public sealed class BatchPageViewModel : ObservableObject
                     return;
                 }
 
+                // the batch deletes (or keeps) the originals as it was sent – the page has to say the same
+                if (target.Originals != Originals)
+                {
+                    RunState = $"{target.Label} má originály: {OriginalsText(target.Originals)}; tu je zvolené: {OriginalsText(Originals)}. " +
+                               "Zvoľte rovnako, alebo pošlite súbory do novej dávky.";
+                    return;
+                }
+
                 if (!Confirm($"Uložiť do {target.Label} {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." + left))
+                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." +
+                             $"\n\nOriginály: {OriginalsText(target.Originals)}." + left))
                 {
                     return;
                 }
@@ -2110,12 +2242,14 @@ public sealed class BatchPageViewModel : ObservableObject
                 var name = $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))}: " +
                            string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? $" + {titles.Count - 3} ďalšie" : "");
                 if (!Confirm($"Odoslať do MEGA spracovania {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                             "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." + left))
+                             "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." +
+                             $"\n\nOriginály: {OriginalsText(Originals)} (dávka si to zapamätá)." + left))
                 {
                     return;
                 }
 
-                if (_services.Mega.Add(name, _library.Layout.Root, profile, handling, ready, template) is not { } batch)
+                // the batch takes over what happens with the originals (owner, 30. 10. 2026)
+                if (_services.Mega.Add(name, _library.Layout.Root, profile, Originals, ready, template) is not { } batch)
                 {
                     RunState = "Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.";
                     return;
@@ -2134,6 +2268,13 @@ public sealed class BatchPageViewModel : ObservableObject
             RunState = "Dávku sa nepodarilo uložiť: " + ex.Message;
         }
     }
+
+    internal static string OriginalsText(OriginalsMode mode) => mode switch
+    {
+        OriginalsMode.DeleteAutomatically => "zmažú sa automaticky (do Koša hneď po overení výsledku)",
+        OriginalsMode.DeleteManually => "zmažete ich ručne po dokončení dávky (do Koša)",
+        _ => "zachovajú sa",
+    };
 
     /// <summary>Where Odoslať do MEGA puts the prepared files: a new batch, or a waiting one to be completed.</summary>
     public System.Collections.ObjectModel.ObservableCollection<MegaTarget> MegaTargets { get; } = [];
@@ -2547,20 +2688,6 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    private void SetHandling(bool selected, OriginalHandling handling)
-    {
-        if (!selected)
-        {
-            return;
-        }
-
-        _services.Settings.OriginalHandling = handling;
-        _services.Settings.Save();
-        OnPropertyChanged(nameof(KeepOriginal));
-        OnPropertyChanged(nameof(DeleteOriginal));
-        RefreshCommands();
-    }
-
     private static void TrySave(CachingInspector inspector)
     {
         try
@@ -2581,7 +2708,7 @@ public sealed class BatchPageViewModel : ObservableObject
                      DetectAudioAllCommand, EditTemplateCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
-                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand,
+                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

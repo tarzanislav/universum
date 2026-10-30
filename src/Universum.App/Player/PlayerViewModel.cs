@@ -229,6 +229,28 @@ public sealed class PlayerViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Plays a sound instead of the chosen audio track (Úprava audiostopy: a dub, or a track with new times); null: the
+    /// chosen audio track again.
+    /// </summary>
+    public async Task SetSoundAsync(PlayerSound? sound)
+    {
+        if (_session is not { } session || session.Sound == sound)
+        {
+            return;
+        }
+
+        _seeking++;
+        try
+        {
+            await session.SetSoundAsync(sound);
+        }
+        finally
+        {
+            _seeking--;
+        }
+    }
+
     /// <summary>Stops playing and forgets the film (an open still going on is given up).</summary>
     public async Task CloseAsync()
     {

@@ -29,7 +29,10 @@ public sealed record TrackDecisions
     /// </summary>
     public IReadOnlyList<int> Order { get; init; } = [];
 
-    /// <summary>New times of subtitle tracks (Úprava titulkostopy: Zmena FPS, rýchlosti, Posun – owner, 30. 10. 2026).</summary>
+    /// <summary>
+    /// New times of subtitle tracks (Úprava titulkostopy: Zmena FPS, rýchlosti, Posun – owner, 30. 10. 2026) and the shift
+    /// of audio tracks (Úprava audiostopy; a change of their speed is written into the sound itself).
+    /// </summary>
     public IReadOnlyDictionary<int, Subtitles.SubtitleTiming> Timings { get; init; } = new Dictionary<int, Subtitles.SubtitleTiming>();
 
     /// <summary>

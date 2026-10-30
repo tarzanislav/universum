@@ -1419,6 +1419,224 @@
                 </Border>
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:AudioPageViewModel}">
+            <!-- owner, 30. 10. 2026: Úprava audiostopy – the sounds play with the film; a dub fitted, PAL 25 ↔ 23,976, codec, loudness -->
+            <Grid Margin="24,16,24,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Content="Vyčistiť" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="Zabudne otvorené video a zvuky – na disku sa nič nezmení" />
+                        <Button Content="Otvoriť video…" Command="{Binding OpenVideoCommand}" Padding="16,6" Margin="0,0,8,0" />
+                        <Button Content="Pridať zvuk…" Command="{Binding AddSoundCommand}" Padding="16,6"
+                                ToolTip="Zvukové súbory (MKA, AC-3, E-AC-3, DTS, AAC, MP3, FLAC, Opus, WAV) alebo iný film, z ktorého sa zoberie zvuk (napr. CZ dabing z iného vydania)" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Úprava audiostopy" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="420" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="400" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1.2*" MinHeight="200" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" MinHeight="150" />
+                        </Grid.RowDefinitions>
+                        <DockPanel>
+                            <WrapPanel DockPanel.Dock="Bottom" Margin="0,6,0,0" DataContext="{Binding SelectedRow}"
+                                       Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Hrá:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding Source}" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                <TextBlock Text="Posun:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0" />
+                                <Button Content="−1000" Command="{Binding DelayStepCommand}" CommandParameter="-1000" Padding="6,2" Margin="0,0,3,0" />
+                                <Button Content="−100" Command="{Binding DelayStepCommand}" CommandParameter="-100" Padding="6,2" Margin="0,0,3,0" />
+                                <Button Content="−10" Command="{Binding DelayStepCommand}" CommandParameter="-10" Padding="6,2" Margin="0,0,4,0" />
+                                <TextBox Text="{Binding DelayText, UpdateSourceTrigger=LostFocus}" Width="70" TextAlignment="Right" />
+                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="3,0,4,0" />
+                                <Button Content="+10" Command="{Binding DelayStepCommand}" CommandParameter="10" Padding="6,2" Margin="0,0,3,0" />
+                                <Button Content="+100" Command="{Binding DelayStepCommand}" CommandParameter="100" Padding="6,2" Margin="0,0,3,0" />
+                                <Button Content="+1000" Command="{Binding DelayStepCommand}" CommandParameter="1000" Padding="6,2" />
+                            </WrapPanel>
+                            <player:PlayerView DataContext="{Binding Player}" />
+                        </DockPanel>
+                        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Background="Transparent" Margin="0,2,0,2" />
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <DataGrid ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="Ponechať">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Zdroj" Binding="{Binding Source, Mode=OneWay}" IsReadOnly="True" Width="2*" />
+                                    <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display, Mode=OneWay}" IsReadOnly="True" Width="*" />
+                                    <DataGridTextColumn Header="Názov stopy" Binding="{Binding Name, Mode=OneWay}" IsReadOnly="True" Width="*" />
+                                    <DataGridTextColumn Header="Formát" Binding="{Binding Format, Mode=OneWay}" IsReadOnly="True" />
+                                    <DataGridTextColumn Header="Zmeny" Binding="{Binding Summary, Mode=OneWay}" IsReadOnly="True" Width="2*" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel Grid.Row="1" Margin="0,8,0,4">
+                                <WrapPanel>
+                                    <Button Content="Odstrániť zo zoznamu" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný zvuk sa nepridá" />
+                                    <TextBlock Text="Napasovať vybraný zvuk na:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <ComboBox ItemsSource="{Binding References}" SelectedItem="{Binding Reference}" Width="200" Margin="0,0,8,0"
+                                              ToolTip="Zvuk filmu, ku ktorému sa vybraný zvuk napasuje (hudba a ruchy sú v oboch, aj pri dabingu)">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock>
+                                                    <Run Text="{Binding Language.Display, Mode=OneWay}" /> – <Run Text="{Binding Source, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
+                                            ToolTip="Prečíta oba zvuky celé a porovná ich v mnohých častiach filmu: posun aj zmena FPS (25 ↔ 23,976); istý výsledok sa nastaví sám" />
+                                    <Button Content="Zastaviť" Command="{Binding StopCommand}" Padding="12,4" Margin="0,0,8,0" />
+                                    <Button Content="Použiť návrh" Command="{Binding ApplyProposalCommand}" Padding="12,4"
+                                            Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
+                                </WrapPanel>
+                                <ProgressBar Value="{Binding Progress}" Maximum="1" Height="4" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" DataContext="{Binding SelectedRow}"
+                                  Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="{Binding Source}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Format}" Style="{StaticResource Hint}" Margin="0,0,0,6" />
+                            <WrapPanel>
+                                <TextBlock Text="Jazyk:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}"
+                                          DisplayMemberPath="Display" Width="170" Margin="0,0,12,0" />
+                            </WrapPanel>
+                            <WrapPanel Margin="0,6,0,0">
+                                <TextBlock Text="Názov stopy:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="250"
+                                         ToolTip="Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (zvuk bez názvu); môžete doň dopísať, prázdny = bez názvu" />
+                            </WrapPanel>
+
+                            <TextBlock Text="Zmena FPS (PAL 25 ↔ 23,976)" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,4" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Zvuk bol pre (FPS)" Style="{StaticResource Hint}" />
+                                    <ListBox ItemsSource="{Binding Rates}" SelectedItem="{Binding FpsFrom}" BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <RadioButton Content="{Binding Label}" IsHitTestVisible="False" Focusable="False"
+                                                             IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=OneWay}" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Video (FPS)" Style="{StaticResource Hint}" />
+                                    <ListBox ItemsSource="{Binding Rates}" SelectedItem="{Binding FpsTo}" BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <RadioButton Content="{Binding Label}" IsHitTestVisible="False" Focusable="False"
+                                                             IsChecked="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=OneWay}" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Grid>
+                            <CheckBox Content="Zachovať výšku tónu" IsChecked="{Binding KeepPitch}" Margin="0,4,0,0"
+                                      ToolTip="Zapnuté: hlasy znejú rovnako, len pomalšie/rýchlejšie. Vypnuté: výška tónu sa zmení s rýchlosťou (vráti pôvodnú výšku zvuku zrýchleného pre PAL bez korekcie)" />
+
+                            <TextBlock Text="Posun (Delay v ms)" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,4" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="−1000" Command="{Binding DelayStepCommand}" CommandParameter="-1000" Padding="8,2" Margin="0,0,4,0" />
+                                <Button Content="−100" Command="{Binding DelayStepCommand}" CommandParameter="-100" Padding="8,2" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding DelayText, UpdateSourceTrigger=LostFocus}" Width="90" TextAlignment="Right" />
+                                <TextBlock Text="ms" VerticalAlignment="Center" Margin="4,0,8,0" />
+                                <Button Content="+100" Command="{Binding DelayStepCommand}" CommandParameter="100" Padding="8,2" Margin="0,0,4,0" />
+                                <Button Content="+1000" Command="{Binding DelayStepCommand}" CommandParameter="1000" Padding="8,2" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="1000 = 1 sekunda; kladné = zvuk neskôr, záporné = skôr. Samotný posun sa zapíše bez straty kvality (mkvmerge)." />
+
+                            <TextBlock Text="Kodek a hlasitosť" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,4" />
+                            <WrapPanel>
+                                <TextBlock Text="Kodek:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox ItemsSource="{Binding Codecs}" SelectedItem="{Binding Codec}" Width="150" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding Bitrates}" SelectedItem="{Binding Bitrate}" Width="120" ToolTip="Dátový tok (automaticky podľa kodeku a kanálov)" />
+                            </WrapPanel>
+                            <CheckBox Content="Stereo (zmiešať 5.1 do dvoch kanálov)" IsChecked="{Binding Stereo}" Margin="0,6,0,0" />
+                            <CheckBox Content="Normalizovať hlasitosť na −23 LUFS (EBU R128)" IsChecked="{Binding Normalize}" Margin="0,4,0,0"
+                                      ToolTip="Zvuk sa najprv celý zmeria, potom sa zapíše s rovnakou hlasitosťou ako ostatné filmy" />
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="Zosilniť / stlmiť:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding GainText, UpdateSourceTrigger=PropertyChanged}" Width="60" TextAlignment="Right" />
+                                <TextBlock Text="dB" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="Zmena FPS, kodek, stereo a hlasitosť zapíšu zvuk znova (FFmpeg) do nového súboru; DTS a TrueHD sa dajú zapísať len do iného kodeku." />
+                            <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" />
+                                    <Button Content="Vynulovať zmeny" Command="{Binding ResetCommand}" HorizontalAlignment="Left" Padding="10,2" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+                <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <WrapPanel DataContext="{Binding Library}">
+                            <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="audioKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
+                            <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="audioKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
+                            <TextBlock Text="Titul:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                            <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
+                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                            <Button Content="TMDB" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
+                                      IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
+                                    Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
+                                <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                            </StackPanel>
+                            <Button Content="Knižnica…" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
+                        </WrapPanel>
+                        <TextBlock TextTrimming="CharacterEllipsis" DataContext="{Binding Library}" ToolTip="{Binding Description}" Margin="0,4,0,4">
+                            <Run Text="Výsledok (nový súbor v knižnici, originály ostanú):" FontWeight="SemiBold" /> <Run Text="{Binding Description, Mode=OneWay}" />
+                            <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </TextBlock>
+                        <CheckBox Content="Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)" IsChecked="{Binding UseRules}" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding Blocked}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />
+                            <Button DockPanel.Dock="Right" Content="Zastaviť" Command="{Binding StopCommand}" Padding="12,6" Margin="0,0,8,0" VerticalAlignment="Top" />
+                            <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Margin="0,0,16,0" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:HeaderEditorPageViewModel}">
             <Grid Margin="32,24,32,16">
                 <Grid.RowDefinitions>

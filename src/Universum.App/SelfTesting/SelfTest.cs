@@ -242,6 +242,7 @@ internal static class SelfTest
         await TestMultiplexerAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
+        await TestAudioAsync(model, window, services, work);
         TestSeriesMemory(model, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
@@ -1755,7 +1756,6 @@ internal static class SelfTest
         {
             return;
         }
-
         page.SelectedRow = row;
         await page.PlayerOpening;
         await WaitFor(() => page.Player.FramesShown > 0);
@@ -1796,6 +1796,73 @@ internal static class SelfTest
             Segment(1.6, 0x80, []);
             return [.. data];
         }
+    }
+
+    // owner, 30. 10. 2026: Úprava audiostopy – a dub (invented: the film's own sound moved) added, written anew, saved
+    private static async Task TestAudioAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var folder = Path.Combine(work, "zvuk");
+        Directory.CreateDirectory(folder);
+        var video = Path.Combine(folder, "Vymyslený.Zvukový.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
+        var originalBytes = File.ReadAllBytes(video);
+        var ffmpeg = (await services.SpeechAsync()).Ffmpeg;
+        var dub = Path.Combine(folder, "Vymyslený dabing.mka");
+        var made = await services.Runner.RunAsync(new Core.Processes.ProcessRequest(ffmpeg,
+            ["-nostdin", "-hide_banner", "-loglevel", "error", "-i", video, "-map", "0:a:0", "-af", "adelay=300:all=1", "-c:a", "flac", dub]));
+        Check(made.ExitCode == 0 && File.Exists(dub), "audio: an invented dub made – " + made.StandardError);
+
+        var page = model.Audio;
+        model.SelectedTool = model.Tools.First(t => t.Page == page);
+        await page.LoadAsync([video]);
+        Check(page.IsVideo && page.Rows.Count == 2 && page.Reference is { IsExternal: false } && page.SelectedRow == page.Reference, "audio: the video's two sounds – " + page.Summary);
+        await page.PlayerOpening;
+        await WaitFor(() => page.Player.FramesShown > 0);
+        Check(page.Player.IsOpen && page.Player.FramesShown > 0, "audio: the film in the player – " + page.Player.Message);
+
+        await page.LoadAsync([dub]);
+        var row = page.Rows.LastOrDefault();
+        Check(row is { IsExternal: true, Track.ExternalFile: not null } && page.SelectedRow == row && page.Rows.Count == 3, "audio: the dub added and selected – " + page.Result);
+        if (row is null)
+        {
+            return;
+        }
+        // too short to be fitted: said, nothing changed
+        await page.SyncCommand.ExecuteAsync(null);
+        Check(page.SyncStatus.Length > 0 && row.DelayText == "0", "audio: Napasovať on two seconds says something – " + page.SyncStatus);
+
+        row.DelayText = "-300";
+        row.FpsFrom = Core.Subtitles.FrameRate.All.Single(r => r.Label == "25");
+        row.FpsTo = Core.Subtitles.FrameRate.All.Single(r => r.Label == "23,976");
+        row.Codec = row.Codecs.Single(c => c.Codec == Core.Audio.AudioCodec.Aac);
+        row.Stereo = true;
+        row.Language = row.LanguageChoices.First(c => c.Tag.Primary == "cs");
+        row.Name = "Vymyslený dabing CZ";
+        Check(row.Recipe.NeedsEncoding && row.Problem is null && row.Summary.Contains("pomalšie", StringComparison.Ordinal) && row.Summary.Contains("zapíše znova", StringComparison.Ordinal),
+            "audio: the dub's changes – " + row.Summary);
+        await Screenshot(window, "studio-audio.png");
+        page.UseRules = false;
+        page.Library.IsMovie = true;
+        page.Library.TitleText = "Zvukový test (2026)";
+        Check(page.SaveCommand.CanExecute(null), "audio: ready to save – " + page.Blocked + " " + page.Library.Description);
+        await page.SaveCommand.ExecuteAsync(null);
+        Check(page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal), "audio: saved – " + page.Result);
+        Check(File.ReadAllBytes(video).AsSpan().SequenceEqual(originalBytes) && File.Exists(dub), "audio: the originals unchanged");
+        var result = Directory.EnumerateFiles(Path.Combine(_outputDirectory, "library"), "*.mkv", SearchOption.AllDirectories)
+            .FirstOrDefault(f => f.Contains("Zvukový test (2026)", StringComparison.Ordinal));
+        if (result is not null)
+        {
+            var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(result);
+            Check(written.TracksOf(TrackType.Audio).Count() == 3 &&
+                  written.TracksOf(TrackType.Audio).Any(t => t is { CodecId: "A_AAC", AudioChannels: 2, Name: "Vymyslený dabing CZ" } && t.Language.Primary == "cs"),
+                "audio: the dub written as stereo AAC with its language and name – " + string.Join(" | ", written.TracksOf(TrackType.Audio).Select(t => $"{t.CodecId} {t.AudioChannels} {t.Language.Primary} {t.Name}")));
+        }
+        else
+        {
+            Check(false, "audio: the result in the library");
+        }
+
+        page.ClearCommand.Execute(null);
     }
 
     private static async Task TestSubtitlesAsync(MainViewModel model, MainWindow window, AppServices services, string work)

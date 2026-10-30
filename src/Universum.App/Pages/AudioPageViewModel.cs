@@ -28,7 +28,8 @@ public sealed class AudioPageViewModel : ObservableObject
 
     /// <summary>Files of sound (and films whose sound is taken).</summary>
     public static readonly IReadOnlySet<string> SoundExtensions = new HashSet<string>(
-        [".mka", ".ac3", ".eac3", ".ec3", ".dts", ".dtshd", ".thd", ".truehd", ".aac", ".m4a", ".mp3", ".flac", ".opus", ".ogg", ".wav", ".mkv", ".mp4", ".m4v", ".avi", ".ts", ".m2ts"],
+        // not MPEG-TS: mkvmerge lists the AC-3 core of TrueHD as a track of its own, FFmpeg does not – the tracks would not match
+        [".mka", ".ac3", ".eac3", ".ec3", ".dts", ".dtshd", ".thd", ".truehd", ".aac", ".m4a", ".mp3", ".flac", ".opus", ".ogg", ".wav", ".mkv", ".mp4", ".m4v", ".avi"],
         StringComparer.OrdinalIgnoreCase);
 
     private readonly AppServices _services;
@@ -167,9 +168,18 @@ public sealed class AudioPageViewModel : ObservableObject
             _ => i.Kind.ToString(),
         }).Distinct()) + " Určte jazyk – alebo vypnite pravidlá (stopy ostanú, ako sú).";
 
+    /// <summary>Nothing is fitted or written now: the sounds can be changed.</summary>
+    public bool IsIdle => !_busy;
+
     /// <summary>A video, then sounds to add (drag and drop).</summary>
     public async Task LoadAsync(IReadOnlyList<string> paths)
     {
+        if (_busy)
+        {
+            Result = "Práve sa napasováva alebo zapisuje – súbory pridajte potom.";
+            return;
+        }
+
         var video = paths.FirstOrDefault(p => BatchAnalyzer.VideoExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()));
         if (_file is null || (video is not null && !paths.All(p => SoundExtensions.Contains(Path.GetExtension(p)))))
         {
@@ -190,7 +200,7 @@ public sealed class AudioPageViewModel : ObservableObject
     }
 
     /// <summary>The video with the sounds as chosen (the sounds written anew not yet); null without a video.</summary>
-    public TargetState? Target() => _file is null ? null : Build(_file, Rows.ToDictionary(r => r, r => r.Track));
+    public TargetState? Target() => _file is null ? null : Build(_file, Rows.ToDictionary(r => r, r => r.Track), [.. Rows]);
 
     private async Task OpenVideoAsync()
     {
@@ -277,7 +287,11 @@ public sealed class AudioPageViewModel : ObservableObject
                     var added = 0;
                     foreach (var track in file.TracksOf(TrackType.Audio))
                     {
-                        var row = new AudioRow(track with { Id = _nextId++, ExternalFile = path, ExternalTrack = track.Id, Flags = track.Flags with { Default = false } }, ordinal++, path, Changed);
+                        // a sound of another container has no Matroska codec ID: by its codec's name (the check of the result compares it)
+                        var row = new AudioRow(track with
+                        {
+                            Id = _nextId++, ExternalFile = path, ExternalTrack = track.Id, Flags = track.Flags with { Default = false }, CodecId = AudioRecipe.CodecIdOf(track),
+                        }, ordinal++, path, Changed);
                         Rows.Add(row);
                         SelectedRow = row;
                         added++;
@@ -373,12 +387,12 @@ public sealed class AudioPageViewModel : ObservableObject
         }
 
         _ = player.SetSoundAsync(_selected is { } row
-            ? new PlayerSound(row.ExternalPath ?? _file.Path, row.Ordinal, row.Problem is null ? row.Timing : SubtitleTiming.None, row.KeepPitch)
+            ? new PlayerSound(row.ExternalPath ?? _file.Path, row.Ordinal, row.Timing.Factor is >= 0.5 and <= 2 ? row.Timing : SubtitleTiming.None, row.KeepPitch)
             : null);
     }
 
     // the target state of the video: its tracks, a sound written anew in place of its track, the sounds added
-    private TargetState Build(MediaFile file, IReadOnlyDictionary<AudioRow, MediaTrack> written)
+    private TargetState Build(MediaFile file, IReadOnlyDictionary<AudioRow, MediaTrack> written, IReadOnlyList<AudioRow> rows)
     {
         var tracks = new List<MediaTrack>();
         var replaced = new HashSet<int>();
@@ -386,7 +400,7 @@ public sealed class AudioPageViewModel : ObservableObject
         foreach (var track in file.Tracks)
         {
             tracks.Add(track);
-            if (Rows.FirstOrDefault(r => !r.IsExternal && r.Track.Id == track.Id) is { } row)
+            if (rows.FirstOrDefault(r => !r.IsExternal && r.Track.Id == track.Id) is { } row)
             {
                 var result = written[row];
                 if (result.Id != track.Id)
@@ -399,7 +413,7 @@ public sealed class AudioPageViewModel : ObservableObject
             }
         }
 
-        foreach (var row in Rows.Where(r => r.IsExternal))
+        foreach (var row in rows.Where(r => r.IsExternal))
         {
             tracks.Add(written[row]);
             rowOf[written[row].Id] = row;
@@ -445,8 +459,10 @@ public sealed class AudioPageViewModel : ObservableObject
         try
         {
             Directory.CreateDirectory(folder);
-            var written = Rows.ToDictionary(r => r, r => r.Track);
-            var encoded = Rows.Where(r => r is { Include: true, Recipe.NeedsEncoding: true }).ToList();
+            // the sounds as they are now (the page cannot change them while it writes)
+            var rows = Rows.ToList();
+            var written = rows.ToDictionary(r => r, r => r.Track);
+            var encoded = rows.Where(r => r is { Include: true, Recipe.NeedsEncoding: true }).ToList();
             var ffmpeg = encoded.Count == 0 ? "" : (await _services.SpeechAsync()).Ffmpeg;
             for (var i = 0; i < encoded.Count; i++)
             {
@@ -467,13 +483,14 @@ public sealed class AudioPageViewModel : ObservableObject
                 written[row] = row.Track with
                 {
                     Id = row.IsExternal ? row.Track.Id : _nextId++, ExternalFile = output, ExternalTrack = 0, Codec = codec ?? row.Track.Codec,
+                    CodecId = row.Recipe.WrittenCodecId(row.Track),
                     AudioChannels = row.Stereo ? 2 : row.Track.AudioChannels, Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null,
                 };
             }
 
             Result = "Zapisujem nový súbor…";
             Progress = encoded.Count / (encoded.Count + 1.0);
-            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file, written)), placement, new OutputOptions(OriginalHandling.Keep),
+            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file, written, rows)), placement, new OutputOptions(OriginalHandling.Keep),
                 cancellationToken: work.Token);
             Progress = 1;
             Result = result.Status switch
@@ -593,6 +610,7 @@ public sealed class AudioPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
+        OnPropertyChanged(nameof(IsIdle));
         OpenVideoCommand?.NotifyCanExecuteChanged();
         AddSoundCommand?.NotifyCanExecuteChanged();
         RemoveCommand?.NotifyCanExecuteChanged();

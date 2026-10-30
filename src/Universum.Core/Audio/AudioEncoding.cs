@@ -33,13 +33,22 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
     /// <summary>The target loudness of normalizing (EBU R128).</summary>
     public const double TargetLoudness = -23;
 
+    /// <summary>A sound written anew has this sample rate (FFmpeg decodes HE-AAC at twice the rate its container says).</summary>
+    public const int SampleRate = 48000;
+
+    /// <summary>atempo puts the sound this much early (measured, both ways): the shift makes up for it, as the player does.</summary>
+    public const int TempoLeadMilliseconds = 21;
+
     public static AudioRecipe None { get; } = new(SubtitleTiming.None);
 
     /// <summary>The sound has to be written anew (a shift alone does not).</summary>
     public bool NeedsEncoding => Timing.Numerator != Timing.Denominator || Codec != AudioCodec.Keep || Stereo || Normalize || Gain != 0;
 
-    /// <summary>The shift alone, as mkvmerge writes it (the speed is in the sound written anew).</summary>
-    public SubtitleTiming Shift => SubtitleTiming.Delay(Timing.DelayMilliseconds);
+    /// <summary>The speed is changed by atempo (the pitch kept).</summary>
+    public bool UsesTempo => Timing.Numerator != Timing.Denominator && KeepPitch;
+
+    /// <summary>The shift alone, as mkvmerge writes it (the speed is in the sound written anew; atempo's lead made up for).</summary>
+    public SubtitleTiming Shift => SubtitleTiming.Delay(Timing.DelayMilliseconds + (UsesTempo ? TempoLeadMilliseconds : 0));
 
     /// <summary>In words, for the list: "FPS 25 → 23,976 (zachová výšku tónu), AC-3 640 kbit/s, normalizovať".</summary>
     public string Describe(MediaTrack track)
@@ -80,11 +89,54 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         return parts.Count == 0 ? "bez zmeny" : string.Join(", ", parts);
     }
 
-    /// <summary>Why the sound cannot be written (a codec FFmpeg does not write – DTS, TrueHD – kept), or null.</summary>
-    public string? Problem(MediaTrack track) =>
-        NeedsEncoding && Encoder(track).Encoder is null
-            ? $"Kodek {track.Codec} FFmpeg nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, Opus, FLAC)."
-            : Timing.Numerator != Timing.Denominator && Timing.Factor is < 0.5 or > 2 ? "Taká zmena rýchlosti sa nedá." : null;
+    /// <summary>Why the sound cannot be written (a codec FFmpeg does not write – DTS, TrueHD – kept, a bitrate too high), or null.</summary>
+    public string? Problem(MediaTrack track)
+    {
+        if (Timing.Numerator != Timing.Denominator && Timing.Factor is < 0.5 or > 2)
+        {
+            return "Taká zmena rýchlosti sa nedá.";
+        }
+
+        if (!NeedsEncoding)
+        {
+            return null;
+        }
+
+        var (name, encoder) = Encoder(track);
+        var most = encoder switch { "ac3" => 640, "eac3" => 6144, "libopus" => 512, "libmp3lame" => 320, _ => int.MaxValue };
+        return encoder is null ? $"Kodek {track.Codec} FFmpeg nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, Opus, FLAC)."
+            : BitrateFor(track) > most ? $"{name} najviac {most} kbit/s."
+            : null;
+    }
+
+    /// <summary>The Matroska codec ID of a codec by its ID or, for other containers, its name (as mkvmerge reports it).</summary>
+    public static string? CodecIdOf(MediaTrack track) => track.CodecId is { Length: > 0 } id ? id : track.Codec.ToUpperInvariant() switch
+    {
+        "AC-3" or "AC3" => "A_AC3",
+        "E-AC-3" or "EAC3" or "E-AC3" => "A_EAC3",
+        "AAC" or "HE-AAC" or "AAC LC" => "A_AAC",
+        "OPUS" => "A_OPUS",
+        "FLAC" => "A_FLAC",
+        "MP3" or "MPEG-1/2 AUDIO LAYER 3" => "A_MPEG/L3",
+        "VORBIS" => "A_VORBIS",
+        "DTS" or "DTS-HD MASTER AUDIO" or "DTS-HD HIGH RESOLUTION" or "DTS-ES" => "A_DTS",
+        "TRUEHD" or "TRUEHD ATMOS" => "A_TRUEHD",
+        { } name when name.StartsWith("PCM", StringComparison.Ordinal) => "A_PCM/INT/LIT",
+        _ => null,
+    };
+
+    /// <summary>The Matroska codec ID of the sound written anew.</summary>
+    public string? WrittenCodecId(MediaTrack track) => Encoder(track).Encoder switch
+    {
+        "ac3" => "A_AC3",
+        "eac3" => "A_EAC3",
+        "aac" => "A_AAC",
+        "libopus" => "A_OPUS",
+        "flac" => "A_FLAC",
+        "libmp3lame" => "A_MPEG/L3",
+        "libvorbis" => "A_VORBIS",
+        _ => null,
+    };
 
     /// <summary>FFmpeg's encoder and the codec's name; the encoder null when FFmpeg cannot write the codec kept.</summary>
     public (string? Name, string? Encoder) Encoder(MediaTrack track) => Codec switch
@@ -94,7 +146,7 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         AudioCodec.Aac => ("AAC", "aac"),
         AudioCodec.Opus => ("Opus", "libopus"),
         AudioCodec.Flac => ("FLAC", "flac"),
-        _ => track.CodecId switch
+        _ => CodecIdOf(track) switch
         {
             "A_AC3" => ("AC-3", "ac3"),
             "A_EAC3" => ("E-AC-3", "eac3"),
@@ -156,8 +208,10 @@ public static partial class AudioEncoder
             return problem;
         }
 
-        var rate = track.AudioSamplingFrequency is > 0 and var known ? known : 48000;
-        var filters = SpeedFilters(recipe, rate);
+        // every sound at one rate first: the container's rate may be half the decoded one (HE-AAC)
+        const int rate = AudioRecipe.SampleRate;
+        var filters = new List<string> { "aresample=" + rate.ToString(CultureInfo.InvariantCulture) };
+        filters.AddRange(SpeedFilters(recipe, rate));
         var stretched = duration is { } length ? TimeSpan.FromTicks((long)(length.Ticks * recipe.Timing.Factor)) : (TimeSpan?)null;
         var input = new[] { "-nostdin", "-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:a:" + ordinal.ToString(CultureInfo.InvariantCulture), "-vn", "-sn", "-dn" };
         if (recipe.Stereo)
@@ -185,6 +239,12 @@ public static partial class AudioEncoder
         }
 
         var (_, encoder) = recipe.Encoder(track);
+        if (encoder == "libopus" && !recipe.Stereo)
+        {
+            // libopus takes 5.1 only as its own layout (AC-3, DTS decode as 5.1(side))
+            filters.Add("aformat=channel_layouts=7.1|5.1|stereo|mono");
+        }
+
         var arguments = new List<string>(input) { "-map_metadata", "-1", "-map_chapters", "-1" };
         if (filters.Count > 0)
         {

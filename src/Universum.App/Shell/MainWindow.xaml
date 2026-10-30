@@ -1454,7 +1454,8 @@
                         </Grid.RowDefinitions>
                         <DockPanel>
                             <WrapPanel DockPanel.Dock="Bottom" Margin="0,6,0,0" DataContext="{Binding SelectedRow}"
-                                       Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}">
+                                       Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}"
+                                       IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=Grid}}">
                                 <TextBlock Text="Hrá:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0" />
                                 <TextBlock Text="{Binding Source}" VerticalAlignment="Center" Margin="0,0,16,0" />
                                 <TextBlock Text="Posun:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0" />
@@ -1481,7 +1482,8 @@
                                     <DataGridTemplateColumn Header="Ponechať">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                                <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
+                                                          IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
@@ -1520,7 +1522,8 @@
                     </Grid>
                     <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" DataContext="{Binding SelectedRow}"
                                   Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}">
-                        <StackPanel Margin="0,0,8,0">
+                        <!-- nothing changes while the sounds are fitted or written -->
+                        <StackPanel Margin="0,0,8,0" IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=Grid}}">
                             <TextBlock Text="{Binding Source}" FontWeight="SemiBold" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Format}" Style="{StaticResource Hint}" Margin="0,0,0,6" />
                             <WrapPanel>

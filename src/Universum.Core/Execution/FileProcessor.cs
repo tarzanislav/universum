@@ -125,7 +125,8 @@ public sealed class FileProcessor(
             var originalTime = File.GetLastWriteTimeUtc(source);
             // the library index is for library places; a file next to the original (header editor) never replaces an earlier one
             var fingerprint = index is null || inLibrary || placement.FixedName is not null ? null : await LibraryIndex.FingerprintAsync(source, cancellationToken);
-            var signature = LibraryIndex.TargetSignature(plan.Target);
+            // added files are read whole for it (a sound may be a gigabyte): away from the caller's thread
+            var signature = await Task.Run(() => LibraryIndex.TargetSignature(plan.Target), cancellationToken).ConfigureAwait(false);
             string? previous = null;
             if (fingerprint is not null && index!.FindPrevious(placement, fingerprint, signature) is { } found)
             {

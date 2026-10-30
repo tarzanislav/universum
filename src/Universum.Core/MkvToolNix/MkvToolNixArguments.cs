@@ -119,6 +119,12 @@ public static class MkvToolNixArguments
             }
 
             AddTrackOptions(arguments, added, inner, writeLanguage: !added.Language.IsUndetermined, writeOtherFlags: true);
+            if (target.RemoveTags)
+            {
+                // the tags an added file brings (FFmpeg writes some into every sound) go as the film's do
+                arguments.Add("--no-track-tags");
+            }
+
             // one track of each added file (a VobSub .idx may hold several languages, a film several sounds)
             arguments.AddRange(added.Type == TrackType.Audio
                 ? ["--audio-tracks", inner, "--no-video", "--no-subtitles", "--no-buttons", "--no-attachments", "--no-global-tags", "--no-chapters", input]

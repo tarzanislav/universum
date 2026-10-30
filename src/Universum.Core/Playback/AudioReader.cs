@@ -174,7 +174,9 @@ public sealed class AudioReader : IAsyncDisposable
         var seek = fileTime;
         if (timing is { IsNone: false } moved)
         {
-            var source = (fileTime.TotalSeconds - (moved.DelayMilliseconds / 1000.0)) / moved.Factor;
+            // atempo plays a little early: made up for as the sound written anew is (Audio.AudioRecipe.Shift)
+            var shift = moved.DelayMilliseconds + (keepPitch && moved.Numerator != moved.Denominator ? Audio.AudioRecipe.TempoLeadMilliseconds : 0);
+            var source = (fileTime.TotalSeconds - (shift / 1000.0)) / moved.Factor;
             seek = TimeSpan.FromSeconds(Math.Max(0, source));
             if (moved.Numerator != moved.Denominator)
             {

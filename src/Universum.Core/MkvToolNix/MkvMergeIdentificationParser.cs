@@ -110,6 +110,7 @@ public static class MkvMergeIdentificationParser
             StatisticsBytes = Long(properties, "tag_number_of_bytes"),
             StatisticsBitsPerSecond = Long(properties, "tag_bps"),
             IndexEntries = Int(properties, "num_index_entries"),
+            DefaultDurationNanoseconds = Long(properties, "default_duration"),
             TagEntries = trackTags.GetValueOrDefault(id),
         };
     }

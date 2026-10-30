@@ -224,6 +224,7 @@ internal static class SelfTest
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
+        await TestSubtitlesAsync(model, window, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
         var secret = UserSecret.Protect("test-key-123");
@@ -1711,6 +1712,73 @@ internal static class SelfTest
         chapters.Interval = "1";
         chapters.Generate();
         Check(chapters.Rows.Count == 1 && chapters.Rows[0].Name == "Kapitola 01", "chapters: generated for a 2-second file");
+    }
+
+    // owner, 30. 10. 2026: Titulky – external subtitles found with the video (name, title words), old encodings, FPS and
+    // delay (mkvmerge --sync), and subtitle files saved as SRT; invented names only
+    private static async Task TestSubtitlesAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var folder = Path.Combine(work, "titulky");
+        Directory.CreateDirectory(folder);
+        var video = Path.Combine(folder, "Vymyslený.Titulkový.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
+        var originalBytes = File.ReadAllBytes(video);
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        File.WriteAllBytes(Path.Combine(folder, "Vymyslený.Titulkový.Film.2026.sk.srt"),
+            Encoding.GetEncoding(1250).GetBytes("1\r\n00:00:00,500 --> 00:00:01,200\r\nĽudia sa vrátia domov, päť dní je veľmi dlho.\r\n"));
+        var vtt = Path.Combine(folder, "vymysleny_titulkovy_film_2026_en.vtt");
+        File.WriteAllText(vtt, "WEBVTT\n\n00:00.300 --> 00:01.000\nPeople will come home.\n");
+        File.WriteAllText(Path.Combine(folder, "Iný.Film.2026.cze.srt"), "1\r\n00:00:00,500 --> 00:00:01,000\r\nIný film.\r\n");
+
+        var page = model.Subtitles;
+        model.SelectedTool = model.Tools.First(t => t.Page == page);
+        await page.LoadAsync([video]);
+        Check(page.IsVideo && page.Rows.Count == 3 && page.Found.Count == 2,
+            $"subtitles: three tracks of the video, two files found with it (not another film) – {page.Summary} | {string.Join(" | ", page.Found.Select(f => f.Display))}");
+        foreach (var found in page.Found.ToList())
+        {
+            found.AddCommand.Execute(null);
+            await WaitFor(() => !page.Rows.All(r => r.ExternalPath != found.Match.Path) && page.OpenVideoCommand.CanExecute(null));
+        }
+
+        var slovak = page.Rows.FirstOrDefault(r => r.ExternalPath?.EndsWith(".sk.srt", StringComparison.Ordinal) == true);
+        var english = page.Rows.FirstOrDefault(r => r.ExternalPath == vtt);
+        Check(slovak is { Language.Tag.Primary: "sk" } && slovak.Note.Contains("Windows-1250", StringComparison.Ordinal), "subtitles: Slovak file in Windows-1250 – " + slovak?.Note);
+        Check(english is { Format: "WebVTT", Language.Tag.Primary: "en" }, "subtitles: English WebVTT by the title words – " + english?.Note);
+        page.SelectedRow = slovak;
+        slovak!.FpsFrom = Core.Subtitles.FrameRate.All.Single(r => r.Label == "25");
+        slovak.FpsTo = Core.Subtitles.FrameRate.All.Single(r => r.Label == "23,976");
+        slovak.DelayText = "250";
+        Check(page.Preview.Count == 1 && page.Preview[0].After == "0:00:00,771", "subtitles: 25 → 23,976 FPS and +250 ms in the preview – " + string.Join(" | ", page.Preview.Select(p => p.After)));
+        Check(slovak.Summary.Contains("FPS 25 → 23,976", StringComparison.Ordinal) && slovak.Summary.Contains("posun +250 ms", StringComparison.Ordinal), "subtitles: the summary – " + slovak.Summary);
+        slovak.SpeedText = "-100";
+        Check(slovak.Problem is not null && !page.SaveCommand.CanExecute(null), "subtitles: −100 % is not possible");
+        slovak.SpeedText = "0";
+        page.Library.IsMovie = true;
+        page.Library.TitleText = "Titulkový test (2026)";
+        Check(page.SaveCommand.CanExecute(null), "subtitles: ready to save – " + page.Library.Description);
+        await Screenshot(window, "subtitles.png");
+        await page.SaveCommand.ExecuteAsync(null);
+        Check(page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal), "subtitles: saved – " + page.Result);
+        Check(File.ReadAllBytes(video).AsSpan().SequenceEqual(originalBytes), "subtitles: original unchanged, byte for byte");
+        var result = Directory.EnumerateFiles(Path.Combine(_outputDirectory, "library"), "*.mkv", SearchOption.AllDirectories)
+            .FirstOrDefault(f => f.Contains("Titulkový test (2026)", StringComparison.Ordinal));
+        Check(result is not null, "subtitles: the result in the library");
+        if (result is not null)
+        {
+            var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(result);
+            Check(written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "sk") && written.TracksOf(TrackType.Subtitles).Any(t => t.Language.Primary == "en"),
+                "subtitles: Slovak and English added – " + string.Join(", ", written.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary)));
+        }
+
+        // subtitle files alone: a new SRT in UTF-8 next to them, the original stays
+        page.ClearCommand.Execute(null);
+        await page.LoadAsync([vtt]);
+        Check(page.IsFiles && page.Rows.Count == 1 && page.SaveCommand.CanExecute(null), "subtitles: a WebVTT file alone – " + page.Summary);
+        await page.SaveCommand.ExecuteAsync(null);
+        var srt = Path.ChangeExtension(vtt, ".srt");
+        Check(File.Exists(srt) && File.ReadAllText(srt).Contains("00:00:00,300 --> 00:00:01,000", StringComparison.Ordinal) && File.Exists(vtt),
+            "subtitles: converted to SRT next to it, the original kept – " + page.Result);
     }
 
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window, AppServices services)

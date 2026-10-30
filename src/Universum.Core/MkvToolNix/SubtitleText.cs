@@ -43,6 +43,54 @@ public static partial class SubtitleText
         }
     }
 
+    /// <summary>
+    /// A whole text subtitle track of a Matroska file with its times (Titulky: conversion to SRT, repairs of the text):
+    /// mkvextract writes it in its own format (SRT, ASS/SSA, WebVTT), UNIVERSUM reads it. mkvextract reads the whole
+    /// file. Null when the track cannot be read.
+    /// </summary>
+    public static async Task<Subtitles.SubtitleDocument?> ExtractDocumentAsync(
+        MkvToolNixInstallation installation, IProcessRunner runner, MediaFile file, MediaTrack track, CancellationToken cancellationToken = default)
+    {
+        if (track.Type != TrackType.Subtitles || !track.IsTextSubtitles || !file.IsMatroska)
+        {
+            return null;
+        }
+
+        var extension = track.CodecId?.ToUpperInvariant() switch
+        {
+            "S_TEXT/ASS" or "S_ASS" => ".ass",
+            "S_TEXT/SSA" or "S_SSA" => ".ssa",
+            "S_TEXT/WEBVTT" or "D_WEBVTT/SUBTITLES" => ".vtt",
+            _ => ".srt",
+        };
+        var target = Path.Combine(Path.GetTempPath(), "UNIVERSUM", $"track-{Guid.NewGuid():N}{extension}");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        try
+        {
+            using var options = MkvToolNixOptionsFile.Create([file.Path, "tracks", track.Id.ToString(CultureInfo.InvariantCulture) + ":" + target]);
+            var result = await runner.RunAsync(
+                new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvExtract), [options.Argument]) { Timeout = TimeSpan.FromMinutes(30) },
+                cancellationToken).ConfigureAwait(false);
+            if (result.ExitCode is not (0 or 1) || !File.Exists(target))
+            {
+                return null;
+            }
+
+            try
+            {
+                return await Subtitles.SubtitleReader.ReadFileAsync(target, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+        }
+        finally
+        {
+            File.Delete(target);
+        }
+    }
+
     /// <summary>Where the parts of the film start (like the pieces of the audio): 20, 35, 50, 65 and 80 % of the film.</summary>
     public static readonly IReadOnlyList<double> PartPositions = [0.2, 0.35, 0.5, 0.65, 0.8];
 

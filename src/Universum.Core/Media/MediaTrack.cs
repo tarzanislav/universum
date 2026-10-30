@@ -44,6 +44,12 @@ public sealed record MediaTrack
     /// <summary>Bits per second from the track statistics tags, when present.</summary>
     public long? StatisticsBitsPerSecond { get; init; }
 
+    /// <summary>The duration of one frame in nanoseconds (video: 41 708 333 = 23,976 frames a second), when the file says it.</summary>
+    public long? DefaultDurationNanoseconds { get; init; }
+
+    /// <summary>Frames a second of a video track (from <see cref="DefaultDurationNanoseconds"/>), or null.</summary>
+    public double? FramesPerSecond => DefaultDurationNanoseconds is > 0 and var duration ? 1_000_000_000.0 / duration : null;
+
     /// <summary>Number of index (cue) entries; 0 for a video track means seeking will be slow or broken.</summary>
     public int? IndexEntries { get; init; }
 

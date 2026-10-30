@@ -31,6 +31,7 @@ public sealed class MainViewModel : ObservableObject
         HeaderEditor = new HeaderEditorPageViewModel(services);
         Mux = new MultiplexerPageViewModel(services);
         Chapters = new ChaptersPageViewModel(services);
+        Subtitles = new SubtitlesPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
@@ -59,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
             new("Zlučovanie", "\uE71D", Mux, multiplexing),
             new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
             new("Kapitoly", "\uE8FD", Chapters, multiplexing),
+            new("Titulky", "\uE7F0", Subtitles, multiplexing),
             new("Informácie", "\uE946", Info, multiplexing),
             new("Single spracovanie", "\uE90F", Rules, templates),
             new("Hromadné spracovanie", "\uE8B7", Batch, templates),
@@ -212,6 +214,9 @@ public sealed class MainViewModel : ObservableObject
     public MultiplexerPageViewModel Mux { get; }
 
     public ChaptersPageViewModel Chapters { get; }
+
+    /// <summary>Titulky: FPS, speed, delay, conversion to SRT, external subtitles (owner, 30. 10. 2026).</summary>
+    public SubtitlesPageViewModel Subtitles { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }
 

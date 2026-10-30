@@ -2039,10 +2039,9 @@ internal static class SelfTest
         await Screenshot(window, "batch-delete-originals.png");
         await batch.DeleteOriginalsCommand.ExecuteAsync(null);
         var (removedOriginals, keptOriginals) = batch.LastCleanup;
-        Check(removedOriginals.Count + keptOriginals.Count >= 4 && removedOriginals.All(f => !File.Exists(f)) &&
-              keptOriginals.All(k => k.Contains("Kôš", StringComparison.Ordinal)) &&
+        Check(removedOriginals.Count >= 4 && removedOriginals.All(f => !File.Exists(f)) &&
               File.Exists(Path.Combine(shows, "Seriál S01E10 - CZ EN SD H264 SMALL.mkv")) && File.Exists(Path.Combine(shows, "Seriál S01E01 - CZ SD H264 SMALL.mkv")),
-            $"batch: originals to the Recycle Bin ({removedOriginals.Count}), kept only without a Recycle Bin ({keptOriginals.Count}), the library intact – {batch.RunState}");
+            $"batch: originals to the Recycle Bin ({removedOriginals.Count}; kept {keptOriginals.Count}: {string.Join("; ", keptOriginals)}), the library intact – {batch.RunState}");
         batch.KeepOriginal = true;
         Check(services.Settings.BatchOriginals == Core.Execution.OriginalsMode.Keep && !batch.CanDeleteOriginals, "batch: back to keeping the originals");
     }

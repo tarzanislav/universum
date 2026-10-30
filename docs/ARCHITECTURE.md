@@ -66,9 +66,12 @@ in next to it without changing the rules, planning or UI.
     spracovanie (`OriginalsMode`, kept with each MEGA batch) the user chooses: keep; delete automatically – each
     original to the Recycle Bin right after its result is written and verified (`OutputOptions.MoveIntoLibrary` false:
     always a new file first, the original is never moved and edited); or delete manually – after the run
-    `OriginalCleanup` sends the originals of results in the library to the Recycle Bin (only when the result is still
-    there, the original did not change since, and it does not lie in MOVIES / TVSHOWS). Never permanently: an original
-    that cannot go to the Recycle Bin stays and the output says so;
+    `OriginalCleanup` sends the originals of results in the library to the Recycle Bin – only when the library index
+    confirms that the result is a file made from exactly this original (`LibraryIndex.IsMadeFrom`, fingerprint read
+    again) and unchanged since. A file the index knows as a result (also of an earlier library) or one in MOVIES /
+    TVSHOWS is never removed, in either mode. A run with automatic deleting is confirmed each time; a MEGA batch is
+    completed only with the same choice. Never permanently: an original that cannot go to the Recycle Bin stays and
+    the output says so;
   - every tool writes its result as a new file into the library, named by the rules (`LibraryTargetPicker` in the
     app: film/series, title, episode, TMDB): rules, batch, header editor, chapter editor (`TargetState.NewChapters`)
     and multiplexer (`MuxSpec.Placement`, name chosen after writing by the size class); `Placement.InPlace` /

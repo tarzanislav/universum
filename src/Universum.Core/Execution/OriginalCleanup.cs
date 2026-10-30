@@ -1,5 +1,6 @@
 using System.Globalization;
 using Universum.Core.IO;
+using Universum.Core.Library;
 
 namespace Universum.Core.Execution;
 
@@ -40,12 +41,14 @@ public static class OriginalCleanup
     }
 
     /// <summary>
-    /// Sends the originals to the Recycle Bin, one by one. <paramref name="inLibrary"/> says whether a path lies among the
-    /// library's results (MOVIES, TVSHOWS) – such a file is never removed.
+    /// Sends the originals to the Recycle Bin, one by one. An original goes only when the library index confirms that its
+    /// result is a file UNIVERSUM made from exactly this original (by its fingerprint, read again now) and that has not
+    /// changed since. A file the index knows as a result, or that lies among the library's results
+    /// (<paramref name="inLibrary"/>), is never removed.
     /// </summary>
     /// <returns>The originals removed, and why the others stayed (Slovak, one line each).</returns>
-    public static (IReadOnlyList<string> Removed, IReadOnlyList<string> Kept) Remove(
-        IEnumerable<WrittenOriginal> originals, IRecycleBin recycleBin, Func<string, bool> inLibrary, CancellationToken cancellationToken = default)
+    public static async Task<(IReadOnlyList<string> Removed, IReadOnlyList<string> Kept)> RemoveAsync(
+        IEnumerable<WrittenOriginal> originals, LibraryIndex index, IRecycleBin recycleBin, Func<string, bool> inLibrary, CancellationToken cancellationToken = default)
     {
         var removed = new List<string>();
         var kept = new List<string>();
@@ -53,7 +56,7 @@ public static class OriginalCleanup
         {
             cancellationToken.ThrowIfCancellationRequested();
             var name = Path.GetFileName(original.Source);
-            if (Why(original, recycleBin, inLibrary) is { } reason)
+            if (await WhyAsync(original, index, recycleBin, inLibrary, cancellationToken).ConfigureAwait(false) is { } reason)
             {
                 if (reason.Length > 0)
                 {
@@ -78,16 +81,17 @@ public static class OriginalCleanup
     }
 
     // why an original stays: "" when it is gone already, null when it may go to the Recycle Bin
-    private static string? Why(WrittenOriginal original, IRecycleBin recycleBin, Func<string, bool> inLibrary)
+    private static async Task<string?> WhyAsync(
+        WrittenOriginal original, LibraryIndex index, IRecycleBin recycleBin, Func<string, bool> inLibrary, CancellationToken cancellationToken)
     {
         if (!File.Exists(original.Source))
         {
             return "";
         }
 
-        if (Paths.Same(original.Source, original.Result) || inLibrary(original.Source))
+        if (Paths.Same(original.Source, original.Result) || inLibrary(original.Source) || index.Knows(original.Source))
         {
-            return "leží v knižnici – nemaže sa";
+            return "je to súbor knižnice – nemaže sa";
         }
 
         if (!File.Exists(original.Result) || new FileInfo(original.Result).Length == 0)
@@ -99,6 +103,21 @@ public static class OriginalCleanup
         if (info.Length != original.Size || info.LastWriteTimeUtc != original.ModifiedUtc)
         {
             return "po spracovaní sa zmenil – ostal";
+        }
+
+        string fingerprint;
+        try
+        {
+            fingerprint = await LibraryIndex.FingerprintAsync(original.Source, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "nedá sa prečítať – ostal (" + ex.Message + ")";
+        }
+
+        if (!index.IsMadeFrom(original.Result, fingerprint))
+        {
+            return "nedá sa overiť, že výsledok v knižnici vznikol práve z neho (zmenil sa alebo bol nahradený) – ostal";
         }
 
         return recycleBin.CannotRecycle(original.Source) is { } reason ? $"Kôš nie je k dispozícii ({reason}) – ostal" : null;

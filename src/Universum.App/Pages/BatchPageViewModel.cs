@@ -432,7 +432,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private List<WrittenOriginal> PendingOriginals()
     {
-        var pending = _written.Where(o => File.Exists(o.Source)).ToList();
+        // the newest entry of an original first (a later run of the same original made the result that counts)
+        var pending = Enumerable.Reverse(_written).Where(o => File.Exists(o.Source)).ToList();
         foreach (var item in _items.Where(i => i.AlreadyInLibraryAt is not null))
         {
             if (_fingerprints.TryGetValue(Path.GetFullPath(item.File.Path), out var fingerprint) &&
@@ -448,8 +449,10 @@ public sealed class BatchPageViewModel : ObservableObject
     private async Task DeleteOriginalsAsync()
     {
         var pending = PendingOriginals();
+        var folders = pending.Select(o => Path.GetDirectoryName(o.Source) ?? "").Distinct(Paths.Comparer).ToList();
         if (pending.Count == 0 ||
             !Confirm($"Zmazať {Texts.Count(pending.Count, "originál", "originály", "originálov")}?\n\n" +
+                     $"Z priečinkov: {string.Join(", ", folders.Take(3))}{(folders.Count > 3 ? $" + {folders.Count - 3} ďalšie" : "")}\n\n" +
                      "Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od spracovania nezmenil; " +
                      "súbory v knižnici (MOVIES, TVSHOWS) sa nikdy nemažú."))
         {
@@ -461,7 +464,8 @@ public sealed class BatchPageViewModel : ObservableObject
         try
         {
             var library = _services.Library;
-            var (removed, kept) = await Task.Run(() => OriginalCleanup.Remove(pending, new WindowsRecycleBin(), path => library?.HoldsResult(path) == true));
+            var index = _services.LibraryIndex;
+            var (removed, kept) = await Task.Run(() => OriginalCleanup.RemoveAsync(pending, index, new WindowsRecycleBin(), path => library?.HoldsResult(path) == true));
             _written.RemoveAll(o => removed.Contains(o.Source, Paths.Comparer));
             RunState = $"Do Koša: {Texts.Count(removed.Count, "originál", "originály", "originálov")}" +
                        (kept.Count > 0 ? $" · ostalo {kept.Count}: " + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "") +
@@ -2082,8 +2086,16 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        // owner, 30. 10. 2026: deleted automatically = each original to the Recycle Bin right after its verified result
+        // owner, 30. 10. 2026: deleted automatically = each original to the Recycle Bin right after its verified result;
+        // the choice is kept between starts, so each run with it is confirmed
         var originals = Originals;
+        if (originals == OriginalsMode.DeleteAutomatically &&
+            !Confirm($"Spustiť so ZMAZANÍM ORIGINÁLOV?\n\nKaždý originál pôjde do Koša Windows hneď po zapísaní a overení nového súboru v knižnici " +
+                     $"({Texts.Count(_items.Count(i => i.NeedsWork), "súbor", "súbory", "súborov")}). Ak ich chcete ponechať, zvoľte Originál: zachovať."))
+        {
+            return;
+        }
+
         var handling = originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep;
 
         Busy = true;
@@ -2204,8 +2216,17 @@ public sealed class BatchPageViewModel : ObservableObject
                     return;
                 }
 
+                // the batch deletes (or keeps) the originals as it was sent – the page has to say the same
+                if (target.Originals != Originals)
+                {
+                    RunState = $"{target.Label} má originály: {OriginalsText(target.Originals)}; tu je zvolené: {OriginalsText(Originals)}. " +
+                               "Zvoľte rovnako, alebo pošlite súbory do novej dávky.";
+                    return;
+                }
+
                 if (!Confirm($"Uložiť do {target.Label} {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." + left))
+                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." +
+                             $"\n\nOriginály: {OriginalsText(target.Originals)}." + left))
                 {
                     return;
                 }

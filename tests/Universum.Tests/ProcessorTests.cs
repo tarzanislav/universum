@@ -374,6 +374,16 @@ public sealed class ProcessorTests
         var recycled = Path.Combine(work.Path, "bin", Path.GetFileName(file));
         Assert.True((await System.IO.File.ReadAllBytesAsync(recycled)).SequenceEqual(bytes), "the original in the Recycle Bin is untouched");
         Assert.True((await inspector.InspectAsync(result.OutputPath!)).TracksOf(TrackType.Audio).Single().Name is null, "the result is edited");
+
+        // review, 30. 10. 2026: a result of a library (here the old one, after the output folder was changed) analysed as an
+        // original is copied into the new library, never sent to the Recycle Bin
+        var otherLibrary = new LibraryLayout(Path.Combine(work.Path, "OUTPUT2"));
+        var again = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(result.OutputPath!)) with { RemoveTags = false });
+        var placement = otherLibrary.Place(again.Target, new TitleInfo(MediaKind.Movie, "Vymyslený film", 2026), null, RuleProfile.Default);
+        var copy = await processor.ProcessAsync(again with { Method = WriteMethod.Remux }, placement, new OutputOptions(OriginalHandling.Delete, MoveIntoLibrary: false));
+        Assert.True(copy.Status == ProcessingStatus.Done && System.IO.File.Exists(result.OutputPath!) && bin.Recycled.Count == 1 &&
+                    copy.Messages.Any(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)),
+            "the library file stays: " + copy.Status + " " + string.Join("; ", copy.Messages));
     }
 
     [Test]
@@ -398,20 +408,27 @@ public sealed class ProcessorTests
         Assert.Equal(3, originals.Count, "three originals with their results");
 
         // one changed after the run, one whose result was removed from the library
+        var index = processor.Index!;
         System.IO.File.SetLastWriteTimeUtc(results[1].SourcePath, DateTime.UtcNow.AddMinutes(5));
         System.IO.File.Delete(results[2].OutputPath!);
-        var (removed, kept) = OriginalCleanup.Remove(originals, bin, work.Layout.HoldsResult);
+        var (removed, kept) = await OriginalCleanup.RemoveAsync(originals, index, bin, work.Layout.HoldsResult);
         Assert.Sequence([results[0].SourcePath], removed, "only the safe original");
         Assert.True(!System.IO.File.Exists(results[0].SourcePath) && bin.Recycled.Count == 1 && System.IO.File.Exists(results[0].OutputPath!), "in the Recycle Bin, the result stays");
         Assert.True(kept.Count == 2 && kept.Any(k => k.Contains("zmenil", StringComparison.Ordinal)) && kept.Any(k => k.Contains("výsledok", StringComparison.Ordinal)),
             "the others stay with the reason: " + string.Join("; ", kept));
 
+        // review, 30. 10. 2026: the time put back, but the library file at the result's place is not made from it
+        var changed = OriginalCleanup.Collect([results[1]]).Single() with { };
+        var other = work.Copy("sk-cz-mixed.mkv");
+        System.IO.File.Copy(other, results[1].OutputPath!, overwrite: true);
+        var (removedOther, keptOther) = await OriginalCleanup.RemoveAsync([changed], index, bin, work.Layout.HoldsResult);
+        Assert.True(removedOther.Count == 0 && keptOther.Single().Contains("overiť", StringComparison.Ordinal), "not verified: " + string.Join("; ", keptOther));
+
         // a file of the library is never removed, nor an original that cannot go to the Recycle Bin
         var inLibrary = new WrittenOriginal(results[0].OutputPath!, new FileInfo(results[0].OutputPath!).Length, System.IO.File.GetLastWriteTimeUtc(results[0].OutputPath!), results[0].OutputPath!);
-        var noBin = OriginalCleanup.Collect([results[1]]).Select(o => o with { ModifiedUtc = System.IO.File.GetLastWriteTimeUtc(o.Source) }).ToList();
-        var (removedNow, keptNow) = OriginalCleanup.Remove([inLibrary, .. noBin], new FolderRecycleBin(Path.Combine(work.Path, "bin2")) { Available = false }, work.Layout.HoldsResult);
-        Assert.True(removedNow.Count == 0 && System.IO.File.Exists(inLibrary.Source) && keptNow.Count == 2 && keptNow.Any(k => k.Contains("Kôš", StringComparison.Ordinal)),
-            "nothing removed: " + string.Join("; ", keptNow));
+        var (removedNow, keptNow) = await OriginalCleanup.RemoveAsync([inLibrary], index, new FolderRecycleBin(Path.Combine(work.Path, "bin2")) { Available = false }, _ => false);
+        Assert.True(removedNow.Count == 0 && System.IO.File.Exists(inLibrary.Source) && keptNow.Single().Contains("knižnice", StringComparison.Ordinal),
+            "a library file is never removed, even when the folder is not known as the library: " + string.Join("; ", keptNow));
     }
 
     [Test]

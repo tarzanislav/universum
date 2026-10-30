@@ -539,7 +539,13 @@ public sealed class FileProcessor(
     {
         var source = plan.Target.Source.Path;
         var messages = new List<string>();
-        if (output.Original == OriginalHandling.Delete && recycleBin.CannotRecycle(source) is { } reason)
+        if (output.Original == OriginalHandling.Delete && index?.Knows(source) == true)
+        {
+            // a file UNIVERSUM made for a library (also an earlier one) is never deleted as an original
+            output = output with { Original = OriginalHandling.Keep };
+            messages.Add($"{OriginalKeptPrefix}it is a result of a library");
+        }
+        else if (output.Original == OriginalHandling.Delete && recycleBin.CannotRecycle(source) is { } reason)
         {
             // the original would be deleted permanently – never; the result is written and the original stays (owner,
             // 30. 10. 2026: a drive without a Recycle Bin does not stop the batch)

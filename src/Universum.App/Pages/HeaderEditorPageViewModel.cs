@@ -23,7 +23,7 @@ namespace Universum.App.Pages;
 /// </summary>
 public sealed class HeaderEditorPageViewModel : ObservableObject
 {
-    private static readonly IReadOnlyList<LanguageChoice> Choices = LanguageChoice.Common;
+    private static IReadOnlyList<LanguageChoice> Choices => LanguageChoice.Common;
 
     private readonly AppServices _services;
     private MediaFile? _file;

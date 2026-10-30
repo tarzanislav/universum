@@ -31,7 +31,7 @@
                 <DataGridTemplateColumn Header="Jazyk" Width="200">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <ComboBox ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName"
+                            <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName"
                                       SelectedItem="{Binding Language, UpdateSourceTrigger=PropertyChanged}" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>

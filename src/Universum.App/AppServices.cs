@@ -598,6 +598,7 @@ public sealed class AppServices
     {
         var locator = new MkvToolNixLocator(Runner, [new RegistryMkvToolNixLocations()]);
         CurrentMkvToolNix = await locator.FindAsync(Settings.MkvToolNixDirectory, cancellationToken);
+        await LoadLanguagesAsync(CurrentMkvToolNix, cancellationToken);
         return CurrentMkvToolNix;
     }
 
@@ -610,9 +611,19 @@ public sealed class AppServices
             Settings.MkvToolNixDirectory = installation.Directory;
             Settings.Save();
             CurrentMkvToolNix = installation;
+            await LoadLanguagesAsync(installation, cancellationToken);
         }
 
         return installation;
+    }
+
+    // owner, 30. 10. 2026: every language MKVToolNix knows in the lists (below the common ones), e.g. Filipino
+    private async Task LoadLanguagesAsync(MkvToolNixInstallation? installation, CancellationToken cancellationToken)
+    {
+        if (installation is not null && Languages.All.Count == Languages.Common.Count)
+        {
+            Languages.Extend(await MkvToolNixLanguages.ReadAsync(installation, Runner, cancellationToken));
+        }
     }
 }
 

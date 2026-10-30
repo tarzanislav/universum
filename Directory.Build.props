@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
-    <Version>0.3.12</Version>
+    <Version>0.3.13</Version>
     <Company>tarzanislav</Company>
     <Product>UNIVERSUM</Product>
     <Copyright>© 2026 tarzanislav</Copyright>

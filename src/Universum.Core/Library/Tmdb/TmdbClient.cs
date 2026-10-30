@@ -35,6 +35,23 @@ public sealed record TmdbTitle(
     /// <summary>The library title by the specification: original title in Latin script, otherwise English title + ID.</summary>
     public TitleInfo? ToTitleInfo() => TitleInfo.FromTmdb(Kind, Id, OriginalTitle, Title, Year);
 
+    /// <summary>
+    /// The library title, also when TMDB has no English title of a title in another script (owner, 30. 10. 2026: such a
+    /// film was not named by its TMDB ID): then another of its names in Latin script, or the name from the file, with the
+    /// TMDB ID – the ID says which title it is. Null when there is no Latin name at all.
+    /// </summary>
+    public TitleInfo? ToLibraryTitle(string? nameFromFile)
+    {
+        if (ToTitleInfo() is { } title)
+        {
+            return title;
+        }
+
+        var name = OtherTitles.FirstOrDefault(n => LibraryNames.IsLatinScript(n) && LibraryNames.Clean(n).Length > 0)
+                   ?? (LibraryNames.IsLatinScript(nameFromFile) && LibraryNames.Clean(nameFromFile).Length > 0 ? nameFromFile : null);
+        return name is null ? null : new TitleInfo(Kind, LibraryNames.Clean(name), Year, Id, IncludeId: true);
+    }
+
     /// <summary>"Creep (2004)" or "Kantara: A Legend Chapter-1 (2025) · ಕಾಂತಾರ" for lists.</summary>
     public string Display =>
         Title + (Year is { } year ? $" ({year.ToString(CultureInfo.InvariantCulture)})" : "") +

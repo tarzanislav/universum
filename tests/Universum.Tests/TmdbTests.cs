@@ -19,6 +19,20 @@ public sealed class TmdbTests
         """{"id":227191,"name":"Nine Puzzles","original_name":"나인 퍼즐","original_language":"ko","first_air_date":"2025-05-21","seasons":[{"season_number":1,"episode_count":11}]}""";
 
     [Test]
+    public void ATitleWithoutAnEnglishNameIsNamedByItsId()
+    {
+        // owner, 30. 10. 2026: a film in another script without an English title on TMDB was not named by its ID
+        var film = new TmdbTitle(MediaKind.Movie, 4242, "검은 밤", "검은 밤", "ko", 2026, []);
+        Assert.True(film.ToTitleInfo() is null, "no English title: the specification's title is missing");
+        Assert.Equal("Vymyslená noc (2026) [tmdbid-4242]", film.ToLibraryTitle("Vymyslená noc")?.FolderName, "the name from the file with the ID");
+        Assert.Equal("Temná noc (2026) [tmdbid-4242]", (film with { OtherTitles = ["검은 밤", "Temná noc"] }).ToLibraryTitle("Vymyslená noc")?.FolderName,
+            "another Latin name of the title first");
+        Assert.True(film.ToLibraryTitle(null) is null && film.ToLibraryTitle("검은 밤") is null, "no Latin name: the user types it");
+        var english = new TmdbTitle(MediaKind.Movie, 4243, "Dark Night", "검은 밤", "ko", 2026, []);
+        Assert.Equal("Dark Night (2026) [tmdbid-4243]", english.ToLibraryTitle("Vymyslená noc")?.FolderName, "with an English title as before");
+    }
+
+    [Test]
     public async Task DetailsGiveTheLibraryTitle()
     {
         var server = new Server();

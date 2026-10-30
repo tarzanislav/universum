@@ -116,10 +116,15 @@ public sealed class BatchPageViewModel : ObservableObject
         AnswerSpecialsCommand = new RelayCommand(AnswerSpecials, () => !Busy && HasSpecialsQuestions);
         Tmdb = new TmdbPicker(services, () => MediaKind.Series,
             () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : SuggestedSeries?.FolderName ?? ""), ChooseTmdbSeries);
+        // owner, 30. 10. 2026: films have the same row as a series – the title, TMDB and the TMDB ID
+        FilmTmdb = new TmdbPicker(services, () => MediaKind.Movie,
+            () => FilmTitle.Length > 0 ? FilmTitle : FilmFiles.Select(p => _library?.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) ?? "",
+            film => _ = ApplyFilmAsync(FilmFiles, film));
         FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
         services.TitlesChanged += () =>
         {
             Tmdb.Refresh();
+            FilmTmdb.Refresh();
             FindMoviesCommand.NotifyCanExecuteChanged();
         };
         services.LibraryChanged += () =>
@@ -346,6 +351,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (SetProperty(ref _selectedGroup, value))
             {
                 ShowGroup();
+                OnFilmChanged();
                 if (IsMixed)
                 {
                     foreach (var name in new[] { nameof(IsMovies), nameof(IsSeries), nameof(SeriesTitle), nameof(SeriesSuggestion), nameof(SeriesNeedsConfirmation), nameof(KindNote), nameof(CanFindTitles) })
@@ -497,6 +503,196 @@ public sealed class BatchPageViewModel : ObservableObject
             _typedTmdb = null;
             _library.Series = TitleGuess.Typed(MediaKind.Series, value);
             Replan();
+        }
+    }
+
+    /// <summary>Looking up the film of the selected files on TMDB (the row Film: at the bottom).</summary>
+    public TmdbPicker FilmTmdb { get; }
+
+    // the files the row Film: names: the selected group in a sorted folder (one film and its versions), otherwise the
+    // files selected in the list, or the group's only file
+    private IReadOnlyList<string> FilmFiles
+    {
+        get
+        {
+            if (_library is null || SelectedGroup is null)
+            {
+                return [];
+            }
+
+            var group = SelectedFiles;
+            var films = group.Where(p => _library.KindFor(p) == MediaKind.Movie).ToList();
+            if (_library.Mixed || films.Count == 1)
+            {
+                return films;
+            }
+
+            var chosen = _selectedFiles.Select(f => f.Item.File.Path).Where(films.Contains).ToList();
+            return chosen;
+        }
+    }
+
+    /// <summary>The row Film: has files to name (otherwise: select the files in the list).</summary>
+    public bool CanNameFilm => FilmFiles.Count > 0;
+
+    public string FilmHint => CanNameFilm
+        ? FilmFiles.Count > 1 ? $"pre {FilmFiles.Count} súbory (verzie jedného filmu)" : ""
+        : "skupina má viac filmov – vyberte súbory v zozname (Ctrl / Shift) alebo zadajte názov pri súbore";
+
+    /// <summary>
+    /// The film of the selected files (owner, 30. 10. 2026: as the row Seriál) – "Názov (rok)", for a title in another
+    /// script "Anglický názov (rok) [tmdbid-ID]", or a TMDB ID or address.
+    /// </summary>
+    public string FilmTitle
+    {
+        get
+        {
+            var files = FilmFiles;
+            var titles = files.Select(p => _library?.Movies.GetValueOrDefault(p)?.FolderName).Distinct().ToList();
+            return files.Count > 0 && titles.Count == 1 ? titles[0] ?? "" : "";
+        }
+        set
+        {
+            var files = FilmFiles;
+            if (_library is null || files.Count == 0)
+            {
+                return;
+            }
+
+            if (TitleGuess.ParseTmdb(value) is { } reference)
+            {
+                _ = NameFilmsFromTmdbAsync(files, reference);
+                return;
+            }
+
+            var typed = TitleGuess.Typed(MediaKind.Movie, value);
+            foreach (var path in files)
+            {
+                if (typed is null)
+                {
+                    _library.Movies.Remove(path);
+                }
+                else
+                {
+                    _library.Movies[path] = typed;
+                    _library.ChosenTitles.Add(path);
+                    _library.UnverifiedTitles.Remove(path);
+                    _unverifiedNotes.Remove(path);
+                }
+            }
+
+            Replan();
+            OnPropertyChanged(nameof(FilmSuggestion));
+        }
+    }
+
+    /// <summary>The suggested film of the selected files, waiting for confirmation.</summary>
+    public string FilmSuggestion => _library is { } library && FilmTitle.Length == 0 &&
+                                    FilmFiles.Select(p => library.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) is { } suggestion
+        ? "návrh: " + suggestion
+        : "";
+
+    /// <summary>A TMDB ID or address for the selected files' film (the field clears after it is applied).</summary>
+    public string FilmTmdbId
+    {
+        get => "";
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value) && FilmFiles is { Count: > 0 } files)
+            {
+                if (TitleGuess.ParseTmdb(value) is { } reference)
+                {
+                    _ = NameFilmsFromTmdbAsync(files, reference);
+                }
+                else
+                {
+                    RunState = "TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….";
+                }
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>A TMDB ID or address of the series (owner, 30. 10. 2026: the same row for films and series).</summary>
+    public string SeriesTmdbId
+    {
+        get => "";
+        set
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (TitleGuess.ParseTmdb(value) is { } reference)
+                {
+                    _ = NameSeriesFromTmdbAsync(reference);
+                }
+                else
+                {
+                    RunState = "TMDB ID je číslo seriálu (napr. 12345) alebo adresa z themoviedb.org (…/tv/…).";
+                }
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    // the series by its TMDB ID (a bare number is a series here)
+    private async Task NameSeriesFromTmdbAsync(TmdbReference reference)
+    {
+        if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
+        {
+            RunState = "TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok) [tmdbid-ID].";
+            return;
+        }
+
+        if (reference.Kind == MediaKind.Movie)
+        {
+            RunState = "Toto je adresa filmu (/movie/) – seriál má adresu …/tv/….";
+            return;
+        }
+
+        try
+        {
+            if (await tmdb.GetAsync(MediaKind.Series, reference.Id) is { } show && _library is not null)
+            {
+                TmdbPicker.TrySaveCache(tmdb);
+                ChooseTmdbSeries(show);
+            }
+            else
+            {
+                RunState = $"TMDB nepozná seriál s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
+            }
+        }
+        catch (TitleServiceException ex)
+        {
+            RunState = ex.Message;
+        }
+    }
+
+    // one film for several files (its versions): read once, applied to all
+    private async Task NameFilmsFromTmdbAsync(IReadOnlyList<string> paths, TmdbReference reference)
+    {
+        if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
+        {
+            RunState = "TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
+            return;
+        }
+
+        try
+        {
+            if (await tmdb.GetAsync(reference.Kind ?? MediaKind.Movie, reference.Id) is { } film && _library is not null)
+            {
+                TmdbPicker.TrySaveCache(tmdb);
+                await ApplyFilmAsync(paths, film);
+            }
+            else
+            {
+                RunState = $"TMDB nepozná {(reference.Kind == MediaKind.Series ? "seriál" : "film")} s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
+            }
+        }
+        catch (TitleServiceException ex)
+        {
+            RunState = ex.Message;
         }
     }
 
@@ -952,6 +1148,7 @@ public sealed class BatchPageViewModel : ObservableObject
         var place = _items.Count(i => i.Status == BatchStatus.Place);
         Simulation = (_library is null ? "Bez výstupného priečinka – len simulácia pravidiel · " : $"Do knižnice {remux + header + place} súborov ({remux} nový súbor, {header} len hlavička, {place} bez zmeny obsahu) · ") +
                      $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
+        OnFilmChanged();
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
         OnPropertyChanged(nameof(SeriesSuggestion));
@@ -1196,33 +1393,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 
-    private async Task NameFilmFromTmdbAsync(string path, TmdbReference reference)
-    {
-        if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
-        {
-            RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
-            return;
-        }
-
-        try
-        {
-            // a /tv/ address (a TV film or miniseries) is a film without an ID after confirmation; a bare ID is a film's
-            var kind = reference.Kind ?? MediaKind.Movie;
-            if (await tmdb.GetAsync(kind, reference.Id) is { } film && _library is not null)
-            {
-                TmdbPicker.TrySaveCache(tmdb);
-                await ApplyFilmAsync(path, film);
-            }
-            else
-            {
-                RunState = $"TMDB nepozná {(reference.Kind == MediaKind.Series ? "seriál" : "film")} s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
-            }
-        }
-        catch (TitleServiceException ex)
-        {
-            RunState = ex.Message;
-        }
-    }
+    private Task NameFilmFromTmdbAsync(string path, TmdbReference reference) => NameFilmsFromTmdbAsync([path], reference);
 
     // a series of TMDB as a film of the library: its name and year, no ID (Jellyfin would take a series' ID for a film's)
     private static TitleInfo? AsFilm(TmdbTitle show) =>
@@ -1251,9 +1422,12 @@ public sealed class BatchPageViewModel : ObservableObject
     public IReadOnlyList<TmdbTitle> CandidatesFor(string path) => _candidates.GetValueOrDefault(path) ?? [];
 
     // the film becomes the file's title – checked in HISTRA as everywhere: a title it does not confirm waits at the file
-    private async Task ApplyFilmAsync(string path, TmdbTitle film)
+    private Task ApplyFilmAsync(string path, TmdbTitle film) => ApplyFilmAsync([path], film);
+
+    // the film becomes the title of the files (one film and its versions) – checked in HISTRA once
+    private async Task ApplyFilmAsync(IReadOnlyList<string> paths, TmdbTitle film)
     {
-        if (_library is null)
+        if (_library is null || paths.Count == 0)
         {
             return;
         }
@@ -1263,41 +1437,77 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             if (AsFilm(film) is { } asFilm)
             {
-                _library.ChosenTitles.Add(path);
-                _library.Movies.Remove(path);
-                _library.MovieSuggestions[path] = asFilm;
-                _library.UnverifiedTitles.Add(path);
-                _unverifiedNotes[path] = MiniseriesNote(film, asFilm);
-                RunState = _unverifiedNotes[path];
+                foreach (var path in paths)
+                {
+                    _library.ChosenTitles.Add(path);
+                    _library.Movies.Remove(path);
+                    _library.MovieSuggestions[path] = asFilm;
+                    _library.UnverifiedTitles.Add(path);
+                    _unverifiedNotes[path] = MiniseriesNote(film, asFilm);
+                }
+
+                RunState = MiniseriesNote(film, asFilm);
             }
 
             Replan();
             return;
         }
 
-        var (title, note) = TmdbPicker.TitleText(film);
-        if (TitleGuess.Typed(MediaKind.Movie, title) is { } info)
+        var (info, note) = LibraryTitle(film, paths[0]);
+        if (info is not null)
         {
             var check = _services.Titles is { UsesHistra: true } titles ? await titles.CheckAsync(film) : null;
-            _library.ChosenTitles.Add(path);
-            if (check is not null && check.Check(film).NeedsConfirmation())
+            var unverified = check is not null && check.Check(film).NeedsConfirmation();
+            foreach (var path in paths)
             {
-                _library.Movies.Remove(path);
-                _library.MovieSuggestions[path] = info;
-                _library.UnverifiedTitles.Add(path);
-                _unverifiedNotes[path] = TmdbPicker.Describe(check, film);
-                note = (note.Length > 0 ? note + " " : "") + "⚠ " + _unverifiedNotes[path];
+                _library.ChosenTitles.Add(path);
+                if (unverified)
+                {
+                    _library.Movies.Remove(path);
+                    _library.MovieSuggestions[path] = info;
+                    _library.UnverifiedTitles.Add(path);
+                    _unverifiedNotes[path] = TmdbPicker.Describe(check!, film);
+                }
+                else
+                {
+                    _library.Movies[path] = info;
+                    _library.UnverifiedTitles.Remove(path);
+                    _unverifiedNotes.Remove(path);
+                }
             }
-            else
+
+            if (unverified)
             {
-                _library.Movies[path] = info;
-                _library.UnverifiedTitles.Remove(path);
-                _unverifiedNotes.Remove(path);
+                note = (note.Length > 0 ? note + " " : "") + "⚠ " + TmdbPicker.Describe(check!, film);
             }
         }
 
-        RunState = note.Length > 0 ? note : $"{Path.GetFileName(path)}: {film.Display}";
+        RunState = note.Length > 0 ? note : $"{(paths.Count == 1 ? Path.GetFileName(paths[0]) : $"{paths.Count} súbory")}: {film.Display}";
         Replan();
+        OnPropertyChanged(nameof(FilmTitle));
+        OnPropertyChanged(nameof(FilmSuggestion));
+    }
+
+    /// <summary>
+    /// The library title of a TMDB title: the original in Latin script, otherwise the English title with the TMDB ID. When
+    /// TMDB has no English title (owner, 29. 10. 2026: a film in another script was not named by its ID), another Latin
+    /// name of the title or the name from the file is used with the ID – the ID says which title it is.
+    /// </summary>
+    internal static (TitleInfo? Title, string Note) LibraryTitle(TmdbTitle title, string? path)
+    {
+        var (text, note) = TmdbPicker.TitleText(title);
+        if (TitleGuess.Typed(title.Kind, text) is { } info)
+        {
+            return (info, note);
+        }
+
+        if (title.ToLibraryTitle(path is null ? null : TitleGuess.ForFile(path).Title?.Name) is not { } fallback ||
+            TitleGuess.Typed(title.Kind, fallback.FolderName) is not { } named)
+        {
+            return (null, "TMDB nemá názov latinkou – napíšte ho pred rok, napr. Anglický názov " + text + ".");
+        }
+
+        return (named, $"TMDB nemá anglický názov – použitý je „{named.Name}“ s TMDB ID {title.Id}; ak treba, opravte názov (ID ostane).");
     }
 
     private void ChooseTmdbSeries(TmdbTitle title)
@@ -1310,8 +1520,8 @@ public sealed class BatchPageViewModel : ObservableObject
         // a sorted folder: the series of the selected group
         if (_library.Mixed)
         {
-            var (seriesText, seriesNote) = TmdbPicker.TitleText(title);
-            if (title.Kind == MediaKind.Series && TitleGuess.Typed(MediaKind.Series, seriesText) is { } groupSeries)
+            var (groupSeries, seriesNote) = title.Kind == MediaKind.Series ? LibraryTitle(title, SelectedFirst) : (null, "");
+            if (groupSeries is not null)
             {
                 foreach (var path in SelectedFiles)
                 {
@@ -1363,7 +1573,12 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         _library.Kind = MediaKind.Series;
-        var chosen = TitleGuess.Typed(MediaKind.Series, text);
+        var (chosen, seriesNote2) = LibraryTitle(title, SelectedFirst);
+        if (seriesNote2.Length > 0)
+        {
+            note = seriesNote2;
+        }
+
         if (Tmdb.NeedsConfirmation && chosen is not null)
         {
             // HISTRA did not confirm TMDB's series: it is only suggested and waits for "Potvrdiť seriál"
@@ -1750,6 +1965,17 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         _selectedFiles = files.ToList();
         DetectAudioSelectedCommand.NotifyCanExecuteChanged();
+        OnFilmChanged();
+    }
+
+    // the row Film: follows the group and the files selected in the list
+    private void OnFilmChanged()
+    {
+        OnPropertyChanged(nameof(FilmTitle));
+        OnPropertyChanged(nameof(FilmSuggestion));
+        OnPropertyChanged(nameof(CanNameFilm));
+        OnPropertyChanged(nameof(FilmHint));
+        FilmTmdb?.Refresh();
     }
 
     private async Task RunAsync()

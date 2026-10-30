@@ -1968,6 +1968,16 @@ internal static class SelfTest
                   .All(i => i.Reasons.All(r => r.Kind != Core.Batch.ReviewReasonKind.KindNotConfirmed)),
             "batch: MOVIES – the numbered versions stay a film, its kind certain");
 
+        // owner, 30. 10. 2026: films have the row Film: like a series – the title for the film and its versions
+        var versions = batch.Items.Where(i => i.File.Path.StartsWith(film, StringComparison.Ordinal)).Select(i => i.File.Path).ToList();
+        Check(batch.CanNameFilm && batch.FilmHint.Contains(versions.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal),
+            $"batch: the row Film: names the group's {versions.Count} versions – {batch.FilmHint}");
+        batch.FilmTitle = "Vymyslený film na skúšku (2020)";
+        Check(batch.FilmTitle == "Vymyslený film na skúšku (2020)" &&
+              batch.Items.Where(i => versions.Contains(i.File.Path)).All(i => i.PlannedPath?.Contains(Path.Combine("MOVIES", "Vymyslený film na skúšku (2020)"), StringComparison.Ordinal) == true),
+            "batch: the film typed in the row Film: names all its versions – " + string.Join(" | ", batch.Items.Select(i => i.PlannedPath)));
+        await Screenshot(window, "batch-film-row.png");
+
         // owner, 29. 10. 2026: MEGA spracovanie – the prepared files go into a batch written later, shown "v dávke" here
         var batches = model.Mega.Rows.Count;
         var ready = batch.Items.Where(i => i.NeedsWork).Select(i => i.File.Path).ToList();
@@ -2008,7 +2018,9 @@ internal static class SelfTest
             await Task.Delay(100);
         }
 
-        Check(megaBatch.State == Core.Mega.MegaBatchState.Done && megaBatch.Files.All(f => f.State == Core.Mega.MegaFileState.Done) &&
+        // two versions of the test film are the same file: the second one is the same stream – already in the library
+        Check(megaBatch.State == Core.Mega.MegaBatchState.Done &&
+              megaBatch.Files.All(f => f.State is Core.Mega.MegaFileState.Done or Core.Mega.MegaFileState.AlreadyInLibrary) &&
               megaBatch.Files.All(f => File.Exists(f.Note)),
             "mega: the batch written into the library after the check – " + megaBatch.Outcome + " | " +
             string.Join(" | ", model.Mega.LastJob?.Messages.Select(m => m.Text) ?? []));

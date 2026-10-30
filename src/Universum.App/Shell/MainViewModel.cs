@@ -48,6 +48,7 @@ public sealed class MainViewModel : ObservableObject
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
         var multiplexing = new ToolGroup("MULTIPLEXING", Color.FromRgb(0x4A, 0x7B, 0xD9));
+        var studios = new ToolGroup("EDITÁCIA VIDEOSTÔP (video, audio, titulky)", Color.FromRgb(0x2B, 0xA6, 0xA6));
         var templates = new ToolGroup("ŠABLÓNY (TEMPLATE)", Color.FromRgb(0x3E, 0xA8, 0x5F));
         var statistics = new ToolGroup("ŠTATISTIKA", Color.FromRgb(0xD9, 0x8B, 0x2B));
         Tools =
@@ -60,8 +61,13 @@ public sealed class MainViewModel : ObservableObject
             new("Zlučovanie", "\uE71D", Mux, multiplexing),
             new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
             new("Kapitoly", "\uE8FD", Chapters, multiplexing),
-            new("Titulky", "\uE7F0", Subtitles, multiplexing),
             new("Informácie", "\uE946", Info, multiplexing),
+            // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
+            new("Úprava videostopy", "\uE714", new PlaceholderPageViewModel("Úprava videostopy",
+                "Štúdio obrazu: strih, prekódovanie, pomer strán, otočenie – s rovnakým prehrávačom ako Úprava titulkostopy.", "fáza 4"), studios),
+            new("Úprava audiostopy", "\uE8D6", new PlaceholderPageViewModel("Úprava audiostopy",
+                "Štúdio zvuku: posun, PAL 25 ↔ 23,976, pridanie externého zvuku (napr. CZ dabing) s automatickým napasovaním, kodek a hlasitosť.", "fáza 3"), studios),
+            new("Úprava titulkostopy", "\uE7F0", Subtitles, studios),
             new("Single spracovanie", "\uE90F", Rules, templates),
             new("Hromadné spracovanie", "\uE8B7", Batch, templates),
             new("MEGA spracovanie", "\uE945", Mega, templates),
@@ -215,7 +221,10 @@ public sealed class MainViewModel : ObservableObject
 
     public ChaptersPageViewModel Chapters { get; }
 
-    /// <summary>Titulky: FPS, speed, delay, conversion to SRT, external subtitles (owner, 30. 10. 2026).</summary>
+    /// <summary>
+    /// Úprava titulkostopy (formerly Titulky): the player with the subtitles, FPS, speed, delay, conversion to SRT, external
+    /// subtitles (owner, 30. 10. 2026).
+    /// </summary>
     public SubtitlesPageViewModel Subtitles { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }

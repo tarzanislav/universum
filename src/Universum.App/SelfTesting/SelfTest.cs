@@ -148,7 +148,8 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Titulky, Informácie | " +
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
               "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
             "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
@@ -1758,6 +1759,27 @@ internal static class SelfTest
         slovak.DelayText = "250";
         Check(page.Preview.Count == 1 && page.Preview[0].After == "0:00:00,771", "subtitles: 25 → 23,976 FPS and +250 ms in the preview – " + string.Join(" | ", page.Preview.Select(p => p.After)));
         Check(slovak.Summary.Contains("FPS 25 → 23,976", StringComparison.Ordinal) && slovak.Summary.Contains("posun +250 ms", StringComparison.Ordinal), "subtitles: the summary – " + slovak.Summary);
+
+        // owner, 30. 10. 2026: Úprava titulkostopy – the film plays here with the subtitles being edited (the top priority)
+        await page.PlayerOpening;
+        await WaitFor(() => page.Player.FramesShown > 0);
+        Check(page.Player.IsOpen && page.Player.FramesShown > 0, $"studio: the film open in the player, its first picture shown ({page.Player.FramesShown}) – {page.Player.Message}");
+        page.CompareRow = english;
+        await page.Player.SeekAsync(TimeSpan.FromSeconds(0.8));
+        await WaitFor(() => page.Player.PrimaryText.Length > 0 && page.Player.SecondaryText.Length > 0);
+        Check(page.Player.PrimaryText.StartsWith("Ľudia sa vrátia domov", StringComparison.Ordinal) && page.Player.SecondaryText == "People will come home.",
+            $"studio: at 0,8 s the Slovak subtitles with their changes (from 0,771 s) and the English ones to compare – „{page.Player.PrimaryText}“ / „{page.Player.SecondaryText}“");
+        page.StartsNowCommand.Execute(null);
+        Check(slovak.DelayText == "279", $"studio: Titulok začína teraz – the shift grows by 29 ms ({slovak.DelayText}) – {page.LiveStatus}");
+        slovak.DelayText = "250";
+        var shown = page.Player.FramesShown;
+        await page.Player.PlayPauseCommand.ExecuteAsync(null);
+        await Task.Delay(700);
+        var played = page.Player.Now;
+        page.Player.Pause();
+        Check(played > TimeSpan.FromSeconds(1.2) && page.Player.FramesShown > shown, $"studio: playing moves the film on ({played}, {page.Player.FramesShown - shown} pictures)");
+        await page.Player.SeekAsync(TimeSpan.FromSeconds(1));
+        await Screenshot(window, "studio-subtitles.png");
         // automatic sync on a 2-second file: nothing to tell, never a crash
         page.SyncByAudio = true;
         await page.SyncCommand.ExecuteAsync(null);

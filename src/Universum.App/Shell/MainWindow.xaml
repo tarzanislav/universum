@@ -4,6 +4,7 @@
         xmlns:pages="clr-namespace:Universum.App.Pages"
         xmlns:app="clr-namespace:Universum.App"
         xmlns:jobs="clr-namespace:Universum.App.Jobs"
+        xmlns:player="clr-namespace:Universum.App.Player"
         Title="UNIVERSUM" Icon="pack://application:,,,/Assets/universum.ico" Width="1280" Height="820" MinWidth="980" MinHeight="600"
         WindowStartupLocation="CenterScreen" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
     <Window.Resources>
@@ -1024,9 +1025,9 @@
             </Grid>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:SubtitlesPageViewModel}">
-            <Grid Margin="32,24,32,16">
+            <!-- owner, 30. 10. 2026: Úprava titulkostopy – the film plays with the subtitles being edited, other subtitles to compare -->
+            <Grid Margin="24,16,24,12">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
@@ -1039,140 +1040,193 @@
                                 ToolTip="Súbory titulkov (SRT, ASS/SSA, WebVTT, TTML, SAMI, SubViewer, MicroDVD, MPL2, TMPlayer) – uložia sa ako nové SRT" />
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="Titulky" />
+                        <TextBlock Style="{StaticResource PageTitle}" Text="Úprava titulkostopy" />
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </DockPanel>
-                <StackPanel Grid.Row="1">
-                <Expander Header="Stiahnuť a preložiť titulky" Margin="0,10,0,0" IsExpanded="False">
-                    <Border Style="{StaticResource Card}" Margin="0,6,0,0">
-                        <StackPanel>
-                            <WrapPanel>
-                                <TextBlock Text="OpenSubtitles.com:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding OnlineLanguage}" Width="60" Margin="0,0,6,0" ToolTip="Jazyk titulkov" />
-                                <ComboBox ItemsSource="{Binding HearingImpairedFilters}" SelectedItem="{Binding HearingImpairedFilter}" Width="100" Margin="0,0,6,0" ToolTip="Titulky pre nepočujúcich (SDH)" />
-                                <Button Content="Hľadať" Command="{Binding SearchOnlineCommand}" Padding="12,3" Margin="0,0,20,0"
-                                        ToolTip="Podľa titulu (s TMDB ID presne) a epizódy; účet a API kľúč v Nastaveniach" />
-                                <TextBlock Text="titulky.com (CZ/SK):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Button Content="Hľadať v prehliadači" Command="{Binding SearchTitulkyCommand}" Padding="12,3" Margin="0,0,20,0"
-                                        ToolTip="Pravidlá titulky.com dovoľujú len prehliadač: stiahnite titulky, UNIVERSUM ich sám vezme zo Stiahnutých súborov" />
-                                <TextBlock Text="Preložiť vybrané (svsub.net) do:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding TranslateTo}" Width="60" Margin="0,0,6,0" />
-                                <Button Content="Preložiť" Command="{Binding TranslateCommand}" Padding="12,3"
-                                        ToolTip="Vybrané titulky preloží AI cez váš účet svsub.net (token v Nastaveniach); posielajú sa len titulky pod neutrálnym názvom" />
-                            </WrapPanel>
-                            <TextBlock Text="{Binding OnlineStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
-                            <ItemsControl ItemsSource="{Binding OnlineResults}" MaxHeight="160" Margin="0,4,0,0">
-                                <ItemsControl.Template>
-                                    <ControlTemplate>
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                            <ItemsPresenter />
-                                        </ScrollViewer>
-                                    </ControlTemplate>
-                                </ItemsControl.Template>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="0,1">
-                                            <Button DockPanel.Dock="Left" Content="Stiahnuť" Padding="8,1" Margin="0,0,8,0"
-                                                    Command="{Binding DataContext.DownloadOnlineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                            <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
-                                       Text="Stiahnuté a preložené titulky sa uložia vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor) – Single aj Hromadné spracovanie ich potom nájdu samo." />
-                        </StackPanel>
-                    </Border>
-                </Expander>
-                <Border Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding HasFound, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <TextBlock Text="Externé titulky pri videu (podľa názvu, slov názvu a čísla epizódy):" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <ItemsControl ItemsSource="{Binding Found}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,2">
-                                        <Button DockPanel.Dock="Left" Content="Pridať" Command="{Binding AddCommand}" Padding="10,2" Margin="0,0,8,0" />
-                                        <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-                </StackPanel>
-                <Grid Grid.Row="2" Margin="0,10,0,0">
+                <Grid Grid.Row="1" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="380" />
+                        <ColumnDefinition Width="*" MinWidth="420" />
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="430" />
                     </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <DataGrid ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="Ponechať">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Zdroj" Binding="{Binding Source, Mode=OneWay}" IsReadOnly="True" Width="2*" />
-                            <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display, Mode=OneWay}" IsReadOnly="True" Width="*" />
-                            <DataGridTextColumn Header="Formát" Binding="{Binding Format, Mode=OneWay}" IsReadOnly="True" />
-                            <DataGridTextColumn Header="Titulkov" Binding="{Binding Count, Mode=OneWay}" IsReadOnly="True" />
-                            <DataGridTextColumn Header="Zmeny" Binding="{Binding Summary, Mode=OneWay}" IsReadOnly="True" Width="2*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <StackPanel Grid.Row="1" Margin="0,8,0,8">
-                        <WrapPanel>
-                            <Button Content="Pridať externé titulky…" Command="{Binding AddExternalCommand}" Padding="12,4" Margin="0,0,8,0"
-                                    ToolTip="Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)" />
-                            <Button Content="Odstrániť zo zoznamu" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný externý súbor sa nepridá" />
-                            <Button Content="Skontrolovať titulky videa" Command="{Binding CheckTracksCommand}" Padding="12,4"
-                                    ToolTip="Porovná každú titulkovú stopu videa so zvukom: sedí, mešká, ide skôr, iné FPS" />
-                        </WrapPanel>
-                        <WrapPanel Margin="0,8,0,0">
-                            <TextBlock Text="Napasovať vybrané automaticky:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <CheckBox Content="podľa zvuku" IsChecked="{Binding SyncByAudio}" VerticalAlignment="Center" Margin="0,0,12,0"
-                                      ToolTip="Kde sa vo filme hovorí – osem častí filmu, aj iné FPS (25 ↔ 23,976 …)" />
-                            <CheckBox Content="podľa titulkov:" IsChecked="{Binding SyncBySubtitles}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                      ToolTip="Iné titulky, ktoré k filmu sedia (aj v inom jazyku)" />
-                            <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SyncReference}" Width="200" Margin="0,0,8,0">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock>
-                                            <Run Text="{Binding Language.Display, Mode=OneWay}" /> – <Run Text="{Binding Source, Mode=OneWay}" />
-                                        </TextBlock>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                            <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
-                                    ToolTip="Nastaví rýchlosť (alebo zmenu FPS) a posun vybraných titulkov, keď je výsledok istý; oboje naraz = istota, keď sa zhodnú" />
-                            <Button Content="Zastaviť" Command="{Binding StopSyncCommand}" Padding="12,4" Margin="0,0,8,0"
-                                    ToolTip="Zastaví čítanie zvuku filmu" />
-                            <Button Content="Použiť návrh" Command="{Binding ApplyProposalCommand}" Padding="12,4"
-                                    Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
-                        </WrapPanel>
-                        <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
-                    </StackPanel>
-                    <DataGrid Grid.Row="2" ItemsSource="{Binding Preview}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal" CanUserSortColumns="False">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="#" Binding="{Binding Number}" />
-                            <DataGridTextColumn Header="Teraz" Binding="{Binding Before}" />
-                            <DataGridTextColumn Header="Po zmene" Binding="{Binding After}" />
-                            <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-                    <ScrollViewer Grid.Column="2" Grid.RowSpan="3" VerticalScrollBarVisibility="Auto" DataContext="{Binding SelectedRow}"
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1.2*" MinHeight="200" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" MinHeight="150" />
+                        </Grid.RowDefinitions>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
+                                <WrapPanel>
+                                    <CheckBox Content="Porovnať s:" IsChecked="{Binding Compare}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                              ToolTip="Iné titulky hore na obraze (žlté), so svojimi zmenami" />
+                                    <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding CompareRow}" Width="190" Margin="0,0,16,0">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock>
+                                                    <Run Text="{Binding Language.Display, Mode=OneWay}" /> – <Run Text="{Binding Source, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <StackPanel Orientation="Horizontal" DataContext="{Binding SelectedRow}" Margin="0,0,12,0">
+                                        <TextBlock Text="Posun:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,6,0" />
+                                        <Button Content="−1000" Command="{Binding DelayStepCommand}" CommandParameter="-1000" Padding="6,2" Margin="0,0,3,0" />
+                                        <Button Content="−100" Command="{Binding DelayStepCommand}" CommandParameter="-100" Padding="6,2" Margin="0,0,4,0" />
+                                        <TextBox Text="{Binding DelayText, UpdateSourceTrigger=PropertyChanged}" Width="70" TextAlignment="Right" />
+                                        <TextBlock Text="ms" VerticalAlignment="Center" Margin="3,0,4,0" />
+                                        <Button Content="+100" Command="{Binding DelayStepCommand}" CommandParameter="100" Padding="6,2" Margin="0,0,3,0" />
+                                        <Button Content="+1000" Command="{Binding DelayStepCommand}" CommandParameter="1000" Padding="6,2" />
+                                    </StackPanel>
+                                    <Button Content="Titulok začína teraz" Command="{Binding StartsNowCommand}" Padding="10,2" Margin="0,0,6,0"
+                                            ToolTip="Najbližší titulok vybraných titulkov sa posunie tak, aby začínal práve teraz (posun sa zmení o rozdiel)" />
+                                    <Button Content="1. bod" Command="{Binding MarkFirstCommand}" Padding="8,2" Margin="0,0,4,0"
+                                            ToolTip="Synchronizácia podľa dvoch titulkov: najbližší titulok patrí sem (na začiatku filmu)" />
+                                    <Button Content="2. bod" Command="{Binding MarkSecondCommand}" Padding="8,2"
+                                            ToolTip="…a druhý titulok ku koncu filmu – vypočíta rýchlosť a posun" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding LiveStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                            </StackPanel>
+                            <player:PlayerView DataContext="{Binding Player}" />
+                        </DockPanel>
+                        <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" Background="Transparent" Margin="0,2,0,2" />
+                        <TabControl Grid.Row="2">
+                            <TabItem Header="Stopy titulkov">
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Border Style="{StaticResource Card}" Margin="0,0,0,8" Visibility="{Binding HasFound, Converter={StaticResource BoolToVisibility}}">
+                                        <StackPanel>
+                                            <TextBlock Text="Externé titulky pri videu (podľa názvu, slov názvu a čísla epizódy):" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                            <ItemsControl ItemsSource="{Binding Found}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <DockPanel Margin="0,2">
+                                                            <Button DockPanel.Dock="Left" Content="Pridať" Command="{Binding AddCommand}" Padding="10,2" Margin="0,0,8,0" />
+                                                            <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                    <DataGrid Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                                        <DataGrid.Columns>
+                                            <DataGridTemplateColumn Header="Ponechať">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTextColumn Header="Zdroj" Binding="{Binding Source, Mode=OneWay}" IsReadOnly="True" Width="2*" />
+                                            <DataGridTextColumn Header="Jazyk" Binding="{Binding Language.Display, Mode=OneWay}" IsReadOnly="True" Width="*" />
+                                            <DataGridTextColumn Header="Formát" Binding="{Binding Format, Mode=OneWay}" IsReadOnly="True" />
+                                            <DataGridTextColumn Header="Titulkov" Binding="{Binding Count, Mode=OneWay}" IsReadOnly="True" />
+                                            <DataGridTextColumn Header="Zmeny" Binding="{Binding Summary, Mode=OneWay}" IsReadOnly="True" Width="2*" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <StackPanel Grid.Row="2" Margin="0,8,0,4">
+                                        <WrapPanel>
+                                            <Button Content="Pridať externé titulky…" Command="{Binding AddExternalCommand}" Padding="12,4" Margin="0,0,8,0"
+                                                    ToolTip="Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)" />
+                                            <Button Content="Odstrániť zo zoznamu" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný externý súbor sa nepridá" />
+                                            <Button Content="Skontrolovať titulky videa" Command="{Binding CheckTracksCommand}" Padding="12,4"
+                                                    ToolTip="Porovná každú titulkovú stopu videa so zvukom: sedí, mešká, ide skôr, iné FPS" />
+                                        </WrapPanel>
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <TextBlock Text="Napasovať vybrané automaticky:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <CheckBox Content="podľa zvuku" IsChecked="{Binding SyncByAudio}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                      ToolTip="Kde sa vo filme hovorí – osem častí filmu, aj iné FPS (25 ↔ 23,976 …)" />
+                                            <CheckBox Content="podľa titulkov:" IsChecked="{Binding SyncBySubtitles}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                      ToolTip="Iné titulky, ktoré k filmu sedia (aj v inom jazyku)" />
+                                            <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SyncReference}" Width="200" Margin="0,0,8,0">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock>
+                                                            <Run Text="{Binding Language.Display, Mode=OneWay}" /> – <Run Text="{Binding Source, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                            <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
+                                                    ToolTip="Nastaví rýchlosť (alebo zmenu FPS) a posun vybraných titulkov, keď je výsledok istý; oboje naraz = istota, keď sa zhodnú" />
+                                            <Button Content="Zastaviť" Command="{Binding StopSyncCommand}" Padding="12,4" Margin="0,0,8,0"
+                                                    ToolTip="Zastaví čítanie zvuku filmu" />
+                                            <Button Content="Použiť návrh" Command="{Binding ApplyProposalCommand}" Padding="12,4"
+                                                    Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
+                                                    ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
+                                        </WrapPanel>
+                                        <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </TabItem>
+                            <TabItem Header="Časy titulkov">
+                                <DataGrid ItemsSource="{Binding Preview}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionMode="Single"
+                                          ToolTip="Dvojklik: prehrávač ide na titulok">
+                                    <DataGrid.InputBindings>
+                                        <MouseBinding Gesture="LeftDoubleClick" Command="{Binding SeekToCueCommand}"
+                                                      CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                    </DataGrid.InputBindings>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="#" Binding="{Binding Number}" />
+                                        <DataGridTextColumn Header="Teraz" Binding="{Binding Before}" />
+                                        <DataGridTextColumn Header="Po zmene" Binding="{Binding After}" />
+                                        <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                            <TabItem Header="Stiahnuť a preložiť">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
+                                    <StackPanel>
+                                        <WrapPanel>
+                                            <TextBlock Text="OpenSubtitles.com:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding OnlineLanguage}" Width="60" Margin="0,0,6,0" ToolTip="Jazyk titulkov" />
+                                            <ComboBox ItemsSource="{Binding HearingImpairedFilters}" SelectedItem="{Binding HearingImpairedFilter}" Width="100" Margin="0,0,6,0" ToolTip="Titulky pre nepočujúcich (SDH)" />
+                                            <Button Content="Hľadať" Command="{Binding SearchOnlineCommand}" Padding="12,3" Margin="0,0,20,0"
+                                                    ToolTip="Podľa titulu (s TMDB ID presne) a epizódy; účet a API kľúč v Nastaveniach" />
+                                            <TextBlock Text="titulky.com (CZ/SK):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <Button Content="Hľadať v prehliadači" Command="{Binding SearchTitulkyCommand}" Padding="12,3" Margin="0,0,20,0"
+                                                    ToolTip="Pravidlá titulky.com dovoľujú len prehliadač: stiahnite titulky, UNIVERSUM ich sám vezme zo Stiahnutých súborov" />
+                                            <TextBlock Text="Preložiť vybrané (svsub.net) do:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding TranslateTo}" Width="60" Margin="0,0,6,0" />
+                                            <Button Content="Preložiť" Command="{Binding TranslateCommand}" Padding="12,3"
+                                                    ToolTip="Vybrané titulky preloží AI cez váš účet svsub.net (token v Nastaveniach); posielajú sa len titulky pod neutrálnym názvom" />
+                                        </WrapPanel>
+                                        <TextBlock Text="{Binding OnlineStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                        <ItemsControl ItemsSource="{Binding OnlineResults}" MaxHeight="160" Margin="0,4,0,0">
+                                            <ItemsControl.Template>
+                                                <ControlTemplate>
+                                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                        <ItemsPresenter />
+                                                    </ScrollViewer>
+                                                </ControlTemplate>
+                                            </ItemsControl.Template>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel Margin="0,1">
+                                                        <Button DockPanel.Dock="Left" Content="Stiahnuť" Padding="8,1" Margin="0,0,8,0"
+                                                                Command="{Binding DataContext.DownloadOnlineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                   Text="Stiahnuté a preložené titulky sa uložia vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor) – Single aj Hromadné spracovanie ich potom nájdu samo." />
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                    <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" DataContext="{Binding SelectedRow}"
                                   Visibility="{Binding DataContext.HasSelection, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel Margin="0,0,8,0">
                             <TextBlock Text="{Binding Source}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -1290,7 +1344,7 @@
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
-                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+                <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0">
                     <StackPanel>
                         <StackPanel Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                             <WrapPanel DataContext="{Binding Library}">
@@ -3270,7 +3324,7 @@
                         <StackPanel>
                             <TextBlock Text="Titulky – sťahovanie a preklad (vaše účty)" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
-                                       Text="OpenSubtitles.com (anglické titulky, aj SDH): API kľúč z profilu (API Consumers), meno a heslo na sťahovanie. svsub.net: váš token (svs_…) – prekladá sa vaším AI kľúčom uloženým v nastaveniach služby. Kľúče a heslo sa ukladajú šifrovane len pre váš účet Windows; nič sa neposiela, kým na stránke Titulky nehľadáte, nesťahujete ani neprekladáte." />
+                                       Text="OpenSubtitles.com (anglické titulky, aj SDH): API kľúč z profilu (API Consumers), meno a heslo na sťahovanie. svsub.net: váš token (svs_…) – prekladá sa vaším AI kľúčom uloženým v nastaveniach služby. Kľúče a heslo sa ukladajú šifrovane len pre váš účet Windows; nič sa neposiela, kým v Úprave titulkostopy nehľadáte, nesťahujete ani neprekladáte." />
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="2*" />

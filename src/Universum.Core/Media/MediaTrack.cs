@@ -49,4 +49,10 @@ public sealed record MediaTrack
 
     /// <summary>Number of tag entries attached to this track.</summary>
     public int TagEntries { get; init; }
+
+    /// <summary>
+    /// The external file the track comes from – a subtitle file added to the video (owner, 30. 10. 2026); null for the
+    /// file's own tracks. Its ID is UNIVERSUM's own (not one of the file's), the track is the first one of that file.
+    /// </summary>
+    public string? ExternalFile { get; init; }
 }

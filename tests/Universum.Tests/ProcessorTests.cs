@@ -664,6 +664,50 @@ public sealed class ProcessorTests
         Assert.Equal(Path.Combine(work.Path, "en-und-cz-forced (upravené) (2).mkv"), second.OutputPath, "never overwrites an earlier result");
     }
 
+    [Test]
+    public async Task ExternalSubtitlesAndNewTimes()
+    {
+        // owner, 30. 10. 2026: subtitles lying with the video are added; FPS, speed and delay change the times (mkvmerge --sync)
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var file = await inspector.InspectAsync(original);
+        var srt = Path.Combine(work.Path, "en-und-cz-forced.sk.srt");
+        await Universum.Core.Subtitles.SrtWriter.SaveAsync(Universum.Core.Subtitles.SubtitleReader.Read("1\n00:00:00,500 --> 00:00:01,000\nĽudia sa vrátia.\n"), srt);
+        var added = new MediaTrack
+        {
+            Id = 1000, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8", IsTextSubtitles = true, Language = LanguageTag.FromCode("sk"), ExternalFile = srt, StatisticsFrames = 1,
+        };
+        var withFile = file with { Tracks = [.. file.Tracks, added] };
+        var czech = file.TracksOf(TrackType.Subtitles).First(t => t.Name == "Czech full");
+        var rules = UniversumRules.Apply(withFile, decisions: CzechDub);
+        var target = rules with
+        {
+            Tracks = rules.Tracks.Select(t => t.TrackId == czech.Id ? t with { Timing = Universum.Core.Subtitles.SubtitleTiming.Delay(250) } : t).ToList(),
+        };
+        var plan = EditPlan.For(target);
+        Assert.True(plan.Method == WriteMethod.Remux && plan.Changes.Any(c => c.Kind == ChangeKind.Added) && plan.Changes.Any(c => c.Kind == ChangeKind.Timing),
+            "a new file with the added subtitles and new times: " + string.Join(", ", plan.Changes.Select(c => c.Kind)));
+
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var written = await inspector.InspectAsync(result.OutputPath!);
+        Assert.True(written.TracksOf(TrackType.Subtitles).Count(t => t.Language.Primary == "sk") == 1, "the Slovak subtitle file is in the result");
+        var before = await MatroskaCues.ReadAsync(original);
+        var after = await MatroskaCues.ReadAsync(result.OutputPath!);
+        var shifted = before[czech.Number!.Value].Select(t => t + TimeSpan.FromMilliseconds(250)).ToList();
+        Assert.True(after.Values.Any(times => times.SequenceEqual(shifted)), "Czech full 250 ms later: " + string.Join(" | ", after.Select(a => $"{a.Key}: {string.Join(",", a.Value)}")));
+        Assert.True(after.Values.Any(times => times.SequenceEqual([TimeSpan.FromMilliseconds(500)])), "the added subtitle at 0,5 s");
+
+        // the same again: already in the library; another subtitle file: another result
+        Assert.Equal(ProcessingStatus.AlreadyInLibrary, (await processor.ProcessAsync(plan, work.Movie(plan), Keep)).Status, "the same result is not written twice");
+        await File.AppendAllTextAsync(srt, "2\r\n00:00:01,200 --> 00:00:01,800\r\nĎalší.\r\n\r\n");
+        Assert.True((await processor.ProcessAsync(plan, work.Movie(plan), Keep)).Status is ProcessingStatus.Done, "other subtitles in the file: written again");
+        File.Delete(srt);
+        var missing = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.True(missing.Status == ProcessingStatus.Failed && missing.Messages.Any(m => m.Contains("no longer exists", StringComparison.Ordinal)), "a removed subtitle file: nothing written");
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();

@@ -19,6 +19,12 @@ public enum ChangeKind
 
     /// <summary>MP4, AVI, TS… become MKV.</summary>
     Container,
+
+    /// <summary>A track added from an external file (subtitles lying with the video).</summary>
+    Added,
+
+    /// <summary>New times of subtitles (FPS, speed, delay).</summary>
+    Timing,
 }
 
 /// <summary>One visible difference between the file and the target, for previews and reports.</summary>

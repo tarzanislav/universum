@@ -24,9 +24,18 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
         {
             var track = target.Tracks[position];
             var source = track.Source;
-            if (sourcePositions[track.TrackId] != position)
+            if (track.IsAdded)
+            {
+                changes.Add(new PlannedChange(track.TrackId, ChangeKind.Added, null, Path.GetFileName(source.ExternalFile)));
+            }
+            else if (sourcePositions[track.TrackId] != position)
             {
                 changes.Add(new PlannedChange(track.TrackId, ChangeKind.Position, (sourcePositions[track.TrackId] + 1).ToString(), (position + 1).ToString()));
+            }
+
+            if (track.TimingChanged)
+            {
+                changes.Add(new PlannedChange(track.TrackId, ChangeKind.Timing, null, track.Timing!.Describe()));
             }
 
             if (track.NameChanged)
@@ -48,7 +57,7 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             }
         }
 
-        foreach (var removed in target.Removed)
+        foreach (var removed in target.RemovedFromFile)
         {
             changes.Add(new PlannedChange(removed.Id, ChangeKind.Removed, (sourcePositions[removed.Id] + 1).ToString(), null));
         }

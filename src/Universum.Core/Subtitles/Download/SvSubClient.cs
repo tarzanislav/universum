@@ -166,7 +166,7 @@ public sealed class SvSubClient(HttpClient http, string token)
                 {
                     HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "svsub.net: neplatný token – " + message,
                     (HttpStatusCode)429 => "svsub.net: príliš veľa požiadaviek (60 za minútu) – " + message,
-                    _ when message?.Contains("no_key_for_provider", StringComparison.Ordinal) == true =>
+                    _ when text.Contains("no_key_for_provider", StringComparison.Ordinal) =>
                         "svsub.net: v nastaveniach služby chýba váš AI kľúč pre zvoleného poskytovateľa (no_key_for_provider).",
                     _ => $"svsub.net: chyba {(int)response.StatusCode} – {message}",
                 });
@@ -193,8 +193,11 @@ public sealed class SvSubClient(HttpClient http, string token)
         var status = (node["status"] ?? node["state"])?.ToString()?.ToLowerInvariant();
         double? progress = node["progress"] is JsonValue value && value.TryGetValue<double>(out var number) ? number <= 1 && number > 0 ? number * 100 : number : null;
         var done = status is "done" or "completed" or "complete" or "finished" or "success" or "succeeded" or "translated" or "ready";
-        var failed = status is "failed" or "error" or "cancelled" or "canceled";
-        return (done, failed, status, progress, (node["error"] ?? node["message"])?.ToString());
+        // the service says a failure by "errorMessage" (verified with the owner's token, 30. 10. 2026)
+        var error = (node["errorMessage"] ?? node["error"])?.ToString();
+        var running = node["running"] is JsonValue flag && flag.TryGetValue<bool>(out var isRunning) && isRunning;
+        var failed = status is "failed" or "error" or "cancelled" or "canceled" || (!done && !running && !string.IsNullOrEmpty(error));
+        return (done, failed, status, progress, error ?? node["message"]?.ToString());
     }
 
     private static string? Message(string text)
@@ -202,7 +205,9 @@ public sealed class SvSubClient(HttpClient http, string token)
         try
         {
             var json = JsonNode.Parse(text);
-            return (json?["error"] ?? json?["message"] ?? json?["code"])?.ToString();
+            var message = (json?["message"] ?? json?["error"])?.ToString();
+            var code = json?["code"]?.ToString();
+            return message is null ? code : code is null ? message : $"{message} ({code})";
         }
         catch (JsonException)
         {

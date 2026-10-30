@@ -51,10 +51,13 @@ public sealed class SubtitleDownloadTests
         var polls = 0;
         var handler = new Fake(request => (request.Method.Method, request.RequestUri!.AbsolutePath) switch
         {
-            ("POST", "/api/v1/jobs") => Json("""{"id":"job-42","status":"queued"}"""),
-            ("GET", "/api/v1/jobs/job-42") => Json(++polls < 2 ? """{"id":"job-42","status":"translating","progress":40}""" : """{"id":"job-42","status":"done","progress":100}"""),
+            // the shapes the service answered with the owner's token (30. 10. 2026)
+            ("POST", "/api/v1/jobs") => Json("""{"id":"job-42","status":"translating","format":"srt","cueCount":1}""", HttpStatusCode.Created),
+            ("GET", "/api/v1/jobs/job-42") => Json(++polls < 2
+                ? """{"id":"job-42","status":"translating","running":true,"progress":40,"errorMessage":null}"""
+                : """{"id":"job-42","status":"done","running":false,"progress":100,"errorMessage":null,"downloadUrl":"/api/v1/jobs/job-42/download"}"""),
             ("GET", "/api/v1/jobs/job-42/download") => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("1\r\n00:00:01,000 --> 00:00:02,000\r\nAhoj.\r\n") },
-            ("DELETE", "/api/v1/jobs/job-42") => Json("{}"),
+            ("DELETE", "/api/v1/jobs/job-42") => Json("""{"deleted":true}"""),
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         });
         var states = new List<string>();
@@ -69,9 +72,14 @@ public sealed class SubtitleDownloadTests
         Assert.True(handler.Requests.Last().Method == "DELETE" && svsub.JobDeleted, "the job is deleted afterwards");
         Assert.True(states.Any(s => s.Contains("40 %", StringComparison.Ordinal)), "progress: " + string.Join(" | ", states));
 
-        var noKey = new SvSubClient(new HttpClient(new Fake(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":"no_key_for_provider"}""") })), "svs_token123");
+        var noKey = new SvSubClient(new HttpClient(new Fake(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("""{"message":"No API key stored for this provider.","code":"no_key_for_provider"}""") })), "svs_token123");
         var error = await Assert.ThrowsAsync<SubtitleServiceException>(() => noKey.TranslateAsync("1\r\n00:00:01,000 --> 00:00:02,000\r\nHi.\r\n", "cs", "openai"), "no AI key at the service");
         Assert.True(error.Message.Contains("AI kľúč", StringComparison.Ordinal), error.Message);
+        var failing = new SvSubClient(new HttpClient(new Fake(request => request.Method.Method == "POST"
+            ? Json("""{"id":"job-7","status":"translating"}""", HttpStatusCode.Created)
+            : request.Method.Method == "GET" ? Json("""{"id":"job-7","status":"translating","running":false,"errorMessage":"rate limited"}""") : Json("""{"deleted":true}"""))), "svs_token123") { PollInterval = TimeSpan.Zero };
+        var failed = await Assert.ThrowsAsync<SubtitleServiceException>(() => failing.TranslateAsync("1\r\n00:00:01,000 --> 00:00:02,000\r\nHi.\r\n", "cs", "openai"), "a stopped job with an error");
+        Assert.True(failed.Message.Contains("rate limited", StringComparison.Ordinal) && failing.JobDeleted, failed.Message);
         Assert.True(SvSubClient.IsValidToken("svs_abc123def") && !SvSubClient.IsValidToken("abc") && !SvSubClient.IsValidToken("svs_ab cd"), "token form");
     }
 
@@ -123,7 +131,7 @@ public sealed class SubtitleDownloadTests
         }
     }
 
-    private static HttpResponseMessage Json(string json) => new(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+    private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) => new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
     private sealed record Sent(string Method, Uri Uri, string Headers, string Body);
 

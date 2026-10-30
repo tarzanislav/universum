@@ -162,7 +162,9 @@ public sealed class AudioPageViewModel : ObservableObject
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
         : "Pravidlá UNIVERSUM: " + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
         {
-            RuleIssueKind.UndeterminedLanguage => $"stopa {i.TrackId} má neurčený jazyk.",
+            RuleIssueKind.UndeterminedLanguage => _file.Tracks.FirstOrDefault(t => t.Id == i.TrackId)?.Type == TrackType.Subtitles
+                ? $"titulková stopa {i.TrackId} má neurčený jazyk (určte ho v Úprave titulkostopy alebo hlavičky)."
+                : $"stopa {i.TrackId} má neurčený jazyk.",
             RuleIssueKind.MultipleVideoTracks => "súbor má viac video stôp.",
             RuleIssueKind.NoAudio => "súbor nemá zvukovú stopu.",
             _ => i.Kind.ToString(),

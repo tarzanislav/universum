@@ -1841,9 +1841,9 @@ internal static class SelfTest
         Check(row.Recipe.NeedsEncoding && row.Problem is null && row.Summary.Contains("pomalšie", StringComparison.Ordinal) && row.Summary.Contains("zapíše znova", StringComparison.Ordinal),
             "audio: the dub's changes – " + row.Summary);
         await Screenshot(window, "studio-audio.png");
-        // with the rules (the tags of FFmpeg's sound go too): the sound of an undetermined language gets one
-        Check(page.Blocked.Contains("neurčený jazyk", StringComparison.Ordinal), "audio: the rules stop on a sound of an undetermined language – " + page.Blocked);
-        page.Rows[1].Language = page.Rows[1].LanguageChoices.First(c => c.Tag.Primary == "en");
+        // the rules stop on the undetermined subtitles of the video (set elsewhere): written as the tracks are
+        Check(page.Blocked.Contains("Úprave titulkostopy", StringComparison.Ordinal), "audio: the rules say where to set the subtitles' language – " + page.Blocked);
+        page.UseRules = false;
         page.Library.IsMovie = true;
         page.Library.TitleText = "Zvukový test (2026)";
         Check(page.SaveCommand.CanExecute(null), "audio: ready to save – " + page.Blocked + " " + page.Library.Description);
@@ -1855,7 +1855,7 @@ internal static class SelfTest
         if (result is not null)
         {
             var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(result);
-            Check(written.TracksOf(TrackType.Audio).Count() == 3 && !written.HasTags &&
+            Check(written.TracksOf(TrackType.Audio).Count() == 3 &&
                   written.TracksOf(TrackType.Audio).Any(t => t is { CodecId: "A_AAC", AudioChannels: 2, Name: "Vymyslený dabing CZ" } && t.Language.Primary == "cs"),
                 "audio: the dub written as stereo AAC with its language and name – " + string.Join(" | ", written.TracksOf(TrackType.Audio).Select(t => $"{t.CodecId} {t.AudioChannels} {t.Language.Primary} {t.Name}")));
         }

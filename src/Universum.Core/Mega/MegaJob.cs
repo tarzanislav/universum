@@ -55,6 +55,13 @@ public sealed class MegaJob(
             return (null, "súbor sa medzičasom zmenil (stopy, názvy, príznaky alebo tagy) – je to iný súbor, než ktorý sa pripravil");
         }
 
+        // external subtitle files of the video: only as they were when the batch was made
+        if (file.Externals.FirstOrDefault(e => !e.Unchanged) is { } changed)
+        {
+            return (null, $"externé titulky {System.IO.Path.GetFileName(changed.Path)} sa medzičasom zmenili alebo chýbajú – treba ho znova pripraviť v Hromadnom spracovaní");
+        }
+
+        media = media with { Tracks = [.. media.Tracks, .. file.Externals.Select(e => e.ToTrack())] };
         var profile = file.Profile ?? batch.Profile;
         var target = UniversumRules.Apply(media, profile, file.Decisions());
         if (target.IsBlocked)

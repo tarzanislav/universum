@@ -142,7 +142,7 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Titulky, Informácie | " +
               "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
             "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
@@ -1756,7 +1756,10 @@ internal static class SelfTest
         slovak.SpeedText = "0";
         page.Library.IsMovie = true;
         page.Library.TitleText = "Titulkový test (2026)";
-        Check(page.SaveCommand.CanExecute(null), "subtitles: ready to save – " + page.Library.Description);
+        Check(page.Blocked.Contains("neurčený jazyk", StringComparison.Ordinal) && !page.SaveCommand.CanExecute(null),
+            "subtitles: the rules stop on the audio of an undetermined language – " + page.Blocked);
+        page.UseRules = false;
+        Check(page.SaveCommand.CanExecute(null), "subtitles: without the rules ready to save – " + page.Library.Description);
         await Screenshot(window, "subtitles.png");
         await page.SaveCommand.ExecuteAsync(null);
         Check(page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal), "subtitles: saved – " + page.Result);

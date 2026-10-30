@@ -67,7 +67,9 @@ public static class MkvToolNixArguments
 
     /// <summary>mkvmerge arguments that write the target state to a new file (track order may change).</summary>
     /// <param name="chaptersXml">Chapter file written from <see cref="TargetState.NewChapters"/> (null = none).</param>
-    public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath, string? chaptersXml = null)
+    /// <param name="externalInputs">The files mkvmerge reads for added tracks (external subtitles converted to SRT in UTF-8), by their original path.</param>
+    public static IReadOnlyList<string> Remux(
+        TargetState target, string sourcePath, string outputPath, string? chaptersXml = null, IReadOnlyDictionary<string, string>? externalInputs = null)
     {
         var arguments = new List<string> { "--gui-mode", "--output", outputPath };
         if (target.TitleChanged)
@@ -109,13 +111,14 @@ public static class MkvToolNixArguments
         foreach (var added in target.Tracks.Where(t => t.IsAdded))
         {
             inputs[added.TrackId] = inputs.Count + 1;
-            if (added.Source.CodecId == "S_TEXT/UTF8")
+            var input = externalInputs?.GetValueOrDefault(added.Source.ExternalFile!) ?? added.Source.ExternalFile!;
+            if (added.Source.IsTextSubtitles)
             {
                 arguments.AddRange(["--sub-charset", "0:UTF-8"]);
             }
 
             AddTrackOptions(arguments, added, "0", writeLanguage: true, writeOtherFlags: true);
-            arguments.AddRange(["--no-global-tags", "--no-chapters", added.Source.ExternalFile!]);
+            arguments.AddRange(["--no-global-tags", "--no-chapters", input]);
         }
 
         arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => t.IsAdded

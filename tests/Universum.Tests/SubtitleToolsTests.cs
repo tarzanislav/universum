@@ -174,4 +174,39 @@ public sealed class SubtitleToolsTests
         Assert.True(ExternalSubtitles.For(alone, loose, videosInFolder: 2).Count == 0, "with two videos not");
         Assert.True(ExternalSubtitles.For(alone, loose, videosInFolder: 1).Single(m => m.Path == loose[1]).IsPicture, "VobSub is pictures");
     }
+
+    [Test]
+    public async Task BatchAnalysisAddsTheSubtitleFilesOfAVideo()
+    {
+        // owner, 30. 10. 2026, bod 5: in Hromadné spracovanie the subtitle files lying with a video become its tracks
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var folder = Directory.CreateTempSubdirectory("universum-external-").FullName;
+        try
+        {
+            var video = Path.Combine(folder, "Vymyslený.Film.2026.mkv");
+            File.Copy(TestData.Media("en-und-cz-forced.mkv"), video);
+            var srt = Path.Combine(folder, "Vymyslený.Film.2026.sk.srt");
+            await File.WriteAllBytesAsync(srt, CodePage(1250).GetBytes("1\r\n00:00:00,500 --> 00:00:01,200\r\nĽudia sa vrátia domov, päť dní je veľmi dlho.\r\n"));
+            await File.WriteAllTextAsync(Path.Combine(folder, "Iný.Film.2026.cze.srt"), "1\r\n00:00:00,500 --> 00:00:01,000\r\nIný.\r\n");
+
+            var analysis = await Universum.Core.Batch.BatchAnalyzer.AnalyzeAsync(folder, false, new Universum.Core.MkvToolNix.MkvMergeInspector(installation, new Universum.Core.Processes.ProcessRunner()));
+            var file = analysis.Groups.Single().Files.Single();
+            var external = file.Tracks.SingleOrDefault(t => t.ExternalFile is not null);
+            Assert.True(external is { Language.Primary: "sk", IsTextSubtitles: true, StatisticsFrames: 1 } && external.ExternalFile == srt,
+                "the Slovak file (Windows-1250) is a track of the video, not the other film's: " + string.Join(" | ", file.Tracks.Select(t => $"{t.Id} {t.Language.Primary} {t.ExternalFile}")));
+            Assert.True(Universum.Core.Batch.StructureSignature.Of(file).Contains("sk (externé)", StringComparison.Ordinal), "the group says it: " + Universum.Core.Batch.StructureSignature.Of(file));
+            Assert.True(Universum.Core.Execution.FileProcessor.StructureOf(file) == Universum.Core.Execution.FileProcessor.StructureOf(await new Universum.Core.MkvToolNix.MkvMergeInspector(installation, new Universum.Core.Processes.ProcessRunner()).InspectAsync(video)),
+                "the structure of the video itself does not change by it");
+
+            // MEGA: kept with the file's size and time; a changed file is not used
+            var kept = Universum.Core.Mega.MegaExternal.Of(external!);
+            Assert.True(kept.Unchanged && kept.ToTrack() is { Id: var id, ExternalFile: var path, Language.Primary: "sk", StatisticsFrames: 1 } && id == external!.Id && path == srt, "MEGA keeps the track");
+            await File.AppendAllTextAsync(srt, "2\r\n00:00:02,000 --> 00:00:03,000\r\nĎalší.\r\n");
+            Assert.True(!kept.Unchanged, "a changed subtitle file is noticed");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
 }

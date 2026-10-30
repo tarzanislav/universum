@@ -708,6 +708,39 @@ public sealed class ProcessorTests
         Assert.True(missing.Status == ProcessingStatus.Failed && missing.Messages.Any(m => m.Contains("no longer exists", StringComparison.Ordinal)), "a removed subtitle file: nothing written");
     }
 
+    [Test]
+    public async Task ExternalSubtitlesWithNewTimesAndRules()
+    {
+        // the Titulky page: two external files (one with FPS and delay), all the rows' languages, kept, rules
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var file = await inspector.InspectAsync(original);
+        var sk = Path.Combine(work.Path, "a.srt");
+        var en = Path.Combine(work.Path, "b.srt");
+        await Universum.Core.Subtitles.SrtWriter.SaveAsync(Universum.Core.Subtitles.SubtitleReader.Read("1\n00:00:00,500 --> 00:00:01,200\nĽudia sa vrátia domov.\n"), sk);
+        await Universum.Core.Subtitles.SrtWriter.SaveAsync(Universum.Core.Subtitles.SubtitleReader.Read("1\n00:00:00,300 --> 00:00:01,000\nPeople will come home.\n"), en);
+        MediaTrack External(int id, string path, string language) => new()
+        {
+            Id = id, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", IsTextSubtitles = true, StatisticsFrames = 1, ExternalFile = path,
+            Language = LanguageTag.Undetermined, Flags = new TrackFlags(Default: false),
+        };
+        var withFiles = file with { Tracks = [.. file.Tracks, External(1000, sk, "sk"), External(1001, en, "en")] };
+        var rows = withFiles.TracksOf(TrackType.Subtitles).ToList();
+        var languages = rows.ToDictionary(t => t.Id, t => t.Id == 1000 ? LanguageTag.FromCode("sk") : t.Id == 1001 ? LanguageTag.FromCode("en") : t.Language.IsUndetermined ? LanguageTag.FromCode("cs") : t.Language);
+        languages[2] = LanguageTag.FromCode("cs");
+        var decisions = new TrackDecisions { Languages = languages, Kept = rows.Select(t => t.Id).ToHashSet() };
+        var rules = UniversumRules.Apply(withFiles, RuleProfile.Default, decisions);
+        var timing = Universum.Core.Subtitles.SubtitleTiming.Fps(Universum.Core.Subtitles.FrameRate.All[2], Universum.Core.Subtitles.FrameRate.All[0])
+            .Then(Universum.Core.Subtitles.SubtitleTiming.Delay(250));
+        var target = rules with { Tracks = rules.Tracks.Select(t => t.TrackId == 1000 ? t with { Timing = timing } : t).ToList() };
+        var plan = EditPlan.For(target);
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages) + " | " + string.Join(" ", MkvToolNixArguments.Remux(target, original, "out.mkv")));
+        var after = await MatroskaCues.ReadAsync(result.OutputPath!);
+        Assert.True(after.Values.Any(times => times.SequenceEqual([TimeSpan.FromMilliseconds(771)])), "the Slovak one 25 → 23,976 and +250 ms: " + string.Join(" | ", after.Select(a => $"{a.Key}: {string.Join(",", a.Value)}")));
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();

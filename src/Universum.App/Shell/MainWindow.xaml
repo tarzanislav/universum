@@ -1243,6 +1243,7 @@
                                 <Run Text="{Binding Tmdb.Message, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                             </TextBlock>
                             <CheckBox Content="Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)" IsChecked="{Binding UseRules}" Margin="0,0,0,6" />
+                            <TextBlock Text="{Binding Blocked}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
                         </StackPanel>
                         <DockPanel>
                             <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />

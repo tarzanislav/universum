@@ -12,7 +12,8 @@ public static class StructureSignature
     {
         var video = file.TracksOf(TrackType.Video).Count();
         var audio = string.Join(", ", file.TracksOf(TrackType.Audio).Select(t => t.Language.Primary));
-        var subtitles = string.Join(", ", file.TracksOf(TrackType.Subtitles).Select(t => t.Language.Primary + (t.Flags.Forced ? " (forced)" : "")));
+        var subtitles = string.Join(", ", file.TracksOf(TrackType.Subtitles).Select(t =>
+            t.Language.Primary + (t.Flags.Forced || (t.ExternalFile is not null && t.Name == Rules.UniversumRules.ForcedName) ? " (forced)" : "") + (t.ExternalFile is not null ? " (externé)" : "")));
         return $"V {video} | A: {Empty(audio)} | T: {Empty(subtitles)} | kapitoly: {(file.HasChapters ? "áno" : "nie")} | tagy: {(file.HasTags ? "áno" : "nie")}";
     }
 

@@ -117,7 +117,7 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     public bool IsFiles => _file is null && Rows.Count > 0;
 
     /// <summary>The UNIVERSUM rules order the tracks and set the flags (Forced, default) – on by default.</summary>
-    public bool UseRules { get => _useRules; set { if (SetProperty(ref _useRules, value)) { Library.Update(); } } }
+    public bool UseRules { get => _useRules; set { if (SetProperty(ref _useRules, value)) { Changed(); } } }
 
     /// <summary>Where the video goes in the library.</summary>
     public LibraryTargetPicker Library { get; }
@@ -374,6 +374,7 @@ public sealed class SubtitlesPageViewModel : ObservableObject
 
     private void Changed()
     {
+        OnPropertyChanged(nameof(Blocked));
         OnPropertyChanged(nameof(IsVideo));
         OnPropertyChanged(nameof(IsFiles));
         UpdatePreview();
@@ -409,8 +410,18 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
+    public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
+        : "Pravidlá UNIVERSUM: " + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
+        {
+            RuleIssueKind.UndeterminedLanguage => $"stopa {(_file.Tracks.FirstOrDefault(t => t.Id == i.TrackId) is { } track ? $"{track.Id} ({Texts.Type(track.Type)})" : "")} má neurčený jazyk.",
+            RuleIssueKind.MultipleVideoTracks => "súbor má viac video stôp.",
+            RuleIssueKind.NoAudio => "súbor nemá zvukovú stopu.",
+            _ => i.Kind.ToString(),
+        }).Distinct()) + " Určte ho v Úprave hlavičky alebo v Single spracovaní – alebo vypnite pravidlá (stopy ostanú, ako sú).";
+
     private bool CanSave() =>
-        !_busy && Rows.Count > 0 && Rows.All(r => r.Problem is null) &&
+        !_busy && Rows.Count > 0 && Rows.All(r => r.Problem is null) && Blocked.Length == 0 &&
         (_file is null
             ? Rows.Any(r => r.IsText)
             : Library.Placement is not null && (Target() is { HasChanges: true } || Rows.Any(r => r is { Include: true, NeedsText: true, IsExternal: false })));

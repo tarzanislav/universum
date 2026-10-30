@@ -51,7 +51,7 @@ public static partial class SubtitleText
     public static async Task<Subtitles.SubtitleDocument?> ExtractDocumentAsync(
         MkvToolNixInstallation installation, IProcessRunner runner, MediaFile file, MediaTrack track, CancellationToken cancellationToken = default)
     {
-        if (track.Type != TrackType.Subtitles || !track.IsTextSubtitles || !file.IsMatroska)
+        if (track.Type != TrackType.Subtitles || !track.IsTextSubtitles || !file.IsMatroska || track.ExternalFile is not null)
         {
             return null;
         }
@@ -201,7 +201,8 @@ public static partial class SubtitleText
         CancellationToken cancellationToken = default)
     {
         var texts = new Dictionary<int, string>();
-        var subtitles = file.TracksOf(TrackType.Subtitles).ToList();
+        // the video's own subtitle tracks (external subtitle files are read as files, not from the video)
+        var subtitles = file.TracksOf(TrackType.Subtitles).Where(t => t.ExternalFile is null).ToList();
         // an empty track (no subtitle by the statistics) has nothing to read – and it is removed anyway
         var wanted = tracks.Where(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles && !Rules.ForcedSubtitles.IsEmpty(t) && subtitles.Any(s => s.Id == t.Id)).ToList();
         if (wanted.Count == 0)

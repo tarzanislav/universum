@@ -592,7 +592,32 @@ public sealed class FileProcessor(
         if (plan.Method == WriteMethod.Remux)
         {
             using var chapters = ChaptersFile.For(plan.Target);
-            result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path), progress, cancellationToken);
+            // external text subtitles (owner, 30. 10. 2026): any format and encoding, written as SRT in UTF-8 for mkvmerge
+            var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "external-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var (inputs, problem) = await Subtitles.ExternalSubtitleTracks.ConvertAsync(plan.Target, folder, cancellationToken).ConfigureAwait(false);
+                if (problem is not null)
+                {
+                    return [problem];
+                }
+
+                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs), progress, cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(folder))
+                    {
+                        Directory.Delete(folder, recursive: true);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // a temporary folder left behind is harmless
+                }
+            }
         }
         else
         {

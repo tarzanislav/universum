@@ -55,6 +55,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         DownloadOnlineCommand = new AsyncRelayCommand<OpenSubtitlesResult>(DownloadOnlineAsync, r => !_busy && r is not null);
         SearchTitulkyCommand = new RelayCommand(SearchTitulky, () => !_busy && (_file is not null || Rows.Count > 0));
         TranslateCommand = new AsyncRelayCommand(TranslateAsync, () => !_busy && _selected is { IsText: true } && _services.SvSubToken is not null);
+        SyncCommand = new AsyncRelayCommand(SyncAsync, () => !_busy && _selected is not null &&
+                                                             ((SyncByAudio && _file is not null) || (SyncBySubtitles && SyncReference is not null && SyncReference != _selected)));
+        CheckTracksCommand = new AsyncRelayCommand(CheckTracksAsync, () => !_busy && _file is { IsMatroska: true } && _file.TracksOf(TrackType.Audio).Any());
         Library = new LibraryTargetPicker(services, Target);
         Library.Changed += RefreshCommands;
         OpenVideoCommand = new AsyncRelayCommand(OpenVideoAsync, () => !_busy);
@@ -83,6 +86,30 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     /// <summary>svsub.net: translates the selected subtitles into <see cref="TranslateTo"/>.</summary>
     public AsyncRelayCommand TranslateCommand { get; }
 
+    /// <summary>Automatic sync of the selected subtitles (owner, 30. 10. 2026: by the audio, other subtitles or both).</summary>
+    public AsyncRelayCommand SyncCommand { get; private set; } = null!;
+
+    /// <summary>Checks every subtitle track of the video against its audio: late, early, another frame rate.</summary>
+    public AsyncRelayCommand CheckTracksCommand { get; private set; } = null!;
+
+    /// <summary>Sync by the audio of the film.</summary>
+    public bool SyncByAudio { get => _syncByAudio; set { if (SetProperty(ref _syncByAudio, value)) { RefreshCommands(); } } }
+
+    /// <summary>Sync by other subtitles that fit the film (<see cref="SyncReference"/>).</summary>
+    public bool SyncBySubtitles { get => _syncBySubtitles; set { if (SetProperty(ref _syncBySubtitles, value)) { RefreshCommands(); } } }
+
+    /// <summary>The subtitles that fit the film, for sync by subtitles.</summary>
+    public SubtitleRow? SyncReference { get => _syncReference; set { if (SetProperty(ref _syncReference, value)) { RefreshCommands(); } } }
+
+    /// <summary>The report of automatic sync and of the check of the tracks.</summary>
+    public string SyncStatus { get => _syncStatus; private set => SetProperty(ref _syncStatus, value); }
+
+    private bool _syncByAudio = true;
+    private bool _syncBySubtitles;
+    private SubtitleRow? _syncReference;
+    private string _syncStatus = "";
+    private (string Path, IReadOnlyList<Core.Subtitles.Sync.ActivityWindow> Windows)? _speech;
+
     /// <summary>The results of OpenSubtitles.com.</summary>
     public ObservableCollection<OpenSubtitlesResult> OnlineResults { get; } = [];
 
@@ -107,6 +134,13 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     public string TranslateTo { get => _translateTo; set => SetProperty(ref _translateTo, value); }
 
     public string OnlineStatus { get => _onlineStatus; private set => SetProperty(ref _onlineStatus, value); }
+
+    private string _outputFormat = "SRT";
+
+    /// <summary>The format subtitle files are saved in (owner, 30. 10. 2026: WebVTT besides SRT).</summary>
+    public string OutputFormat { get => _outputFormat; set => SetProperty(ref _outputFormat, value); }
+
+    public IReadOnlyList<string> OutputFormats { get; } = ["SRT", "WebVTT"];
 
     /// <summary>Forgets the video and the subtitles (nothing changes on the disk); subtitle files dropped then are opened on their own.</summary>
     public RelayCommand ClearCommand { get; }
@@ -635,17 +669,26 @@ public sealed class SubtitlesPageViewModel : ObservableObject
                 var document = row.Timing.Apply(row.Repaired(row.Document)!);
                 var folder = Path.GetDirectoryName(row.ExternalPath)!;
                 var name = Path.GetFileNameWithoutExtension(row.ExternalPath);
-                var path = Path.Combine(folder, name + ".srt");
+                var extension = OutputFormat == "WebVTT" ? ".vtt" : ".srt";
+                var path = Path.Combine(folder, name + extension);
                 for (var copy = 1; File.Exists(path); copy++)
                 {
-                    path = Path.Combine(folder, $"{name} (upravené{(copy > 1 ? " " + copy.ToString(CultureInfo.InvariantCulture) : "")}).srt");
+                    path = Path.Combine(folder, $"{name} (upravené{(copy > 1 ? " " + copy.ToString(CultureInfo.InvariantCulture) : "")}){extension}");
                 }
 
-                await SrtWriter.SaveAsync(document, path);
+                if (OutputFormat == "WebVTT")
+                {
+                    await VttWriter.SaveAsync(document, path);
+                }
+                else
+                {
+                    await SrtWriter.SaveAsync(document, path);
+                }
+
                 saved.Add(Path.GetFileName(path));
             }
 
-            Result = saved.Count == 0 ? "Nebolo čo uložiť." : $"Uložené ako SRT (UTF-8), pôvodné súbory ostali: {string.Join(", ", saved)}.";
+            Result = saved.Count == 0 ? "Nebolo čo uložiť." : $"Uložené ako {OutputFormat} (UTF-8), pôvodné súbory ostali: {string.Join(", ", saved)}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -670,6 +713,175 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         DownloadOnlineCommand?.NotifyCanExecuteChanged();
         SearchTitulkyCommand?.NotifyCanExecuteChanged();
         TranslateCommand?.NotifyCanExecuteChanged();
+        SyncCommand?.NotifyCanExecuteChanged();
+        CheckTracksCommand?.NotifyCanExecuteChanged();
+    }
+
+    // the times of a row's subtitles: the external file's, the index of the video's own track, or the whole track read
+    private async Task<IReadOnlyList<(TimeSpan Start, TimeSpan End)>?> CuesOfAsync(SubtitleRow row)
+    {
+        if (row.Document is { } document)
+        {
+            return document.Cues.Select(c => (c.Start, c.End)).ToList();
+        }
+
+        if (_file is null || row.Track.Number is not { } number || _services.CurrentMkvToolNix is not { } installation)
+        {
+            return null;
+        }
+
+        var intervals = await MatroskaCues.ReadIntervalsAsync(_file.Path);
+        if (intervals.TryGetValue(number, out var cues) && cues.Count > 0)
+        {
+            return cues;
+        }
+
+        SyncStatus = $"Čítam celú stopu {row.Track.Id} (súbor nemá index titulkov)…";
+        row.Document = await SubtitleText.ExtractDocumentAsync(installation, _services.Runner, _file, row.Track);
+        return row.Document?.Cues.Select(c => (c.Start, c.End)).ToList();
+    }
+
+    // where people speak in the film: parts of the default (or first) audio track, read once for the video
+    private async Task<IReadOnlyList<Core.Subtitles.Sync.ActivityWindow>?> SpeechAsync()
+    {
+        if (_file is not { Duration: { } duration } file || !file.TracksOf(TrackType.Audio).Any())
+        {
+            return null;
+        }
+
+        if (_speech is { } known && known.Path == file.Path)
+        {
+            return known.Windows;
+        }
+
+        string ffmpeg;
+        try
+        {
+            ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
+        }
+        catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
+        {
+            SyncStatus = "FFmpeg nie je k dispozícii: " + ex.Message;
+            return null;
+        }
+
+        var audio = file.TracksOf(TrackType.Audio).ToList();
+        var ordinal = Math.Max(0, audio.FindIndex(t => t.Flags.Default));
+        var parts = Core.Subtitles.Sync.SpeechActivity.Parts(duration);
+        var windows = await Core.Subtitles.Sync.SpeechActivity.ReadAsync(_services.Runner, ffmpeg, file.Path, ordinal, parts, TimeSpan.FromMinutes(2.5),
+            new Progress<int>(i => SyncStatus = $"Počúvam zvuk filmu – časť {i + 1} z {parts.Count}…"));
+        _speech = (file.Path, windows);
+        return windows;
+    }
+
+    private async Task SyncAsync()
+    {
+        if (_selected is not { } row)
+        {
+            return;
+        }
+
+        _busy = true;
+        RefreshCommands();
+        try
+        {
+            if (await CuesOfAsync(row) is not { Count: > 0 } cues)
+            {
+                SyncStatus = "Časy týchto titulkov sa nedajú zistiť.";
+                return;
+            }
+
+            var duration = _file?.Duration ?? (cues[^1].End + TimeSpan.FromMinutes(1));
+            Core.Subtitles.Sync.SyncResult? byAudio = null, bySubtitles = null;
+            if (SyncByAudio && await SpeechAsync() is { Count: > 0 } speech)
+            {
+                SyncStatus = "Porovnávam titulky s rečou…";
+                byAudio = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku"));
+            }
+
+            if (SyncBySubtitles && SyncReference is { } reference && reference != row && await CuesOfAsync(reference) is { Count: > 0 } referenceCues)
+            {
+                // the reference as it will be after its own changes
+                var fitted = referenceCues.Select(c => (reference.Timing.Apply(c.Start), reference.Timing.Apply(c.End))).ToList();
+                var windows = Core.Subtitles.Sync.SpeechActivity.Parts(duration).Select(s => Core.Subtitles.Sync.ActivityWindow.FromCues(fitted, s, TimeSpan.FromMinutes(2.5))).ToList();
+                bySubtitles = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, windows, "podľa titulkov " + reference.Language.Tag.Primary));
+            }
+
+            var result = Core.Subtitles.Sync.SubtitleSync.Combine(byAudio, bySubtitles, duration);
+            if (result is null)
+            {
+                SyncStatus = "Nedalo sa nič zistiť (bez zvuku aj bez iných titulkov).";
+                return;
+            }
+
+            row.ApplySync(result.Timing, result.Detail);
+            SyncStatus = result.Detail + (result.Reliable ? " Hodnoty sú nastavené pri titulkoch – skontrolujte náhľad a uložte." : " Hodnoty sú nastavené, ale overte ich.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException)
+        {
+            SyncStatus = "Napasovanie sa nepodarilo: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            RefreshCommands();
+        }
+    }
+
+    // owner: the other subtitle tracks too – are they late or early against the audio?
+    private async Task CheckTracksAsync()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        RefreshCommands();
+        try
+        {
+            if (await SpeechAsync() is not { Count: > 0 } speech)
+            {
+                SyncStatus = "Zvuk filmu sa nepodarilo prečítať.";
+                return;
+            }
+
+            var intervals = await MatroskaCues.ReadIntervalsAsync(_file.Path);
+            var lines = new List<string>();
+            foreach (var row in Rows.Where(r => !r.IsExternal))
+            {
+                var name = $"stopa {row.Track.Id} ({row.Language.Tag.Primary}{(row.Forced ? ", forced" : "")})";
+                if (row.Track.Number is not { } number || !intervals.TryGetValue(number, out var cues) || cues.Count < 10)
+                {
+                    lines.Add($"{name}: málo titulkov alebo bez indexu – nedá sa posúdiť");
+                    continue;
+                }
+
+                var result = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku"));
+                lines.Add(result is null ? $"{name}: nedá sa posúdiť"
+                    : !result.Reliable ? $"{name}: neisté – {result.Detail}"
+                    : result.Timing.IsNone ? $"{name}: sedia"
+                    : $"{name}: {Lag(result)} – {result.Timing.Describe()} (Napasovať ich nastaví)");
+            }
+
+            SyncStatus = "Kontrola titulkov podľa zvuku: " + string.Join("; ", lines) + ".";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ProcessStartException or TimeoutException)
+        {
+            SyncStatus = "Kontrola sa nepodarila: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            RefreshCommands();
+        }
+
+        string Lag(Core.Subtitles.Sync.SyncResult result)
+        {
+            var at = (_file?.Duration ?? TimeSpan.FromHours(1)) / 2;
+            var lag = result.LagAt(at).TotalSeconds;
+            return lag > 0 ? $"meškajú o {lag:0.0} s" : $"idú skôr o {-lag:0.0} s";
+        }
     }
 
     // the title for the services: the library picker's (with the TMDB ID), else the name of the file
@@ -704,7 +916,15 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             var (name, year, tmdb, episode) = Title();
             var filter = HearingImpairedFilter switch { "len SDH" => "only", "bez SDH" => "exclude", _ => "include" };
             var results = await client.SearchAsync(new OpenSubtitlesQuery(OnlineLanguage, tmdb, name, year, episode?.Season, episode?.Episode, filter));
-            foreach (var result in results.Take(40))
+            // owner, 30. 10. 2026: the release that fits the video and the frame rate of the film first
+            var video = _file?.Path ?? Anchor ?? "";
+            var fps = _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond;
+            var compared = results.Select(r =>
+            {
+                var match = ReleaseMatch.Score(r.Release, video);
+                return r with { Match = match, MatchNote = ReleaseMatch.FpsNote(r.Fps, fps) + (match > 0 ? $" · release {match * 100:0} %" : "") };
+            });
+            foreach (var result in compared.OrderByDescending(r => ReleaseMatch.FpsFits(r.Fps, fps)).ThenByDescending(r => Math.Round(r.Match, 1)).ThenByDescending(r => r.Downloads).Take(40))
             {
                 OnlineResults.Add(result);
             }

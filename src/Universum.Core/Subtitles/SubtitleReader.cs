@@ -136,7 +136,7 @@ public static partial class SubtitleReader
             var times = lines[at].Split("-->", 2);
             var end = times[1].Trim().Split(' ', 2)[0];
             var body = string.Join("\n", lines.Skip(at + 1).Where(l => l.Trim().Length > 0));
-            cues.Add(new SubtitleCue(Clock(times[0].Trim()), Clock(end), Html(VttVoice().Replace(body, ""))));
+            cues.Add(new SubtitleCue(Clock(times[0].Trim()), Clock(end), System.Net.WebUtility.HtmlDecode(Html(VttVoice().Replace(body, "")))));
         }
 
         return Sorted(cues);

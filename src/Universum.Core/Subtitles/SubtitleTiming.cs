@@ -83,6 +83,10 @@ public sealed record SubtitleTiming(long DelayMilliseconds, long Numerator, long
         return Reduced(delay, to, from);
     }
 
+    /// <summary>A factor found by measuring (automatic sync) and a delay: the factor kept to nine digits.</summary>
+    public static SubtitleTiming FromFactor(double factor, long delayMilliseconds) =>
+        Reduced(delayMilliseconds, new BigInteger(Math.Round(factor * 1_000_000_000)), 1_000_000_000);
+
     /// <summary>This change and then <paramref name="next"/>: (t·a + d₁)·b + d₂.</summary>
     public SubtitleTiming Then(SubtitleTiming next) =>
         Reduced((long)Math.Round((double)DelayMilliseconds * next.Numerator / next.Denominator) + next.DelayMilliseconds,

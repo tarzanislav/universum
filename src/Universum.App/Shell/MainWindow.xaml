@@ -1130,11 +1130,34 @@
                             <DataGridTextColumn Header="Zmeny" Binding="{Binding Summary, Mode=OneWay}" IsReadOnly="True" Width="2*" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <WrapPanel Grid.Row="1" Margin="0,8,0,8">
-                        <Button Content="Pridať externé titulky…" Command="{Binding AddExternalCommand}" Padding="12,4" Margin="0,0,8,0"
-                                ToolTip="Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)" />
-                        <Button Content="Odstrániť zo zoznamu" Command="{Binding RemoveCommand}" Padding="12,4" ToolTip="Pridaný externý súbor sa nepridá" />
-                    </WrapPanel>
+                    <StackPanel Grid.Row="1" Margin="0,8,0,8">
+                        <WrapPanel>
+                            <Button Content="Pridať externé titulky…" Command="{Binding AddExternalCommand}" Padding="12,4" Margin="0,0,8,0"
+                                    ToolTip="Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)" />
+                            <Button Content="Odstrániť zo zoznamu" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný externý súbor sa nepridá" />
+                            <Button Content="Skontrolovať titulky videa" Command="{Binding CheckTracksCommand}" Padding="12,4"
+                                    ToolTip="Porovná každú titulkovú stopu videa so zvukom: sedí, mešká, ide skôr, iné FPS" />
+                        </WrapPanel>
+                        <WrapPanel Margin="0,8,0,0">
+                            <TextBlock Text="Napasovať vybrané automaticky:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <CheckBox Content="podľa zvuku" IsChecked="{Binding SyncByAudio}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                      ToolTip="Kde sa vo filme hovorí – osem častí filmu, aj iné FPS (25 ↔ 23,976 …)" />
+                            <CheckBox Content="podľa titulkov:" IsChecked="{Binding SyncBySubtitles}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                      ToolTip="Iné titulky, ktoré k filmu sedia (aj v inom jazyku)" />
+                            <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SyncReference}" Width="200" Margin="0,0,8,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <Run Text="{Binding Language.Display, Mode=OneWay}" /> – <Run Text="{Binding Source, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4"
+                                    ToolTip="Nastaví rýchlosť a posun vybraných titulkov; oboje naraz = istota, keď sa zhodnú" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
                     <DataGrid Grid.Row="2" ItemsSource="{Binding Preview}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal" CanUserSortColumns="False">
                         <DataGrid.Columns>
@@ -1291,8 +1314,10 @@
                         </StackPanel>
                         <DockPanel>
                             <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />
+                            <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding OutputFormat}" Width="90" Margin="0,0,8,0" VerticalAlignment="Top"
+                                      Visibility="{Binding IsFiles, Converter={StaticResource BoolToVisibility}}" ToolTip="Formát nových súborov titulkov" />
                             <StackPanel Margin="0,0,16,0">
-                                <TextBlock Style="{StaticResource Hint}" Text="Video: nový súbor v knižnici (mkvmerge, časy cez --sync). Súbory titulkov: nové SRT vedľa pôvodných. Originály ostanú nezmenené." TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource Hint}" Text="Video: nový súbor v knižnici (mkvmerge, časy cez --sync). Súbory titulkov: nové SRT alebo WebVTT vedľa pôvodných. Originály ostanú nezmenené." TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
                             </StackPanel>
                         </DockPanel>

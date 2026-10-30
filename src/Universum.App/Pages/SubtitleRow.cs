@@ -346,6 +346,16 @@ public sealed class SubtitleRow : ObservableObject
         }
     }
 
+    /// <summary>The result of automatic sync: the speed and the delay it found (the frame rate is part of the speed).</summary>
+    public void ApplySync(SubtitleTiming timing, string note)
+    {
+        FpsFrom = null;
+        FpsTo = null;
+        SpeedText = (((decimal)timing.Denominator / timing.Numerator - 1) * 100).ToString("0.######", Slovak);
+        DelayText = timing.DelayMilliseconds.ToString(CultureInfo.InvariantCulture);
+        SyncNote = note;
+    }
+
     private void TwoPoints()
     {
         if (ParseClock(FirstNow) is not { } first || ParseClock(FirstTarget) is not { } firstTarget ||

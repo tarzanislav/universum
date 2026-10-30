@@ -22,8 +22,14 @@ public sealed record OpenSubtitlesQuery(string Languages, int? TmdbId, string? N
 public sealed record OpenSubtitlesResult(
     int FileId, string FileName, string Language, string Release, int Downloads, bool HearingImpaired, bool ForeignPartsOnly, bool MachineTranslated, double? Fps)
 {
+    /// <summary>How well it fits the video (0–1, <see cref="ReleaseMatch"/>) – set by the page.</summary>
+    public double Match { get; init; }
+
+    /// <summary>The comparison with the video: the frame rate and the release ("FPS sedí · release 80 %").</summary>
+    public string MatchNote { get; init; } = "";
+
     /// <summary>"EN SDH · Release.Name · 12 345 stiahnutí".</summary>
-    public string Display =>
+    public string Display => (MatchNote.Length > 0 ? MatchNote + " · " : "") +
         Language.ToUpperInvariant() + (HearingImpaired ? " SDH" : "") + (ForeignPartsOnly ? " forced" : "") + (MachineTranslated ? " (strojový preklad)" : "") +
         " · " + (Release.Length > 0 ? Release : FileName) + " · " + Downloads.ToString("#,0", CultureInfo.GetCultureInfo("sk-SK")) + " stiahnutí" +
         (Fps is { } fps && fps > 0 ? " · " + fps.ToString("0.###", CultureInfo.GetCultureInfo("sk-SK")) + " FPS" : "");

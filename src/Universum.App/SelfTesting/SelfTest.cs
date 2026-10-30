@@ -271,8 +271,9 @@ internal static class SelfTest
         await Screenshot(updatesWindow, "updates.png");
         updatesWindow.Close();
 
-        // "Otvoriť v UNIVERSUM" from the Explorer: a folder opens in batch processing
-        await model.OpenPathAsync(Path.Combine(_outputDirectory, "batch"));
+        // "Otvoriť v UNIVERSUM" from the Explorer: a folder opens in batch processing (the batch folder's originals went to
+        // the Recycle Bin in the test of Zmazať originály; the folder of the rules page still has its file)
+        await model.OpenPathAsync(Path.Combine(_outputDirectory, "rules"));
         Check(model.SelectedTool.Page == model.Batch && model.Batch.Groups.Count > 0, "a folder from the command line opens in batch processing");
         await TestContextMenuAsync(model);
         window.Close();

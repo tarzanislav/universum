@@ -578,7 +578,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             return;
         }
 
-        var target = Build(_file, Rows.ToDictionary(r => r, r => r.Track), written: false).Target;
+        var target = Build(_file, Rows.ToDictionary(r => r, r => r.Track), names: false).Target;
 
         foreach (var row in Rows)
         {
@@ -703,7 +703,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     public TargetState? Target() => _file is null ? null : Build(_file, Rows.ToDictionary(r => r, r => r.Track)).Target;
 
     // the target state of the video: the rows' tracks (an external file or a rewritten track of the video by its track)
-    // written: with the names the user wrote (false: what the tracks would be called without them)
+    // names: with the names the user wrote (false: what the tracks would be called without them)
     private (TargetState Target, HashSet<int> Replaced) Build(MediaFile file, IReadOnlyDictionary<SubtitleRow, MediaTrack> written, bool names = true)
     {
         var tracks = new List<MediaTrack>();

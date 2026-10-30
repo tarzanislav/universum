@@ -104,15 +104,15 @@ public sealed record SubtitleTiming(long DelayMilliseconds, long Numerator, long
     /// <summary>The value of mkvmerge's "--sync" after "TID:": "delay,numerator/denominator".</summary>
     public string MkvMergeValue => string.Create(CultureInfo.InvariantCulture, $"{DelayMilliseconds},{Numerator}/{Denominator}");
 
-    /// <summary>In words: "posun +1 500 ms, časy × 1,04271 (titulky o 4,096 % pomalšie)".</summary>
-    public string Describe()
+    /// <summary>In words: "posun +1 500 ms, časy × 1,04271 (titulky o 4,096 % pomalšie)" – of <paramref name="subject"/> (also "zvuk").</summary>
+    public string Describe(string subject = "titulky")
     {
         var sk = CultureInfo.GetCultureInfo("sk-SK");
         var parts = new List<string>();
         if (Numerator != Denominator)
         {
             var speed = ((double)Denominator / Numerator - 1) * 100;
-            parts.Add($"časy × {Factor.ToString("0.#####", sk)} (titulky o {Math.Abs(speed).ToString("0.###", sk)} % {(speed > 0 ? "rýchlejšie" : "pomalšie")})");
+            parts.Add($"časy × {Factor.ToString("0.#####", sk)} ({subject} o {Math.Abs(speed).ToString("0.###", sk)} % {(speed > 0 ? "rýchlejšie" : "pomalšie")})");
         }
 
         if (DelayMilliseconds != 0)

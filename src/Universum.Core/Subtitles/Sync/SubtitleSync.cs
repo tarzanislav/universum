@@ -228,8 +228,11 @@ public static class SubtitleSync
         FrameRate.All.SelectMany(from => FrameRate.All.Where(to => to != from).Select(to => (from, to, Ratio: from.Value / to.Value)))
             .Where(p => p.Ratio is > 0.9 and < 1.1);
 
-    // the measured factor, or exactly 1 or a change of frame rate when that moves no subtitle noticeably differently
-    private static (double Factor, (FrameRate From, FrameRate To)? Rates) Snap(double measured, double length, double? filmFps)
+    /// <summary>
+    /// The measured factor, or exactly 1 or a change of frame rate when that moves nothing of a film of
+    /// <paramref name="length"/> seconds noticeably differently (also for sound: Úprava audiostopy).
+    /// </summary>
+    internal static (double Factor, (FrameRate From, FrameRate To)? Rates) Snap(double measured, double length, double? filmFps)
     {
         if (Math.Abs(measured - 1) * length <= Unnoticed)
         {

@@ -51,6 +51,7 @@ public sealed class SlotRow : ObservableObject
     private readonly Action<SlotRow, int>? _move;
     private readonly RuleProfile _profile;
     private bool _removedByLanguage;
+    private string? _rulesName;
 
     public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null, RuleProfile? profile = null)
     {
@@ -102,6 +103,48 @@ public sealed class SlotRow : ObservableObject
     public string ResultNote => _removedByLanguage ? "odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)"
         : Kept ? "ponechané – jazyk mimo zoznamu titulkov"
         : "";
+
+    /// <summary>An audio or subtitle track: its name can be written for the whole group (owner, 30. 10. 2026).</summary>
+    public bool CanName => Key.Type is TrackType.Audio or TrackType.Subtitles;
+
+    /// <summary>
+    /// Track name: the name the result gets – the rules' one, or the one written here for the whole group (it wins over
+    /// the rules'); empty = no name.
+    /// </summary>
+    public string TrackName
+    {
+        get => Group.Decisions.Names.TryGetValue(Key, out var name) ? name : _rulesName ?? "";
+        set
+        {
+            value = value.Trim();
+            if (!CanName || value == TrackName)
+            {
+                return;
+            }
+
+            if (value == (_rulesName ?? ""))
+            {
+                Group.Decisions.Names.Remove(Key);
+            }
+            else
+            {
+                Group.Decisions.Names[Key] = value;
+            }
+
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>Called after a recalculation with the name the track gets in the group's first file.</summary>
+    public void SetResultName(string? name)
+    {
+        if (!Group.Decisions.Names.ContainsKey(Key))
+        {
+            _rulesName = name;
+            OnPropertyChanged(nameof(TrackName));
+        }
+    }
 
     /// <summary>Called after a recalculation with what the rules do with the track in the group's first file.</summary>
     public void SetRemovedByLanguage(bool removed)

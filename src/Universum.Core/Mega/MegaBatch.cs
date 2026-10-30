@@ -92,6 +92,9 @@ public sealed class MegaFile
     /// <summary>New times of subtitle tracks (by track ID, also the external files' – their IDs are kept in <see cref="Externals"/>).</summary>
     public Dictionary<int, Subtitles.SubtitleTiming> Timings { get; init; } = [];
 
+    /// <summary>Track names written by the user, by track ID (empty = no name).</summary>
+    public Dictionary<int, string> Names { get; init; } = [];
+
     /// <summary>The edits of Úprava titulkostopy, to be opened again in Hromadné spracovanie; null = none.</summary>
     public StudioEdits? Studio { get; init; }
 
@@ -133,6 +136,7 @@ public sealed class MegaFile
         Kept = Kept.ToHashSet(),
         Order = Order,
         Timings = Timings,
+        Names = Names,
     };
 
     /// <summary>A prepared file of Hromadné spracovanie (it has its place in the library and something to do).</summary>
@@ -158,6 +162,7 @@ public sealed class MegaFile
             Kept = [.. item.Decisions.Kept],
             Order = [.. item.Decisions.Order],
             Timings = item.Decisions.Timings.ToDictionary(),
+            Names = item.Decisions.Names.ToDictionary(),
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),

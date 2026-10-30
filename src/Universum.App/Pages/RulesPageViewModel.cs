@@ -26,6 +26,9 @@ public sealed class RulesPageViewModel : ObservableObject
     private readonly HashSet<int> _kept = [];
     private readonly Dictionary<int, bool> _forced = [];
 
+    // owner, 30. 10. 2026: track names written by the user (they win over the rules'); empty = no name
+    private readonly Dictionary<int, string> _names = [];
+
     // the languages UNIVERSUM read from the subtitles' text (owner, 30. 10. 2026), applied unless the user chose another
     private IReadOnlyDictionary<int, Core.Text.SubtitleLanguageResult> _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
     private CancellationTokenSource? _subtitleReading;
@@ -91,6 +94,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _kept.Clear();
         _order.Clear();
         _forced.Clear();
+        _names.Clear();
         _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
         _subtitleReading?.Cancel();
         _subtitleReading = null;
@@ -235,6 +239,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _kept.Clear();
         _order.Clear();
         _forced.Clear();
+        _names.Clear();
         _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
         _subtitleReading?.Cancel();
         _subtitleReading = null;
@@ -351,7 +356,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         var target = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced });
+            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -374,6 +379,7 @@ public sealed class RulesPageViewModel : ObservableObject
                     : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? "návrh UNIVERSUM: forced – " + amount
                     : "",
                 ForcedChanged = ForcedChanged,
+                NameChanged = NameChanged,
             });
         }
 
@@ -416,6 +422,37 @@ public sealed class RulesPageViewModel : ObservableObject
     private void Moved(RuleRow row, int by) => Later(() => MoveTrack(row.TrackId, by));
 
     private void ForcedChanged(RuleRow row, bool forced) => Later(() => ChooseForced(row.TrackId, forced));
+
+    private void NameChanged(RuleRow row, string name) => Later(() => ChooseName(row.TrackId, name));
+
+    /// <summary>
+    /// The name of an audio or subtitle track as the user writes it (also used by the self-test); the rules' own name
+    /// again needs no choice.
+    /// </summary>
+    public void ChooseName(int trackId, string name)
+    {
+        if (_file is null)
+        {
+            return;
+        }
+
+        name = name.Trim();
+        _names.Remove(trackId);
+        var languages = _detected.ToDictionary(d => d.Key, d => LanguageTag.FromCode(d.Value.Language));
+        foreach (var (id, chosen) in _languages)
+        {
+            languages[id] = chosen;
+        }
+
+        var rules = UniversumRules.Apply(_file, _services.Profile,
+            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names });
+        if ((rules.Tracks.FirstOrDefault(t => t.TrackId == trackId)?.Name ?? "") != name)
+        {
+            _names[trackId] = name;
+        }
+
+        Recalculate();
+    }
 
     /// <summary>Forced or not, as the user says (also used by the self-test); the rules' own answer needs no choice.</summary>
     public void ChooseForced(int trackId, bool forced)

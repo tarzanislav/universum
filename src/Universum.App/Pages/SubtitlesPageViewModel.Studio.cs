@@ -247,6 +247,11 @@ public sealed partial class SubtitlesPageViewModel
                     row.Choose(language);
                 }
 
+                if (edits.Names.TryGetValue(row.Track.Id, out var name))
+                {
+                    row.Name = name;
+                }
+
                 row.Include = !edits.Removed.Contains(row.Track.Id);
                 continue;
             }
@@ -259,6 +264,11 @@ public sealed partial class SubtitlesPageViewModel
             if (edits.FileLanguages.FirstOrDefault(l => Paths.Same(l.Key, path)) is { Key: not null } fileLanguage)
             {
                 row.Choose(fileLanguage.Value);
+            }
+
+            if (edits.FileNames.FirstOrDefault(n => Paths.Same(n.Key, path)).Value is { } fileName)
+            {
+                row.Name = fileName;
             }
 
             row.Include = !edits.RemovedFiles.Any(r => Paths.Same(r, path));
@@ -323,6 +333,11 @@ public sealed partial class SubtitlesPageViewModel
                     edits.Forced[row.Track.Id] = row.Forced;
                 }
 
+                if (row.WrittenName is { } name)
+                {
+                    edits.Names[row.Track.Id] = name;
+                }
+
                 continue;
             }
 
@@ -352,6 +367,11 @@ public sealed partial class SubtitlesPageViewModel
             if (!timing.IsNone && row.Include)
             {
                 edits.FileTimings[path] = timing;
+            }
+
+            if (row.WrittenName is { } fileName && row.Include)
+            {
+                edits.FileNames[path] = fileName;
             }
         }
 

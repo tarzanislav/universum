@@ -1492,9 +1492,11 @@ public sealed class BatchPageViewModel : ObservableObject
         var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
         var removed = item.Target.RemovedByLanguage.Where(t => keyOf.ContainsKey(t.Id)).Select(t => keyOf[t.Id]).ToHashSet();
         var order = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).Select(t => keyOf[t.TrackId]).ToList();
+        var names = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).ToDictionary(t => keyOf[t.TrackId], t => t.Name);
         foreach (var slot in SlotRows)
         {
             slot.SetRemovedByLanguage(removed.Contains(slot.Key));
+            slot.SetResultName(names.GetValueOrDefault(slot.Key));
         }
 
         var wanted = SlotRows.OrderBy(s => order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
@@ -2594,7 +2596,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 var path = media.Path;
                 // decisions by track ID only for the file's own tracks the studio does not decide (the IDs of external
                 // files are given by each analysis; the studio's edits come back by path)
-                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).ToHashSet() : new HashSet<int>();
+                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).Concat(studioOfFile.Names.Keys).ToHashSet() : new HashSet<int>();
                 var slots = SlotKey.Of(media).Where(x => x.Track.ExternalFile is null && !studied.Contains(x.Track.Id)).ToDictionary(x => x.Track.Id, x => x.Key);
                 kinds.Add(file.Title.Kind);
                 _library.KindOfFile[path] = file.Title.Kind;
@@ -2621,6 +2623,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 foreach (var (id, forced) in file.Forced.Where(f => slots.ContainsKey(f.Key)))
                 {
                     group.Decisions.Forced[slots[id]] = forced;
+                }
+
+                foreach (var (id, name) in file.Names.Where(n => slots.ContainsKey(n.Key)))
+                {
+                    group.Decisions.Names[slots[id]] = name;
                 }
 
                 group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));

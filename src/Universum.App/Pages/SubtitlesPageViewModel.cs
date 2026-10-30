@@ -562,10 +562,28 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         OnPropertyChanged(nameof(Blocked));
         OnPropertyChanged(nameof(IsVideo));
         OnPropertyChanged(nameof(IsFiles));
+        ShowNames();
         UpdatePreview();
         RefreshPlayer();
         Library?.Update();
         RefreshCommands();
+    }
+
+    // the names the tracks get (the rules' until the user writes his own) shown in their rows
+    private void ShowNames()
+    {
+        if (Target() is not { } target)
+        {
+            return;
+        }
+
+        foreach (var row in Rows)
+        {
+            if (target.Tracks.FirstOrDefault(t => t.TrackId == row.Track.Id) is { } track)
+            {
+                row.ShowName(track.Name);
+            }
+        }
     }
 
     private void UpdatePreview()
@@ -705,6 +723,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 Forced = rowOf.Where(r => r.Value is { Include: true, ForcedDecision: not null }).ToDictionary(r => r.Key, r => r.Value.ForcedDecision!.Value),
                 Removed = removed,
                 Kept = rowOf.Where(r => r.Value.Include).Select(r => r.Key).ToHashSet(),
+                Names = rowOf.Where(r => r.Value is { Include: true, WrittenName: not null }).ToDictionary(r => r.Key, r => r.Value.WrittenName!),
             };
             target = UniversumRules.Apply(augmented, _services.Profile, decisions);
 
@@ -719,7 +738,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         else
         {
             var edits = tracks.Where(t => !removed.Contains(t.Id)).Select(t => rowOf.TryGetValue(t.Id, out var row)
-                ? new TrackEdit(t.Id, row.Name, row.Language.Tag, t.Flags with { Forced = row.Forced, HearingImpaired = row.HearingImpaired })
+                ? new TrackEdit(t.Id, row.WrittenName ?? row.InitialName, row.Language.Tag, t.Flags with { Forced = row.Forced, HearingImpaired = row.HearingImpaired })
                 : new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList();
             target = ManualTarget.Create(augmented, edits, removed, title: "");
         }

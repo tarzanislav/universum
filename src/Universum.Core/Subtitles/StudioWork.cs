@@ -18,7 +18,11 @@ public sealed record StudioTrackState
     /// <summary>The language code ("cs", "fil").</summary>
     public string? Language { get; init; }
 
+    /// <summary>The track name written by the user (null: the rules' or the file's).</summary>
     public string? Name { get; init; }
+
+    /// <summary>The name was written by the user (older saved works have none: a name other than the file's counts).</summary>
+    public bool NameWritten { get; init; }
 
     public bool Forced { get; init; }
 

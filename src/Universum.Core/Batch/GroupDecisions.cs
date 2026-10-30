@@ -42,6 +42,9 @@ public sealed class GroupDecisions
         chosen[key] = chosenLanguage;
     }
 
+    /// <summary>Names of audio and subtitle slots written by the user (owner, 30. 10. 2026); empty = no name.</summary>
+    public Dictionary<SlotKey, string> Names { get; } = [];
+
     /// <summary>Subtitle slots kept although their language is not among the profile's subtitle languages.</summary>
     public HashSet<SlotKey> Kept { get; } = [];
 

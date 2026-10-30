@@ -42,6 +42,12 @@ public sealed record StudioEdits
     /// <summary>Forced chosen for external files found by the analysis, by path.</summary>
     public Dictionary<string, bool> FileForced { get; init; } = [];
 
+    /// <summary>Track names written for the video's own tracks, by track ID (empty = no name).</summary>
+    public Dictionary<int, string> Names { get; init; } = [];
+
+    /// <summary>Track names written for external files (found by the analysis or added here), by path.</summary>
+    public Dictionary<string, string> FileNames { get; init; } = [];
+
     /// <summary>
     /// The values of the studio's rows (FPS, speed, shift, as typed) – the studio shows them again exactly when the task
     /// is opened again; the plan uses the times above.
@@ -58,7 +64,7 @@ public sealed record StudioEdits
     public List<StudioFile> Added { get; init; } = [];
 
     public bool IsEmpty => Timings.Count == 0 && FileTimings.Count == 0 && Languages.Count == 0 && FileLanguages.Count == 0 && Forced.Count == 0 &&
-                           FileForced.Count == 0 && Removed.Count == 0 && RemovedFiles.Count == 0 && Added.Count == 0;
+                           FileForced.Count == 0 && Removed.Count == 0 && RemovedFiles.Count == 0 && Added.Count == 0 && Names.Count == 0 && FileNames.Count == 0;
 
     /// <summary>In words, for the batch: "časy titulkov 2, pridané 1, vynechané 1".</summary>
     public string Describe()
@@ -72,6 +78,11 @@ public sealed record StudioEdits
         if (Languages.Count + FileLanguages.Count is > 0 and var languages)
         {
             parts.Add($"jazyk {languages}");
+        }
+
+        if (Names.Count + FileNames.Count is > 0 and var named)
+        {
+            parts.Add($"názvy {named}");
         }
 
         if (Added.Count > 0)
@@ -107,9 +118,20 @@ public sealed record StudioEdits
         var languages = decisions.Languages.ToDictionary();
         var forced = decisions.Forced.ToDictionary();
         var removed = decisions.Removed.ToHashSet();
-        foreach (var track in file.TracksOf(TrackType.Subtitles))
+        var names = decisions.Names.ToDictionary();
+        foreach (var track in file.Tracks.Where(t => t.Type is TrackType.Audio or TrackType.Subtitles))
         {
             var path = track.ExternalFile;
+            if ((path is null ? Names.GetValueOrDefault(track.Id) : FileNames.FirstOrDefault(n => Paths.Same(n.Key, path)).Value) is { } name)
+            {
+                names[track.Id] = name;
+            }
+
+            if (track.Type != TrackType.Subtitles)
+            {
+                continue;
+            }
+
             if ((path is null ? Timings.GetValueOrDefault(track.Id) : ByPath(FileTimings, path)) is { IsNone: false } timing)
             {
                 timings[track.Id] = timing;
@@ -144,7 +166,7 @@ public sealed record StudioEdits
             }
         }
 
-        return decisions with { Timings = timings, Languages = languages, Forced = forced, Removed = removed };
+        return decisions with { Timings = timings, Languages = languages, Forced = forced, Removed = removed, Names = names };
     }
 
     // by path, as Windows compares names

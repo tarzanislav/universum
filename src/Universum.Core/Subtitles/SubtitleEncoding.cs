@@ -66,8 +66,29 @@ public static class SubtitleEncoding
             // an 8-bit encoding: the one that reads as Czech or Slovak
         }
 
+        // a text of mostly letters beyond ASCII is Cyrillic (Czech and Slovak have one in ten at most)
+        var high = bytes.Count(b => b >= 0xC0);
+        var ascii = bytes.Count(b => b is >= (byte)'A' and <= (byte)'Z' or >= (byte)'a' and <= (byte)'z');
+        if (high > 0 && high > ascii)
+        {
+            var cyrillic = System.Text.Encoding.GetEncoding(1251).GetString(bytes);
+            if (cyrillic.Count(c => c is >= 'А' and <= 'я') > high / 2)
+            {
+                return (cyrillic, "Windows-1251");
+            }
+        }
+
+        // a longer Czech or Slovak text always has š, ž, ť, ľ or ř – without them it is western (è, à, ç: Windows-1252);
+        // a short one (a few subtitles) is read as Czech or Slovak
+        var central = new[] { (1250, "Windows-1250"), (28592, "ISO-8859-2") }
+            .Select(e => (Text: System.Text.Encoding.GetEncoding(e.Item1).GetString(bytes), Name: e.Item2)).ToList();
+        if (ascii >= 200 && central.All(e => e.Text.Count(c => "šžťľřŠŽŤĽŘ".Contains(c)) == 0))
+        {
+            return (System.Text.Encoding.GetEncoding(1252).GetString(bytes), "Windows-1252");
+        }
+
         (string Text, string Name, int Score)? best = null;
-        foreach (var (page, name) in new[] { (1250, "Windows-1250"), (28592, "ISO-8859-2"), (1252, "Windows-1252") })
+        foreach (var (page, name) in new[] { (1250, "Windows-1250"), (28592, "ISO-8859-2") })
         {
             var text = System.Text.Encoding.GetEncoding(page).GetString(bytes);
             var score = 0;

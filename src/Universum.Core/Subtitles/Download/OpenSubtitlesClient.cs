@@ -47,13 +47,19 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
     public async Task LoginAsync(string username, string password, CancellationToken cancellationToken = default)
     {
         var answer = await SendAsync(HttpMethod.Post, "login", new JsonObject { ["username"] = username, ["password"] = password }, cancellationToken).ConfigureAwait(false);
-        _token = answer["token"]?.GetValue<string>() ?? throw new SubtitleServiceException("OpenSubtitles: prihlásenie nevrátilo token.");
-        if (answer["base_url"]?.GetValue<string>() is { Length: > 0 } host)
+        _token = Text(answer["token"]) ?? throw new SubtitleServiceException("OpenSubtitles: prihlásenie nevrátilo token.");
+        if (Text(answer["base_url"]) is { Length: > 0 } host)
         {
-            _host = host.Replace("https://", "", StringComparison.OrdinalIgnoreCase).TrimEnd('/');
-            if (_host.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
+            host = host.Replace("https://", "", StringComparison.OrdinalIgnoreCase).TrimEnd('/');
+            if (host.EndsWith("/api/v1", StringComparison.OrdinalIgnoreCase))
             {
-                _host = _host[..^7];
+                host = host[..^7];
+            }
+
+            // the key and the token go only to OpenSubtitles' own servers (VIP: vip-api.opensubtitles.com)
+            if (Uri.CheckHostName(host) == UriHostNameType.Dns && host.EndsWith(".opensubtitles.com", StringComparison.OrdinalIgnoreCase))
+            {
+                _host = host.ToLowerInvariant();
             }
         }
     }
@@ -113,9 +119,10 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
                 continue;
             }
 
+            var language = Text(attributes["language"])?.ToLowerInvariant() ?? "";
             results.Add(new OpenSubtitlesResult(
-                id.GetValue<int>(), file["file_name"]?.GetValue<string>() ?? "", attributes["language"]?.GetValue<string>() ?? "",
-                attributes["release"]?.GetValue<string>() ?? "", Int(attributes["download_count"]), Bool(attributes["hearing_impaired"]),
+                Int(id), Text(file["file_name"]) ?? "", language.Length is >= 2 and <= 3 && language.All(char.IsAsciiLetterLower) ? language : "",
+                Text(attributes["release"]) ?? "", Int(attributes["download_count"]), Bool(attributes["hearing_impaired"]),
                 Bool(attributes["foreign_parts_only"]), Bool(attributes["machine_translated"]) || Bool(attributes["ai_translated"]), Double(attributes["fps"])));
         }
 
@@ -132,7 +139,7 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
 
         var answer = await SendAsync(HttpMethod.Post, "download", new JsonObject { ["file_id"] = fileId }, cancellationToken).ConfigureAwait(false);
         Remaining = answer["remaining"] is { } remaining ? Int(remaining) : null;
-        var link = answer["link"]?.GetValue<string>() ?? throw new SubtitleServiceException("OpenSubtitles: " + (answer["message"]?.GetValue<string>() ?? "odkaz na stiahnutie chýba."));
+        var link = Text(answer["link"]) ?? throw new SubtitleServiceException("OpenSubtitles: " + (Text(answer["message"]) ?? "odkaz na stiahnutie chýba."));
         if (!Uri.TryCreate(link, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
         {
             throw new SubtitleServiceException("OpenSubtitles: neplatný odkaz na stiahnutie.");
@@ -141,14 +148,21 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
         // the link is temporary and plain: no key, no login
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.UserAgent.ParseAdd(userAgent);
-        using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            throw new SubtitleServiceException($"OpenSubtitles: súbor sa nepodarilo stiahnuť ({(int)response.StatusCode}).");
-        }
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new SubtitleServiceException($"OpenSubtitles: súbor sa nepodarilo stiahnuť ({(int)response.StatusCode}).");
+            }
 
-        var content = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        return (answer["file_name"]?.GetValue<string>() ?? $"{fileId}.srt", content);
+            var content = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            return (Text(answer["file_name"]) ?? $"{fileId}.srt", content);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            throw new SubtitleServiceException("OpenSubtitles: súbor sa nepodarilo stiahnuť – " + ex.Message, ex);
+        }
     }
 
     private async Task<JsonNode> SendAsync(HttpMethod method, string path, JsonObject? body, CancellationToken cancellationToken)
@@ -172,7 +186,7 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
         {
             response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             throw new SubtitleServiceException("OpenSubtitles nie je dostupný: " + ex.Message, ex);
         }
@@ -192,7 +206,7 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
 
             if (!response.IsSuccessStatusCode)
             {
-                var message = json?["message"]?.GetValue<string>() ?? json?["errors"]?.ToJsonString() ?? response.ReasonPhrase;
+                var message = Text(json?["message"]) ?? json?["errors"]?.ToJsonString() ?? response.ReasonPhrase;
                 throw new SubtitleServiceException(response.StatusCode switch
                 {
                     HttpStatusCode.Unauthorized => "OpenSubtitles: neplatný API kľúč alebo prihlásenie – " + message,
@@ -204,6 +218,9 @@ public sealed class OpenSubtitlesClient(HttpClient http, string apiKey, string u
             return json ?? throw new SubtitleServiceException("OpenSubtitles: nečitateľná odpoveď.");
         }
     }
+
+    // a string value, or null (never an exception on another type)
+    private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
     private static int Int(JsonNode? node) => node is JsonValue value && value.TryGetValue<int>(out var number) ? number
         : node is JsonValue other && other.TryGetValue<double>(out var real) ? (int)real : 0;

@@ -364,7 +364,8 @@ public sealed class SubtitleRow : ObservableObject
         // the speed and the delay of the two points replace the others
         FpsFrom = null;
         FpsTo = null;
-        SpeedPercent = Math.Round(((double)sync.Denominator / sync.Numerator - 1) * 100, 3);
+        // the exact speed of the two points (millionths of a per cent), not the slider's rounding
+        SpeedText = (((decimal)sync.Denominator / sync.Numerator - 1) * 100).ToString("0.######", Slovak);
         DelayText = sync.DelayMilliseconds.ToString(CultureInfo.InvariantCulture);
         SyncNote = $"Vypočítané: rýchlosť {SpeedText} %, posun {DelayText} ms.";
     }

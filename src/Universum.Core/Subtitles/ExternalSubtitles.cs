@@ -73,11 +73,20 @@ public static class ExternalSubtitles
         var videoEpisode = EpisodeParser.FromText(video);
         var videoIsEpisode = TitleGuess.NamesEpisode(videoEpisode, video) || EpisodeParser.SeasonOfPath(videoPath) is not null;
         var videoTitle = TitleGuess.FromName(video, videoIsEpisode ? MediaKind.Series : MediaKind.Movie);
+        // the names of the other videos of the folder: a subtitle file named after one of them is that one's ("Film 2.srt")
+        var others = list.Where(p => !string.Equals(p, videoPath, StringComparison.OrdinalIgnoreCase) &&
+                                     Batch.BatchAnalyzer.VideoExtensions.Contains(System.IO.Path.GetExtension(p).ToLowerInvariant()))
+            .Select(p => Words.Normalize(System.IO.Path.GetFileNameWithoutExtension(p))).ToHashSet(StringComparer.Ordinal);
         var matches = new List<SubtitleFileMatch>();
         foreach (var path in list.Where(p => IsSubtitleFile(p, list)))
         {
             var name = System.IO.Path.GetFileNameWithoutExtension(path);
             var (language, isForced, hearingImpaired, rest) = Tail(name, forced);
+            if (others.Contains(Words.Normalize(rest)) || others.Contains(Words.Normalize(name)))
+            {
+                continue;
+            }
+
             var match = Score(video, videoIsEpisode, videoEpisode, videoTitle, name, rest, videosInFolder);
             if (match is { } found)
             {
@@ -168,7 +177,7 @@ public static class ExternalSubtitles
             {
                 language ??= LanguageTag.FromCode(code!);
             }
-            else if (!Neutral.Contains(word) && !(word.Length <= 2 && word.All(char.IsAsciiDigit)))
+            else if (!Neutral.Contains(word))
             {
                 break;
             }

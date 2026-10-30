@@ -60,9 +60,9 @@ public sealed record SubtitleTiming(long DelayMilliseconds, long Numerator, long
             return null;
         }
 
-        // hundredths of a per cent are kept exactly: 100 / (100 + p) = 10000 / (10000 + 100·p)
-        var hundredths = (long)Math.Round(percent * 100, MidpointRounding.AwayFromZero);
-        return Reduced(0, 10_000, 10_000 + hundredths);
+        // millionths of a per cent are kept exactly: 100 / (100 + p) = 10⁸ / (10⁸ + 10⁶·p)
+        var millionths = (long)Math.Round(percent * 1_000_000, MidpointRounding.AwayFromZero);
+        return Reduced(0, 100_000_000, 100_000_000 + millionths);
     }
 
     /// <summary>

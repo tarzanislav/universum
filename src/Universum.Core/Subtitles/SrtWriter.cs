@@ -23,9 +23,13 @@ public static class SrtWriter
         return text.ToString();
     }
 
-    /// <summary>Saves the subtitles as an SRT file in UTF-8.</summary>
-    public static Task SaveAsync(SubtitleDocument document, string path, CancellationToken cancellationToken = default) =>
-        File.WriteAllTextAsync(path, Write(document), new UTF8Encoding(encoderShouldEmitUTF8Identifier: true), cancellationToken);
+    /// <summary>Saves the subtitles as a new SRT file in UTF-8 – never over an existing file (IOException then).</summary>
+    public static async Task SaveAsync(SubtitleDocument document, string path, CancellationToken cancellationToken = default)
+    {
+        await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        await writer.WriteAsync(Write(document).AsMemory(), cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>"01:02:03,456".</summary>
     public static string Time(TimeSpan time)

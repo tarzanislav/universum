@@ -440,7 +440,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             foreach (var at in Enumerable.Range(0, count).Where(i => count <= 10 || i < 7 || i >= count - 2))
             {
                 var cue = document.Cues[at];
-                Preview.Add(new SubtitlePreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), SubtitleRow.Clock(cue.Start), SubtitleRow.Clock(timing.Apply(cue.Start)), cue.Text.Replace('\n', ' ')));
+                var moved = timing.Apply(cue.Start);
+                Preview.Add(new SubtitlePreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), SubtitleRow.Clock(cue.Start),
+                    moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved), cue.Text.Replace('\n', ' ')));
             }
 
             return;
@@ -743,13 +745,14 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             await client.LoginAsync(user, password);
             var (name, content) = await client.DownloadAsync(result.FileId);
             var document = SubtitleReader.Read(SubtitleDownloads.Text(content), _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond);
-            var language = LanguageTag.FromCode(result.Language.Length > 0 ? result.Language : OnlineLanguage).Primary;
+            var language = result.Language.Length > 0 ? result.Language : OnlineLanguage;
             var saved = await SubtitleDownloads.SaveBesideAsync(anchor, document, language, result.HearingImpaired, result.ForeignPartsOnly);
+            _taken.Add(saved);
             OnlineStatus = $"Stiahnuté ({name}) a uložené vedľa videa ako {Path.GetFileName(saved)}" + (client.Remaining is { } left ? $"; dnes ešte {left} stiahnutí." : ".");
             _busy = false;
             await AddFilesAsync([saved]);
         }
-        catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
             OnlineStatus = ex is SubtitleServiceException ? ex.Message : "Stiahnuté titulky sa nepodarilo uložiť: " + ex.Message;
         }
@@ -818,7 +821,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
                 var document = await SubtitleReader.ReadFileAsync(file, _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond);
                 var language = SubtitleLanguage.Detect(document.PlainText)?.Language ?? "und";
                 var name = Words.Normalize(Path.GetFileNameWithoutExtension(file));
-                saved.Add(await SubtitleDownloads.SaveBesideAsync(anchor, document, language, forced: Core.Text.Words.ContainsAny(name, _services.Profile.ForcedKeywords)));
+                var path = await SubtitleDownloads.SaveBesideAsync(anchor, document, language, forced: Core.Text.Words.ContainsAny(name, _services.Profile.ForcedKeywords));
+                _taken.Add(path);
+                saved.Add(path);
             }
 
             if (saved.Count > 0)
@@ -866,7 +871,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
 
             var translated = await client.TranslateAsync(SrtWriter.Write(document), TranslateTo, _services.SvSubProvider, new Progress<string>(s => OnlineStatus = "svsub.net: " + s));
             var saved = await SubtitleDownloads.SaveBesideAsync(anchor, SubtitleReader.Read(translated), TranslateTo, row.HearingImpaired, row.Forced);
-            OnlineStatus = $"Preložené ({row.Language.Tag.Primary} → {TranslateTo}) a uložené vedľa videa ako {Path.GetFileName(saved)}; úloha na svsub.net je zmazaná.";
+            _taken.Add(saved);
+            OnlineStatus = $"Preložené ({row.Language.Tag.Primary} → {TranslateTo}) a uložené vedľa videa ako {Path.GetFileName(saved)}; " +
+                           (client.JobDeleted ? "úloha na svsub.net je zmazaná." : "úlohu na svsub.net sa nepodarilo zmazať – zmažte ju na stránke služby.");
             _busy = false;
             await AddFilesAsync([saved]);
         }

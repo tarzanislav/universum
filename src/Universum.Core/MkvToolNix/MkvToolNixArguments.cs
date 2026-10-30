@@ -117,8 +117,9 @@ public static class MkvToolNixArguments
                 arguments.AddRange(["--sub-charset", "0:UTF-8"]);
             }
 
-            AddTrackOptions(arguments, added, "0", writeLanguage: true, writeOtherFlags: true);
-            arguments.AddRange(["--no-global-tags", "--no-chapters", input]);
+            AddTrackOptions(arguments, added, "0", writeLanguage: !added.Language.IsUndetermined, writeOtherFlags: true);
+            // one track of each added file (a VobSub .idx may hold several languages)
+            arguments.AddRange(["--subtitle-tracks", "0", "--no-global-tags", "--no-chapters", input]);
         }
 
         arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => t.IsAdded

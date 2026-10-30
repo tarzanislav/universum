@@ -62,8 +62,16 @@ public static class SubtitleDownloads
     /// The name subtitles get next to the video: "Film.cs.srt", "Film.en.sdh.srt", "Film.cs.forced.srt" – a free one
     /// ("Film.cs (2).srt") when it is taken.
     /// </summary>
-    public static string BesideVideo(string video, string language, bool hearingImpaired = false, bool forced = false, string extension = ".srt") =>
-        Free(Path.Combine(Path.GetDirectoryName(video)!, Path.GetFileNameWithoutExtension(video) + "." + language + (hearingImpaired ? ".sdh" : "") + (forced ? ".forced" : "") + extension));
+    public static string BesideVideo(string video, string language, bool hearingImpaired = false, bool forced = false, string extension = ".srt")
+    {
+        // the language comes from a service too: letters only ("cs", "en", "und")
+        var code = language.Length is >= 2 and <= 8 && language.All(char.IsAsciiLetterLower) ? language : "und";
+        var folder = Path.GetDirectoryName(Path.GetFullPath(video))!;
+        var path = Free(Path.Combine(folder, Path.GetFileNameWithoutExtension(video) + "." + code + (hearingImpaired ? ".sdh" : "") + (forced ? ".forced" : "") + extension));
+        return string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), folder, StringComparison.OrdinalIgnoreCase)
+            ? path
+            : throw new IOException("the subtitles would be saved outside the video's folder");
+    }
 
     /// <summary>Saves subtitles next to the video as SRT in UTF-8 (a new file; returns its path).</summary>
     public static async Task<string> SaveBesideAsync(string video, SubtitleDocument document, string language, bool hearingImpaired = false, bool forced = false,

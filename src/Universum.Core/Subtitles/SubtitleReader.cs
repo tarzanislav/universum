@@ -33,6 +33,19 @@ public static partial class SubtitleReader
     /// <exception cref="FormatException">The text is not subtitles UNIVERSUM can read.</exception>
     public static SubtitleDocument Read(string text, double? framesPerSecond = null)
     {
+        try
+        {
+            return ReadText(text, framesPerSecond);
+        }
+        catch (Exception ex) when (ex is OverflowException or ArgumentException or System.Xml.XmlException or InvalidOperationException or IndexOutOfRangeException)
+        {
+            // a damaged file (times too big, broken XML): not subtitles UNIVERSUM can read
+            throw new FormatException("Titulky sú poškodené: " + ex.Message, ex);
+        }
+    }
+
+    private static SubtitleDocument ReadText(string text, double? framesPerSecond)
+    {
         text = text.TrimStart('\uFEFF').Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         var start = text.TrimStart();
         if (start.StartsWith("WEBVTT", StringComparison.Ordinal))
@@ -479,6 +492,12 @@ public static partial class SubtitleReader
         foreach (var part in parts)
         {
             seconds = (seconds * 60) + double.Parse(part, NumberStyles.Float, CultureInfo.InvariantCulture);
+        }
+
+        // a time of years is a damaged file, not subtitles
+        if (double.IsNaN(seconds) || seconds is < 0 or > 100_000_000)
+        {
+            throw new FormatException("Nemožný čas titulku: " + value);
         }
 
         return TimeSpan.FromTicks((long)Math.Round(seconds * TimeSpan.TicksPerSecond));

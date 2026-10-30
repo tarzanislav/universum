@@ -83,3 +83,41 @@ public sealed class FileColorConverter : IValueConverter
         return brush;
     }
 }
+
+/// <summary>
+/// A password box bound to a view model (WPF does not bind <see cref="System.Windows.Controls.PasswordBox.Password"/>):
+/// the password is never shown on the screen (owner's accounts for subtitles).
+/// </summary>
+public static class PasswordBinding
+{
+    public static readonly System.Windows.DependencyProperty PasswordProperty = System.Windows.DependencyProperty.RegisterAttached(
+        "Password", typeof(string), typeof(PasswordBinding),
+        new System.Windows.FrameworkPropertyMetadata("", System.Windows.FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, Changed));
+
+    private static readonly System.Windows.DependencyProperty HookedProperty =
+        System.Windows.DependencyProperty.RegisterAttached("Hooked", typeof(bool), typeof(PasswordBinding), new System.Windows.PropertyMetadata(false));
+
+    public static string GetPassword(System.Windows.DependencyObject element) => (string)element.GetValue(PasswordProperty);
+
+    public static void SetPassword(System.Windows.DependencyObject element, string value) => element.SetValue(PasswordProperty, value);
+
+    private static void Changed(System.Windows.DependencyObject element, System.Windows.DependencyPropertyChangedEventArgs e)
+    {
+        if (element is not System.Windows.Controls.PasswordBox box)
+        {
+            return;
+        }
+
+        if (!(bool)box.GetValue(HookedProperty))
+        {
+            box.SetValue(HookedProperty, true);
+            box.PasswordChanged += (_, _) => SetPassword(box, box.Password);
+        }
+
+        var value = e.NewValue as string ?? "";
+        if (box.Password != value)
+        {
+            box.Password = value;
+        }
+    }
+}

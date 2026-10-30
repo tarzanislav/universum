@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:pages="clr-namespace:Universum.App.Pages"
+        xmlns:app="clr-namespace:Universum.App"
         xmlns:jobs="clr-namespace:Universum.App.Jobs"
         Title="UNIVERSUM" Icon="pack://application:,,,/Assets/universum.ico" Width="1280" Height="820" MinWidth="980" MinHeight="600"
         WindowStartupLocation="CenterScreen" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
@@ -3225,7 +3226,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox Text="{Binding OpenSubtitlesKey, UpdateSourceTrigger=PropertyChanged}" ToolTip="OpenSubtitles.com – API kľúč (uložený sa nezobrazuje)" Margin="0,0,6,0" />
                                 <TextBox Grid.Column="1" Text="{Binding OpenSubtitlesUser, UpdateSourceTrigger=PropertyChanged}" ToolTip="Meno účtu OpenSubtitles.com" Margin="0,0,6,0" />
-                                <TextBox Grid.Column="2" Text="{Binding OpenSubtitlesPassword, UpdateSourceTrigger=PropertyChanged}" ToolTip="Heslo účtu (uložené sa nezobrazuje)" Margin="0,0,6,0" />
+                                <PasswordBox Grid.Column="2" app:PasswordBinding.Password="{Binding OpenSubtitlesPassword, Mode=TwoWay}" ToolTip="Heslo účtu (uložené sa nezobrazuje)" Margin="0,0,6,0" />
                                 <StackPanel Grid.Column="3" Orientation="Horizontal">
                                     <Button Content="Overiť a uložiť" Command="{Binding SaveOpenSubtitlesCommand}" Padding="12,5" Margin="0,0,8,0" />
                                     <Button Content="Odstrániť" Command="{Binding RemoveOpenSubtitlesCommand}" Padding="12,5" />

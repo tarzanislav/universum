@@ -209,4 +209,62 @@ public sealed class SubtitleToolsTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Test]
+    public async Task ReviewFindingsAreFixed()
+    {
+        // another film's subtitles are never taken: "Film 2" is not "Film" (with or without its video in the folder)
+        var film = Path.Combine("D:", "Filmy", "Vymyslený film.mkv");
+        string[] sequel = [Path.Combine("D:", "Filmy", "Vymyslený film 2.srt"), Path.Combine("D:", "Filmy", "Vymyslený film 2.cze.srt")];
+        Assert.True(ExternalSubtitles.For(film, sequel, videosInFolder: 1).Count == 0, "the sequel's subtitles");
+        Assert.True(ExternalSubtitles.For(film, [.. sequel, Path.Combine("D:", "Filmy", "Vymyslený film 2.mkv")], videosInFolder: 2).Count == 0, "with the sequel's video");
+
+        // damaged files are "not subtitles", never a crash
+        foreach (var damaged in new[] { "{99999999999999999999}{1}x\n{1}{2}y\n", "[99999999999999999999][1]x\n[1][2]y\n", "WEBVTT\n\n99999999999999999999:00.000 --> 00:01.000\nx\n",
+                     "<tt xmlns=\"http://www.w3.org/ns/ttml\"><body><p begin=\"99999999999999999h\" end=\"1s\">x</p></body></tt>", "<tt><body><p begin=\"1s\"" })
+        {
+            Assert.Throws<FormatException>(() => SubtitleReader.Read(damaged), "damaged: " + damaged[..12]);
+        }
+
+        // western and Cyrillic texts in their 8-bit encodings
+        var italian = string.Join("\r\n", Enumerable.Range(1, 12).Select(i => $"{i}\r\n00:00:{i:00},000 --> 00:00:{i:00},900\r\nC'è già una città, però è così più bella.\r\n"));
+        var (westernText, western) = SubtitleEncoding.Decode(CodePage(1252).GetBytes(italian));
+        Assert.True(western == "Windows-1252" && westernText.Contains("città", StringComparison.Ordinal), "Italian: " + western);
+        var russian = "1\r\n00:00:01,000 --> 00:00:02,000\r\nПривет, как дела? Это очень хорошо, спасибо большое.\r\n";
+        Assert.True(SubtitleEncoding.Decode(CodePage(1251).GetBytes(russian)) is (var cyrillic, "Windows-1251") && cyrillic.Contains("Привет", StringComparison.Ordinal), "Russian");
+        Assert.True(SubtitleEncoding.Decode(CodePage(1250).GetBytes("1\r\n00:00:01,000 --> 00:00:02,000\r\nPočkej chvíli.\r\n")).Text.Contains("Počkej", StringComparison.Ordinal),
+            "a short Czech text without š, ž stays Czech");
+
+        // a language from a service never leads out of the video's folder
+        var folder = Directory.CreateTempSubdirectory("universum-beside-").FullName;
+        try
+        {
+            var video = Path.Combine(folder, "Vymyslený film.mkv");
+            Assert.Equal(Path.Combine(folder, "Vymyslený film.und.srt"), Universum.Core.Subtitles.Download.SubtitleDownloads.BesideVideo(video, "../../x"), "letters only");
+            var first = Universum.Core.Subtitles.Download.SubtitleDownloads.BesideVideo(video, "cs");
+            await SrtWriter.SaveAsync(new SubtitleDocument([new SubtitleCue(T(1), T(2), "A")], "SRT"), first);
+            await Assert.ThrowsAsync<IOException>(() => SrtWriter.SaveAsync(new SubtitleDocument([new SubtitleCue(T(1), T(2), "B")], "SRT"), first), "never over an existing file");
+            Assert.True(File.ReadAllText(first).Contains("A", StringComparison.Ordinal), "the first one stays");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+
+        // two points exactly (millionths of a per cent)
+        var sync = SubtitleTiming.TwoPoints(T(62.5), T(64.0), T(6256.270), T(6256.270 + 0))!;
+        var bySpeed = SubtitleTiming.Speed(((decimal)sync.Denominator / sync.Numerator - 1) * 100)!.Then(SubtitleTiming.Delay(sync.DelayMilliseconds));
+        Assert.True(Math.Abs((bySpeed.Apply(T(6256.270)) - T(6256.270)).TotalMilliseconds) <= 2, "the second point lands within 2 ms: " + bySpeed.Apply(T(6256.270)));
+    }
+
+    [Test]
+    public void AddedFilesGiveOneTrackAndTheirOwnLanguage()
+    {
+        var video = new MediaFile { Path = "Vymyslený film.mkv", ContainerType = "Matroska", Tracks = [new MediaTrack { Id = 0, Type = TrackType.Video }, new MediaTrack { Id = 1, Type = TrackType.Audio, Language = LanguageTag.FromCode("cs") }] };
+        var idx = new MediaTrack { Id = 1000, Type = TrackType.Subtitles, CodecId = "S_VOBSUB", ExternalFile = "Vymyslený film.idx" };
+        var target = Universum.Core.Rules.ManualTarget.Create(video with { Tracks = [.. video.Tracks, idx] }, Universum.Core.Rules.ManualTarget.AsIs(video with { Tracks = [.. video.Tracks, idx] }));
+        var arguments = string.Join(" ", Universum.Core.MkvToolNix.MkvToolNixArguments.Remux(target, video.Path, "out.mkv"));
+        Assert.True(arguments.Contains("--subtitle-tracks 0 --no-global-tags --no-chapters Vymyslený film.idx", StringComparison.Ordinal) && !arguments.Contains("--language 0:und", StringComparison.Ordinal),
+            "one track of the VobSub file, its own language: " + arguments);
+    }
 }

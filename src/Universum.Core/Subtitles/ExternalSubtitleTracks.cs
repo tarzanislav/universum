@@ -16,7 +16,10 @@ public static class ExternalSubtitleTracks
     /// <summary>The ID of the first added track (the video's own IDs are smaller).</summary>
     public const int FirstId = 1000;
 
-    /// <summary>The video with the subtitle files lying with it that belong to it (unchanged when there are none).</summary>
+    /// <summary>
+    /// The video with the subtitle files lying with it that belong to it (unchanged when there are none); a file the video
+    /// already holds (a subtitle track of the same language with as many subtitles – a result processed again) is not added.
+    /// </summary>
     /// <param name="siblings">The files of the video's folder.</param>
     /// <param name="videosInFolder">How many videos the folder holds.</param>
     public static async Task<MediaFile> AddAsync(
@@ -33,7 +36,9 @@ public static class ExternalSubtitleTracks
         var id = Math.Max(FirstId, file.Tracks.Select(t => t.Id + 1).DefaultIfEmpty(0).Max());
         foreach (var match in matches)
         {
-            if (await TrackOfAsync(match, id, fps, cancellationToken).ConfigureAwait(false) is { } track)
+            if (await TrackOfAsync(match, id, fps, cancellationToken).ConfigureAwait(false) is { } track &&
+                !file.TracksOf(TrackType.Subtitles).Any(t => t.ExternalFile is null && t.StatisticsFrames is > 0 && t.StatisticsFrames == track.StatisticsFrames &&
+                                                             t.Language.Primary == track.Language.Primary))
             {
                 tracks.Add(track);
                 id++;

@@ -14,6 +14,9 @@ namespace Universum.Core.Subtitles.Download;
 /// </summary>
 public sealed class SvSubClient(HttpClient http, string token)
 {
+    /// <summary>The job was deleted on the service after the last translation (false: it may still be there).</summary>
+    public bool JobDeleted { get; private set; }
+
     private const string Api = "https://svsub.net/api/v1/";
 
     /// <summary>The service takes at most this many bytes of subtitles.</summary>
@@ -74,32 +77,52 @@ public sealed class SvSubClient(HttpClient http, string token)
             }
 
             progress?.Report("Sťahujem preklad…");
-            using var request = Request(HttpMethod.Get, "jobs/" + Uri.EscapeDataString(id) + "/download");
-            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            string text;
+            try
             {
-                throw new SubtitleServiceException($"svsub.net: preklad sa nepodarilo stiahnuť ({(int)response.StatusCode}) – {Message(text) ?? response.ReasonPhrase}");
+                using var request = Request(HttpMethod.Get, "jobs/" + Uri.EscapeDataString(id) + "/download");
+                using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new SubtitleServiceException($"svsub.net: preklad sa nepodarilo stiahnuť ({(int)response.StatusCode}) – {Message(text) ?? response.ReasonPhrase}");
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                throw new SubtitleServiceException("svsub.net: preklad sa nepodarilo stiahnuť – " + ex.Message, ex);
             }
 
             // the file itself, or JSON with it
-            if (text.TrimStart().StartsWith('{') && JsonNode.Parse(text) is { } json &&
-                (json["content"] ?? json["result"] ?? json["data"]?["content"])?.GetValue<string>() is { } content)
+            if (text.TrimStart().StartsWith('{'))
             {
-                text = content;
+                try
+                {
+                    var json = JsonNode.Parse(text);
+                    if ((json?["content"] ?? json?["result"] ?? json?["data"]?["content"]) is JsonValue value && value.TryGetValue<string>(out var content))
+                    {
+                        text = content;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // not JSON after all: the text as it is
+                }
             }
 
             return text;
         }
         finally
         {
-            // nothing stays on the service (owner: the project is strictly private)
+            // nothing stays on the service (owner: the project is strictly private); a failed delete is said, never hidden
+            JobDeleted = false;
             try
             {
                 using var delete = Request(HttpMethod.Delete, "jobs/" + Uri.EscapeDataString(id));
-                using var _ = await http.SendAsync(delete, CancellationToken.None).ConfigureAwait(false);
+                using var answer = await http.SendAsync(delete, CancellationToken.None).ConfigureAwait(false);
+                JobDeleted = answer.IsSuccessStatusCode || answer.StatusCode == HttpStatusCode.NotFound;
             }
-            catch (HttpRequestException)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 // left on the service: the user can delete it there
             }
@@ -128,7 +151,7 @@ public sealed class SvSubClient(HttpClient http, string token)
         {
             response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             throw new SubtitleServiceException("svsub.net nie je dostupný: " + ex.Message, ex);
         }

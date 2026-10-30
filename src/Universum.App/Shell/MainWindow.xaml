@@ -1513,7 +1513,7 @@
                                             Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
                                             ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
                                 </WrapPanel>
-                                <ProgressBar Value="{Binding Progress}" Maximum="1" Height="4" Margin="0,6,0,0" />
+                                <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="1" Height="4" Margin="0,6,0,0" />
                                 <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
                             </StackPanel>
                         </Grid>

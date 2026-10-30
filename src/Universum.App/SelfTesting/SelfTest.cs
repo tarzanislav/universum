@@ -2018,7 +2018,9 @@ internal static class SelfTest
             await Task.Delay(100);
         }
 
-        Check(megaBatch.State == Core.Mega.MegaBatchState.Done && megaBatch.Files.All(f => f.State == Core.Mega.MegaFileState.Done) &&
+        // two versions of the test film are the same file: the second one is the same stream – already in the library
+        Check(megaBatch.State == Core.Mega.MegaBatchState.Done &&
+              megaBatch.Files.All(f => f.State is Core.Mega.MegaFileState.Done or Core.Mega.MegaFileState.AlreadyInLibrary) &&
               megaBatch.Files.All(f => File.Exists(f.Note)),
             "mega: the batch written into the library after the check – " + megaBatch.Outcome + " | " +
             string.Join(" | ", model.Mega.LastJob?.Messages.Select(m => m.Text) ?? []));

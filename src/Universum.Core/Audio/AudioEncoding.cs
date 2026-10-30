@@ -46,9 +46,14 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
     {
         var sk = CultureInfo.GetCultureInfo("sk-SK");
         var parts = new List<string>();
-        if (!Timing.IsNone)
+        if (Timing.Numerator != Timing.Denominator)
         {
-            parts.Add(Timing.Describe("zvuk") + (Timing.Numerator != Timing.Denominator ? KeepPitch ? " (výška tónu ostane)" : " (výška tónu sa zmení)" : ""));
+            parts.Add(new SubtitleTiming(0, Timing.Numerator, Timing.Denominator).Describe("zvuk") + (KeepPitch ? ", výška tónu ostane" : ", výška tónu sa zmení"));
+        }
+
+        if (Timing.DelayMilliseconds != 0)
+        {
+            parts.Add(Shift.Describe("zvuk"));
         }
 
         if (NeedsEncoding)
@@ -64,7 +69,7 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
 
         if (Normalize)
         {
-            parts.Add(string.Create(sk, $"hlasitosť {TargetLoudness} LUFS"));
+            parts.Add("hlasitosť −23 LUFS (EBU R128)");
         }
 
         if (Gain != 0)

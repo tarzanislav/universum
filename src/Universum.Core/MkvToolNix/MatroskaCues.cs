@@ -49,21 +49,21 @@ public static class MatroskaCues
         Entries(stream).ToDictionary(t => t.Key, t => (IReadOnlyList<TimeSpan>)t.Value.Select(e => e.Start).ToList());
 
     /// <summary>
-    /// When the subtitles of every track are shown, by the index alone (mkvmerge writes how long each subtitle lasts;
-    /// without it two seconds) – the timing of a subtitle track without reading the film (automatic sync).
+    /// The cue points of every track with how long each lasts when the index says it (mkvmerge writes it for text
+    /// subtitles) – the timing of a subtitle track without reading the film (automatic sync; SubtitleSync.Intervals).
     /// </summary>
-    public static Task<IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan End)>>> ReadIntervalsAsync(string path, CancellationToken cancellationToken = default) =>
+    public static Task<IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>> ReadPointsAsync(string path, CancellationToken cancellationToken = default) =>
         Task.Run(() =>
         {
             try
             {
                 using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
-                return (IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan End)>>)Entries(stream).ToDictionary(
-                    t => t.Key, t => (IReadOnlyList<(TimeSpan Start, TimeSpan End)>)t.Value.Select(e => (e.Start, e.Start + (e.Duration ?? TimeSpan.FromSeconds(2)))).ToList());
+                return (IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>)Entries(stream).ToDictionary(
+                    t => t.Key, t => (IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>)t.Value);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
             {
-                return new Dictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan End)>>();
+                return new Dictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>();
             }
         }, cancellationToken);
 

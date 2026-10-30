@@ -15,7 +15,7 @@ public static class VttWriter
             var start = cue.Start < TimeSpan.Zero ? TimeSpan.Zero : cue.Start;
             var end = cue.End < start ? start : cue.End;
             text.Append(Time(start)).Append(" --> ").Append(Time(end)).Append('\n')
-                .Append(Escape(cue.Text.Replace("\r", "", StringComparison.Ordinal))).Append("\n\n");
+                .Append(Escape(Lines(cue.Text))).Append("\n\n");
         }
 
         return text.ToString();
@@ -36,6 +36,10 @@ public static class VttWriter
         return string.Create(CultureInfo.InvariantCulture,
             $"{milliseconds / 3_600_000:00}:{milliseconds / 60_000 % 60:00}:{milliseconds / 1000 % 60:00}.{milliseconds % 1000:000}");
     }
+
+    // an empty line ends a subtitle in WebVTT: the lines of the text without empty ones
+    private static string Lines(string text) =>
+        string.Join('\n', text.Replace("\r", "", StringComparison.Ordinal).Split('\n').Where(l => l.Trim().Length > 0));
 
     // &, < and > are written as entities (so "-->" never stands in a text), except the tags <i>, <b>, <u> UNIVERSUM keeps
     private static string Escape(string text)

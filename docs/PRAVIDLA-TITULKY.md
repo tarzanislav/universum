@@ -96,10 +96,13 @@ nový súbor v knižnici, súbory titulkov ako nové SRT vedľa pôvodných (nik
     skúšajú sa aj pomery FPS (25 ↔ 23,976 …); časti, ktoré sa zhodujú, dajú posun a zvyšok zmeny rýchlosti;
   - **podľa titulkov**, ktoré k filmu sedia (aj v inom jazyku), rovnakým spôsobom;
   - **oboje** – keď sa zhodnú (do 0,3 s na začiatku, v strede a na konci filmu), je to isté; inak upozornenie.
-  - Výsledok nastaví rýchlosť a posun pri titulkoch; spoľahlivý je, keď sa zhoduje aspoň polovica častí, inak
-    „NEISTÉ, overte prehraním“.
+  - Spoľahlivý výsledok (zhoduje sa aspoň polovica častí) nastaví pri titulkoch **zmenu FPS** (keď ide presne o pomer
+    FPS, aj 23,978 špeciálne), inak **rýchlosť**, a **posun**; malá zmena rýchlosti, ktorá žiadny titulok neposunie
+    o viac ako 0,12 s, sa nenastaví. **Neistý výsledok sa sám nepoužije** – vlastné hodnoty ostanú, návrh nastaví až
+    tlačidlo „Použiť návrh“. Čítanie zvuku sa dá zastaviť.
+  - Časy zvuku sú časy súboru (MKV, ktorého prvý čas nie je 0, ich má posunuté rovnako ako titulky).
 - **Skontrolovať titulky videa:** každá titulková stopa videa (časy z indexu súboru) sa porovná so zvukom – sedí,
-  mešká, ide skôr, iné FPS.
+  mešká, ide skôr, iné FPS. Obrázkové titulky (PGS) bez dĺžok v indexe sa berú po dvojiciach zobrazenie–zmazanie.
 
 ## 6. Externé titulky
 

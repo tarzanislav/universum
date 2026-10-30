@@ -58,6 +58,8 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         SyncCommand = new AsyncRelayCommand(SyncAsync, () => !_busy && _selected is not null &&
                                                              ((SyncByAudio && _file is not null) || (SyncBySubtitles && SyncReference is not null && SyncReference != _selected)));
         CheckTracksCommand = new AsyncRelayCommand(CheckTracksAsync, () => !_busy && _file is { IsMatroska: true } && _file.TracksOf(TrackType.Audio).Any());
+        StopSyncCommand = new RelayCommand(() => _syncCancellation?.Cancel(), () => _syncCancellation is { IsCancellationRequested: false });
+        ApplyProposalCommand = new RelayCommand(ApplyProposal, () => !_busy && _proposal is not null);
         Library = new LibraryTargetPicker(services, Target);
         Library.Changed += RefreshCommands;
         OpenVideoCommand = new AsyncRelayCommand(OpenVideoAsync, () => !_busy);
@@ -92,6 +94,15 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     /// <summary>Checks every subtitle track of the video against its audio: late, early, another frame rate.</summary>
     public AsyncRelayCommand CheckTracksCommand { get; private set; } = null!;
 
+    /// <summary>Stops automatic sync or the check of the tracks (FFmpeg reads parts of the film).</summary>
+    public RelayCommand StopSyncCommand { get; private set; } = null!;
+
+    /// <summary>Applies a proposal of automatic sync that is not sure (owner checks it by playing).</summary>
+    public RelayCommand ApplyProposalCommand { get; private set; } = null!;
+
+    /// <summary>Automatic sync found something, but not for sure: it is applied only by <see cref="ApplyProposalCommand"/>.</summary>
+    public bool HasProposal => _proposal is not null;
+
     /// <summary>Sync by the audio of the film.</summary>
     public bool SyncByAudio { get => _syncByAudio; set { if (SetProperty(ref _syncByAudio, value)) { RefreshCommands(); } } }
 
@@ -108,7 +119,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     private bool _syncBySubtitles;
     private SubtitleRow? _syncReference;
     private string _syncStatus = "";
-    private (string Path, IReadOnlyList<Core.Subtitles.Sync.ActivityWindow> Windows)? _speech;
+    private (string Key, IReadOnlyList<Core.Subtitles.Sync.ActivityWindow> Windows)? _speech;
+    private CancellationTokenSource? _syncCancellation;
+    private (SubtitleRow Row, Core.Subtitles.Sync.SyncResult Result)? _proposal;
 
     /// <summary>The results of OpenSubtitles.com.</summary>
     public ObservableCollection<OpenSubtitlesResult> OnlineResults { get; } = [];
@@ -418,6 +431,16 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     {
         if (_selected is { IsExternal: true } row)
         {
+            if (SyncReference == row)
+            {
+                SyncReference = null;
+            }
+
+            if (Proposal?.Row == row)
+            {
+                Proposal = null;
+            }
+
             Rows.Remove(row);
             SelectedRow = Rows.FirstOrDefault();
             if (_file is not null)
@@ -438,6 +461,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     private void Clear()
     {
         _file = null;
+        SyncReference = null;
+        Proposal = null;
+        _speech = null;
         Rows.Clear();
         Found.Clear();
         Preview.Clear();
@@ -715,10 +741,12 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         TranslateCommand?.NotifyCanExecuteChanged();
         SyncCommand?.NotifyCanExecuteChanged();
         CheckTracksCommand?.NotifyCanExecuteChanged();
+        StopSyncCommand?.NotifyCanExecuteChanged();
+        ApplyProposalCommand?.NotifyCanExecuteChanged();
     }
 
     // the times of a row's subtitles: the external file's, the index of the video's own track, or the whole track read
-    private async Task<IReadOnlyList<(TimeSpan Start, TimeSpan End)>?> CuesOfAsync(SubtitleRow row)
+    private async Task<IReadOnlyList<(TimeSpan Start, TimeSpan End)>?> CuesOfAsync(SubtitleRow row, CancellationToken cancellationToken)
     {
         if (row.Document is { } document)
         {
@@ -730,8 +758,8 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             return null;
         }
 
-        var intervals = await MatroskaCues.ReadIntervalsAsync(_file.Path);
-        if (intervals.TryGetValue(number, out var cues) && cues.Count > 0)
+        var index = await MatroskaCues.ReadPointsAsync(_file.Path, cancellationToken);
+        if (index.TryGetValue(number, out var points) && Core.Subtitles.Sync.SubtitleSync.Intervals(points, picture: !row.IsText) is { Count: > 0 } cues)
         {
             return cues;
         }
@@ -741,37 +769,79 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         return row.Document?.Cues.Select(c => (c.Start, c.End)).ToList();
     }
 
-    // where people speak in the film: parts of the default (or first) audio track, read once for the video
-    private async Task<IReadOnlyList<Core.Subtitles.Sync.ActivityWindow>?> SpeechAsync()
+    // where people speak in the film: parts of the default (or first) audio track, read once for the video as it is now
+    private async Task<(IReadOnlyList<Core.Subtitles.Sync.ActivityWindow>? Windows, string? Problem)> SpeechAsync(CancellationToken cancellationToken)
     {
         if (_file is not { Duration: { } duration } file || !file.TracksOf(TrackType.Audio).Any())
         {
-            return null;
+            return (null, "video nemá zvuk");
         }
 
-        if (_speech is { } known && known.Path == file.Path)
+        var audio = file.TracksOf(TrackType.Audio).ToList();
+        var ordinal = Math.Max(0, audio.FindIndex(t => t.Flags.Default));
+        var info = new FileInfo(file.Path);
+        var key = $"{file.Path}|{(info.Exists ? info.Length : 0)}|{(info.Exists ? info.LastWriteTimeUtc.Ticks : 0)}|{ordinal}";
+        if (_speech is { } known && known.Key == key)
         {
-            return known.Windows;
+            return (known.Windows, null);
         }
 
         string ffmpeg;
         try
         {
-            ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
+            ffmpeg = (await _services.SpeechAsync(cancellationToken)).Ffmpeg;
         }
         catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
         {
-            SyncStatus = "FFmpeg nie je k dispozícii: " + ex.Message;
-            return null;
+            return (null, "FFmpeg nie je k dispozícii: " + ex.Message);
         }
 
-        var audio = file.TracksOf(TrackType.Audio).ToList();
-        var ordinal = Math.Max(0, audio.FindIndex(t => t.Flags.Default));
         var parts = Core.Subtitles.Sync.SpeechActivity.Parts(duration);
         var windows = await Core.Subtitles.Sync.SpeechActivity.ReadAsync(_services.Runner, ffmpeg, file.Path, ordinal, parts, TimeSpan.FromMinutes(2.5),
-            new Progress<int>(i => SyncStatus = $"Počúvam zvuk filmu – časť {i + 1} z {parts.Count}…"));
-        _speech = (file.Path, windows);
-        return windows;
+            new Progress<int>(i => SyncStatus = $"Počúvam zvuk filmu – časť {i + 1} z {parts.Count}…"), cancellationToken);
+        if (windows.Count == 0)
+        {
+            return (null, $"FFmpeg neprečítal zvukovú stopu {audio[ordinal].Id} (súbor je nedostupný alebo poškodený)");
+        }
+
+        // a read that failed in parts is not kept: the next try reads the film again
+        if (windows.Count * 2 >= parts.Count)
+        {
+            _speech = (key, windows);
+        }
+
+        return (windows, null);
+    }
+
+    // the frame rate of the video (which change of frame rate sync names)
+    private double? FilmFps => _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond;
+
+    private CancellationToken StartSync()
+    {
+        _busy = true;
+        Proposal = null;
+        _syncCancellation = new CancellationTokenSource();
+        RefreshCommands();
+        return _syncCancellation.Token;
+    }
+
+    private void EndSync()
+    {
+        _syncCancellation?.Dispose();
+        _syncCancellation = null;
+        _busy = false;
+        RefreshCommands();
+    }
+
+    private (SubtitleRow Row, Core.Subtitles.Sync.SyncResult Result)? Proposal
+    {
+        get => _proposal;
+        set
+        {
+            _proposal = value;
+            OnPropertyChanged(nameof(HasProposal));
+            ApplyProposalCommand?.NotifyCanExecuteChanged();
+        }
     }
 
     private async Task SyncAsync()
@@ -781,41 +851,65 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             return;
         }
 
-        _busy = true;
-        RefreshCommands();
+        var cancellationToken = StartSync();
         try
         {
-            if (await CuesOfAsync(row) is not { Count: > 0 } cues)
+            if (await CuesOfAsync(row, cancellationToken) is not { Count: > 0 } cues)
             {
                 SyncStatus = "Časy týchto titulkov sa nedajú zistiť.";
                 return;
             }
 
             var duration = _file?.Duration ?? (cues[^1].End + TimeSpan.FromMinutes(1));
+            var fps = FilmFps;
             Core.Subtitles.Sync.SyncResult? byAudio = null, bySubtitles = null;
-            if (SyncByAudio && await SpeechAsync() is { Count: > 0 } speech)
+            string? problem = null;
+            if (SyncByAudio && _file is not null)
             {
-                SyncStatus = "Porovnávam titulky s rečou…";
-                byAudio = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku"));
+                var (speech, why) = await SpeechAsync(cancellationToken);
+                problem = why;
+                if (speech is { Count: > 0 })
+                {
+                    SyncStatus = "Porovnávam titulky s rečou…";
+                    byAudio = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku", filmFps: fps), cancellationToken);
+                }
             }
 
-            if (SyncBySubtitles && SyncReference is { } reference && reference != row && await CuesOfAsync(reference) is { Count: > 0 } referenceCues)
+            if (SyncBySubtitles && SyncReference is { } reference && reference != row && Rows.Contains(reference) &&
+                await CuesOfAsync(reference, cancellationToken) is { Count: > 0 } referenceCues)
             {
                 // the reference as it will be after its own changes
                 var fitted = referenceCues.Select(c => (reference.Timing.Apply(c.Start), reference.Timing.Apply(c.End))).ToList();
                 var windows = Core.Subtitles.Sync.SpeechActivity.Parts(duration).Select(s => Core.Subtitles.Sync.ActivityWindow.FromCues(fitted, s, TimeSpan.FromMinutes(2.5))).ToList();
-                bySubtitles = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, windows, "podľa titulkov " + reference.Language.Tag.Primary));
+                bySubtitles = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, windows, "podľa titulkov " + reference.Language.Tag.Primary, filmFps: fps), cancellationToken);
             }
 
             var result = Core.Subtitles.Sync.SubtitleSync.Combine(byAudio, bySubtitles, duration);
             if (result is null)
             {
-                SyncStatus = "Nedalo sa nič zistiť (bez zvuku aj bez iných titulkov).";
+                SyncStatus = "Nedalo sa nič zistiť" + (problem is null ? " (bez zvuku aj bez iných titulkov)." : $": {problem}.");
                 return;
             }
 
-            row.ApplySync(result.Timing, result.Detail);
-            SyncStatus = result.Detail + (result.Reliable ? " Hodnoty sú nastavené pri titulkoch – skontrolujte náhľad a uložte." : " Hodnoty sú nastavené, ale overte ich.");
+            if (result.Reliable)
+            {
+                row.ApplySync(result);
+                SyncStatus = result.Detail + " Hodnoty sú nastavené pri titulkoch – skontrolujte náhľad a uložte.";
+            }
+            else if (result.IsProposal)
+            {
+                // never applied by itself: the user's own values stay until the proposal is taken
+                Proposal = (row, result);
+                SyncStatus = result.Detail + " Hodnoty titulkov sa nezmenili – návrh použijete tlačidlom „Použiť návrh“.";
+            }
+            else
+            {
+                SyncStatus = result.Detail + " Hodnoty titulkov sa nezmenili." + (problem is null ? "" : $" ({problem})");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SyncStatus = "Napasovanie je zastavené – hodnoty titulkov sa nezmenili.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException)
         {
@@ -823,9 +917,19 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         }
         finally
         {
-            _busy = false;
-            RefreshCommands();
+            EndSync();
         }
+    }
+
+    private void ApplyProposal()
+    {
+        if (Proposal is { } proposal && Rows.Contains(proposal.Row))
+        {
+            proposal.Row.ApplySync(proposal.Result);
+            SyncStatus = proposal.Result.Detail + " Návrh je nastavený – overte ho prehraním.";
+        }
+
+        Proposal = null;
     }
 
     // owner: the other subtitle tracks too – are they late or early against the audio?
@@ -836,35 +940,43 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             return;
         }
 
-        _busy = true;
-        RefreshCommands();
+        var cancellationToken = StartSync();
         try
         {
-            if (await SpeechAsync() is not { Count: > 0 } speech)
+            var (speech, problem) = await SpeechAsync(cancellationToken);
+            if (speech is not { Count: > 0 })
             {
-                SyncStatus = "Zvuk filmu sa nepodarilo prečítať.";
+                SyncStatus = "Zvuk filmu sa nepodarilo prečítať" + (problem is null ? "." : $": {problem}.");
                 return;
             }
 
-            var intervals = await MatroskaCues.ReadIntervalsAsync(_file.Path);
+            var index = await MatroskaCues.ReadPointsAsync(_file.Path, cancellationToken);
+            var fps = FilmFps;
             var lines = new List<string>();
-            foreach (var row in Rows.Where(r => !r.IsExternal))
+            foreach (var row in Rows.Where(r => !r.IsExternal).ToList())
             {
                 var name = $"stopa {row.Track.Id} ({row.Language.Tag.Primary}{(row.Forced ? ", forced" : "")})";
-                if (row.Track.Number is not { } number || !intervals.TryGetValue(number, out var cues) || cues.Count < 10)
+                var cues = row.Track.Number is { } number && index.TryGetValue(number, out var points)
+                    ? Core.Subtitles.Sync.SubtitleSync.Intervals(points, picture: !row.IsText)
+                    : [];
+                if (cues.Count < 10)
                 {
                     lines.Add($"{name}: málo titulkov alebo bez indexu – nedá sa posúdiť");
                     continue;
                 }
 
-                var result = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku"));
+                var result = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku", filmFps: fps), cancellationToken);
                 lines.Add(result is null ? $"{name}: nedá sa posúdiť"
                     : !result.Reliable ? $"{name}: neisté – {result.Detail}"
                     : result.Timing.IsNone ? $"{name}: sedia"
-                    : $"{name}: {Lag(result)} – {result.Timing.Describe()} (Napasovať ich nastaví)");
+                    : $"{name}: {Lag(result)}{(result.Rates is { } rates ? $", iné FPS ({rates.From.Label} → {rates.To.Label})" : "")} – {result.Timing.Describe()} (Napasovať ich nastaví)");
             }
 
             SyncStatus = "Kontrola titulkov podľa zvuku: " + string.Join("; ", lines) + ".";
+        }
+        catch (OperationCanceledException)
+        {
+            SyncStatus = "Kontrola je zastavená.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ProcessStartException or TimeoutException)
         {
@@ -872,8 +984,7 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         }
         finally
         {
-            _busy = false;
-            RefreshCommands();
+            EndSync();
         }
 
         string Lag(Core.Subtitles.Sync.SyncResult result)

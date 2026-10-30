@@ -1153,8 +1153,13 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
-                            <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4"
-                                    ToolTip="Nastaví rýchlosť a posun vybraných titulkov; oboje naraz = istota, keď sa zhodnú" />
+                            <Button Content="Napasovať" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
+                                    ToolTip="Nastaví rýchlosť (alebo zmenu FPS) a posun vybraných titulkov, keď je výsledok istý; oboje naraz = istota, keď sa zhodnú" />
+                            <Button Content="Zastaviť" Command="{Binding StopSyncCommand}" Padding="12,4" Margin="0,0,8,0"
+                                    ToolTip="Zastaví čítanie zvuku filmu" />
+                            <Button Content="Použiť návrh" Command="{Binding ApplyProposalCommand}" Padding="12,4"
+                                    Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
                         </WrapPanel>
                         <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
                     </StackPanel>

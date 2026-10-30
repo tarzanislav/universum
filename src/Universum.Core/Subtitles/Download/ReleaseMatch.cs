@@ -58,12 +58,13 @@ public static class ReleaseMatch
     // the release words of a name and its group (the word after the last dash: "…x264-GROUP")
     private static (HashSet<string> Words, string? Group) Parts(string name)
     {
+        // "WEB-DL" is one release word, never the group
+        name = name.Replace("WEB-DL", "WEBDL", StringComparison.OrdinalIgnoreCase);
         var dash = name.LastIndexOf('-');
         var group = dash > 0 && dash < name.Length - 1 && !name[(dash + 1)..].Contains(' ', StringComparison.Ordinal)
             ? Words.Normalize(name[(dash + 1)..]).Replace(" ", "", StringComparison.Ordinal)
             : null;
-        var words = Words.Normalize(name.Replace("WEB-DL", "WEBDL", StringComparison.OrdinalIgnoreCase)).Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(ReleaseWords.Contains).ToHashSet(StringComparer.Ordinal);
-        return (words, group is { Length: > 0 } ? group : null);
+        var words = Words.Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(ReleaseWords.Contains).ToHashSet(StringComparer.Ordinal);
+        return (words, group is { Length: > 0 } && !ReleaseWords.Contains(group) ? group : null);
     }
 }

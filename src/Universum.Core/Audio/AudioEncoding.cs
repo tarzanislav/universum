@@ -151,7 +151,7 @@ public static partial class AudioEncoder
             return problem;
         }
 
-        var rate = track.AudioSamplingFrequency is > 0 and var known ? known.Value : 48000;
+        var rate = track.AudioSamplingFrequency is > 0 and var known ? known : 48000;
         var filters = SpeedFilters(recipe, rate);
         var stretched = duration is { } length ? TimeSpan.FromTicks((long)(length.Ticks * recipe.Timing.Factor)) : (TimeSpan?)null;
         var input = new[] { "-nostdin", "-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:a:" + ordinal.ToString(CultureInfo.InvariantCulture), "-vn", "-sn", "-dn" };

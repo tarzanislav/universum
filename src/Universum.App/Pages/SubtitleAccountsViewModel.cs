@@ -18,6 +18,7 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
     private string _openSubtitlesPassword = "";
     private string _svSubToken = "";
     private string _svSubProvider;
+    private string _svSubModel;
     private string _status = "";
 
     public SubtitleAccountsViewModel(AppServices services)
@@ -25,6 +26,7 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
         _services = services;
         _openSubtitlesUser = services.OpenSubtitlesAccount.User ?? "";
         _svSubProvider = services.SvSubProvider;
+        _svSubModel = services.SvSubModel;
         SaveOpenSubtitlesCommand = new AsyncRelayCommand(SaveOpenSubtitlesAsync, () => OpenSubtitlesKey.Trim().Length > 0 || OpenSubtitlesPassword.Length > 0 || OpenSubtitlesUser.Trim() != (services.OpenSubtitlesAccount.User ?? ""));
         RemoveOpenSubtitlesCommand = new RelayCommand(() =>
         {
@@ -33,10 +35,10 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
             Status = "Účet OpenSubtitles je odstránený.";
             Refresh();
         }, () => _services.OpenSubtitlesAccount.Key is not null);
-        SaveSvSubCommand = new RelayCommand(SaveSvSub, () => SvSubToken.Trim().Length > 0 || SvSubProvider.Trim() != _services.SvSubProvider);
+        SaveSvSubCommand = new RelayCommand(SaveSvSub, () => SvSubToken.Trim().Length > 0 || SvSubProvider.Trim() != _services.SvSubProvider || SvSubModel.Trim() != _services.SvSubModel);
         RemoveSvSubCommand = new RelayCommand(() =>
         {
-            _services.SetSvSub(null, SvSubProvider);
+            _services.SetSvSub(null, SvSubProvider, SvSubModel);
             Status = "Token svsub.net je odstránený.";
             Refresh();
         }, () => _services.SvSubToken is not null);
@@ -55,6 +57,9 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
 
     public IReadOnlyList<string> Providers { get; } = ["openai", "anthropic", "gemini", "deepseek"];
 
+    /// <summary>The AI model ("gpt-6-astra"); empty = the service's default.</summary>
+    public string SvSubModel { get => _svSubModel; set { if (SetProperty(ref _svSubModel, value ?? "")) { Refresh(); } } }
+
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
 
     /// <summary>What is stored now (never the secrets themselves).</summary>
@@ -62,7 +67,8 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
         "OpenSubtitles: " + (_services.OpenSubtitlesAccount is { Key: not null } account
             ? "kľúč uložený" + (account.User is { } user ? $", účet {user}" + (account.Password is null ? " (bez hesla – sťahovať sa nedá)" : "") : " (bez účtu – len hľadanie)")
             : "nenastavené") +
-        " · svsub.net: " + (_services.SvSubToken is null ? "nenastavené" : $"token uložený, poskytovateľ {_services.SvSubProvider}");
+        " · svsub.net: " + (_services.SvSubToken is null ? "nenastavené"
+            : $"token uložený, poskytovateľ {_services.SvSubProvider}, model {(_services.SvSubModel.Length > 0 ? _services.SvSubModel : "predvolený služby")}");
 
     public AsyncRelayCommand SaveOpenSubtitlesCommand { get; }
 
@@ -116,7 +122,7 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
             return;
         }
 
-        _services.SetSvSub(token, SvSubProvider);
+        _services.SetSvSub(token, SvSubProvider, SvSubModel);
         SvSubToken = "";
         Status = "svsub.net: uložené (token šifrovane). Overí sa pri prvom preklade.";
         Refresh();

@@ -3238,16 +3238,19 @@
                                     <ColumnDefinition Width="2*" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox Text="{Binding SvSubToken, UpdateSourceTrigger=PropertyChanged}" ToolTip="svsub.net – token (svs_…; uložený sa nezobrazuje)" Margin="0,0,6,0" />
+                                <PasswordBox app:PasswordBinding.Password="{Binding SvSubToken, Mode=TwoWay}" ToolTip="svsub.net – token (svs_…; uložený sa nezobrazuje)" Margin="0,0,6,0" />
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding Providers}" Text="{Binding SvSubProvider, UpdateSourceTrigger=PropertyChanged}" IsEditable="True"
-                                          ToolTip="Poskytovateľ AI, ktorým svsub.net prekladá (váš kľúč je v nastaveniach služby; model sa vyberá tam)" Margin="0,0,6,0" />
-                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                          ToolTip="Poskytovateľ AI, ktorým svsub.net prekladá (váš kľúč je v nastaveniach služby)" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="2" Text="{Binding SvSubModel, UpdateSourceTrigger=PropertyChanged}" Width="130" Margin="0,0,6,0"
+                                         ToolTip="Model AI (napr. gpt-6-astra); prázdne = predvolený model služby. Úroveň uvažovania API svsub.net nepozná." />
+                                <StackPanel Grid.Column="3" Orientation="Horizontal">
                                     <Button Content="Uložiť" Command="{Binding SaveSvSubCommand}" Padding="12,5" Margin="0,0,8,0" />
                                     <Button Content="Odstrániť" Command="{Binding RemoveSvSubCommand}" Padding="12,5" />
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Text="token svsub.net · poskytovateľ AI" Margin="2,2,0,6" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Text="token svsub.net · poskytovateľ AI · model AI" Margin="2,2,0,6" />
                             <TextBlock Text="{Binding Stored}" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>

@@ -61,7 +61,7 @@ public static class UniversumRules
         targets.AddRange(audio.Select(a => new TrackTarget(
             a.Track, null, a.Language,
             a.Track.Flags with { Default = ReferenceEquals(a, defaultAudio), Enabled = true, Forced = false },
-            a.Role)));
+            a.Role)).Select(a => decisions.Timings.TryGetValue(a.TrackId, out var shift) && !shift.IsNone ? a with { Timing = shift } : a));
 
         targets.AddRange(SubtitleTargets(audio, defaultAudio, subtitles, profile, issues)
             .Select(s => decisions.Timings.TryGetValue(s.TrackId, out var timing) && !timing.IsNone ? s with { Timing = timing } : s));

@@ -105,25 +105,34 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--chapters", chaptersXml]);
         }
 
-        // external subtitle files (owner, 30. 10. 2026): each one more input with one track, its values always written –
-        // the file itself has none; UNIVERSUM's own SRT files are UTF-8
+        // external subtitle files and sounds (owner, 30. 10. 2026): each one more input with one track, its values always
+        // written – the file itself has none; UNIVERSUM's own SRT files are UTF-8; a sound may be one track of another film
         var inputs = new Dictionary<int, int>();
         foreach (var added in target.Tracks.Where(t => t.IsAdded))
         {
             inputs[added.TrackId] = inputs.Count + 1;
             var input = externalInputs?.GetValueOrDefault(added.Source.ExternalFile!) ?? added.Source.ExternalFile!;
+            var inner = added.Source.ExternalTrack.ToString(CultureInfo.InvariantCulture);
             if (added.Source.IsTextSubtitles)
             {
-                arguments.AddRange(["--sub-charset", "0:UTF-8"]);
+                arguments.AddRange(["--sub-charset", inner + ":UTF-8"]);
             }
 
-            AddTrackOptions(arguments, added, "0", writeLanguage: !added.Language.IsUndetermined, writeOtherFlags: true);
-            // one track of each added file (a VobSub .idx may hold several languages)
-            arguments.AddRange(["--subtitle-tracks", "0", "--no-global-tags", "--no-chapters", input]);
+            AddTrackOptions(arguments, added, inner, writeLanguage: !added.Language.IsUndetermined, writeOtherFlags: true);
+            if (target.RemoveTags)
+            {
+                // the tags an added file brings (FFmpeg writes some into every sound) go as the film's do
+                arguments.Add("--no-track-tags");
+            }
+
+            // one track of each added file (a VobSub .idx may hold several languages, a film several sounds)
+            arguments.AddRange(added.Type == TrackType.Audio
+                ? ["--audio-tracks", inner, "--no-video", "--no-subtitles", "--no-buttons", "--no-attachments", "--no-global-tags", "--no-chapters", input]
+                : ["--subtitle-tracks", inner, "--no-global-tags", "--no-chapters", input]);
         }
 
         arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => t.IsAdded
-            ? inputs[t.TrackId].ToString(CultureInfo.InvariantCulture) + ":0"
+            ? inputs[t.TrackId].ToString(CultureInfo.InvariantCulture) + ":" + t.Source.ExternalTrack.ToString(CultureInfo.InvariantCulture)
             : "0:" + t.TrackId.ToString(CultureInfo.InvariantCulture)))]);
         return arguments;
     }

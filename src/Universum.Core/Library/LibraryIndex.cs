@@ -90,12 +90,13 @@ public sealed class LibraryIndex
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())))[..24];
     }
 
-    // an added subtitle file is known by its content (another file of the same name is another result)
+    // an added file (subtitles, a sound) is known by its content – read as a stream, also when it is gigabytes
     private static string ContentHash(string path)
     {
         try
         {
-            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))[..16];
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, FileOptions.SequentialScan);
+            return Convert.ToHexString(SHA256.HashData(stream))[..16];
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

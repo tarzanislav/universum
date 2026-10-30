@@ -302,6 +302,12 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (Model.SelectedTool.Page == Model.Audio)
+            {
+                await Model.Audio.LoadAsync(files.Where(File.Exists).ToList());
+                return;
+            }
+
             if (Model.SelectedTool.Page == Model.HeaderEditor)
             {
                 await Model.HeaderEditor.LoadAsync(files[0]);

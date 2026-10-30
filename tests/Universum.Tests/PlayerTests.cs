@@ -207,6 +207,135 @@ public sealed class PlayerTests
     }
 
     // a clock the test moves; the sound is only counted
+    [Test]
+    public async Task SoundFromElsewhereMovedAsWritten()
+    {
+        // Úprava audiostopy (owner, 30. 10. 2026): another sound (a dub) plays with the film, moved by its shift
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
+        if (ffmpeg is null)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+        }
+
+        var folder = Directory.CreateTempSubdirectory("universum-sound-").FullName;
+        try
+        {
+            var film = Path.Combine(folder, "film.mkv");
+            await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg!,
+            [
+                "-nostdin", "-v", "error", "-f", "lavfi", "-i", "color=c=gray:s=160x90:r=25:d=4", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+                "-t", "4", "-c:v", "libx264", "-c:a", "aac", film,
+            ]));
+            var dub = Path.Combine(folder, "dabing.mka");
+            await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg!,
+                ["-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4", "-c:a", "flac", dub]));
+
+            var audio = new RecordingAudioOutput();
+            await using var session = new PlayerSession(ffmpeg!, new PlayerSource(film, T(4), TimeSpan.Zero, true, 25, 1), audio, VideoFormat.For(25, 160, 90));
+            await session.SetSoundAsync(new PlayerSound(dub, 0, SubtitleTiming.Delay(1000)));
+            for (var wait = 0; wait < 150 && audio.Count < Pcm.BytesPerSecond * 2; wait++)
+            {
+                await Task.Delay(20);
+            }
+
+            var (silence, sound) = (audio.Loudness(T(0.1), T(0.9)), audio.Loudness(T(1.1), T(1.9)));
+            Assert.True(silence < 10 && sound > 1000, $"the dub starts a second later: silence {silence}, then the tone {sound}");
+
+            // from 2 s on: the dub's 1 s at once
+            audio.Clear();
+            await session.SeekAsync(T(2));
+            for (var wait = 0; wait < 150 && audio.Count < Pcm.BytesPerSecond / 2; wait++)
+            {
+                await Task.Delay(20);
+            }
+
+            Assert.True(audio.Loudness(T(0), T(0.4)) > 1000 && session.Sound is { Timing.DelayMilliseconds: 1000 }, "after a seek the dub plays at once");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    private sealed class RecordingAudioOutput : IAudioOutput
+    {
+        private readonly List<byte> _pcm = [];
+
+        public int Count
+        {
+            get
+            {
+                lock (_pcm)
+                {
+                    return _pcm.Count;
+                }
+            }
+        }
+
+        public TimeSpan Played { get; set; }
+
+        public double Volume { get; set; } = 1;
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> pcm, CancellationToken cancellationToken)
+        {
+            lock (_pcm)
+            {
+                if (_pcm.Count < Pcm.BytesPerSecond * 4)
+                {
+                    _pcm.AddRange(pcm.ToArray());
+                }
+            }
+
+            return ValueTask.CompletedTask;
+        }
+
+        public void Clear()
+        {
+            lock (_pcm)
+            {
+                _pcm.Clear();
+            }
+        }
+
+        // the mean absolute sample between two times of what was written
+        public double Loudness(TimeSpan from, TimeSpan to)
+        {
+            lock (_pcm)
+            {
+                var start = (int)(from.TotalSeconds * Pcm.BytesPerSecond) & ~3;
+                var end = Math.Min(_pcm.Count, (int)(to.TotalSeconds * Pcm.BytesPerSecond) & ~3);
+                double sum = 0;
+                var count = 0;
+                for (var i = start; i + 1 < end; i += 2)
+                {
+                    sum += Math.Abs((short)(_pcm[i] | (_pcm[i + 1] << 8)));
+                    count++;
+                }
+
+                return count == 0 ? 0 : sum / count;
+            }
+        }
+
+        public void Pause()
+        {
+        }
+
+        public void Resume()
+        {
+        }
+
+        public void Reset()
+        {
+            Played = TimeSpan.Zero;
+            Clear();
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
     private sealed class CountingAudioOutput : IAudioOutput
     {
         private long _bytes;

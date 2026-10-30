@@ -69,8 +69,12 @@ public sealed record MediaTrack
     public int TagEntries { get; init; }
 
     /// <summary>
-    /// The external file the track comes from – a subtitle file added to the video (owner, 30. 10. 2026); null for the
-    /// file's own tracks. Its ID is UNIVERSUM's own (not one of the file's), the track is the first one of that file.
+    /// The external file the track comes from – a subtitle file or a sound added to the video (owner, 30. 10. 2026); null
+    /// for the file's own tracks. Its ID is UNIVERSUM's own (not one of the file's); the track is
+    /// <see cref="ExternalTrack"/> of that file.
     /// </summary>
     public string? ExternalFile { get; init; }
+
+    /// <summary>The track's ID in <see cref="ExternalFile"/> (mkvmerge's; 0 for a file of one track – a subtitle file, a sound).</summary>
+    public int ExternalTrack { get; init; }
 }

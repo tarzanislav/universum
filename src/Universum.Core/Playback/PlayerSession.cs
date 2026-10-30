@@ -20,6 +20,12 @@ public sealed record PlayerSource(string Path, TimeSpan Duration, TimeSpan Origi
 }
 
 /// <summary>
+/// A sound played instead of the film's own (Úprava audiostopy): an audio track (<paramref name="Ordinal"/>, 0 = the
+/// first) of a file – the film itself or another one – moved and stretched as it will be written.
+/// </summary>
+public sealed record PlayerSound(string Path, int Ordinal, Subtitles.SubtitleTiming Timing, bool KeepPitch = true);
+
+/// <summary>
 /// The player of UNIVERSUM (owner, 30. 10. 2026: own code, FFmpeg only as a separate decoder): pictures and sound are
 /// decoded from the position on by two FFmpeg processes, the sound plays on the <see cref="IAudioOutput"/>, whose clock
 /// is the clock of the film – each picture is shown when its time comes, late ones are skipped. A seek starts the
@@ -47,13 +53,7 @@ public sealed class PlayerSession : IAsyncDisposable
     {
         _ffmpeg = ffmpeg;
         Source = source;
-        // a film without sound runs by the clock alone
-        if (source.AudioTracks == 0)
-        {
-            audio.Dispose();
-            audio = new ClockAudioOutput(limitedToSound: false);
-        }
-
+        // a film without sound plays silence (a sound from elsewhere can be played with it)
         _audio = audio;
         Format = format ?? VideoFormat.For(source.FramesPerSecond);
     }
@@ -64,6 +64,9 @@ public sealed class PlayerSession : IAsyncDisposable
 
     /// <summary>The audio track played (0 = the first).</summary>
     public int AudioTrack { get; private set; }
+
+    /// <summary>A sound played instead of the film's own audio track, or null.</summary>
+    public PlayerSound? Sound { get; private set; }
 
     public bool IsPlaying { get; private set; }
 
@@ -116,9 +119,11 @@ public sealed class PlayerSession : IAsyncDisposable
             _soundProblem = null;
             var fileTime = time - Source.Origin;
             _video = Source.HasVideo ? VideoReader.Start(_ffmpeg, Source.Path, fileTime, time, Format) : null;
-            if (Source.AudioTracks > 0)
             {
-                var sound = _sound = AudioReader.Start(_ffmpeg, Source.Path, fileTime, Math.Clamp(AudioTrack, 0, Source.AudioTracks - 1));
+                // a sound from elsewhere is placed by the film's time as mkvmerge writes it (from 0, not from the file's start)
+                var sound = _sound = Sound is { } other ? AudioReader.Start(_ffmpeg, other.Path, time, other.Ordinal, other.Timing, other.KeepPitch)
+                    : Source.AudioTracks > 0 ? AudioReader.Start(_ffmpeg, Source.Path, fileTime, Math.Clamp(AudioTrack, 0, Source.AudioTracks - 1))
+                    : null;
                 var feeding = _feeding = new CancellationTokenSource();
                 var (output, length) = (_audio, Source.Duration > TimeSpan.Zero ? End - time : TimeSpan.Zero);
                 _fed = Task.Run(() => FeedAsync(sound, output, length, feeding.Token), CancellationToken.None);
@@ -198,6 +203,19 @@ public sealed class PlayerSession : IAsyncDisposable
     public async Task SetAudioTrackAsync(int ordinal)
     {
         AudioTrack = Math.Clamp(ordinal, 0, Math.Max(0, Source.AudioTracks - 1));
+        Sound = null;
+        await SeekAsync(Position).ConfigureAwait(true);
+    }
+
+    /// <summary>Plays <paramref name="sound"/> instead of the film's audio track (null: the film's own again) from the position.</summary>
+    public async Task SetSoundAsync(PlayerSound? sound)
+    {
+        if (sound == Sound)
+        {
+            return;
+        }
+
+        Sound = sound;
         await SeekAsync(Position).ConfigureAwait(true);
     }
 
@@ -270,19 +288,23 @@ public sealed class PlayerSession : IAsyncDisposable
         feeding?.Dispose();
     }
 
-    // the sound to the output; when it ends before the picture, silence keeps the clock going to the end of the film
-    private async Task FeedAsync(AudioReader sound, IAudioOutput output, TimeSpan length, CancellationToken cancellationToken)
+    // the sound to the output (none: silence); when it ends before the picture, silence keeps the clock going to the end
+    // of the film
+    private async Task FeedAsync(AudioReader? sound, IAudioOutput output, TimeSpan length, CancellationToken cancellationToken)
     {
         try
         {
             long written = 0;
-            await foreach (var block in sound.Blocks.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            if (sound is not null)
             {
-                await output.WriteAsync(block, cancellationToken).ConfigureAwait(false);
-                written += block.Length;
+                await foreach (var block in sound.Blocks.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    await output.WriteAsync(block, cancellationToken).ConfigureAwait(false);
+                    written += block.Length;
+                }
             }
 
-            if (written == 0 && sound.Problem is { } problem)
+            if (written == 0 && sound?.Problem is { } problem)
             {
                 _soundProblem = "zvuk: " + problem;
             }

@@ -105,7 +105,7 @@ public sealed class FileProcessor(
 
             if (plan.Target.Tracks.FirstOrDefault(t => t.IsAdded && !File.Exists(t.Source.ExternalFile)) is { } missing)
             {
-                return Result(plan, ProcessingStatus.Failed, null, null, [$"the subtitle file {Path.GetFileName(missing.Source.ExternalFile)} no longer exists"]);
+                return Result(plan, ProcessingStatus.Failed, null, null, [$"the added file {Path.GetFileName(missing.Source.ExternalFile)} no longer exists"]);
             }
 
             var sourceSize = new FileInfo(source).Length;
@@ -125,7 +125,8 @@ public sealed class FileProcessor(
             var originalTime = File.GetLastWriteTimeUtc(source);
             // the library index is for library places; a file next to the original (header editor) never replaces an earlier one
             var fingerprint = index is null || inLibrary || placement.FixedName is not null ? null : await LibraryIndex.FingerprintAsync(source, cancellationToken);
-            var signature = LibraryIndex.TargetSignature(plan.Target);
+            // added files are read whole for it (a sound may be a gigabyte): away from the caller's thread
+            var signature = await Task.Run(() => LibraryIndex.TargetSignature(plan.Target), cancellationToken).ConfigureAwait(false);
             string? previous = null;
             if (fingerprint is not null && index!.FindPrevious(placement, fingerprint, signature) is { } found)
             {

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.Channels;
 using Universum.Core.Processes;
+using Universum.Core.Subtitles;
 
 namespace Universum.Core.Playback;
 
@@ -159,16 +160,43 @@ public sealed class AudioReader : IAsyncDisposable
     /// <summary>FFmpeg ended without any sound: its message.</summary>
     public string? Problem { get; private set; }
 
-    /// <summary>Starts at <paramref name="fileTime"/> (from the start of the file) with the audio track <paramref name="ordinal"/> (0 = the first).</summary>
-    public static AudioReader Start(string ffmpeg, string path, TimeSpan fileTime, int ordinal)
+    /// <summary>
+    /// Starts at <paramref name="fileTime"/> (the film's time from the start of its file) with the audio track
+    /// <paramref name="ordinal"/> (0 = the first) of <paramref name="path"/> – the film's own sound, or a sound from
+    /// elsewhere moved and stretched by <paramref name="timing"/> as it will be written (Úprava audiostopy): the film's
+    /// time T plays the sound's time (T − shift) ÷ factor, silence before the sound starts.
+    /// </summary>
+    public static AudioReader Start(string ffmpeg, string path, TimeSpan fileTime, int ordinal, SubtitleTiming? timing = null, bool keepPitch = true)
     {
+        var invariant = CultureInfo.InvariantCulture;
+        // sound that starts later than the seek (a delayed track) starts with silence: the clock stays with the picture
+        var filters = new List<string> { string.Create(invariant, $"aresample={Pcm.SampleRate}:async=1:first_pts=0") };
+        var seek = fileTime;
+        if (timing is { IsNone: false } moved)
+        {
+            // atempo plays a little early: made up for as the sound written anew is (Audio.AudioRecipe.Shift)
+            var shift = moved.DelayMilliseconds + (keepPitch && moved.Numerator != moved.Denominator ? Audio.AudioRecipe.TempoLeadMilliseconds : 0);
+            var source = (fileTime.TotalSeconds - (shift / 1000.0)) / moved.Factor;
+            seek = TimeSpan.FromSeconds(Math.Max(0, source));
+            if (moved.Numerator != moved.Denominator)
+            {
+                var tempo = 1 / moved.Factor;
+                filters.Add(keepPitch ? string.Create(invariant, $"atempo={tempo:0.#########}")
+                    : string.Create(invariant, $"asetrate={Pcm.SampleRate * tempo:0.#####},aresample={Pcm.SampleRate}"));
+            }
+
+            if (source < 0)
+            {
+                filters.Add(string.Create(invariant, $"adelay={-source * moved.Factor * 1000:0}:all=1"));
+            }
+        }
+
         var process = StreamingProcess.Start(ffmpeg,
         [
             "-nostdin", "-hide_banner", "-loglevel", "error",
-            "-ss", VideoReader.Seconds(fileTime), "-i", path,
-            "-map", "0:a:" + ordinal.ToString(CultureInfo.InvariantCulture), "-vn", "-sn", "-dn",
-            // sound that starts later than the seek (a delayed track) starts with silence: the clock stays with the picture
-            "-af", "aresample=async=1:first_pts=0",
+            "-ss", VideoReader.Seconds(seek), "-i", path,
+            "-map", "0:a:" + ordinal.ToString(invariant), "-vn", "-sn", "-dn",
+            "-af", string.Join(",", filters),
             "-ac", Pcm.Channels.ToString(CultureInfo.InvariantCulture), "-ar", Pcm.SampleRate.ToString(CultureInfo.InvariantCulture),
             "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1",
         ]);

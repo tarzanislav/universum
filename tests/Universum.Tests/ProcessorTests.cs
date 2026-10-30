@@ -741,6 +741,50 @@ public sealed class ProcessorTests
         Assert.True(after.Values.Any(times => times.SequenceEqual([TimeSpan.FromMilliseconds(771)])), "the Slovak one 25 → 23,976 and +250 ms: " + string.Join(" | ", after.Select(a => $"{a.Key}: {string.Join(",", a.Value)}")));
     }
 
+    [Test]
+    public async Task AddedSoundsWithRules()
+    {
+        // Úprava audiostopy: a sound FFmpeg wrote (with its tags) and the second sound of another film, moved; the rules
+        // remove every tag, the check of the result passes
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(System.IO.Path.PathSeparator)
+            .Select(d => System.IO.Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
+        if (ffmpeg is null)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+        }
+
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var other = work.Copy("en-und-cz-forced.mkv", "iny film.mkv");
+        var dub = System.IO.Path.Combine(work.Path, "dabing.mka");
+        var made = await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg!, ["-nostdin", "-v", "error", "-i", original, "-map", "0:a:0", "-c:a", "aac", "-b:a", "96k", dub]));
+        Assert.True(made.ExitCode == 0, made.StandardError);
+        var file = await inspector.InspectAsync(original);
+        var written = (await inspector.InspectAsync(dub)).TracksOf(TrackType.Audio).Single();
+        var second = (await inspector.InspectAsync(other)).TracksOf(TrackType.Audio).ElementAt(1);
+        var withSounds = file with
+        {
+            Tracks = [.. file.Tracks, written with { Id = 1000, ExternalFile = dub, ExternalTrack = written.Id, Flags = written.Flags with { Default = false } },
+                second with { Id = 1001, ExternalFile = other, ExternalTrack = second.Id, Flags = second.Flags with { Default = false } }],
+        };
+        var languages = withSounds.Tracks.Where(t => t.Type != TrackType.Video).ToDictionary(t => t.Id, t => t.Language.IsUndetermined ? LanguageTag.FromCode("cs") : t.Language);
+        var target = UniversumRules.Apply(withSounds, RuleProfile.Default, new TrackDecisions
+        {
+            Languages = languages,
+            Kept = withSounds.TracksOf(TrackType.Subtitles).Select(t => t.Id).ToHashSet(),
+            Names = new Dictionary<int, string> { [1000] = "Vymyslený dabing" },
+            Timings = new Dictionary<int, Universum.Core.Subtitles.SubtitleTiming> { [1001] = Universum.Core.Subtitles.SubtitleTiming.Delay(-300) },
+        });
+        Assert.True(target.RemoveTags && target.For(1001).Timing is { DelayMilliseconds: -300 }, "the rules remove tags; the shift of a sound is kept");
+        var plan = EditPlan.For(target);
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages) + " | " + string.Join(" ", MkvToolNixArguments.Remux(target, original, "out.mkv")));
+        var after = await inspector.InspectAsync(result.OutputPath!);
+        Assert.True(after.TracksOf(TrackType.Audio).Count() == 4 && !after.HasTags && after.TracksOf(TrackType.Audio).Any(t => t is { CodecId: "A_AAC", Name: "Vymyslený dabing" }),
+            "four sounds, the dub with its name, no tags – " + string.Join(" | ", after.TracksOf(TrackType.Audio).Select(t => $"{t.CodecId} {t.Name} {t.TagEntries}")));
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();
@@ -763,9 +807,9 @@ public sealed class ProcessorTests
 
         public string InMovies(params string[] parts) => System.IO.Path.Combine([Layout.Movies, .. parts]);
 
-        public string Copy(string testFile)
+        public string Copy(string testFile, string? name = null)
         {
-            var target = System.IO.Path.Combine(Path, testFile);
+            var target = System.IO.Path.Combine(Path, name ?? testFile);
             System.IO.File.Copy(TestData.Media(testFile), target);
             return target;
         }

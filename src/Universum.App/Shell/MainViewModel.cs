@@ -32,6 +32,7 @@ public sealed class MainViewModel : ObservableObject
         Mux = new MultiplexerPageViewModel(services);
         Chapters = new ChaptersPageViewModel(services);
         Subtitles = new SubtitlesPageViewModel(services);
+        Audio = new AudioPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
@@ -65,8 +66,7 @@ public sealed class MainViewModel : ObservableObject
             // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
             new("Úprava videostopy", "\uE714", new PlaceholderPageViewModel("Úprava videostopy",
                 "Štúdio obrazu: strih, prekódovanie, pomer strán, otočenie – s rovnakým prehrávačom ako Úprava titulkostopy.", "fáza 4"), studios),
-            new("Úprava audiostopy", "\uE8D6", new PlaceholderPageViewModel("Úprava audiostopy",
-                "Štúdio zvuku: posun, PAL 25 ↔ 23,976, pridanie externého zvuku (napr. CZ dabing) s automatickým napasovaním, kodek a hlasitosť.", "fáza 3"), studios),
+            new("Úprava audiostopy", "\uE8D6", Audio, studios),
             new("Úprava titulkostopy", "\uE7F0", Subtitles, studios),
             new("Single spracovanie", "\uE90F", Rules, templates),
             new("Hromadné spracovanie", "\uE8B7", Batch, templates),
@@ -244,6 +244,12 @@ public sealed class MainViewModel : ObservableObject
     /// subtitles (owner, 30. 10. 2026).
     /// </summary>
     public SubtitlesPageViewModel Subtitles { get; }
+
+    /// <summary>
+    /// Úprava audiostopy (owner, 30. 10. 2026): the sounds with the film – shift, PAL 25 ↔ 23,976, a dub fitted
+    /// automatically, codec, stereo, loudness, language and name.
+    /// </summary>
+    public AudioPageViewModel Audio { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }
 

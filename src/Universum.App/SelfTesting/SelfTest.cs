@@ -170,6 +170,14 @@ internal static class SelfTest
         File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), copy, overwrite: true);
         model.SelectedTool = model.Tools.First(t => t.Page == model.Rules);
         await model.Rules.LoadAsync(copy);
+        for (var wait = 0; wait < 600 && model.Rules.IsReadingSubtitles; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        // owner, 30. 10. 2026: the language of every text subtitle track is read – the Czech full subtitles certainly Czech
+        Check(model.Rules.Rows.FirstOrDefault(r => r.TrackId == 4)?.LanguageNote.StartsWith("návrh UNIVERSUM: isté", StringComparison.Ordinal) == true,
+            "rules: the subtitles' language read from their text – " + model.Rules.Rows.FirstOrDefault(r => r.TrackId == 4)?.LanguageNote);
         Check(model.Rules.Plan?.Target.IsBlocked == true, "rules: undetermined languages block the file");
         Check(!model.Rules.ApplyCommand.CanExecute(null), "rules: apply disabled while blocked");
         Check(services.Library is not null || model.Rules.Target.Contains("výstupný priečinok", StringComparison.Ordinal),
@@ -1864,6 +1872,8 @@ internal static class SelfTest
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 4, "batch: everything waits for the title and the subtitle language");
         Check(batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Audio, 1)) is { IsNamedInTrack: true } named && named.ChosenLanguage == Languages.Czech,
             "batch: the language named in the track name (CZ Dabing) is shown as chosen");
+        Check(batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 1)).Evidence.StartsWith("NÁVRH UNIVERSUM podľa textu titulkov (isté", StringComparison.Ordinal),
+            "batch: the subtitles' language read after the analysis – " + batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 1)).Evidence);
         await Screenshot(window, "batch-analysed.png");
 
         var forcedSlot = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0));

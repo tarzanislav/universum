@@ -63,8 +63,9 @@ public sealed class BatchPageViewModel : ObservableObject
         ClearCommand = new RelayCommand(Clear, () => !Busy && !IsRunning);
         AnalyzeCommand = new AsyncRelayCommand(AnalyzeAsync, () => !Busy && Directory.Exists(Folder));
         ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions,
-            () => !Busy && (SlotRows.Any(s => s.HasSuggestion || s.ForcedSuggested) || FileRows.Any(f => f.AudioSlots.Any(s => s.HasOwnSuggestion))));
-        DetectSubtitlesCommand = new AsyncRelayCommand(DetectSubtitlesAsync, () => !Busy && SlotRows.Any(s => s.IsSubtitles && s.NeedsLanguage));
+            () => !Busy && (SlotRows.Any(s => s.HasSuggestion) || FileRows.Any(f => f.AudioSlots.Any(s => s.HasOwnSuggestion))));
+        DetectSubtitlesCommand = new AsyncRelayCommand(() => ReadSubtitlesAsync(again: true),
+            () => !Busy && _subtitleReading is null && SelectedGroup?.Group.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles) == true);
         DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
         DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
         DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All), () => !Busy && _analysis is { Groups.Count: > 0 });
@@ -73,10 +74,11 @@ public sealed class BatchPageViewModel : ObservableObject
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
         SaveTemplateCommand = new RelayCommand(SaveTemplate, () => !Busy && Template.Slots.Count > 0);
         RulesOnlyCommand = new RelayCommand(() => Template = BatchTemplate.RulesOnly, () => !Busy);
-        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork));
+        RunCommand = new AsyncRelayCommand(RunAsync, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _items.Any(i => i.NeedsWork));
         DeleteOriginalsCommand = new AsyncRelayCommand(DeleteOriginalsAsync, () => !Busy && !_running && Originals != OriginalsMode.Keep && PendingOriginals().Count > 0);
         PauseCommand = new RelayCommand(TogglePause, () => _running);
-        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null || _speechCancellation is not null);
+        StopCommand = new RelayCommand(Stop, () => _running || _tmdbCancellation is not null || _analysisCancellation is not null || _speechCancellation is not null ||
+                                                   _subtitleReading is not null);
         CleanupCommand = new RelayCommand(Cleanup, () => !Busy && _leftovers.Count > 0);
         SaveReportCommand = new RelayCommand(SaveReport, () => !Busy && _items.Count > 0);
         // a batch of MEGA spracovanie added, finished or removed: its files are free again or taken
@@ -90,7 +92,8 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         };
         RefreshMegaTargets();
-        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && !_ranSinceAnalysis && !_needsAnalysis && _library is not null && _items.Any(i => i.NeedsWork));
+        SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
+                                                             _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
@@ -193,6 +196,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        _subtitleReading?.Cancel();
         _analysis = null;
         _items = [];
         _library = null;
@@ -950,6 +954,9 @@ public sealed class BatchPageViewModel : ObservableObject
         _results = [];
         Finish = null;
 
+        // the subtitles of the previous analysis are no longer read: this one reads its own when it is done
+        await StopReadingSubtitlesAsync();
+
         // nothing of a previous folder stays ready to run while (or if) this one is read
         _analysis = null;
         _items = [];
@@ -967,6 +974,7 @@ public sealed class BatchPageViewModel : ObservableObject
         using var cancellation = new CancellationTokenSource();
         _analysisCancellation = cancellation;
         var live = new Dictionary<string, GroupRow>(StringComparer.Ordinal);
+        var readSubtitles = false;
         Groups.Clear();
         SelectedGroup = null;
         SummaryIsWarning = false;
@@ -1072,6 +1080,10 @@ public sealed class BatchPageViewModel : ObservableObject
             // owner, 29. 10. 2026: what is already in the library is known at the analysis (in the background)
             _ = CheckLibraryAsync();
 
+            // owner, 30. 10. 2026: the language of every text subtitle track is read from its text (after the analysis,
+            // the page free meanwhile; Spustiť waits for it, Zastaviť stops it)
+            readSubtitles = true;
+
             // the output folder was changed while the folder was read: its MOVIES / TVSHOWS were not left out
             if (_services.Library?.Root != libraryAtStart)
             {
@@ -1105,6 +1117,11 @@ public sealed class BatchPageViewModel : ObservableObject
             Progress = 0;
             OnPropertyChanged(nameof(IsAnalyzing));
             Busy = false;
+        }
+
+        if (readSubtitles)
+        {
+            await ReadSubtitlesAsync(again: false);
         }
     }
 
@@ -1379,7 +1396,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var (key, track) in SlotKey.Of(group.Representative))
         {
-            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot));
+            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot, _services.Profile));
         }
 
         ArrangeSlots();
@@ -1923,43 +1940,135 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>Recognises the language of undetermined text subtitles of the selected group (reads the representative file).</summary>
-    private async Task DetectSubtitlesAsync()
+    // the subtitle reading running in the background (null when none) and its end
+    private CancellationTokenSource? _subtitleReading;
+    private Task _subtitleReadingDone = Task.CompletedTask;
+
+    /// <summary>Stops the subtitle reading and waits until it has ended (a new analysis, Vymazať frontu).</summary>
+    private async Task StopReadingSubtitlesAsync()
     {
-        if (SelectedGroup?.Group is not { } group || _services.CurrentMkvToolNix is not { } installation)
+        _subtitleReading?.Cancel();
+        await _subtitleReadingDone;
+    }
+
+    // what was read, by the file (path, size, time): an analysis again or a group shown again reads nothing twice
+    private readonly Dictionary<string, IReadOnlyDictionary<int, SubtitleLanguageResult>> _subtitleLanguages = new(Paths.Comparer);
+
+    /// <summary>Reading the subtitles runs (the run waits for it; Zastaviť stops it).</summary>
+    public bool IsReadingSubtitles => _subtitleReading is not null;
+
+    /// <summary>
+    /// The language of every text subtitle track (owner, 30. 10. 2026): the first file of each group is read – the start of
+    /// the film by FFmpeg, the whole track by mkvextract when the start holds too little – and the language found is applied
+    /// to the group as UNIVERSUM's suggestion (Czech and Slovak by their letters and words). <paramref name="again"/>: the
+    /// selected group is read once more (Prečítať titulky znova).
+    /// </summary>
+    private async Task ReadSubtitlesAsync(bool again)
+    {
+        if (_analysis is not { } analysis || _subtitleReading is not null || _services.CurrentMkvToolNix is not { } installation)
         {
             return;
         }
 
-        Busy = true;
+        var groups = again && SelectedGroup?.Group is { } selected ? [selected] : analysis.Groups.ToList();
+        groups = groups.Where(g => g.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles)).ToList();
+        if (groups.Count == 0)
+        {
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        var done = new TaskCompletionSource();
+        _subtitleReading = cancellation;
+        _subtitleReadingDone = done.Task;
+        OnPropertyChanged(nameof(IsReadingSubtitles));
+        RefreshCommands();
+        int read = 0, certain = 0, probable = 0;
         try
         {
-            // tracks with the language in their name ("CZ titulky") or chosen for the group are not read
-            var undetermined = SlotRows.Where(s => s.IsSubtitles && s.NeedsLanguage && s.ChosenLanguage is null).ToList();
-            var named = SlotRows.Count(s => s.IsSubtitles && s.IsNamedInTrack);
-            int recognised = 0, unreadable = 0;
-            var images = undetermined.Count(s => !s.Track.IsTextSubtitles);
-            foreach (var slot in undetermined.Where(s => s.Track.IsTextSubtitles).ToList())
+            string? ffmpeg;
+            try
             {
-                RunState = $"Čítam titulky {slot.Slot}…";
-                var text = await SubtitleText.ExtractAsync(installation, _services.Runner, group.Representative, slot.Track);
-                if (text is not null && TextLanguageDetector.Detect(text) is { } code)
+                ffmpeg = (await _services.SpeechAsync(cancellation.Token)).Ffmpeg;
+            }
+            catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
+            {
+                // without FFmpeg mkvextract reads the whole tracks
+                ffmpeg = null;
+            }
+
+            foreach (var group in groups)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var file = group.Representative;
+                var key = FileKey(file.Path);
+                if (again || !_subtitleLanguages.TryGetValue(key, out var found))
                 {
-                    group.Suggestions[slot.Key] = new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.SubtitleText);
-                    recognised++;
+                    RunState = $"Čítam titulky {++read} / {groups.Count}: {Path.GetFileName(file.Path)}…";
+                    found = await SubtitleText.DetectAsync(installation, _services.Runner, ffmpeg, file, cancellation.Token);
+                    _subtitleLanguages[key] = found;
                 }
-                else
+
+                if (!ReferenceEquals(_analysis, analysis))
                 {
-                    unreadable++;
+                    return;
+                }
+
+                var slots = SlotKey.Of(file).ToDictionary(x => x.Track.Id, x => x.Key);
+                group.Detected.Clear();
+                foreach (var (id, result) in found.Where(f => slots.ContainsKey(f.Key)))
+                {
+                    group.Detected[slots[id]] = SubtitleText.Evidence(result);
+                    if (result.Certain)
+                    {
+                        certain++;
+                    }
+                    else
+                    {
+                        probable++;
+                    }
                 }
             }
 
-            Replan();
-            RunState = Texts.Detection("Titulky", recognised, unreadable, named,
-                images > 0 ? $"{images} obrazové (PGS, VobSub) sa čítať nedajú – jazyk vyberte pri stope" : null);
+            RunState = $"Titulky prečítané: jazyk {Texts.Count(certain + probable, "stopy", "stôp", "stôp")} je návrh UNIVERSUM" +
+                       (probable > 0 ? $" ({probable} len najpravdepodobnejší – overte)" : "") + " – iný jazyk vyberiete pri stope.";
+        }
+        catch (OperationCanceledException)
+        {
+            RunState = "Čítanie titulkov zastavené – jazyky ostávajú, ako ich má súbor.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Core.Processes.ProcessStartException or TimeoutException or MkvToolNixException)
+        {
+            RunState = "Titulky sa nepodarilo prečítať – jazyky ostávajú, ako ich má súbor: " + ex.Message;
         }
         finally
         {
-            Busy = false;
+            if (ReferenceEquals(_subtitleReading, cancellation))
+            {
+                _subtitleReading = null;
+            }
+
+            OnPropertyChanged(nameof(IsReadingSubtitles));
+            if (ReferenceEquals(_analysis, analysis))
+            {
+                Replan();
+            }
+
+            RefreshCommands();
+            done.TrySetResult();
+        }
+    }
+
+    private static string FileKey(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return $"{Path.GetFullPath(path)}|{info.Length}|{info.LastWriteTimeUtc.Ticks}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return path;
         }
     }
 
@@ -2542,6 +2651,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         _tmdbCancellation?.Cancel();
         _speechCancellation?.Cancel();
+        _subtitleReading?.Cancel();
         if (_control is not null)
         {
             _control.StopAfterCurrent = true;

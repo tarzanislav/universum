@@ -45,7 +45,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         Library = new LibraryTargetPicker(services, Target);
         Library.Changed += RefreshCommands;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
-        ApplyRulesCommand = new RelayCommand(ApplyRules, () => !Busy && _file is not null);
+        ApplyRulesCommand = new AsyncRelayCommand(ApplyRulesAsync, () => !Busy && _file is not null);
         ResetCommand = new RelayCommand(() => Fill(_file), () => !Busy && _file is not null);
         MoveUpCommand = new RelayCommand(() => Move(-1), () => CanMove(-1));
         MoveDownCommand = new RelayCommand(() => Move(+1), () => CanMove(+1));
@@ -59,7 +59,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     public AsyncRelayCommand OpenCommand { get; }
 
-    public RelayCommand ApplyRulesCommand { get; }
+    public AsyncRelayCommand ApplyRulesCommand { get; }
 
     public RelayCommand ResetCommand { get; }
 
@@ -167,7 +167,63 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         return ManualTarget.Create(_file, kept, removed, RemoveTags && _file.HasTags, Title == (_file.Title ?? "") ? null : Title);
     }
 
-    /// <summary>Fills everything in by the UNIVERSUM rules (languages the user already chose for undetermined tracks are kept).</summary>
+    // owner, 30. 10. 2026: the language of every text subtitle track read from its text (once for the opened file)
+    private IReadOnlyDictionary<int, Core.Text.SubtitleLanguageResult> _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
+    private MediaFile? _detectedFor;
+
+    /// <summary>
+    /// Použiť pravidlá: the languages of the subtitles are read from their text first (owner, 30. 10. 2026; once for the
+    /// opened file – the start of the film, the whole forced tracks), then the rules fill everything in.
+    /// </summary>
+    public async Task ApplyRulesAsync()
+    {
+        if (_file is not { } file)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_detectedFor, file) && file.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles) &&
+            _services.CurrentMkvToolNix is { } installation)
+        {
+            Busy = true;
+            Result = "Čítam titulky – jazyk každej titulkovej stopy z jej textu…";
+            try
+            {
+                string? ffmpeg;
+                try
+                {
+                    ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
+                }
+                catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
+                {
+                    ffmpeg = null;
+                }
+
+                var found = await SubtitleText.DetectAsync(installation, _services.Runner, ffmpeg, file);
+                if (ReferenceEquals(_file, file))
+                {
+                    _detected = found;
+                    _detectedFor = file;
+                }
+            }
+            finally
+            {
+                Busy = false;
+            }
+
+            if (!ReferenceEquals(_file, file))
+            {
+                return;
+            }
+        }
+
+        ApplyRules();
+    }
+
+    /// <summary>
+    /// Fills everything in by the UNIVERSUM rules: the languages read from the subtitles (návrh UNIVERSUM), and a language
+    /// the user chose for a track wins.
+    /// </summary>
     public void ApplyRules()
     {
         if (_file is null)
@@ -175,8 +231,18 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             return;
         }
 
-        var languages = Rows.Where(r => r.Source.Language.IsUndetermined && !r.Language.Tag.IsUndetermined)
-            .ToDictionary(r => r.TrackId, r => r.Language.Tag);
+        var languages = new Dictionary<int, LanguageTag>();
+        var detected = ReferenceEquals(_detectedFor, _file) ? _detected : new Dictionary<int, Core.Text.SubtitleLanguageResult>();
+        foreach (var (id, found) in detected)
+        {
+            languages[id] = LanguageTag.FromCode(found.Language);
+        }
+
+        foreach (var row in Rows.Where(r => !r.Language.Tag.IsUndetermined && !r.Language.Same(r.Source.Language)))
+        {
+            languages[row.TrackId] = row.Language.Tag;
+        }
+
         var target = UniversumRules.Apply(_file, _services.Profile, new TrackDecisions { Languages = languages });
         _loading = true;
         try
@@ -187,9 +253,9 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
                 row.Take(track);
             }
 
-            // subtitles out of the language list are marked for removal (the user can take them back)
+            // subtitles out of the language list and empty ones are marked for removal (the user can take them back)
             var rest = Rows.Where(r => !ordered.Contains(r)).ToList();
-            foreach (var row in rest.Where(r => target.RemovedByLanguage.Any(t => t.Id == r.TrackId)))
+            foreach (var row in rest.Where(r => target.RemovedByLanguage.Any(t => t.Id == r.TrackId) || target.RemovedEmpty.Any(t => t.Id == r.TrackId)))
             {
                 row.IsRemoved = true;
             }
@@ -208,9 +274,13 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         }
 
         Recalculate();
-        Result = target.Issues.Any(i => i.Kind == RuleIssueKind.UndeterminedLanguage)
+        var read = detected.Count == 0 ? ""
+            : $" Jazyk {detected.Count} titulkových stôp je návrh UNIVERSUM podľa ich textu" +
+              (detected.Values.Count(r => !r.Certain) is > 0 and var probable ? $" ({probable} len najpravdepodobnejší – overte)" : "") + ".";
+        var empty = target.RemovedEmpty.Count == 0 ? "" : $" Prázdne titulkové stopy ({target.RemovedEmpty.Count}) sú označené na odstránenie.";
+        Result = (target.Issues.Any(i => i.Kind == RuleIssueKind.UndeterminedLanguage)
             ? "Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova."
-            : "Pravidlá UNIVERSUM sú použité – skontrolujte a uložte.";
+            : "Pravidlá UNIVERSUM sú použité – skontrolujte a uložte.") + read + empty;
     }
 
     private async Task ReadAsync(string path)

@@ -52,7 +52,7 @@ internal static class Output
                     EvidenceSource.GroupDecision => "zadaný",
                     _ => "návrh – potvrďte --confirm-suggestions alebo --language",
                 };
-                var forced = group.ForcedSuggestions.Contains(key) ? $", návrh forced: --forced {group.Label}:{type}:{key.Ordinal + 1}" : "";
+                var forced = Universum.Core.Rules.ForcedSubtitles.ByAmount(group.Representative, track) is { } amount ? $", forced podľa počtu titulkov ({amount})" : "";
                 Console.WriteLine($"  {group.Label}:{type}:{key.Ordinal + 1}  {track.Codec,-14} {language,-4} {source}{forced}  {track.Name}");
             }
 

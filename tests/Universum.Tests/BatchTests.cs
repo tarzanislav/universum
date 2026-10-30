@@ -873,7 +873,7 @@ public sealed class BatchTests
     }
 
     [Test]
-    public void ForcedSuggestedFromSubtitleCounts()
+    public void ForcedFromSubtitleCountsWithoutConfirmation()
     {
         var file = new MediaFile
         {
@@ -890,12 +890,15 @@ public sealed class BatchTests
         group.Files.Add(file);
         var analysis = new BatchAnalysis("/", false, [group], [], []);
 
+        // owner, 30. 10. 2026: the rules take the small amount as forced at once (UNIVERSUM's suggestion, no confirmation)
         BatchPlanner.Suggest(analysis);
-        Assert.Sequence([new SlotKey(TrackType.Subtitles, 1)], group.ForcedSuggestions, "37 of 1200 subtitles: forced");
-
-        group.Decisions.Forced[new SlotKey(TrackType.Subtitles, 1)] = true;
         var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
-        Assert.True(item.Target.For(3).Flags.Forced && item.Target.For(2).Flags.Default, "confirmed forced; full Czech default");
+        Assert.True(item.Target.For(3) is { Role: TrackRole.Forced, Name: "Forced", Flags.Forced: true } && item.Target.For(2).Flags.Default,
+            "37 of 1200 subtitles: forced; foreign audio – the full Czech default");
+
+        group.Decisions.Forced[new SlotKey(TrackType.Subtitles, 1)] = false;
+        item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.True(item.Target.For(3) is { Role: TrackRole.Main, Name: null, Flags.Forced: false }, "the user's choice wins");
     }
 
     [Test]

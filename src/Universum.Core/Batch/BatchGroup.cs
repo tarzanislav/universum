@@ -17,6 +17,12 @@ public sealed class BatchGroup(string signature, int index)
 
     public GroupDecisions Decisions { get; } = new();
 
+    /// <summary>
+    /// The languages UNIVERSUM read from the text of the subtitles of the group's first file (owner, 30. 10. 2026), applied
+    /// to the whole group as its suggestion; a choice of the user wins.
+    /// </summary>
+    public Dictionary<SlotKey, LanguageEvidence> Detected { get; } = [];
+
     /// <summary>Suggestions waiting for confirmation (specification, section 7.3, medium confidence).</summary>
     public Dictionary<SlotKey, LanguageEvidence> Suggestions { get; } = [];
 
@@ -42,8 +48,6 @@ public sealed class BatchGroup(string signature, int index)
         suggestions[key] = suggestion;
     }
 
-    /// <summary>Subtitle slots that are probably forced (few subtitles compared with a full track of the same language).</summary>
-    public HashSet<SlotKey> ForcedSuggestions { get; } = [];
 
     private static string LabelFor(int index)
     {

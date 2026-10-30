@@ -88,6 +88,7 @@ public static class Texts
         EvidenceSource.FileDecision => "vaša voľba pre súbor",
         EvidenceSource.Similarity => "NÁVRH podľa podobnej stopy – potvrďte",
         EvidenceSource.SubtitleText => "NÁVRH podľa textu titulkov – potvrďte",
+        EvidenceSource.SubtitleAnalysis => "NÁVRH UNIVERSUM podľa textu titulkov" + (evidence?.Detail is { } read ? $" ({read})" : "") + " – iný jazyk vyberte",
         EvidenceSource.Speech => "NÁVRH podľa reči – potvrďte" + (evidence?.Detail is { } detail ? $" ({detail})" : ""),
         _ => "",
     };

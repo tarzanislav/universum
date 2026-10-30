@@ -23,10 +23,13 @@ public static class CzechOrSlovak
         StringComparer.Ordinal);
 
     /// <summary>How many Czech-only and Slovak-only words the texts hold.</summary>
-    public static (int Czech, int Slovak) Count(params string?[] texts)
+    public static (int Czech, int Slovak) Count(params string?[] texts) => CountWithout(new HashSet<string>(), texts);
+
+    /// <summary>How many Czech-only and Slovak-only words the texts hold, leaving out the words in <paramref name="skip"/>.</summary>
+    public static (int Czech, int Slovak) CountWithout(IReadOnlySet<string> skip, params string?[] texts)
     {
         int czech = 0, slovak = 0;
-        foreach (var word in texts.SelectMany(Words))
+        foreach (var word in texts.SelectMany(Words).Where(w => !skip.Contains(w)))
         {
             if (Czech.Contains(word))
             {

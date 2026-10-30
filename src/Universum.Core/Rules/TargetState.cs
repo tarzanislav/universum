@@ -12,6 +12,9 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>Tracks left out of the result (only audio and subtitles can be removed).</summary>
     public IReadOnlyList<MediaTrack> Removed { get; init; } = [];
 
+    /// <summary>Subtitle tracks without a single subtitle (owner, 30. 10. 2026): left out.</summary>
+    public IReadOnlyList<MediaTrack> RemovedEmpty { get; init; } = [];
+
     /// <summary>Subtitles left out because their language is not among the profile's subtitle languages.</summary>
     public IReadOnlyList<MediaTrack> RemovedByLanguage { get; init; } = [];
 

@@ -92,7 +92,8 @@ public sealed class RulesTests
     {
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), Subs(2, "cze", "Vynútené titulky"), Subs(3, "slo", "NÚTENÉ")));
         AssertFlags(target.For(2), true, true, "Czech forced by name, default (matches the Czech audio)");
-        AssertFlags(target.For(3), false, true, "Slovak forced by name, not default (R7)");
+        AssertFlags(target.For(3), false, false, "owner, 30. 10. 2026: beside Czech forced the Slovak ones are not active");
+        Assert.True(target.For(2).Name == "Forced" && target.For(3).Name == "Forced", "both named Forced");
     }
 
     [Test]
@@ -100,16 +101,97 @@ public sealed class RulesTests
     {
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "eng", "Forced", forced: true), Subs(3, "cze", null)));
         AssertFlags(target.For(2), false, false, "English forced subtitles lose the flag");
+        Assert.Equal("Forced", target.For(2).Name, "owner, 30. 10. 2026: but are named Forced");
         AssertFlags(target.For(3), true, false, "Czech subtitles default");
     }
 
     [Test]
-    public void ForcedMatchingTheDefaultAudio()
+    public void CzechForcedWinOverSlovak()
     {
+        // owner, 30. 10. 2026: with Czech and Slovak forced subtitles only the Czech ones are active – also with Slovak audio
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "slo", null), Subs(2, "cze", null, forced: true), Subs(3, "slo", null, forced: true)));
-        AssertFlags(target.For(3), true, true, "forced Slovak matches the Slovak audio (R7)");
-        AssertFlags(target.For(2), false, true, "forced Czech stays forced");
+        Assert.Equal(new TrackFlags(Default: true, Enabled: true, Forced: true), target.For(2).Flags, "Czech forced: default, enabled, forced, nothing else");
+        AssertFlags(target.For(3), false, false, "Slovak forced: not default, not forced");
         Assert.Sequence([0, 1, 2, 3], target.Tracks.Select(t => t.TrackId), "Czech forced before Slovak forced");
+    }
+
+    [Test]
+    public void SlovakForcedWhenThereAreNoCzech()
+    {
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), Subs(2, "slo", "forced"), Subs(3, "eng", "Forced")));
+        AssertFlags(target.For(2), true, true, "only Slovak forced: active");
+        AssertFlags(target.For(3), false, false, "English forced: named, not active");
+        Assert.True(target.For(2).Name == "Forced" && target.For(3).Name == "Forced", "both named Forced");
+    }
+
+    [Test]
+    public void ForeignAudioShowsFullSubtitlesForcedStayForced()
+    {
+        // owner, 30. 10. 2026: foreign audio – the full Czech subtitles are the default ones, the Czech forced keep Forced
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", "Forced"), Subs(3, "cze", null), Subs(4, "slo", "forced")));
+        AssertFlags(target.For(3), true, false, "full Czech: default");
+        AssertFlags(target.For(2), false, true, "Czech forced: forced, not default");
+        AssertFlags(target.For(4), false, false, "Slovak forced: not active");
+
+        // no full Czech or Slovak subtitles: the forced ones are shown
+        var only = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", "Forced"), Subs(3, "eng", null)));
+        AssertFlags(only.For(2), true, true, "only Czech forced: default and forced");
+        Assert.True(!only.Issues.Any(i => i.Kind == RuleIssueKind.NoPreferredSubtitles), "nothing to report");
+    }
+
+    [Test]
+    public void ForcedByTheAmountOfSubtitles()
+    {
+        // owner, 30. 10. 2026: without the word Forced, the small number of subtitles (and bytes) tells forced subtitles
+        var full = Subs(3, "cze", null) with { StatisticsFrames = 1240, StatisticsBytes = 52_000 };
+        var few = Subs(2, "cze", null) with { StatisticsFrames = 85, StatisticsBytes = 3_100 };
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), few, full));
+        Assert.True(target.For(2).Role == TrackRole.Forced && target.For(2).Name == "Forced", "few subtitles: forced");
+        AssertFlags(target.For(2), true, true, "active Czech forced");
+        Assert.True(ForcedSubtitles.ByAmount(File(Video(0), few, full), few)!.Contains("85", StringComparison.Ordinal), "the reason says the numbers");
+        Assert.True(target.For(3).Role == TrackRole.Main, "the full ones are not");
+
+        // the user's choice wins
+        var chosen = UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), few, full), decisions: new TrackDecisions { Forced = new Dictionary<int, bool> { [2] = false } });
+        Assert.True(chosen.For(2).Role == TrackRole.Main && chosen.For(2).Name is null, "not forced when the user says so");
+
+        // the only track: compared with the length of the film
+        var film = File(Video(0), Audio(1, "eng", null), few) with { Duration = TimeSpan.FromMinutes(110) };
+        Assert.True(ForcedSubtitles.ByAmount(film, few) is not null, "85 subtitles in 110 minutes: forced");
+        var normal = few with { StatisticsFrames = 900 };
+        Assert.True(ForcedSubtitles.ByAmount(film with { Tracks = [Video(0), normal] }, normal) is null, "900 in 110 minutes: full");
+        Assert.True(ForcedSubtitles.ByAmount(File(Video(0), few), few) is null, "without the length or another track: unknown");
+    }
+
+    [Test]
+    public void ImageSubtitlesAreNotComparedWithText()
+    {
+        // review: PGS counts two frames for a subtitle and megabytes of pictures – full Czech SRT beside English SDH in
+        // PGS stays full; image tracks are compared with image tracks
+        var czech = Subs(2, "cze", null) with { StatisticsFrames = 1_000, StatisticsBytes = 45_000, IsTextSubtitles = true };
+        var pgs = Subs(3, "eng", "SDH") with { CodecId = "S_HDMV/PGS", StatisticsFrames = 3_600, StatisticsBytes = 40_000_000 };
+        var film = File(Video(0), Audio(1, "cze", null), czech, pgs) with { Duration = TimeSpan.FromMinutes(110) };
+        Assert.True(ForcedSubtitles.ByAmount(film, czech) is null, "full Czech SRT is not forced beside PGS");
+        Assert.True(UniversumRules.Apply(film).For(2).Role == TrackRole.Main, "and stays the main Czech subtitles");
+
+        var forcedPgs = Subs(4, "cze", null) with { CodecId = "S_HDMV/PGS", StatisticsFrames = 120, StatisticsBytes = 1_500_000 };
+        Assert.True(ForcedSubtitles.ByAmount(film with { Tracks = [.. film.Tracks, forcedPgs] }, forcedPgs)?.Contains("obrázkovej", StringComparison.Ordinal) == true,
+            "few PGS frames against the full PGS track: forced");
+        var forcedText = Subs(5, "cze", null) with { StatisticsFrames = 40, IsTextSubtitles = true };
+        var alone = File(Video(0), forcedText, pgs) with { Duration = TimeSpan.FromMinutes(110) };
+        Assert.True(ForcedSubtitles.ByAmount(alone, forcedText)?.Contains("minút", StringComparison.Ordinal) == true,
+            "the only text track is compared with the length of the film");
+    }
+
+    [Test]
+    public void EmptySubtitlesAreRemoved()
+    {
+        // owner, 30. 10. 2026: a subtitle track without a single subtitle is removed from the container
+        var empty = Subs(3, "cze", null) with { StatisticsFrames = 0, StatisticsBytes = 0 };
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), Subs(2, "cze", null) with { StatisticsFrames = 900 }, empty));
+        Assert.Sequence([3], target.RemovedEmpty.Select(t => t.Id), "the empty one");
+        Assert.True(target.Removed.Any(t => t.Id == 3) && target.Tracks.All(t => t.TrackId != 3), "left out of the result");
+        Assert.True(UniversumRules.Apply(File(Video(0), Audio(1, "cze", null), Subs(2, "cze", null))).RemovedEmpty.Count == 0, "without statistics nothing is removed");
     }
 
     [Test]
@@ -121,6 +203,7 @@ public sealed class RulesTests
         AssertFlags(target.For(2), true, false, "English audio is default instead of the commentary");
         Assert.Equal(TrackRole.Commentary, target.For(1).Role);
         Assert.Equal(TrackRole.HearingImpaired, target.For(3).Role);
+        Assert.True(target.For(3).Flags.HearingImpaired, "owner, 30. 10. 2026: the flag of subtitles for the hearing impaired is set");
         AssertFlags(target.For(4), true, false, "full Czech subtitles default: the only Czech audio is commentary");
     }
 

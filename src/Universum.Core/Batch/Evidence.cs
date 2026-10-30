@@ -34,6 +34,12 @@ public enum EvidenceSource
     /// <summary>Language recognised from the text of the subtitles.</summary>
     SubtitleText,
 
+    /// <summary>
+    /// Language UNIVERSUM read from the text of the subtitles and applied as its suggestion (owner, 30. 10. 2026: the
+    /// language of every subtitle track, Czech and Slovak by their letters and words); the user can choose another.
+    /// </summary>
+    SubtitleAnalysis,
+
     /// <summary>Language recognised from the speech of an audio track (whisper.cpp).</summary>
     Speech,
 }

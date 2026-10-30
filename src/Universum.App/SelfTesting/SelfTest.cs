@@ -225,6 +225,7 @@ internal static class SelfTest
         await TestMultiplexerAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
+        TestSeriesMemory(model, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
         var secret = UserSecret.Protect("test-key-123");
@@ -2172,6 +2173,19 @@ internal static class SelfTest
     {
         await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         await Task.Delay(300);
+    }
+
+    // napovedkyňa (owner, 30. 10. 2026): a series processed before is named at once, without a search (invented names)
+    private static void TestSeriesMemory(MainViewModel model, AppServices services, string work)
+    {
+        var episode = Path.Combine(work, "Stiahnute", "Vymysleny.Napovedany.Serial.S02E07.1080p.WEB.mkv");
+        Check(services.RememberedSeriesFor(episode) is null, "napovedkyňa: an unknown series is not named");
+        var series = new TitleInfo(MediaKind.Series, "Vymyslený napovedaný seriál", 2024, 990001);
+        services.RememberSeries(series, Path.Combine(work, "Iny tyzden", "Vymysleny Napovedany Serial S02E01.mkv"));
+        Check(services.RememberedSeriesFor(episode) == series, "napovedkyňa: the next episode gets the remembered series");
+        Check(model.Settings.SeriesMemory.Rows.Any(r => r.Series.Title == series), "napovedkyňa: the series is listed in Nastavenia");
+        model.Settings.SeriesMemory.ForgetCommand.Execute(model.Settings.SeriesMemory.Rows.First(r => r.Series.Title == series));
+        Check(services.RememberedSeriesFor(episode) is null, "napovedkyňa: a forgotten series is searched again");
     }
 
     private static void Check(bool condition, string what)

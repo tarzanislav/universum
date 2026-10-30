@@ -145,6 +145,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 _library = LibraryJob.Guess(layout, _analysis);
+                if (ApplySeriesMemory() is { Length: > 0 } hint)
+                {
+                    RunState = hint.Trim();
+                }
+
                 OnLibraryChanged();
             }
         };
@@ -1030,6 +1035,7 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
             ApplySentSeries();
+            var hint = ApplySeriesMemory();
             ApplyEditedBatch();
 
             // owner, 29. 10. 2026: a folder sorted into MOVIES and TVSHOWS – each group holds one title
@@ -1056,7 +1062,7 @@ public sealed class BatchPageViewModel : ObservableObject
                           ? $", POZOR: {_interrupted.Count} nedokončený presun v knižnici (možno jediná kópia, nemažte): " +
                             string.Join("; ", _interrupted.Select(f => f + (FileProcessor.OriginalPlaceOf(AppSettings.JournalDirectory, f) is { } home ? " → patrí do " + home : "")))
                           : "") + "." +
-                      (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "");
+                      (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "") + hint;
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
 
@@ -1173,7 +1179,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var file in _analysis.Groups.SelectMany(g => g.Files))
         {
-            if (_sentSeries.TryGetValue(Path.GetFullPath(file.Path), out var title) && TitleGuess.Typed(MediaKind.Series, title) is { } series)
+            if (_sentSeries.TryGetValue(Path.GetFullPath(file.Path), out var title) && (Remembered(title) ?? TitleGuess.Typed(MediaKind.Series, title)) is { } series)
             {
                 _library.SeriesOfFile[file.Path] = series;
             }
@@ -1200,9 +1206,53 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             _library.Kind = MediaKind.Series;
             OnLibraryChanged();
-            SeriesTitle = seriesTitle;
+            if (Remembered(seriesTitle) is { } remembered)
+            {
+                // napovedkyňa: the series processed before, with its title from TMDB and HISTRA – no new search
+                _library.Series = remembered;
+                _library.SeriesUnverified = false;
+                OnPropertyChanged(nameof(SeriesTitle));
+                OnLibraryChanged();
+            }
+            else
+            {
+                SeriesTitle = seriesTitle;
+            }
+
             OnPropertyChanged(nameof(IsSeries));
             OnPropertyChanged(nameof(IsMovies));
+        }
+    }
+
+    // napovedkyňa (owner, 30. 10. 2026): series processed before get their remembered titles at once
+    private string ApplySeriesMemory()
+    {
+        if (_library is null || _analysis is null)
+        {
+            return "";
+        }
+
+        var given = _library.ApplyMemory(_services.SeriesMemory, _analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).ToList());
+        return given.Count == 0 ? ""
+            : $" Napovedkyňa: {string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))} – seriál, ktorý už spracúvate, názov bez hľadania (zmeniť ho môžete).";
+    }
+
+    // the remembered series a title typed in Novinky names (original title and year), or null
+    private TitleInfo? Remembered(string typed) =>
+        TitleGuess.FromName(typed, MediaKind.Series) is { } name ? _services.SeriesMemory.Find([name]) : null;
+
+    // napovedkyňa: the series of the files that go into the library (a run, a MEGA batch), under the names their files carry
+    private void RememberSeries(IEnumerable<BatchItem> items)
+    {
+        if (_library is not { } library)
+        {
+            return;
+        }
+
+        foreach (var series in items.Where(i => library.KindFor(i.File.Path) == MediaKind.Series && library.SeriesFor(i.File.Path) is not null)
+                     .GroupBy(i => library.SeriesFor(i.File.Path)!))
+        {
+            _services.SeriesMemory.Remember(series.Key, series.SelectMany(i => library.SeriesNamesOf(i.File.Path)).Select(n => n.Name), DateTime.UtcNow);
         }
     }
 
@@ -2206,6 +2256,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var handling = originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep;
+        RememberSeries(_items.Where(i => i.NeedsWork));
 
         Busy = true;
         _running = true;
@@ -2367,6 +2418,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 RunState = $"Odoslané do MEGA spracovania ako {batch.Label} ({Texts.Count(batch.Files.Count, "súbor", "súbory", "súborov")}).";
             }
 
+            RememberSeries(ready);
             _services.NotifyMegaChanged();
             Replan();
             RefreshCommands();

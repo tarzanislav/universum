@@ -1003,6 +1003,54 @@ public sealed class BatchTests
         return job;
     }
 
+    [Test]
+    public void NapovedkynaRemembersSeriesProcessedRegularly()
+    {
+        // owner, 30. 10. 2026: a series processed before gets its title at once – no search (all names invented)
+        using var work = new Work();
+        string P(string root, params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([work.Path, root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        var output = Path.Combine(work.Path, "OUTPUT");
+        var memory = new SeriesMemory(Path.Combine(work.Path, "napovedkyna.json"));
+        var series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2025, 4242);
+        var week1 = new[] { P("Stiahnute", "Vymysleny.Serial.S01E01.1080p.WEB.mkv"), P("Stiahnute", "Vymysleny.Serial.S01E02.1080p.WEB.mkv") };
+        var job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Stiahnute"), week1));
+        Assert.True(job.ApplyMemory(memory, week1).Count == 0 && job.Series is null && !job.KindConfirmed, "nothing remembered yet: only the suggestion");
+        memory.Remember(series, job.SeriesNamesOf(week1[0]).Select(n => n.Name), DateTime.UtcNow);
+
+        // the next week, read again from the file: the title at once, the kind confirmed
+        memory = new SeriesMemory(memory.File);
+        var week2 = new[] { P("Novy tyzden", "vymysleny serial s01e03 720p.mkv") };
+        job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Novy tyzden"), week2));
+        Assert.True(job.ApplyMemory(memory, week2) is [{ TmdbId: 4242 }] && job.Series == series && job.KindConfirmed, "napovedkyňa gives the remembered series: " + job.Series);
+
+        // another series of the same name from another year is not given
+        var remake = new[] { P("Remake", "Vymysleny Serial (2010) S02E01.mkv") };
+        job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Remake"), remake));
+        Assert.True(job.ApplyMemory(memory, remake).Count == 0 && job.Series is null, "another year: no suggestion");
+
+        // a folder sorted into TVSHOWS: by its folder's name, also when the files carry only a code
+        var codes = new[] { P("Vstup", "TVSHOWS", "Vymyslena rieka", "VR01.mkv"), P("Vstup", "TVSHOWS", "Vymyslena rieka", "VR02.mkv") };
+        var river = new TitleInfo(MediaKind.Series, "Vymyslená rieka", 2021, 777);
+        memory.Remember(river, ["Vymyslena rieka"], DateTime.UtcNow);
+        job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Vstup"), codes));
+        Assert.True(job.ApplyMemory(memory, codes).Count == 1 && codes.All(c => job.SeriesFor(c) == river), "the series of the TVSHOWS folder");
+
+        // a name that now belongs to another series moves to it; two series for one batch give nothing; forgetting
+        var other = new TitleInfo(MediaKind.Series, "Iný vymyslený seriál", 2025, 5151);
+        memory.Remember(other, ["Vymysleny Serial"], DateTime.UtcNow);
+        Assert.Equal(other, memory.Find([new NameGuess("Vymyslený   seriál", null, null)]), "the name belongs to the last series processed under it");
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("vymysleny serial", null, null), new NameGuess("Vymyslena rieka", null, null)]), "two series: nothing");
+        memory.Forget(other);
+        Assert.True(memory.Find([new NameGuess("Vymysleny Serial", null, null)]) is null && new SeriesMemory(memory.File).Series is [{ Title.TmdbId: 777 }], "forgotten, also after a restart (the first series lost its only name)");
+    }
+
     private static BatchAnalysis Synthetic(string folder, params string[] paths)
     {
         var group = new BatchGroup("x", 0);

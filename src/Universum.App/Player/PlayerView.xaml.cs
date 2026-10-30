@@ -19,15 +19,16 @@ public partial class PlayerView : UserControl
         };
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    // Space plays or pauses also after a click on a button of the player (a button would take Space itself); not in a text box
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        if (e.Key == Key.Space && DataContext is PlayerViewModel { PlayPauseCommand: var command } && command.CanExecute(null))
+        if (e.Key == Key.Space && e.OriginalSource is not TextBox && DataContext is PlayerViewModel { PlayPauseCommand: var command } && command.CanExecute(null))
         {
             command.Execute(null);
             e.Handled = true;
         }
 
-        base.OnKeyDown(e);
+        base.OnPreviewKeyDown(e);
     }
 
     private void OnRendering(object? sender, EventArgs e) => (DataContext as PlayerViewModel)?.Tick();

@@ -126,11 +126,14 @@ public sealed partial class SubtitlesPageViewModel
             }
             else if (document is null)
             {
+                _reading.Remove(row);
                 LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať.";
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
         {
+            // tried again when the track is chosen again
+            _reading.Remove(row);
             LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať: {ex.Message}";
         }
     }

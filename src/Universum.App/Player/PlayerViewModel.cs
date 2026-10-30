@@ -38,6 +38,8 @@ public sealed class PlayerViewModel : ObservableObject
     private int _audioTrack;
     private bool _updatingPosition;
     private int _opening;
+    private int _seeking;
+    private TimeSpan _lastNow = TimeSpan.MinValue;
 
     public PlayerViewModel(AppServices services)
     {
@@ -144,60 +146,76 @@ public sealed class PlayerViewModel : ObservableObject
 
     public AsyncRelayCommand NextSubtitleCommand { get; }
 
-    /// <summary>Opens a film (paused at its start, the first picture shown).</summary>
+    /// <summary>Opens a film (paused at its start, the first picture shown); a newer open or Close wins.</summary>
     public async Task OpenAsync(MediaFile file)
     {
-        var opening = ++_opening;
         await CloseAsync();
+        var opening = ++_opening;
         Message = "Otváram video…";
-        string ffmpeg;
         try
         {
-            ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
-        }
-        catch (Exception ex) when (ex is Core.Speech.SpeechException or System.IO.IOException or UnauthorizedAccessException)
-        {
-            Message = "Prehrávač potrebuje FFmpeg z inštalácie UNIVERSUM: " + ex.Message;
-            return;
-        }
+            var ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
+            var origin = file.IsMatroska ? await SpeechActivity.StartAsync(_services.Runner, ffmpeg, file.Path) : TimeSpan.Zero;
+            if (opening != _opening)
+            {
+                return;
+            }
 
-        var origin = file.IsMatroska ? await SpeechActivity.StartAsync(_services.Runner, ffmpeg, file.Path) : TimeSpan.Zero;
-        if (opening != _opening)
-        {
-            return;
-        }
+            // the computer's sound device; without one the film runs by a clock
+            IAudioOutput audio = WaveOutAudioOutput.TryOpen() is { } device ? device : new ClockAudioOutput();
+            var session = new PlayerSession(ffmpeg, PlayerSource.Of(file, origin), audio) { Volume = _volume };
+            _session = session;
+            Picture = new WriteableBitmap(session.Format.Width, session.Format.Height, 96, 96, PixelFormats.Bgr32, null);
+            AudioTracks = file.TracksOf(TrackType.Audio).Select((t, i) => $"{i + 1}: {Pages.Texts.Language(t.Language)}, {t.Codec}" +
+                                                                         (t.AudioChannels is { } channels ? $" {channels} k." : "")).ToList();
+            _audioTrack = Math.Max(0, file.TracksOf(TrackType.Audio).ToList().FindIndex(t => t.Flags.Default));
+            OnPropertyChanged(nameof(AudioTracks));
+            OnPropertyChanged(nameof(AudioTrack));
+            // the slider's range changes: its value is the film's start, not a seek
+            _updatingPosition = true;
+            Start = origin.TotalSeconds;
+            End = (origin + (file.Duration ?? TimeSpan.FromSeconds(1))).TotalSeconds;
+            Position = origin.TotalSeconds;
+            _updatingPosition = false;
+            OnPropertyChanged(nameof(FrameWidth));
+            OnPropertyChanged(nameof(FrameHeight));
+            OnPropertyChanged(nameof(IsOpen));
+            Refresh();
+            _seeking++;
+            try
+            {
+                if (_audioTrack > 0)
+                {
+                    await session.SetAudioTrackAsync(_audioTrack);
+                }
+                else
+                {
+                    await session.SeekAsync(origin);
+                }
+            }
+            finally
+            {
+                _seeking--;
+            }
 
-        // the computer's sound device; without one the film runs by a clock
-        IAudioOutput audio = WaveOutAudioOutput.TryOpen() is { } device ? device : new ClockAudioOutput();
-        var session = new PlayerSession(ffmpeg, PlayerSource.Of(file, origin), audio) { Volume = _volume };
-        _session = session;
-        Picture = new WriteableBitmap(session.Format.Width, session.Format.Height, 96, 96, PixelFormats.Bgr32, null);
-        AudioTracks = file.TracksOf(TrackType.Audio).Select((t, i) => $"{i + 1}: {Pages.Texts.Language(t.Language)}, {t.Codec}" +
-                                                                     (t.AudioChannels is { } channels ? $" {channels} k." : "")).ToList();
-        _audioTrack = Math.Max(0, file.TracksOf(TrackType.Audio).ToList().FindIndex(t => t.Flags.Default));
-        OnPropertyChanged(nameof(AudioTracks));
-        OnPropertyChanged(nameof(AudioTrack));
-        Start = origin.TotalSeconds;
-        End = (origin + (file.Duration ?? TimeSpan.FromSeconds(1))).TotalSeconds;
-        OnPropertyChanged(nameof(FrameWidth));
-        OnPropertyChanged(nameof(FrameHeight));
-        OnPropertyChanged(nameof(IsOpen));
-        Refresh();
-        if (_audioTrack > 0)
-        {
-            await session.SetAudioTrackAsync(_audioTrack);
+            if (opening == _opening)
+            {
+                Message = !session.Source.HasVideo ? "Súbor nemá obraz – hrá sa zvuk a titulky." : session.Problem is { } problem ? "FFmpeg: " + problem : "";
+            }
         }
-        else
+        catch (Exception ex) when (ex is Core.Speech.SpeechException or System.IO.IOException or UnauthorizedAccessException or Core.Processes.ProcessStartException)
         {
-            await session.SeekAsync(origin);
+            if (opening == _opening)
+            {
+                Message = "Prehrávač potrebuje FFmpeg z inštalácie UNIVERSUM: " + ex.Message;
+            }
         }
-
-        Message = !session.Source.HasVideo ? "Súbor nemá obraz – hrá sa zvuk a titulky." : session.Problem is { } problem ? "FFmpeg: " + problem : "";
     }
 
-    /// <summary>Stops playing and forgets the film.</summary>
+    /// <summary>Stops playing and forgets the film (an open still going on is given up).</summary>
     public async Task CloseAsync()
     {
+        _opening++;
         _seekDelay.Stop();
         if (_session is { } session)
         {
@@ -205,9 +223,12 @@ public sealed class PlayerViewModel : ObservableObject
             Picture = null;
             _shown = null;
             _shownTime = TimeSpan.MinValue;
+            _lastNow = TimeSpan.MinValue;
             FramesShown = 0;
             PrimaryText = "";
             SecondaryText = "";
+            AudioTracks = [];
+            OnPropertyChanged(nameof(AudioTracks));
             OnPropertyChanged(nameof(IsOpen));
             Refresh();
             await session.DisposeAsync();
@@ -232,13 +253,21 @@ public sealed class PlayerViewModel : ObservableObject
         }
 
         _seekDelay.Stop();
-        await session.SeekAsync(time);
-        if (session.Problem is { } problem)
+        _seeking++;
+        try
         {
-            Message = "FFmpeg: " + problem;
+            await session.SeekAsync(time);
+        }
+        finally
+        {
+            _seeking--;
         }
 
-        Tick();
+        if (ReferenceEquals(session, _session))
+        {
+            Message = session.Problem is { } problem ? "FFmpeg: " + problem : Message.StartsWith("FFmpeg: ", StringComparison.Ordinal) ? "" : Message;
+            Tick();
+        }
     }
 
     public void Pause()
@@ -259,6 +288,8 @@ public sealed class PlayerViewModel : ObservableObject
         }
 
         var now = session.Position;
+        var moved = now != _lastNow;
+        _lastNow = now;
         if (session.FrameFor(now) is { } frame && (!ReferenceEquals(frame, _shown) || frame.Time != _shownTime) && _picture is { } picture &&
             picture.PixelWidth == frame.Format.Width && picture.PixelHeight == frame.Format.Height)
         {
@@ -268,8 +299,20 @@ public sealed class PlayerViewModel : ObservableObject
             FramesShown++;
         }
 
+        if (session.IsPlaying && session.IsAtEnd)
+        {
+            session.Pause();
+            Refresh();
+        }
+
+        if (!moved)
+        {
+            return;
+        }
+
         ShowSubtitles(now);
-        if (!_seekDelay.IsEnabled)
+        // the slider follows the film – not while it is dragged or a seek goes on (it would jump back)
+        if (!_seekDelay.IsEnabled && _seeking == 0)
         {
             _updatingPosition = true;
             Position = now.TotalSeconds;
@@ -280,12 +323,6 @@ public sealed class PlayerViewModel : ObservableObject
         if (time != _time)
         {
             Time = time;
-        }
-
-        if (session.IsPlaying && session.IsAtEnd)
-        {
-            session.Pause();
-            Refresh();
         }
     }
 

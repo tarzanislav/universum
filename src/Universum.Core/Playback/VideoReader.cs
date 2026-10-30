@@ -10,9 +10,17 @@ namespace Universum.Core.Playback;
 /// </summary>
 public sealed record VideoFormat(int Width, int Height, double FramesPerSecond)
 {
-    /// <summary>1280 × 720 at the film's frame rate (25 when it is not known).</summary>
-    public static VideoFormat For(double? framesPerSecond, int width = 1280, int height = 720) =>
-        new(width & ~1, height & ~1, framesPerSecond is > 1 and < 300 ? framesPerSecond.Value : 25);
+    /// <summary>1280 × 720 at the film's frame rate (25 when it is not known; 50 or 60 pictures a second are halved for the preview).</summary>
+    public static VideoFormat For(double? framesPerSecond, int width = 1280, int height = 720)
+    {
+        var fps = framesPerSecond is > 1 and < 300 ? framesPerSecond.Value : 25;
+        while (fps > 30.5)
+        {
+            fps /= 2;
+        }
+
+        return new VideoFormat(width & ~1, height & ~1, fps);
+    }
 
     /// <summary>Bytes of one picture (BGRA, four bytes a pixel).</summary>
     public int FrameBytes => Width * Height * 4;

@@ -23,14 +23,19 @@ public sealed record PlayerSource(string Path, TimeSpan Duration, TimeSpan Origi
 public sealed class PlayerSession : IAsyncDisposable
 {
     private readonly string _ffmpeg;
-    private readonly IAudioOutput _audio;
+    private IAudioOutput _audio;
     private VideoReader? _video;
     private AudioReader? _sound;
     private CancellationTokenSource? _feeding;
     private Task _fed = Task.CompletedTask;
     private VideoFrame? _current;
     private TimeSpan _start;
+    private TimeSpan? _target;
     private int _generation;
+    private string? _problem;
+    private volatile string? _soundProblem;
+    private volatile bool _soundFailed;
+    private bool _recovering;
 
     public PlayerSession(string ffmpeg, PlayerSource source, IAudioOutput audio, VideoFormat? format = null)
     {
@@ -40,7 +45,7 @@ public sealed class PlayerSession : IAsyncDisposable
         if (source.AudioTracks == 0)
         {
             audio.Dispose();
-            audio = new ClockAudioOutput();
+            audio = new ClockAudioOutput(limitedToSound: false);
         }
 
         _audio = audio;
@@ -56,92 +61,118 @@ public sealed class PlayerSession : IAsyncDisposable
 
     public bool IsPlaying { get; private set; }
 
-    /// <summary>Why pictures or sound are missing (FFmpeg's message), or null.</summary>
-    public string? Problem { get; private set; }
+    /// <summary>Why pictures or sound are missing (FFmpeg's message, the sound device), or null.</summary>
+    public string? Problem => _problem ?? _soundProblem;
 
-    /// <summary>Where the film is now (the film's time, as subtitles count it).</summary>
+    /// <summary>Where the film is now (the film's time, as subtitles count it); during a seek where it goes.</summary>
     public TimeSpan Position
     {
         get
         {
+            if (_target is { } target)
+            {
+                return target;
+            }
+
             var position = _start + _audio.Played;
-            var end = Source.Origin + Source.Duration;
-            return Source.Duration > TimeSpan.Zero && position > end ? end : position;
+            return Source.Duration > TimeSpan.Zero && position > End ? End : position;
         }
     }
 
     /// <summary>The film is at its end.</summary>
-    public bool IsAtEnd => Source.Duration > TimeSpan.Zero && Position >= Source.Origin + Source.Duration - TimeSpan.FromMilliseconds(50);
+    public bool IsAtEnd => Source.Duration > TimeSpan.Zero && Position >= End - TimeSpan.FromMilliseconds(50);
 
     public double Volume { get => _audio.Volume; set => _audio.Volume = value; }
 
+    private TimeSpan End => Source.Origin + Source.Duration;
+
     /// <summary>
     /// Goes to <paramref name="time"/> (the film's time); playing goes on there when it played. Waits until the first
-    /// picture (and some sound) is decoded – at most a few seconds.
+    /// picture (and some sound) is decoded – at most a few seconds. A newer seek wins over one still going on.
     /// </summary>
     public async Task SeekAsync(TimeSpan time)
     {
         var generation = ++_generation;
-        var end = Source.Origin + Source.Duration;
-        time = time < Source.Origin ? Source.Origin : Source.Duration > TimeSpan.Zero && time > end ? end : time;
-        await StopDecodingAsync().ConfigureAwait(true);
-        if (generation != _generation)
+        time = time < Source.Origin ? Source.Origin : Source.Duration > TimeSpan.Zero && time > End ? End : time;
+        _target = time;
+        try
         {
-            return;
-        }
-
-        _audio.Reset();
-        _start = time;
-        _current = null;
-        Problem = null;
-        var fileTime = time - Source.Origin;
-        _video = Source.HasVideo ? VideoReader.Start(_ffmpeg, Source.Path, fileTime, time, Format) : null;
-        if (Source.AudioTracks > 0)
-        {
-            _sound = AudioReader.Start(_ffmpeg, Source.Path, fileTime, Math.Clamp(AudioTrack, 0, Source.AudioTracks - 1));
-            _feeding = new CancellationTokenSource();
-            var (sound, token) = (_sound, _feeding.Token);
-            _fed = Task.Run(() => FeedAsync(sound, token), CancellationToken.None);
-        }
-
-        // both decoders start together; the clock runs only when the first picture can be shown
-        if (_video is { } video)
-        {
-            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            try
+            await StopDecodingAsync().ConfigureAwait(true);
+            if (generation != _generation)
             {
-                await video.Frames.WaitToReadAsync(limit.Token).ConfigureAwait(true);
-            }
-            catch (OperationCanceledException)
-            {
-                // slow: it plays as the pictures come
+                return;
             }
 
-            // no picture at all – not at the very end of the film, where there is none to show
-            if (generation == _generation && !video.Frames.TryPeek(out _) && video.Frames.Completion.IsCompleted &&
-                (Source.Duration <= TimeSpan.Zero || time < end - TimeSpan.FromSeconds(1)))
+            _audio.Reset();
+            _start = time;
+            _current = null;
+            _problem = null;
+            _soundProblem = null;
+            var fileTime = time - Source.Origin;
+            _video = Source.HasVideo ? VideoReader.Start(_ffmpeg, Source.Path, fileTime, time, Format) : null;
+            if (Source.AudioTracks > 0)
             {
-                Problem = video.Problem;
+                var sound = _sound = AudioReader.Start(_ffmpeg, Source.Path, fileTime, Math.Clamp(AudioTrack, 0, Source.AudioTracks - 1));
+                var feeding = _feeding = new CancellationTokenSource();
+                var (output, length) = (_audio, Source.Duration > TimeSpan.Zero ? End - time : TimeSpan.Zero);
+                _fed = Task.Run(() => FeedAsync(sound, output, length, feeding.Token), CancellationToken.None);
+            }
+
+            // both decoders start together; the clock runs only when the first picture can be shown
+            if (_video is { } video)
+            {
+                using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await video.Frames.WaitToReadAsync(limit.Token).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    // slow: it plays as the pictures come
+                }
+
+                // no picture at all – not at the very end of the film, where there is none to show
+                if (generation == _generation && !video.Frames.TryPeek(out _) && video.Frames.Completion.IsCompleted &&
+                    (Source.Duration <= TimeSpan.Zero || time < End - TimeSpan.FromSeconds(1)))
+                {
+                    _problem = video.Problem;
+                }
+            }
+
+            if (generation == _generation)
+            {
+                _target = null;
+                if (IsPlaying)
+                {
+                    _audio.Resume();
+                }
             }
         }
-
-        if (generation == _generation && IsPlaying)
+        finally
         {
-            _audio.Resume();
+            if (generation == _generation)
+            {
+                _target = null;
+            }
         }
     }
 
     /// <summary>Plays from the position (from the start again at the end).</summary>
     public async Task PlayAsync()
     {
+        IsPlaying = true;
+        if (_target is not null)
+        {
+            // the seek going on plays when its first picture is there
+            return;
+        }
+
         if (IsAtEnd)
         {
-            IsPlaying = true;
             await SeekAsync(Source.Origin).ConfigureAwait(true);
             return;
         }
 
-        IsPlaying = true;
         if (_video is null && _sound is null)
         {
             await SeekAsync(Position).ConfigureAwait(true);
@@ -157,7 +188,7 @@ public sealed class PlayerSession : IAsyncDisposable
         _audio.Pause();
     }
 
-    /// <summary>Plays another audio track of the film from the position.</summary>
+    /// <summary>Plays another audio track of the film from the position (or from where a seek goes).</summary>
     public async Task SetAudioTrackAsync(int ordinal)
     {
         AudioTrack = Math.Clamp(ordinal, 0, Math.Max(0, Source.AudioTracks - 1));
@@ -166,10 +197,15 @@ public sealed class PlayerSession : IAsyncDisposable
 
     /// <summary>
     /// The picture to show at <paramref name="time"/>: the latest one decoded that is due (the ones before it are given
-    /// back); null before the first. It stays valid until the next call.
+    /// back); null before the first. It stays valid until the next call. Called for every frame of the window.
     /// </summary>
     public VideoFrame? FrameFor(TimeSpan time)
     {
+        if (_soundFailed && !_recovering)
+        {
+            _ = RecoverAsync();
+        }
+
         if (_video is not { } video)
         {
             return _current;
@@ -198,15 +234,14 @@ public sealed class PlayerSession : IAsyncDisposable
 
     private async Task StopDecodingAsync()
     {
-        if (_feeding is { } feeding)
+        // what this stop ends – a newer seek starts its own decoders meanwhile
+        var (feeding, fed, video, sound) = (_feeding, _fed, _video, _sound);
+        (_feeding, _fed, _video, _sound) = (null, Task.CompletedTask, null, null);
+        if (feeding is not null)
         {
             await feeding.CancelAsync().ConfigureAwait(true);
         }
 
-        var video = _video;
-        var sound = _sound;
-        _video = null;
-        _sound = null;
         if (video is not null)
         {
             await video.DisposeAsync().ConfigureAwait(true);
@@ -219,22 +254,63 @@ public sealed class PlayerSession : IAsyncDisposable
 
         try
         {
-            await _fed.ConfigureAwait(true);
+            await fed.ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
             // stopped
         }
 
-        _feeding?.Dispose();
-        _feeding = null;
+        feeding?.Dispose();
     }
 
-    private async Task FeedAsync(AudioReader sound, CancellationToken cancellationToken)
+    // the sound to the output; when it ends before the picture, silence keeps the clock going to the end of the film
+    private async Task FeedAsync(AudioReader sound, IAudioOutput output, TimeSpan length, CancellationToken cancellationToken)
     {
-        await foreach (var block in sound.Blocks.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        try
         {
-            await _audio.WriteAsync(block, cancellationToken).ConfigureAwait(false);
+            long written = 0;
+            await foreach (var block in sound.Blocks.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await output.WriteAsync(block, cancellationToken).ConfigureAwait(false);
+                written += block.Length;
+            }
+
+            if (written == 0 && sound.Problem is { } problem)
+            {
+                _soundProblem = "zvuk: " + problem;
+            }
+
+            var silence = new byte[Pcm.BytesPerSecond / 20];
+            for (var left = length - Pcm.Duration(written); left > TimeSpan.Zero; left -= Pcm.Duration(silence.Length))
+            {
+                await output.WriteAsync(silence, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (IOException ex)
+        {
+            // the sound device stopped taking sound: the film goes on by a clock (FrameFor switches)
+            _soundProblem = ex.Message;
+            _soundFailed = true;
+        }
+    }
+
+    private async Task RecoverAsync()
+    {
+        _recovering = true;
+        _soundFailed = false;
+        var at = Position;
+        var failed = _audio;
+        _audio = new ClockAudioOutput { Volume = failed.Volume };
+        try
+        {
+            await SeekAsync(at).ConfigureAwait(true);
+            failed.Dispose();
+            _soundProblem = "Zvukové zariadenie neprijíma zvuk – film ide ďalej bez zvuku.";
+        }
+        finally
+        {
+            _recovering = false;
         }
     }
 }

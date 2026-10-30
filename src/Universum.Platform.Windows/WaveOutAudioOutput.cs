@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Universum.Core.Playback;
@@ -164,10 +165,13 @@ public sealed partial class WaveOutAudioOutput : IAudioOutput
             _ = waveOutReset(_device);
             foreach (var pointer in _headers)
             {
+                // a buffer the driver still holds is never freed (left rather than broken)
                 var header = (WaveHeader*)pointer;
-                _ = waveOutUnprepareHeader(_device, header, (uint)sizeof(WaveHeader));
-                NativeMemory.Free(header->Data);
-                NativeMemory.Free(header);
+                if (waveOutUnprepareHeader(_device, header, (uint)sizeof(WaveHeader)) == 0)
+                {
+                    NativeMemory.Free(header->Data);
+                    NativeMemory.Free(header);
+                }
             }
 
             _ = waveOutClose(_device);
@@ -177,10 +181,6 @@ public sealed partial class WaveOutAudioOutput : IAudioOutput
     // the sound into a free buffer, louder or quieter, and to the device; false when the device is closed
     private unsafe bool Queue(int index, ReadOnlySpan<byte> pcm)
     {
-        var header = (WaveHeader*)_headers[index];
-        var target = new Span<byte>(header->Data, pcm.Length);
-        pcm.CopyTo(target);
-        Pcm.Scale(target, Volume);
         lock (_gate)
         {
             if (_disposed)
@@ -188,9 +188,19 @@ public sealed partial class WaveOutAudioOutput : IAudioOutput
                 return false;
             }
 
+            var header = (WaveHeader*)_headers[index];
+            var target = new Span<byte>(header->Data, pcm.Length);
+            pcm.CopyTo(target);
+            Pcm.Scale(target, Volume);
             header->BufferLength = (uint)pcm.Length;
             header->Flags &= ~DoneFlag;
-            _ = waveOutWrite(_device, header, (uint)sizeof(WaveHeader));
+            if (waveOutWrite(_device, header, (uint)sizeof(WaveHeader)) is var error and not 0)
+            {
+                // the buffer is free again; the player goes on by a clock
+                header->Flags |= DoneFlag;
+                throw new IOException($"Zvukové zariadenie neprijíma zvuk (waveOut {error}) – film ide ďalej bez zvuku.");
+            }
+
             return true;
         }
     }

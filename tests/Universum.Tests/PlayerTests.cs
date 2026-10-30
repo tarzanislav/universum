@@ -121,6 +121,65 @@ public sealed class PlayerTests
         Assert.True(session.AudioTrack == 1 && session.Problem is null, "the second audio track");
     }
 
+    [Test]
+    public async Task SeeksThatOverlapAndSoundShorterThanThePicture()
+    {
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
+        if (ffmpeg is null)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+        }
+
+        var folder = Directory.CreateTempSubdirectory("universum-player-").FullName;
+        try
+        {
+            // three seconds of picture, the sound starts 0,5 s late and ends after 2 s
+            var film = Path.Combine(folder, "film.mkv");
+            await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg!,
+            [
+                "-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=160x90:r=10:d=3", "-itsoffset", "0.5", "-f", "lavfi", "-i", "sine=duration=1.5",
+                "-c:v", "libx264", "-g", "10", "-c:a", "aac", film,
+            ]));
+            var counted = new CountingAudioOutput();
+            await using (var session = new PlayerSession(ffmpeg!, new PlayerSource(film, T(3), TimeSpan.Zero, true, 10, 1), counted))
+            {
+                // the delayed sound starts with silence: the clock stays with the picture
+                await session.SeekAsync(TimeSpan.Zero);
+                for (var wait = 0; wait < 100 && counted.Bytes < Pcm.BytesPerSecond * 29 / 10; wait++)
+                {
+                    await Task.Delay(20);
+                }
+
+                Assert.True(counted.Bytes >= Pcm.BytesPerSecond * 29 / 10, $"sound for the whole film, silence before and after it ({Pcm.Duration(counted.Bytes)})");
+
+                // a second seek while the first goes on: both end, the second wins; Play meanwhile plays from there
+                var first = session.SeekAsync(T(1));
+                var second = session.SeekAsync(T(2));
+                await session.PlayAsync();
+                var both = Task.WhenAll(first, second);
+                Assert.True(await Task.WhenAny(both, Task.Delay(5000)) == both, "the first seek does not wait for the second one's sound");
+                Assert.True(session.Position == T(2) && session.FrameFor(session.Position) is { Time.TotalMilliseconds: 2000 } && session.IsPlaying,
+                    $"at the second seek, playing: {session.Position}");
+            }
+
+            // without a sound device: the clock goes on through the silence to the end of the picture
+            await using var clock = new PlayerSession(ffmpeg!, new PlayerSource(film, T(3), TimeSpan.Zero, true, 10, 1), new ClockAudioOutput());
+            await clock.SeekAsync(T(1.5));
+            await clock.PlayAsync();
+            for (var wait = 0; wait < 150 && !clock.IsAtEnd; wait++)
+            {
+                await Task.Delay(20);
+            }
+
+            Assert.True(clock.IsAtEnd, $"the end of the film is reached ({clock.Position})");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     // a clock the test moves; the sound is only counted
     private sealed class CountingAudioOutput : IAudioOutput
     {

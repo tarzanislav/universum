@@ -6,7 +6,7 @@ namespace Universum.Core.Processes;
 
 /// <summary>
 /// A tool whose standard output is read as a stream while it runs – FFmpeg decoding pictures and sound for the player.
-/// No shell, no window; the last part of its error output is kept for messages; disposing ends it (and what it started).
+/// No shell, no window; the last part of its error output is kept for messages; disposing ends it.
 /// </summary>
 public sealed class StreamingProcess : IAsyncDisposable
 {
@@ -130,7 +130,8 @@ public sealed class StreamingProcess : IAsyncDisposable
         {
             if (!_process.HasExited)
             {
-                _process.Kill(entireProcessTree: true);
+                // FFmpeg starts nothing of its own: the process alone (the whole tree lists every process of Windows)
+                _process.Kill();
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException)

@@ -56,14 +56,17 @@ public static class Pcm
 
 /// <summary>
 /// Without a sound device (or for a film without sound): the sound is only counted and the clock runs with the real
-/// time – limited to the sound written, so the clock stops where the sound of the film ends.
+/// time – as a device does, it stands while no sound is there (and where the sound of the film ends), and goes on
+/// from there when sound comes.
 /// </summary>
-public sealed class ClockAudioOutput : IAudioOutput
+public sealed class ClockAudioOutput(bool limitedToSound = true) : IAudioOutput
 {
     private readonly System.Diagnostics.Stopwatch _watch = new();
     private readonly object _gate = new();
+    private readonly bool _limitedToSound = limitedToSound;
     private long _written;
-    private bool _limited;
+    private TimeSpan _played;
+    private TimeSpan _counted;
 
     public double Volume { get; set; } = 1;
 
@@ -73,8 +76,16 @@ public sealed class ClockAudioOutput : IAudioOutput
         {
             lock (_gate)
             {
+                // the time since the last look, as far as there is sound for it
                 var elapsed = _watch.Elapsed;
-                return _limited && elapsed > Pcm.Duration(_written) ? Pcm.Duration(_written) : elapsed;
+                _played += elapsed - _counted;
+                _counted = elapsed;
+                if (_limitedToSound && _played > Pcm.Duration(_written))
+                {
+                    _played = Pcm.Duration(_written);
+                }
+
+                return _played;
             }
         }
     }
@@ -84,7 +95,6 @@ public sealed class ClockAudioOutput : IAudioOutput
         lock (_gate)
         {
             _written += pcm.Length;
-            _limited = true;
         }
 
         while (Pcm.Duration(Interlocked.Read(ref _written)) - Played > TimeSpan.FromSeconds(0.5))
@@ -97,6 +107,7 @@ public sealed class ClockAudioOutput : IAudioOutput
     {
         lock (_gate)
         {
+            _ = Played;
             _watch.Stop();
         }
     }
@@ -115,7 +126,8 @@ public sealed class ClockAudioOutput : IAudioOutput
         {
             _watch.Reset();
             _written = 0;
-            _limited = false;
+            _played = TimeSpan.Zero;
+            _counted = TimeSpan.Zero;
         }
     }
 
@@ -144,6 +156,9 @@ public sealed class AudioReader : IAsyncDisposable
     /// <summary>The sound in order; completed when the track (or FFmpeg) ends.</summary>
     public ChannelReader<byte[]> Blocks => _blocks.Reader;
 
+    /// <summary>FFmpeg ended without any sound: its message.</summary>
+    public string? Problem { get; private set; }
+
     /// <summary>Starts at <paramref name="fileTime"/> (from the start of the file) with the audio track <paramref name="ordinal"/> (0 = the first).</summary>
     public static AudioReader Start(string ffmpeg, string path, TimeSpan fileTime, int ordinal)
     {
@@ -152,6 +167,8 @@ public sealed class AudioReader : IAsyncDisposable
             "-nostdin", "-hide_banner", "-loglevel", "error",
             "-ss", VideoReader.Seconds(fileTime), "-i", path,
             "-map", "0:a:" + ordinal.ToString(CultureInfo.InvariantCulture), "-vn", "-sn", "-dn",
+            // sound that starts later than the seek (a delayed track) starts with silence: the clock stays with the picture
+            "-af", "aresample=async=1:first_pts=0",
             "-ac", Pcm.Channels.ToString(CultureInfo.InvariantCulture), "-ar", Pcm.SampleRate.ToString(CultureInfo.InvariantCulture),
             "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1",
         ]);
@@ -176,6 +193,7 @@ public sealed class AudioReader : IAsyncDisposable
 
     private async Task ReadAsync(CancellationToken cancellationToken)
     {
+        long total = 0;
         try
         {
             var output = _process.Output;
@@ -189,6 +207,7 @@ public sealed class AudioReader : IAsyncDisposable
                     break;
                 }
 
+                total += read;
                 await _blocks.Writer.WriteAsync(read == BlockBytes ? block : block[..read], cancellationToken).ConfigureAwait(false);
                 if (read < BlockBytes)
                 {
@@ -202,6 +221,12 @@ public sealed class AudioReader : IAsyncDisposable
         }
         finally
         {
+            if (total == 0 && !cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
+                Problem = _process.ErrorText is { Length: > 0 } error ? error.Split('\n')[^1].Trim() : null;
+            }
+
             _blocks.Writer.TryComplete();
         }
     }

@@ -310,7 +310,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// The studio should open a file of the batch: the file as the analysis has it (with the subtitle files found with
     /// it) and its edits so far.
     /// </summary>
-    public event Action<MediaFile, StudioEdits?>? StudioRequested;
+    public event Action<MediaFile, StudioEdits?, IReadOnlyDictionary<int, string>>? StudioRequested;
 
     private void EditInStudio()
     {
@@ -319,7 +319,10 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        StudioRequested?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path));
+        // the names the group gives the file's own tracks: the studio shows them until a name of its own is written
+        var names = SlotKey.Of(analysed).Where(x => x.Track.ExternalFile is null && item.Group.Decisions.Names.ContainsKey(x.Key))
+            .ToDictionary(x => x.Track.Id, x => item.Group.Decisions.Names[x.Key]);
+        StudioRequested?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path), names);
     }
 
     /// <summary>
@@ -1492,7 +1495,9 @@ public sealed class BatchPageViewModel : ObservableObject
         var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
         var removed = item.Target.RemovedByLanguage.Where(t => keyOf.ContainsKey(t.Id)).Select(t => keyOf[t.Id]).ToHashSet();
         var order = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).Select(t => keyOf[t.TrackId]).ToList();
-        var names = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).ToDictionary(t => keyOf[t.TrackId], t => t.Name);
+        // the names the rules give (no name written – by the group or in the studio): what a written name is compared with
+        var rules = UniversumRules.Apply(item.File, _services.Profile, item.Decisions with { Names = new Dictionary<int, string>() });
+        var names = rules.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).ToDictionary(t => keyOf[t.TrackId], t => t.Name);
         foreach (var slot in SlotRows)
         {
             slot.SetRemovedByLanguage(removed.Contains(slot.Key));
@@ -2596,7 +2601,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 var path = media.Path;
                 // decisions by track ID only for the file's own tracks the studio does not decide (the IDs of external
                 // files are given by each analysis; the studio's edits come back by path)
-                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).Concat(studioOfFile.Names.Keys).ToHashSet() : new HashSet<int>();
+                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).ToHashSet() : new HashSet<int>();
                 var slots = SlotKey.Of(media).Where(x => x.Track.ExternalFile is null && !studied.Contains(x.Track.Id)).ToDictionary(x => x.Track.Id, x => x.Key);
                 kinds.Add(file.Title.Kind);
                 _library.KindOfFile[path] = file.Title.Kind;
@@ -2625,9 +2630,23 @@ public sealed class BatchPageViewModel : ObservableObject
                     group.Decisions.Forced[slots[id]] = forced;
                 }
 
-                foreach (var (id, name) in file.Names.Where(n => slots.ContainsKey(n.Key)))
+                // the group's names: of the file's own tracks by ID, of external files by their path (their IDs are the
+                // analysis'); the ones the studio wrote come back with the studio's edits
+                foreach (var (id, name) in file.Names)
                 {
-                    group.Decisions.Names[slots[id]] = name;
+                    if (file.Studio?.Names.ContainsKey(id) == true ||
+                        (file.Externals.FirstOrDefault(e => e.Id == id) is { } external && file.Studio?.FileNames.Keys.Any(p => Paths.Same(p, external.Path)) == true))
+                    {
+                        continue;
+                    }
+
+                    var slot = SlotKey.Of(media).FirstOrDefault(x => file.Externals.FirstOrDefault(e => e.Id == id) is { } added
+                        ? x.Track.ExternalFile is { } path && Paths.Same(path, added.Path)
+                        : x.Track.ExternalFile is null && x.Track.Id == id);
+                    if (slot.Track is not null)
+                    {
+                        group.Decisions.Names[slot.Key] = name;
+                    }
                 }
 
                 group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));

@@ -21,6 +21,7 @@ public sealed class SubtitleRow : ObservableObject
     private string _name;
     private readonly string _initialName;
     private bool _nameWritten;
+    private string _defaultName;
     private bool _forced;
     private bool _hearingImpaired;
     private FrameRate? _fpsFrom;
@@ -55,6 +56,7 @@ public sealed class SubtitleRow : ObservableObject
         _language = LanguageChoices.First(c => c.Same(language));
         _name = name ?? "";
         _initialName = _name;
+        _defaultName = _name;
         _forced = forced;
         _hearingImpaired = hearingImpaired;
         InitialForced = forced;
@@ -151,9 +153,20 @@ public sealed class SubtitleRow : ObservableObject
         {
             if (value != _name)
             {
-                _nameWritten = true;
+                // the name the result would have anyway again: no name of the user's
+                _nameWritten = value.Trim() != _defaultName;
                 Set(ref _name, value);
             }
+        }
+    }
+
+    /// <summary>A name the user wrote before (a saved work, a task): it counts as written, also when it is the default one.</summary>
+    public void WriteName(string name)
+    {
+        _nameWritten = true;
+        if (!Set(ref _name, name, nameof(Name)))
+        {
+            Changed();
         }
     }
 
@@ -163,12 +176,13 @@ public sealed class SubtitleRow : ObservableObject
     /// <summary>The name in the file (or of the external file's track).</summary>
     public string InitialName => _initialName;
 
-    /// <summary>Shows the name the result gets while the user has not written his own.</summary>
+    /// <summary>The name the result would get without the user's (the rules' or the batch's); shown while he has written none.</summary>
     public void ShowName(string? name)
     {
-        if (!_nameWritten && _name != (name ?? ""))
+        _defaultName = name ?? "";
+        if (!_nameWritten && _name != _defaultName)
         {
-            _name = name ?? "";
+            _name = _defaultName;
             OnPropertyChanged(nameof(Name));
         }
     }
@@ -565,7 +579,7 @@ public sealed class SubtitleRow : ObservableObject
 
         if (state.Name is { } written && (state.NameWritten || written != _initialName))
         {
-            Name = written;
+            WriteName(written);
         }
 
         Forced = state.Forced;

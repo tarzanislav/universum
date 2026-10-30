@@ -136,13 +136,17 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    /// <summary>Called after a recalculation with the name the track gets in the group's first file.</summary>
+    /// <summary>Called after a recalculation with the name the rules give the track in the group's first file.</summary>
     public void SetResultName(string? name)
     {
-        if (!Group.Decisions.Names.ContainsKey(Key))
+        if (_rulesName != name)
         {
             _rulesName = name;
-            OnPropertyChanged(nameof(TrackName));
+            if (!Group.Decisions.Names.ContainsKey(Key))
+            {
+                // only then: a name being written is not written over by a recalculation that changes nothing
+                OnPropertyChanged(nameof(TrackName));
+            }
         }
     }
 

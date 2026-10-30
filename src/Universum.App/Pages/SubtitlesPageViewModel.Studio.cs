@@ -22,6 +22,9 @@ public sealed partial class SubtitlesPageViewModel
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
 
+    // a task of Hromadné spracovanie: the names the batch gives the video's own tracks
+    private Dictionary<int, string> _batchNames = [];
+
     // ends the reading of picture subtitles of a video closed
     private CancellationTokenSource _readingStop = new();
 
@@ -151,7 +154,9 @@ public sealed partial class SubtitlesPageViewModel
     /// Hromadné spracovanie cannot take them (null: taken). False when
     /// the studio is busy (saving, syncing) – it says so.
     /// </summary>
-    public async Task<bool> EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Func<StudioEdits, string?> save, Action leave)
+    /// <param name="batchNames">The names the batch gives the video's own tracks (by track ID): shown until the user writes his own.</param>
+    public async Task<bool> EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Func<StudioEdits, string?> save, Action leave,
+        IReadOnlyDictionary<int, string>? batchNames = null)
     {
         if (_busy)
         {
@@ -187,6 +192,7 @@ public sealed partial class SubtitlesPageViewModel
             return false;
         }
 
+        _batchNames = batchNames?.ToDictionary() ?? [];
         _quiet++;
         try
         {
@@ -249,7 +255,7 @@ public sealed partial class SubtitlesPageViewModel
 
                 if (edits.Names.TryGetValue(row.Track.Id, out var name))
                 {
-                    row.Name = name;
+                    row.WriteName(name);
                 }
 
                 row.Include = !edits.Removed.Contains(row.Track.Id);
@@ -268,7 +274,7 @@ public sealed partial class SubtitlesPageViewModel
 
             if (edits.FileNames.FirstOrDefault(n => Paths.Same(n.Key, path)).Value is { } fileName)
             {
-                row.Name = fileName;
+                row.WriteName(fileName);
             }
 
             row.Include = !edits.RemovedFiles.Any(r => Paths.Same(r, path));
@@ -388,6 +394,7 @@ public sealed partial class SubtitlesPageViewModel
     private void EndTask()
     {
         _task = null;
+        _batchNames = [];
         OnPropertyChanged(nameof(IsTask));
         OnPropertyChanged(nameof(TaskText));
         RefreshCommands();

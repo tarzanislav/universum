@@ -372,25 +372,29 @@ public sealed class PlayerViewModel : ObservableObject
         }
     }
 
-    // the picture subtitle shown now, drawn once (UNIVERSUM decodes it) and placed on the picture: its canvas (the video's
-    // size) fitted into the frame as the film is
+    // the picture subtitle shown now, drawn once (UNIVERSUM decodes it; the same pictures with other times are not drawn
+    // again) and placed on the picture: its canvas (the video's size) lies on the film as the decoder fits it into the frame
     private void ShowPicture(ref (PictureCue? Cue, ImageSource? Image, Rect Place) shown, PictureTimeline pictures, TimeSpan now, string image, string place)
     {
         var cue = pictures.Cues.Count == 0 ? null : pictures.At(now).LastOrDefault();
-        if (ReferenceEquals(cue, shown.Cue))
+        if (ReferenceEquals(cue, shown.Cue) ||
+            (cue is not null && shown.Cue is { } before && ReferenceEquals(cue.Objects, before.Objects) && ReferenceEquals(cue.Palette, before.Palette)))
         {
+            shown = (cue, shown.Image, shown.Place);
             return;
         }
 
         shown = (cue, null, Rect.Empty);
-        if (cue is not null && PgsReader.Render(cue) is { } drawn && cue.CanvasWidth > 0 && cue.CanvasHeight > 0)
+        if (cue is not null && PgsReader.Render(cue) is { } drawn)
         {
             var bitmap = BitmapSource.Create(drawn.Width, drawn.Height, 96, 96, PixelFormats.Bgra32, null, drawn.Bgra, drawn.Width * 4);
             bitmap.Freeze();
-            var scale = Math.Min((double)FrameWidth / cue.CanvasWidth, (double)FrameHeight / cue.CanvasHeight);
-            var left = (FrameWidth - (cue.CanvasWidth * scale)) / 2;
-            var top = (FrameHeight - (cue.CanvasHeight * scale)) / 2;
-            shown = (cue, bitmap, new Rect(left + (drawn.X * scale), top + (drawn.Y * scale), drawn.Width * scale, drawn.Height * scale));
+            var (frameWidth, frameHeight) = ((double)FrameWidth, (double)FrameHeight);
+            var aspect = _session?.Source.DisplayAspect ?? ((double)cue.CanvasWidth / cue.CanvasHeight);
+            var (width, height) = aspect > frameWidth / frameHeight ? (frameWidth, frameWidth / aspect) : (frameHeight * aspect, frameHeight);
+            var (left, top) = ((frameWidth - width) / 2, (frameHeight - height) / 2);
+            var (scaleX, scaleY) = (width / cue.CanvasWidth, height / cue.CanvasHeight);
+            shown = (cue, bitmap, new Rect(left + (drawn.X * scaleX), top + (drawn.Y * scaleY), drawn.Width * scaleX, drawn.Height * scaleY));
         }
 
         OnPropertyChanged(image);

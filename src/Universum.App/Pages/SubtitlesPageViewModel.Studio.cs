@@ -22,6 +22,9 @@ public sealed partial class SubtitlesPageViewModel
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
 
+    // ends the reading of picture subtitles of a video closed
+    private CancellationTokenSource _readingStop = new();
+
     // the picture subtitles (PGS) read for the player, by row
     private readonly Dictionary<SubtitleRow, IReadOnlyList<PictureCue>> _pictures = [];
     private (string Path, IReadOnlyList<MediaTrack> Externals, Func<StudioEdits, string?> Save, Action Leave)? _task;
@@ -494,32 +497,36 @@ public sealed partial class SubtitlesPageViewModel
         _ = row.IsText ? ReadTrackAsync(row, file, installation) : ReadPicturesAsync(row, file, installation);
     }
 
+    // picture subtitles are read once a video (mkvextract reads the whole file): also none or a failure is kept, so a
+    // change of the times does not read them again; another video stops the reading
     private async Task ReadPicturesAsync(SubtitleRow row, Core.Media.MediaFile file, MkvToolNixInstallation installation)
     {
+        var stop = _readingStop.Token;
         try
         {
-            var pictures = await PictureSubtitles.ExtractAsync(installation, _services.Runner, file, row.Track);
+            var pictures = await PictureSubtitles.ExtractAsync(installation, _services.Runner, file, row.Track, stop);
             if (!ReferenceEquals(_file, file))
             {
                 return;
             }
 
-            if (pictures.Count == 0)
-            {
-                _reading.Remove(row);
-                LiveStatus = $"Obrázkové titulky {row.Source} sa nepodarilo prečítať.";
-                return;
-            }
-
             _pictures[row] = pictures;
-            LiveStatus = $"Obrázkové titulky {row.Source} sú načítané ({pictures.Count}).";
+            LiveStatus = pictures.Count == 0 ? $"Obrázkové titulky {row.Source} sa nepodarilo prečítať (žiadne titulky)."
+                : $"Obrázkové titulky {row.Source} sú načítané ({pictures.Count}).";
             UpdatePreview();
             RefreshPlayer();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
+        catch (OperationCanceledException)
         {
-            _reading.Remove(row);
-            LiveStatus = $"Obrázkové titulky {row.Source} sa nepodarilo prečítať: {ex.Message}";
+            // another video
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
+        {
+            if (ReferenceEquals(_file, file))
+            {
+                _pictures[row] = [];
+                LiveStatus = $"Obrázkové titulky {row.Source} sa nepodarilo prečítať: {ex.Message}";
+            }
         }
     }
 
@@ -537,14 +544,12 @@ public sealed partial class SubtitlesPageViewModel
             }
             else if (document is null)
             {
-                _reading.Remove(row);
+                // not read again for every change (the whole file is read): when the video is opened again
                 LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať.";
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
         {
-            // tried again when the track is chosen again
-            _reading.Remove(row);
             LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať: {ex.Message}";
         }
     }

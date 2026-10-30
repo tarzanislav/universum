@@ -33,6 +33,44 @@ public sealed class PictureSubtitleTests
     }
 
     [Test]
+    public void DamagedAndCroppedPictures()
+    {
+        var data = new List<byte>();
+        void Segment(double seconds, byte type, params byte[] body)
+        {
+            var pts = (uint)Math.Round(seconds * 90000);
+            data.AddRange([(byte)'P', (byte)'G', (byte)(pts >> 24), (byte)(pts >> 16), (byte)(pts >> 8), (byte)pts, 0, 0, 0, 0, type, (byte)(body.Length >> 8), (byte)body.Length, .. body]);
+        }
+
+        // object 1: 4 × 1, colours 1 2 3 1; object 9 far outside the 1920 × 1080 canvas
+        byte[] palette = [0, 0, 1, 235, 128, 128, 255, 2, 81, 90, 240, 255, 3, 63, 240, 102, 255];
+        // shown: object 1 cropped to its x 2..3 at (10, 20), the same object listed three times, object 9 at (8000, 8000)
+        Segment(1, 0x16, 0x07, 0x80, 0x04, 0x38, 0x10, 0, 0, 0x80, 0, 0, 5,
+            0, 1, 0, 0x80, 0, 10, 0, 20, 0, 2, 0, 0, 0, 2, 0, 1,
+            0, 1, 0, 0, 0, 10, 0, 20,
+            0, 1, 0, 0, 0, 10, 0, 20,
+            0, 9, 0, 0, 0x1F, 0x40, 0x1F, 0x40);
+        Segment(1, 0x14, palette);
+        Segment(1, 0x15, 0, 1, 0, 0xC0, 0, 0, 13, 0, 4, 0, 1, 1, 2, 3, 1, 0, 0);
+        Segment(1, 0x15, 0, 9, 0, 0xC0, 0, 0, 10, 0, 1, 0, 1, 1, 0, 0);
+        Segment(1, 0x80);
+        // a later part of object 1 without its first part in this display set: lost, not added to the old picture
+        Segment(2, 0x15, 0, 1, 0, 0x40, 9, 9, 9);
+        Segment(2, 0x16, 0x07, 0x80, 0x04, 0x38, 0x10, 0, 1, 0x00, 0, 0, 1, 0, 1, 0, 0, 0, 10, 0, 20);
+        Segment(2, 0x80);
+        Segment(3, 0x16, 0x07, 0x80, 0x04, 0x38, 0x10, 0, 2, 0x00, 0, 0, 0);
+        Segment(3, 0x80);
+
+        var cues = PgsReader.Read([.. data]);
+        Assert.True(cues.Count == 2 && cues[0].Objects.Count == 2 && cues[0].Objects[0].Crop == (2, 0, 2, 1), "the same picture once, at most two a subtitle");
+        Assert.True(ReferenceEquals(cues[0].Objects[0].Rle, cues[1].Objects[0].Rle) && cues[1].Objects[0].Rle.Length == 6, "the pixels shared, the lost part not added");
+        var image = PgsReader.Render(cues[0])!;
+        Assert.True(image is { X: 10, Y: 20, Width: 2, Height: 1 }, $"only the cropped part, nothing outside the canvas – {image.X},{image.Y} {image.Width}×{image.Height}");
+        Assert.True(image.Bgra[2] > 200 && image.Bgra[0] < 60 && image.Bgra.Skip(4).All(b => b == 255),
+            "the part shows the pixels 2 and 3 (red, white), not 0 and 1 (white, blue) – " + string.Join(",", image.Bgra));
+    }
+
+    [Test]
     public async Task PicturesOfAnMkvTrack()
     {
         // the same subtitles in an MKV (mkvmerge takes the .sup), read back from the track as UNIVERSUM reads it

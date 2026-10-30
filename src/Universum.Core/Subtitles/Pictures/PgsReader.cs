@@ -2,9 +2,18 @@ using System.Buffers.Binary;
 
 namespace Universum.Core.Subtitles.Pictures;
 
-/// <summary>One picture of a picture subtitle: where it stands on the canvas and its run-length coded pixels.</summary>
-/// <param name="Rle">The pixels as PGS codes them (indexes into the palette, runs of equal ones).</param>
-public sealed record PictureObject(int X, int Y, int Width, int Height, byte[] Rle);
+/// <summary>
+/// One picture of a picture subtitle: where it stands on the canvas, its size and run-length coded pixels; a cropped one
+/// shows only its part <see cref="Crop"/> (at X, Y).
+/// </summary>
+/// <param name="Rle">The pixels as PGS codes them (indexes into the palette, runs of equal ones) – shared by the subtitles that show it.</param>
+public sealed record PictureObject(int X, int Y, int Width, int Height, byte[] Rle, (int X, int Y, int Width, int Height)? Crop = null)
+{
+    /// <summary>The size shown (the part when cropped).</summary>
+    public int ShownWidth => Crop is { } part ? Math.Min(part.Width, Math.Max(0, Width - part.X)) : Width;
+
+    public int ShownHeight => Crop is { } part ? Math.Min(part.Height, Math.Max(0, Height - part.Y)) : Height;
+}
 
 /// <summary>
 /// A picture subtitle (PGS of a Blu-ray): shown from <see cref="Start"/> to <see cref="End"/>, its pictures on a canvas
@@ -30,11 +39,23 @@ public static class PgsReader
     private const int MaximumSide = 8192;
     private const int MaximumObjectBytes = 16 * 1024 * 1024;
 
-    /// <summary>The subtitles of a ".sup" file.</summary>
+    // as the format allows: two pictures a subtitle, 64 pictures an epoch (more is damage)
+    private const int MaximumPlaced = 2;
+    private const int MaximumObjects = 64;
+
+    /// <summary>A ".sup" file larger than this is not read (the subtitles of a long film are tens of megabytes).</summary>
+    public const long MaximumFileBytes = 1L << 30;
+
+    /// <summary>The subtitles of a ".sup" file (read away from the caller's thread); <see cref="InvalidDataException"/> for a file too large.</summary>
     public static async Task<IReadOnlyList<PictureCue>> ReadFileAsync(string path, CancellationToken cancellationToken = default)
     {
+        if (new FileInfo(path).Length > MaximumFileBytes)
+        {
+            throw new InvalidDataException("Súbor obrázkových titulkov je príliš veľký.");
+        }
+
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
-        return Read(bytes);
+        return await Task.Run(() => Read(bytes), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>The subtitles of PGS data.</summary>
@@ -42,7 +63,9 @@ public static class PgsReader
     {
         var shown = new List<(TimeSpan Time, PictureCue? Cue)>();
         var palettes = new Dictionary<int, uint[]>();
-        var objects = new Dictionary<int, (int Width, int Height, List<byte> Rle)>();
+        // an object's pixels: collected from its fragments, made one array once shown (shared by every subtitle showing it)
+        var objects = new Dictionary<int, (int Width, int Height, List<byte> Rle, byte[]? Whole)>();
+        var started = new HashSet<int>();
         (TimeSpan Time, int Width, int Height, int Palette, List<(int Id, int X, int Y, (int X, int Y, int W, int H)? Crop)> Placed)? composition = null;
 
         var at = 0;
@@ -80,7 +103,7 @@ public static class PgsReader
                     var placed = new List<(int, int, int, (int, int, int, int)?)>();
                     var count = body[10];
                     var offset = 11;
-                    for (var i = 0; i < count && offset + 8 <= body.Length; i++)
+                    for (var i = 0; i < count && placed.Count < MaximumPlaced && offset + 8 <= body.Length; i++)
                     {
                         var id = BinaryPrimitives.ReadUInt16BigEndian(body[offset..]);
                         var cropped = (body[offset + 3] & 0x80) != 0;
@@ -95,7 +118,11 @@ public static class PgsReader
                             offset += 8;
                         }
 
-                        placed.Add((id, x, y, crop));
+                        // the same picture twice is damage: once
+                        if (placed.All(p => p.Item1 != id))
+                        {
+                            placed.Add((id, x, y, crop));
+                        }
                     }
 
                     composition = (Time(pts), BinaryPrimitives.ReadUInt16BigEndian(body), BinaryPrimitives.ReadUInt16BigEndian(body[2..]), body[9], placed);
@@ -130,24 +157,34 @@ public static class PgsReader
                         var length = (rle[0] << 16) | (rle[1] << 8) | rle[2];
                         var width = BinaryPrimitives.ReadUInt16BigEndian(rle[3..]);
                         var height = BinaryPrimitives.ReadUInt16BigEndian(rle[5..]);
-                        if (width is 0 or > MaximumSide || height is 0 or > MaximumSide || length > MaximumObjectBytes)
+                        if (width is 0 or > MaximumSide || height is 0 or > MaximumSide || length > MaximumObjectBytes ||
+                            (!objects.ContainsKey(id) && objects.Count >= MaximumObjects))
                         {
                             objects.Remove(id);
+                            started.Remove(id);
                             break;
                         }
 
-                        objects[id] = (width, height, [.. rle[7..]]);
+                        objects[id] = (width, height, [.. rle[7..]], null);
+                        started.Add(id);
                     }
-                    else if (objects.TryGetValue(id, out var started) && started.Rle.Count + rle.Length <= MaximumObjectBytes)
+                    else if (started.Contains(id) && objects.TryGetValue(id, out var begun) && begun.Rle.Count + rle.Length <= MaximumObjectBytes)
                     {
-                        started.Rle.AddRange(rle);
+                        // a later part of a picture whose first part came in this display set (else it is lost)
+                        begun.Rle.AddRange(rle);
                     }
 
                     break;
                 }
 
-                case EndOfSet when composition is { } set:
+                case EndOfSet:
                 {
+                    started.Clear();
+                    if (composition is not { } set)
+                    {
+                        break;
+                    }
+
                     composition = null;
                     if (set.Placed.Count == 0)
                     {
@@ -160,8 +197,13 @@ public static class PgsReader
                     {
                         if (objects.TryGetValue(id, out var picture) && picture.Rle.Count > 0)
                         {
-                            var whole = new PictureObject(x, y, picture.Width, picture.Height, [.. picture.Rle]);
-                            pictures.Add(crop is { } part ? Cropped(whole, part) : whole);
+                            if (picture.Whole is null)
+                            {
+                                picture = picture with { Whole = [.. picture.Rle] };
+                                objects[id] = picture;
+                            }
+
+                            pictures.Add(new PictureObject(x, y, picture.Width, picture.Height, picture.Whole, crop is { Item3: > 0, Item4: > 0 } part ? part : null));
                         }
                     }
 
@@ -192,37 +234,45 @@ public static class PgsReader
     }
 
     /// <summary>
-    /// The pictures of a subtitle drawn into one BGRA image of the area they cover (on the canvas); null when nothing
-    /// can be drawn.
+    /// The pictures of a subtitle drawn into one BGRA image of the area they cover on the canvas (what lies outside the
+    /// canvas is left out); null when nothing can be drawn.
     /// </summary>
     public static PictureImage? Render(PictureCue cue)
     {
-        if (cue.Objects.Count == 0)
+        if (cue.CanvasWidth is <= 0 or > MaximumSide || cue.CanvasHeight is <= 0 or > MaximumSide)
         {
             return null;
         }
 
-        var left = cue.Objects.Min(o => o.X);
-        var top = cue.Objects.Min(o => o.Y);
-        var width = cue.Objects.Max(o => o.X + o.Width) - left;
-        var height = cue.Objects.Max(o => o.Y + o.Height) - top;
-        if (width <= 0 || height <= 0 || width > MaximumSide || height > MaximumSide)
+        var shown = cue.Objects.Where(o => o.X < cue.CanvasWidth && o.Y < cue.CanvasHeight && o.ShownWidth > 0 && o.ShownHeight > 0).ToList();
+        if (shown.Count == 0)
+        {
+            return null;
+        }
+
+        var left = shown.Min(o => o.X);
+        var top = shown.Min(o => o.Y);
+        var width = Math.Min(cue.CanvasWidth, shown.Max(o => o.X + o.ShownWidth)) - left;
+        var height = Math.Min(cue.CanvasHeight, shown.Max(o => o.Y + o.ShownHeight)) - top;
+        if (width <= 0 || height <= 0)
         {
             return null;
         }
 
         var bgra = new byte[width * height * 4];
-        foreach (var picture in cue.Objects)
+        foreach (var picture in shown)
         {
-            Decode(picture, cue.Palette, bgra, width, picture.X - left, picture.Y - top);
+            Decode(picture, cue.Palette, bgra, width, height, picture.X - left, picture.Y - top);
         }
 
         return new PictureImage(left, top, width, height, bgra);
     }
 
-    // the run-length coded pixels into the image: a colour byte, or 0 and a code (end of line, runs of 0 or of a colour)
-    private static void Decode(PictureObject picture, uint[] palette, byte[] target, int stride, int left, int top)
+    // the run-length coded pixels into the image (a cropped picture: only its part, from the part's corner): a colour
+    // byte, or 0 and a code (end of line, runs of 0 or of a colour)
+    private static void Decode(PictureObject picture, uint[] palette, byte[] target, int stride, int rows, int left, int top)
     {
+        var (cropX, cropY, cropWidth, cropHeight) = picture.Crop ?? (0, 0, picture.Width, picture.Height);
         var rle = picture.Rle;
         int x = 0, y = 0, at = 0;
         while (at < rle.Length && y < picture.Height)
@@ -276,20 +326,18 @@ public static class PgsReader
             }
 
             var argb = palette[colour];
+            var row = top + y - cropY;
             for (var i = 0; i < run && x < picture.Width; i++, x++)
             {
-                var offset = (((top + y) * stride) + left + x) * 4;
-                if (offset >= 0 && offset + 4 <= target.Length && (argb >> 24) != 0)
+                var column = left + x - cropX;
+                if ((argb >> 24) != 0 && x >= cropX && x < cropX + cropWidth && y >= cropY && y < cropY + cropHeight &&
+                    column >= 0 && column < stride && row >= 0 && row < rows)
                 {
-                    BinaryPrimitives.WriteUInt32LittleEndian(target.AsSpan(offset), argb);
+                    BinaryPrimitives.WriteUInt32LittleEndian(target.AsSpan(((row * stride) + column) * 4), argb);
                 }
             }
         }
     }
-
-    // a cropped object: only its part (rare); the pixels are decoded whole, the part is cut by the picture's size
-    private static PictureObject Cropped(PictureObject whole, (int X, int Y, int W, int H) crop) =>
-        crop.X == 0 && crop.Y == 0 && crop.W > 0 && crop.H > 0 ? whole with { Width = Math.Min(whole.Width, crop.W), Height = Math.Min(whole.Height, crop.H) } : whole;
 
     // Y Cr Cb (limited range; BT.709 for HD, BT.601 for SD) and alpha → BGRA as one little-endian number
     private static uint Color(byte y, byte cr, byte cb, byte alpha, int height)

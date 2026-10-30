@@ -85,9 +85,36 @@ public partial class MainWindow : Window
 
     // Novinky: an opened series shows the tree of its episodes (a binding of the row itself – a style's would lose to
     // the grid's details mode)
-    // Časy titulkov: only the text of a subtitle that can be changed (subtitles read as text, no repair of the whole text)
+    // Časy titulkov: only the text of a subtitle that can be changed (subtitles read as text, no repair of the whole text);
+    // a double click goes to the subtitle, it does not edit
     private void OnCueBeginningEdit(object sender, System.Windows.Controls.DataGridBeginningEditEventArgs e) =>
-        e.Cancel = e.Row.Item is not SubtitlePreviewRow { IsEditable: true };
+        e.Cancel = e.Row.Item is not SubtitlePreviewRow { IsEditable: true } || e.EditingEventArgs is MouseButtonEventArgs { ClickCount: >= 2 };
+
+    private void OnCueDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGridRow { Item: SubtitlePreviewRow cue } row &&
+            System.Windows.Controls.ItemsControl.ItemsControlFromItemContainer(row)?.DataContext is SubtitlesPageViewModel page)
+        {
+            page.SeekToCueCommand.Execute(cue);
+        }
+    }
+
+    // the list is made anew while a text is being edited (a change of time, a track read): the edit ends first – a list
+    // in the middle of an edit cannot be replaced
+    private void OnCueGridLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid { DataContext: SubtitlesPageViewModel page } grid && !_cueGrids.Contains(grid))
+        {
+            _cueGrids.Add(grid);
+            page.PropertyChanging += (_, change) =>
+            {
+                if (change.PropertyName == nameof(SubtitlesPageViewModel.Preview) && !grid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true))
+                {
+                    grid.CancelEdit(System.Windows.Controls.DataGridEditingUnit.Row);
+                }
+            };
+        }
+    }
 
     // the row's edit ends with the text's, before the list is made anew with the changed text
     private void OnCueCellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
@@ -106,6 +133,8 @@ public partial class MainWindow : Window
             grid.ScrollIntoView(chosen);
         }
     }
+
+    private readonly HashSet<System.Windows.Controls.DataGrid> _cueGrids = [];
 
     private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
         e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,

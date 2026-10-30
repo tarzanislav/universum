@@ -532,6 +532,9 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         ShowPreview(null, []);
         _pictures.Clear();
         _reading.Clear();
+        _readingStop.Cancel();
+        _readingStop.Dispose();
+        _readingStop = new CancellationTokenSource();
         CompareRow = null;
         _ = Player.CloseAsync();
         HasWork = false;
@@ -618,7 +621,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         _previewOf = row;
         Preview = rows;
         SelectedPreview = chosen is null ? null
-            : chosen.Index is { } index ? rows.FirstOrDefault(r => r.Index >= index) ?? rows.LastOrDefault()
+            : chosen.Index is { } index && rows.Any(r => r.Index is not null) ? rows.FirstOrDefault(r => r.Index >= index) ?? rows.LastOrDefault()
             : rows.FirstOrDefault(r => r.Number.Length > 0 && r.Number == chosen.Number);
     }
 
@@ -634,10 +637,14 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     // after the list has finished its edit, as the list is made anew then
     private static void EditCueLater(SubtitleRow row, int index, string value)
     {
-        var lines = value.Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        // " | " (as the list shows a new line); a "|" in a word ("|t's" read from a picture) stays
+        var lines = LineSeparator().Split(value).Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
         var text = lines.Length == 0 ? null : string.Join('\n', lines);
         System.Windows.Application.Current.Dispatcher.BeginInvoke(() => row.EditCue(index, text));
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\s+\|\s+")]
+    private static partial System.Text.RegularExpressions.Regex LineSeparator();
 
     /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""

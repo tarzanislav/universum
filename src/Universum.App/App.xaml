@@ -12,6 +12,11 @@
             <local:TrackTypeBrushConverter x:Key="TrackTypeBrush" />
             <local:FileColorConverter x:Key="FileColor" />
 
+            <!-- long lists (all languages of MKVToolNix, thousands): only the visible items are made -->
+            <ItemsPanelTemplate x:Key="VirtualList">
+                <VirtualizingStackPanel VirtualizationMode="Recycling" />
+            </ItemsPanelTemplate>
+
             <!-- the type of a track as a pastel label (the same colours on every page) -->
             <Style x:Key="TypeChip" TargetType="Border">
                 <Setter Property="CornerRadius" Value="4" />

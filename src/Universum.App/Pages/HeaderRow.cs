@@ -7,9 +7,23 @@ namespace Universum.App.Pages;
 /// <summary>A language in the header editor's list.</summary>
 public sealed record LanguageChoice(LanguageTag Tag, string Display)
 {
-    /// <summary>"neurčený" and the built-in languages.</summary>
-    public static IReadOnlyList<LanguageChoice> Common { get; } =
-        [Of(LanguageTag.Undetermined), .. Languages.All.Select(l => Of(LanguageTag.FromCode(l.Ietf)))];
+    private static (IReadOnlyList<Language> Source, IReadOnlyList<LanguageChoice> Choices)? _common;
+
+    /// <summary>"neurčený", the common languages, then every other language MKVToolNix knows (built again when they come).</summary>
+    public static IReadOnlyList<LanguageChoice> Common
+    {
+        get
+        {
+            var all = Languages.All;
+            if (_common is not { } built || !ReferenceEquals(built.Source, all))
+            {
+                built = (all, [Of(LanguageTag.Undetermined), .. all.Where(l => l != Languages.Undetermined).Select(l => Of(LanguageTag.FromCode(l.Ietf)))]);
+                _common = built;
+            }
+
+            return built.Choices;
+        }
+    }
 
     public static LanguageChoice Of(LanguageTag tag)
     {

@@ -263,7 +263,7 @@ public sealed class FileSlotRow : ObservableObject
         Key = key;
         Track = track;
         _changed = changed;
-        Choices = [new FileLanguageItem(null, ""), .. FileLanguageItem.All];
+        Choices = new PrependedList<FileLanguageItem>(new FileLanguageItem(null, ""), FileLanguageItem.All);
         Refresh();
     }
 
@@ -369,9 +369,23 @@ public sealed class FileLanguageItem(Language? language, string display) : Obser
 {
     private string _display = display;
 
-    /// <summary>The languages, shared by all lists.</summary>
-    public static readonly IReadOnlyList<FileLanguageItem> All =
-        [.. Universum.Core.Media.Languages.All.Select(l => new FileLanguageItem(l, l.SlovakName))];
+    private static (IReadOnlyList<Language> Source, IReadOnlyList<FileLanguageItem> Items)? _all;
+
+    /// <summary>The languages, shared by all lists (built again when MKVToolNix adds its languages).</summary>
+    public static IReadOnlyList<FileLanguageItem> All
+    {
+        get
+        {
+            var languages = Universum.Core.Media.Languages.All;
+            if (_all is not { } built || !ReferenceEquals(built.Source, languages))
+            {
+                built = (languages, [.. languages.Select(l => new FileLanguageItem(l, l.SlovakName))]);
+                _all = built;
+            }
+
+            return built.Items;
+        }
+    }
 
     public Language? Language { get; } = language;
 

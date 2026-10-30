@@ -422,7 +422,7 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         var name = Path.GetFileNameWithoutExtension(path);
         var words = Words.Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var language = words.Reverse().Select(w => w switch { "cz" or "czech" => "cs", "slovak" => "sk", "english" => "en", _ => w })
-            .Select(w => w.Length is 2 or 3 ? Languages.Find(w) : null).FirstOrDefault(l => l is not null);
+            .Select(w => w.Length is 2 or 3 ? Languages.FindCommon(w) : null).FirstOrDefault(l => l is not null);
         return new SubtitleFileMatch(path, 0, "pridané ručne", language is null ? null : LanguageTag.FromCode(language.Ietf),
             Core.Text.Words.ContainsAny(name, _services.Profile.ForcedKeywords), Core.Text.Words.ContainsAny(name, _services.Profile.HearingImpairedKeywords));
     }

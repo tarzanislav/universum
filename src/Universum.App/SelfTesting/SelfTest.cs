@@ -70,6 +70,12 @@ internal static class SelfTest
 
         Write($"using {installation}");
         Check(installation.IsSupportedVersion, $"version {installation.Version} >= {MkvToolNixVersion.Minimum}");
+
+        // owner, 30. 10. 2026: every language of MKVToolNix in the lists (a film in Filipino), the common ones on top
+        Check(Languages.All.Count > 7000 && Languages.All.Take(Languages.Common.Count).SequenceEqual(Languages.Common) &&
+              Languages.Find("fil")?.SlovakName == "filipínčina" && LanguageChoice.Common.Any(c => c.Display == "filipínčina (fil)") &&
+              FileLanguageItem.All.Count == Languages.All.Count,
+            $"languages: all of MKVToolNix ({Languages.All.Count}), the common ones first, Filipino among them");
         foreach (var tool in Enum.GetValues<MkvToolNixTool>())
         {
             Check(installation.HasTool(tool), $"tool present: {MkvToolNixToolNames.FileName(tool)}");

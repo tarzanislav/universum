@@ -153,7 +153,7 @@ public static class ExternalSubtitles
     // a title made of more than the words every subtitle file may carry ("titulky", "cze", "forced")
     private static bool Meaningful(string? title) =>
         Words.Normalize(title).Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Any(w => !Neutral.Contains(w) && !LanguageWords.ContainsKey(w) && !HearingImpairedWords.Contains(w) && !(w.Length is 2 or 3 && Languages.Find(w) is not null) && w != "forced");
+            .Any(w => !Neutral.Contains(w) && !LanguageWords.ContainsKey(w) && !HearingImpairedWords.Contains(w) && !(w.Length is 2 or 3 && Languages.FindCommon(w) is not null) && w != "forced");
 
     // the language and flag words at the end of the name ("Film.2020.cze.forced"), and the name without them
     private static (LanguageTag? Language, bool Forced, bool HearingImpaired, string Title) Tail(string name, HashSet<string> forcedWords)
@@ -173,7 +173,7 @@ public static class ExternalSubtitles
             {
                 hearingImpaired = true;
             }
-            else if (LanguageWords.TryGetValue(word, out var code) || (word.Length is 2 or 3 && Languages.Find(word) is { } found && (code = found.Ietf) is not null))
+            else if (LanguageWords.TryGetValue(word, out var code) || (word.Length is 2 or 3 && Languages.FindCommon(word) is { } found && (code = found.Ietf) is not null))
             {
                 language ??= LanguageTag.FromCode(code!);
             }

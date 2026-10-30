@@ -54,6 +54,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
         NewsSources = new NewsSourcesViewModel(services);
         InterestSources = new InterestSourcesViewModel(services);
+        SubtitleAccounts = new SubtitleAccountsViewModel(services);
         Load(services.Profile);
     }
 
@@ -67,6 +68,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>Nastavenia → Zaujímavosti.</summary>
     public InterestSourcesViewModel InterestSources { get; }
+
+    /// <summary>OpenSubtitles.com and svsub.net accounts (Titulky).</summary>
+    public SubtitleAccountsViewModel SubtitleAccounts { get; }
 
     /// <summary>Asks the main window to open the update window.</summary>
     public event Action? ShowUpdatesRequested;

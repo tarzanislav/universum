@@ -6,12 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Planning;
 using Universum.Core.Processes;
 using Universum.Core.Rules;
 using Universum.Core.Subtitles;
+using Universum.Core.Subtitles.Download;
 using Universum.Core.Text;
 
 namespace Universum.App.Pages;
@@ -49,6 +51,10 @@ public sealed class SubtitlesPageViewModel : ObservableObject
     public SubtitlesPageViewModel(AppServices services)
     {
         _services = services;
+        SearchOnlineCommand = new AsyncRelayCommand(SearchOnlineAsync, () => !_busy && (_file is not null || Rows.Count > 0));
+        DownloadOnlineCommand = new AsyncRelayCommand<OpenSubtitlesResult>(DownloadOnlineAsync, r => !_busy && r is not null);
+        SearchTitulkyCommand = new RelayCommand(SearchTitulky, () => !_busy && (_file is not null || Rows.Count > 0));
+        TranslateCommand = new AsyncRelayCommand(TranslateAsync, () => !_busy && _selected is { IsText: true } && _services.SvSubToken is not null);
         Library = new LibraryTargetPicker(services, Target);
         Library.Changed += RefreshCommands;
         OpenVideoCommand = new AsyncRelayCommand(OpenVideoAsync, () => !_busy);
@@ -64,6 +70,43 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             RefreshCommands();
         }, () => !_busy && (_file is not null || Rows.Count > 0));
     }
+
+    /// <summary>OpenSubtitles.com: search the subtitles of the title (the language, SDH).</summary>
+    public AsyncRelayCommand SearchOnlineCommand { get; }
+
+    /// <summary>OpenSubtitles.com: download one, save it next to the video and add it.</summary>
+    public AsyncRelayCommand<OpenSubtitlesResult> DownloadOnlineCommand { get; }
+
+    /// <summary>titulky.com: the search in the browser; the downloaded file is taken from Downloads.</summary>
+    public RelayCommand SearchTitulkyCommand { get; }
+
+    /// <summary>svsub.net: translates the selected subtitles into <see cref="TranslateTo"/>.</summary>
+    public AsyncRelayCommand TranslateCommand { get; }
+
+    /// <summary>The results of OpenSubtitles.com.</summary>
+    public ObservableCollection<OpenSubtitlesResult> OnlineResults { get; } = [];
+
+    /// <summary>The languages subtitles are downloaded in and translated into.</summary>
+    public IReadOnlyList<string> OnlineLanguages { get; } = ["en", "cs", "sk"];
+
+    private string _onlineLanguage = "en";
+    private string _hearingImpairedFilter = "všetky";
+    private string _translateTo = "cs";
+    private string _onlineStatus = "";
+    private System.Windows.Threading.DispatcherTimer? _downloadsWatch;
+    private readonly HashSet<string> _taken = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The language searched on OpenSubtitles.com (owner: English, also SDH).</summary>
+    public string OnlineLanguage { get => _onlineLanguage; set => SetProperty(ref _onlineLanguage, value); }
+
+    public IReadOnlyList<string> HearingImpairedFilters { get; } = ["všetky", "len SDH", "bez SDH"];
+
+    public string HearingImpairedFilter { get => _hearingImpairedFilter; set => SetProperty(ref _hearingImpairedFilter, value); }
+
+    /// <summary>The language svsub.net translates into (owner: mostly "cz" = cs; also sk, en).</summary>
+    public string TranslateTo { get => _translateTo; set => SetProperty(ref _translateTo, value); }
+
+    public string OnlineStatus { get => _onlineStatus; private set => SetProperty(ref _onlineStatus, value); }
 
     /// <summary>Forgets the video and the subtitles (nothing changes on the disk); subtitle files dropped then are opened on their own.</summary>
     public RelayCommand ClearCommand { get; }
@@ -621,5 +664,220 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         RemoveCommand?.NotifyCanExecuteChanged();
         SaveCommand?.NotifyCanExecuteChanged();
         ClearCommand?.NotifyCanExecuteChanged();
+        SearchOnlineCommand?.NotifyCanExecuteChanged();
+        DownloadOnlineCommand?.NotifyCanExecuteChanged();
+        SearchTitulkyCommand?.NotifyCanExecuteChanged();
+        TranslateCommand?.NotifyCanExecuteChanged();
+    }
+
+    // the title for the services: the library picker's (with the TMDB ID), else the name of the file
+    private (string Name, int? Year, int? TmdbId, EpisodeNumber? Episode) Title()
+    {
+        if (Library.Title is { } title)
+        {
+            return (title.Name, title.Year, title.TmdbId, Library.Episode);
+        }
+
+        var path = _file?.Path ?? Rows.FirstOrDefault()?.ExternalPath ?? "";
+        var guess = TitleGuess.ForFile(path);
+        return (guess.Title?.Name ?? Path.GetFileNameWithoutExtension(path), guess.Title?.Year, guess.Title?.TmdbId, guess.Episode?.Number);
+    }
+
+    // where downloaded and translated subtitles are saved: next to the video, or next to the opened subtitle file
+    private string? Anchor => _file?.Path ?? Rows.FirstOrDefault(r => r.ExternalPath is not null)?.ExternalPath;
+
+    private async Task SearchOnlineAsync()
+    {
+        if (_services.OpenSubtitles() is not { } client)
+        {
+            OnlineStatus = "OpenSubtitles: zadajte API kľúč v Nastaveniach (Titulky – sťahovanie a preklad).";
+            return;
+        }
+
+        _busy = true;
+        RefreshCommands();
+        OnlineResults.Clear();
+        try
+        {
+            var (name, year, tmdb, episode) = Title();
+            var filter = HearingImpairedFilter switch { "len SDH" => "only", "bez SDH" => "exclude", _ => "include" };
+            var results = await client.SearchAsync(new OpenSubtitlesQuery(OnlineLanguage, tmdb, name, year, episode?.Season, episode?.Episode, filter));
+            foreach (var result in results.Take(40))
+            {
+                OnlineResults.Add(result);
+            }
+
+            OnlineStatus = results.Count == 0
+                ? $"OpenSubtitles: pre „{name}“{(episode is null ? "" : " " + episode.Tag)} nič nenašiel" + (tmdb is null ? " – skúste titul s TMDB ID." : ".")
+                : $"OpenSubtitles: {results.Count} výsledkov" + (tmdb is null ? " (podľa názvu – presnejšie s TMDB ID)" : " (podľa TMDB ID)") + ".";
+        }
+        catch (SubtitleServiceException ex)
+        {
+            OnlineStatus = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            RefreshCommands();
+        }
+    }
+
+    private async Task DownloadOnlineAsync(OpenSubtitlesResult? result)
+    {
+        if (result is null || _services.OpenSubtitles() is not { } client || Anchor is not { } anchor)
+        {
+            return;
+        }
+
+        var (_, user, password) = _services.OpenSubtitlesAccount;
+        if (user is null || password is null)
+        {
+            OnlineStatus = "OpenSubtitles: na stiahnutie treba meno a heslo účtu v Nastaveniach.";
+            return;
+        }
+
+        _busy = true;
+        RefreshCommands();
+        try
+        {
+            await client.LoginAsync(user, password);
+            var (name, content) = await client.DownloadAsync(result.FileId);
+            var document = SubtitleReader.Read(SubtitleDownloads.Text(content), _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond);
+            var language = LanguageTag.FromCode(result.Language.Length > 0 ? result.Language : OnlineLanguage).Primary;
+            var saved = await SubtitleDownloads.SaveBesideAsync(anchor, document, language, result.HearingImpaired, result.ForeignPartsOnly);
+            OnlineStatus = $"Stiahnuté ({name}) a uložené vedľa videa ako {Path.GetFileName(saved)}" + (client.Remaining is { } left ? $"; dnes ešte {left} stiahnutí." : ".");
+            _busy = false;
+            await AddFilesAsync([saved]);
+        }
+        catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException)
+        {
+            OnlineStatus = ex is SubtitleServiceException ? ex.Message : "Stiahnuté titulky sa nepodarilo uložiť: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            RefreshCommands();
+        }
+    }
+
+    // owner: titulky.com allows only a browser – UNIVERSUM opens the search and takes the downloaded file from Downloads
+    private void SearchTitulky()
+    {
+        var (name, _, _, episode) = Title();
+        var query = name + (episode is null ? "" : " " + episode.Tag);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SubtitleDownloads.TitulkyCom(query).AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            OnlineStatus = "Prehliadač sa nepodarilo otvoriť: " + ex.Message;
+            return;
+        }
+
+        var since = DateTime.UtcNow.AddSeconds(-2);
+        var until = DateTime.UtcNow.AddMinutes(30);
+        _downloadsWatch?.Stop();
+        _downloadsWatch = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _downloadsWatch.Tick += async (_, _) =>
+        {
+            if (DateTime.UtcNow > until || Anchor is null)
+            {
+                _downloadsWatch?.Stop();
+                return;
+            }
+
+            foreach (var download in SubtitleDownloads.NewFiles(AppServices.DownloadsFolder, since).Where(_taken.Add))
+            {
+                await TakeDownloadAsync(download);
+            }
+        };
+        _downloadsWatch.Start();
+        OnlineStatus = $"titulky.com je otvorený v prehliadači („{query}“). Stiahnuté titulky (aj ZIP) UNIVERSUM do 30 minút sám vezme zo Stiahnutých súborov, uloží ich vedľa videa a pridá.";
+    }
+
+    private async Task TakeDownloadAsync(string download)
+    {
+        if (Anchor is not { } anchor || _busy)
+        {
+            _taken.Remove(download);
+            return;
+        }
+
+        try
+        {
+            var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "downloads-" + Guid.NewGuid().ToString("N"));
+            var saved = new List<string>();
+            foreach (var file in SubtitleDownloads.Unpack(download, folder))
+            {
+                if (ExternalSubtitles.PictureExtensions.Contains(Path.GetExtension(file)))
+                {
+                    continue;
+                }
+
+                var document = await SubtitleReader.ReadFileAsync(file, _file?.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond);
+                var language = SubtitleLanguage.Detect(document.PlainText)?.Language ?? "und";
+                var name = Words.Normalize(Path.GetFileNameWithoutExtension(file));
+                saved.Add(await SubtitleDownloads.SaveBesideAsync(anchor, document, language, forced: Core.Text.Words.ContainsAny(name, _services.Profile.ForcedKeywords)));
+            }
+
+            if (saved.Count > 0)
+            {
+                OnlineStatus = $"Prevzaté zo Stiahnutých súborov: {Path.GetFileName(download)} → {string.Join(", ", saved.Select(Path.GetFileName))} (vedľa videa; pôvodný súbor ostal).";
+                await AddFilesAsync(saved);
+            }
+        }
+        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            OnlineStatus = $"{Path.GetFileName(download)} sa nedá prevziať: {ex.Message}";
+        }
+    }
+
+    // svsub.net (owner: when no subtitles exist): the selected subtitles translated with the user's token
+    private async Task TranslateAsync()
+    {
+        if (_selected is not { IsText: true } row || _services.SvSub() is not { } client || Anchor is not { } anchor || _services.CurrentMkvToolNix is not { } installation)
+        {
+            return;
+        }
+
+        if (string.Equals(row.Language.Tag.Primary, TranslateTo, StringComparison.OrdinalIgnoreCase))
+        {
+            OnlineStatus = "Zdrojový a cieľový jazyk nemôžu byť rovnaké – vyberte iný cieľový jazyk.";
+            return;
+        }
+
+        _busy = true;
+        RefreshCommands();
+        try
+        {
+            var document = row.Document;
+            if (document is null && _file is not null)
+            {
+                OnlineStatus = "Čítam celú titulkovú stopu (číta sa celý súbor)…";
+                document = row.Document = await SubtitleText.ExtractDocumentAsync(installation, _services.Runner, _file, row.Track);
+            }
+
+            if (document is null)
+            {
+                OnlineStatus = "Titulky sa nepodarilo prečítať.";
+                return;
+            }
+
+            var translated = await client.TranslateAsync(SrtWriter.Write(document), TranslateTo, _services.SvSubProvider, new Progress<string>(s => OnlineStatus = "svsub.net: " + s));
+            var saved = await SubtitleDownloads.SaveBesideAsync(anchor, SubtitleReader.Read(translated), TranslateTo, row.HearingImpaired, row.Forced);
+            OnlineStatus = $"Preložené ({row.Language.Tag.Primary} → {TranslateTo}) a uložené vedľa videa ako {Path.GetFileName(saved)}; úloha na svsub.net je zmazaná.";
+            _busy = false;
+            await AddFilesAsync([saved]);
+        }
+        catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException)
+        {
+            OnlineStatus = ex is SubtitleServiceException ? ex.Message : "Preklad sa nepodarilo uložiť: " + ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+            RefreshCommands();
+        }
     }
 }

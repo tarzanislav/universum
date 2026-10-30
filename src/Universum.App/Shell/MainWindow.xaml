@@ -1043,7 +1043,49 @@
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     </StackPanel>
                 </DockPanel>
-                <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding HasFound, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Grid.Row="1">
+                <Expander Header="Stiahnuť a preložiť titulky" Margin="0,10,0,0" IsExpanded="False">
+                    <Border Style="{StaticResource Card}" Margin="0,6,0,0">
+                        <StackPanel>
+                            <WrapPanel>
+                                <TextBlock Text="OpenSubtitles.com:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding OnlineLanguage}" Width="60" Margin="0,0,6,0" ToolTip="Jazyk titulkov" />
+                                <ComboBox ItemsSource="{Binding HearingImpairedFilters}" SelectedItem="{Binding HearingImpairedFilter}" Width="100" Margin="0,0,6,0" ToolTip="Titulky pre nepočujúcich (SDH)" />
+                                <Button Content="Hľadať" Command="{Binding SearchOnlineCommand}" Padding="12,3" Margin="0,0,20,0"
+                                        ToolTip="Podľa titulu (s TMDB ID presne) a epizódy; účet a API kľúč v Nastaveniach" />
+                                <TextBlock Text="titulky.com (CZ/SK):" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Button Content="Hľadať v prehliadači" Command="{Binding SearchTitulkyCommand}" Padding="12,3" Margin="0,0,20,0"
+                                        ToolTip="Pravidlá titulky.com dovoľujú len prehliadač: stiahnite titulky, UNIVERSUM ich sám vezme zo Stiahnutých súborov" />
+                                <TextBlock Text="Preložiť vybrané (svsub.net) do:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding TranslateTo}" Width="60" Margin="0,0,6,0" />
+                                <Button Content="Preložiť" Command="{Binding TranslateCommand}" Padding="12,3"
+                                        ToolTip="Vybrané titulky preloží AI cez váš účet svsub.net (token v Nastaveniach); posielajú sa len titulky pod neutrálnym názvom" />
+                            </WrapPanel>
+                            <TextBlock Text="{Binding OnlineStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <ItemsControl ItemsSource="{Binding OnlineResults}" MaxHeight="160" Margin="0,4,0,0">
+                                <ItemsControl.Template>
+                                    <ControlTemplate>
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter />
+                                        </ScrollViewer>
+                                    </ControlTemplate>
+                                </ItemsControl.Template>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,1">
+                                            <Button DockPanel.Dock="Left" Content="Stiahnuť" Padding="8,1" Margin="0,0,8,0"
+                                                    Command="{Binding DataContext.DownloadOnlineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="Stiahnuté a preložené titulky sa uložia vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor) – Single aj Hromadné spracovanie ich potom nájdu samo." />
+                        </StackPanel>
+                    </Border>
+                </Expander>
+                <Border Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding HasFound, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <TextBlock Text="Externé titulky pri videu (podľa názvu, slov názvu a čísla epizódy):" FontWeight="SemiBold" Margin="0,0,0,4" />
                         <ItemsControl ItemsSource="{Binding Found}">
@@ -1058,6 +1100,7 @@
                         </ItemsControl>
                     </StackPanel>
                 </Border>
+                </StackPanel>
                 <Grid Grid.Row="2" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="380" />
@@ -3166,6 +3209,46 @@
                                 <Button Content="Vymazať uložené novinky a históriu…" Command="{Binding ClearCacheCommand}" Padding="12,5" />
                             </WrapPanel>
                             <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding SubtitleAccounts}">
+                        <StackPanel>
+                            <TextBlock Text="Titulky – sťahovanie a preklad (vaše účty)" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="OpenSubtitles.com (anglické titulky, aj SDH): API kľúč z profilu (API Consumers), meno a heslo na sťahovanie. svsub.net: váš token (svs_…) – prekladá sa vaším AI kľúčom uloženým v nastaveniach služby. Kľúče a heslo sa ukladajú šifrovane len pre váš účet Windows; nič sa neposiela, kým na stránke Titulky nehľadáte, nesťahujete ani neprekladáte." />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding OpenSubtitlesKey, UpdateSourceTrigger=PropertyChanged}" ToolTip="OpenSubtitles.com – API kľúč (uložený sa nezobrazuje)" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" Text="{Binding OpenSubtitlesUser, UpdateSourceTrigger=PropertyChanged}" ToolTip="Meno účtu OpenSubtitles.com" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="2" Text="{Binding OpenSubtitlesPassword, UpdateSourceTrigger=PropertyChanged}" ToolTip="Heslo účtu (uložené sa nezobrazuje)" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                    <Button Content="Overiť a uložiť" Command="{Binding SaveOpenSubtitlesCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveOpenSubtitlesCommand}" Padding="12,5" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Text="API kľúč · meno · heslo" Margin="2,2,0,8" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding SvSubToken, UpdateSourceTrigger=PropertyChanged}" ToolTip="svsub.net – token (svs_…; uložený sa nezobrazuje)" Margin="0,0,6,0" />
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding Providers}" Text="{Binding SvSubProvider, UpdateSourceTrigger=PropertyChanged}" IsEditable="True"
+                                          ToolTip="Poskytovateľ AI, ktorým svsub.net prekladá (váš kľúč je v nastaveniach služby; model sa vyberá tam)" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                    <Button Content="Uložiť" Command="{Binding SaveSvSubCommand}" Padding="12,5" Margin="0,0,8,0" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveSvSubCommand}" Padding="12,5" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Text="token svsub.net · poskytovateľ AI" Margin="2,2,0,6" />
+                            <TextBlock Text="{Binding Stored}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding InterestSources}">

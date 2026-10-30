@@ -29,6 +29,9 @@ public sealed record TrackDecisions
     /// </summary>
     public IReadOnlyList<int> Order { get; init; } = [];
 
+    /// <summary>New times of subtitle tracks (Úprava titulkostopy: Zmena FPS, rýchlosti, Posun – owner, 30. 10. 2026).</summary>
+    public IReadOnlyDictionary<int, Subtitles.SubtitleTiming> Timings { get; init; } = new Dictionary<int, Subtitles.SubtitleTiming>();
+
     /// <summary>Video names to reuse, so a preview does not change on every recalculation.</summary>
     public IReadOnlyDictionary<int, string> VideoNames { get; init; } = new Dictionary<int, string>();
 }

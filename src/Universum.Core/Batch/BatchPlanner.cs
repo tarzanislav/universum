@@ -166,6 +166,13 @@ public static class BatchPlanner
 
     public static BatchItem PlanFile(MediaFile file, BatchGroup group, BatchTemplate template, RuleProfile profile, LibraryJob? library = null)
     {
+        // Úprava titulkostopy: the subtitle files added there are tracks of the file (written with it)
+        var studio = group.Decisions.Studio.GetValueOrDefault(file.Path);
+        if (studio is not null)
+        {
+            file = studio.Apply(file);
+        }
+
         var evidence = new Dictionary<SlotKey, LanguageEvidence>();
         var languages = new Dictionary<int, LanguageTag>();
         var forced = new Dictionary<int, bool>();
@@ -195,11 +202,16 @@ public static class BatchPlanner
             Kept = group.Decisions.Kept.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
             Order = group.Decisions.Order.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToList(),
         };
+        if (studio is not null)
+        {
+            decisions = studio.Apply(decisions, file);
+        }
+
         var target = UniversumRules.Apply(file, profile, decisions);
         var match = template.Evaluate(target);
         if (template.Unlisted == UnlistedTracks.Remove && match.Unlisted.Count > 0)
         {
-            decisions = decisions with { Removed = match.Unlisted.Select(t => t.TrackId).Where(id => !decisions.Kept.Contains(id)).ToHashSet() };
+            decisions = decisions with { Removed = decisions.Removed.Concat(match.Unlisted.Select(t => t.TrackId).Where(id => !decisions.Kept.Contains(id))).ToHashSet() };
             target = UniversumRules.Apply(file, profile, decisions);
             match = template.Evaluate(target);
         }

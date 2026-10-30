@@ -95,6 +95,7 @@ public sealed class BatchPageViewModel : ObservableObject
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
                                                              _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
+        EditInStudioCommand = new RelayCommand(EditInStudio, () => !Busy && !IsRunning && _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
@@ -201,6 +202,8 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        _studioEdits.Clear();
+
         _subtitleReading?.Cancel();
         _analysis = null;
         _items = [];
@@ -289,6 +292,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (SetProperty(ref _selectedFile, value))
             {
                 ShowInfoCommand.NotifyCanExecuteChanged();
+                EditInStudioCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -298,6 +302,77 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>The Information page should show this file.</summary>
     public event Action<string>? InfoRequested;
+
+    /// <summary>Úprava titulkostopy for the selected file (owner, 30. 10. 2026: Upraviť v štúdiu → Uložiť do úlohy).</summary>
+    public RelayCommand EditInStudioCommand { get; }
+
+    /// <summary>
+    /// The studio should open a file of the batch: the file as the analysis has it (with the subtitle files found with
+    /// it) and its edits so far.
+    /// </summary>
+    public event Action<MediaFile, StudioEdits?>? StudioRequested;
+
+    private void EditInStudio()
+    {
+        if (_selectedFile?.Item is not { } item || item.Group.Files.FirstOrDefault(f => Paths.Same(f.Path, item.File.Path)) is not { } analysed)
+        {
+            return;
+        }
+
+        StudioRequested?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path));
+    }
+
+    /// <summary>
+    /// Uložiť do úlohy: the studio's edits of a file of the batch (none: forgotten); the plan is computed again. They
+    /// stay with the file's path, also when the folder is analysed again. Null when taken, else why not.
+    /// </summary>
+    public string? SaveStudio(string path, StudioEdits edits)
+    {
+        if (IsRunning || _ranSinceAnalysis || _needsAnalysis)
+        {
+            return IsRunning
+                ? "Hromadné spracovanie práve beží – úpravu uložte do úlohy po jeho skončení a novej analýze."
+                : "Hromadné spracovanie už prebehlo (alebo čaká na novú analýzu) – analyzujte priečinok znova a úpravu uložte potom.";
+        }
+
+        if (_analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path))) is not { } group)
+        {
+            return "Súbor už nie je v Hromadnom spracovaní – analyzujte priečinok znova.";
+        }
+
+        var key = group.Files.First(f => Paths.Same(f.Path, path)).Path;
+        if (edits.IsEmpty)
+        {
+            group.Decisions.Studio.Remove(key);
+            _studioEdits.Remove(key);
+        }
+        else
+        {
+            group.Decisions.Studio[key] = edits;
+            _studioEdits[key] = edits;
+        }
+
+        Replan();
+        RunState = $"{Path.GetFileName(path)}: úprava titulkostopy v úlohe – {edits.Describe()}.";
+        return null;
+    }
+
+    // the studio's edits by the files' paths: given again to the groups of every new analysis of the folder
+    private readonly Dictionary<string, StudioEdits> _studioEdits = new(Paths.Comparer);
+
+    private void ApplyStudioEdits()
+    {
+        foreach (var group in _analysis?.Groups ?? [])
+        {
+            foreach (var file in group.Files)
+            {
+                if (_studioEdits.TryGetValue(file.Path, out var edits))
+                {
+                    group.Decisions.Studio[file.Path] = edits;
+                }
+            }
+        }
+    }
 
     /// <summary>The analysed files, by group (for the Information page).</summary>
     public IEnumerable<KnownFile> KnownFiles =>
@@ -1036,6 +1111,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
             ApplySentSeries();
             var hint = ApplySeriesMemory();
+            ApplyStudioEdits();
             ApplyEditedBatch();
 
             // owner, 29. 10. 2026: a folder sorted into MOVIES and TVSHOWS – each group holds one title
@@ -1408,7 +1484,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private void ArrangeSlots()
     {
         if (SlotRows.Count == 0 || SlotRows[0].Group is not { } group ||
-            _items.FirstOrDefault(i => i.Group == group && i.File == group.Representative) is not { } item)
+            _items.FirstOrDefault(i => i.Group == group && Paths.Same(i.File.Path, group.Representative.Path)) is not { } item)
         {
             return;
         }
@@ -2516,7 +2592,10 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 var path = media.Path;
-                var slots = SlotKey.Of(media).ToDictionary(x => x.Track.Id, x => x.Key);
+                // decisions by track ID only for the file's own tracks the studio does not decide (the IDs of external
+                // files are given by each analysis; the studio's edits come back by path)
+                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).ToHashSet() : new HashSet<int>();
+                var slots = SlotKey.Of(media).Where(x => x.Track.ExternalFile is null && !studied.Contains(x.Track.Id)).ToDictionary(x => x.Track.Id, x => x.Key);
                 kinds.Add(file.Title.Kind);
                 _library.KindOfFile[path] = file.Title.Kind;
                 _library.ConfirmedKinds.Add(path);
@@ -2553,6 +2632,12 @@ public sealed class BatchPageViewModel : ObservableObject
                 if (file.ProcessAnyway)
                 {
                     group.Decisions.ProcessAnyway.Add(path);
+                }
+
+                if (file.Studio is { } studio)
+                {
+                    group.Decisions.Studio[path] = studio;
+                    _studioEdits[path] = studio;
                 }
             }
         }
@@ -2867,7 +2952,7 @@ public sealed class BatchPageViewModel : ObservableObject
         foreach (var command in new IRelayCommand[]
                  {
                      ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
-                     DetectAudioAllCommand, EditTemplateCommand,
+                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,

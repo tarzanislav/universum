@@ -51,6 +51,11 @@ public sealed class GroupDecisions
     /// </summary>
     public List<SlotKey> Order { get; } = [];
 
+    /// <summary>
+    /// Úprava titulkostopy of single files (full path → its edits; owner, 30. 10. 2026: Upraviť v štúdiu → Uložiť do úlohy).
+    /// </summary>
+    public Dictionary<string, StudioEdits> Studio { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
     /// <summary>Files (full paths) to process even though required template slots are missing.</summary>
     public HashSet<string> ProcessAnyway { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 }

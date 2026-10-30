@@ -104,8 +104,13 @@ public sealed class MainViewModel : ObservableObject
         SelectedTool = Tools.First(t => t.Page == Subtitles);
         await Subtitles.EditForBatchAsync(file, edits, saved =>
         {
-            Batch.SaveStudio(file.Path, saved);
-            SelectedTool = batch;
+            var refused = Batch.SaveStudio(file.Path, saved);
+            if (refused is null)
+            {
+                SelectedTool = batch;
+            }
+
+            return refused;
         }, () => SelectedTool = batch);
     }
 

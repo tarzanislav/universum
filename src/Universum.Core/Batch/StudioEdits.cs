@@ -36,6 +36,18 @@ public sealed record StudioEdits
     /// <summary>Languages chosen for external files found by the analysis, by path.</summary>
     public Dictionary<string, LanguageTag> FileLanguages { get; init; } = [];
 
+    /// <summary>Forced chosen for the video's own subtitle tracks, by track ID (only where the studio changed it).</summary>
+    public Dictionary<int, bool> Forced { get; init; } = [];
+
+    /// <summary>Forced chosen for external files found by the analysis, by path.</summary>
+    public Dictionary<string, bool> FileForced { get; init; } = [];
+
+    /// <summary>
+    /// The values of the studio's rows (FPS, speed, shift, as typed) – the studio shows them again exactly when the task
+    /// is opened again; the plan uses the times above.
+    /// </summary>
+    public List<StudioTrackState> States { get; init; } = [];
+
     /// <summary>Subtitle tracks of the video left out.</summary>
     public List<int> Removed { get; init; } = [];
 
@@ -45,8 +57,8 @@ public sealed record StudioEdits
     /// <summary>External files added in the studio.</summary>
     public List<StudioFile> Added { get; init; } = [];
 
-    public bool IsEmpty => Timings.Count == 0 && FileTimings.Count == 0 && Languages.Count == 0 && FileLanguages.Count == 0 && Removed.Count == 0 &&
-                           RemovedFiles.Count == 0 && Added.Count == 0;
+    public bool IsEmpty => Timings.Count == 0 && FileTimings.Count == 0 && Languages.Count == 0 && FileLanguages.Count == 0 && Forced.Count == 0 &&
+                           FileForced.Count == 0 && Removed.Count == 0 && RemovedFiles.Count == 0 && Added.Count == 0;
 
     /// <summary>In words, for the batch: "časy titulkov 2, pridané 1, vynechané 1".</summary>
     public string Describe()
@@ -93,6 +105,7 @@ public sealed record StudioEdits
     {
         var timings = decisions.Timings.ToDictionary();
         var languages = decisions.Languages.ToDictionary();
+        var forced = decisions.Forced.ToDictionary();
         var removed = decisions.Removed.ToHashSet();
         foreach (var track in file.TracksOf(TrackType.Subtitles))
         {
@@ -111,13 +124,27 @@ public sealed record StudioEdits
                 languages[track.Id] = chosen.Value;
             }
 
+            // forced: a file added here as it was added, the others where the studio changed it
+            if (path is not null && Added.FirstOrDefault(a => Paths.Same(a.Path, path)) is { } added)
+            {
+                forced[track.Id] = added.Forced;
+            }
+            else if (path is null && Forced.TryGetValue(track.Id, out var isForced))
+            {
+                forced[track.Id] = isForced;
+            }
+            else if (path is not null && FileForced.FirstOrDefault(f => Paths.Same(f.Key, path)) is { Key: not null } fileForced)
+            {
+                forced[track.Id] = fileForced.Value;
+            }
+
             if (path is null ? Removed.Contains(track.Id) : RemovedFiles.Any(r => Paths.Same(r, path)))
             {
                 removed.Add(track.Id);
             }
         }
 
-        return decisions with { Timings = timings, Languages = languages, Removed = removed };
+        return decisions with { Timings = timings, Languages = languages, Forced = forced, Removed = removed };
     }
 
     // by path, as Windows compares names

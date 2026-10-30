@@ -537,7 +537,7 @@ public sealed class BatchTests
             Timings = { [3] = SubtitleTiming.Delay(1500) },
             FileTimings = { [added] = SubtitleTiming.Delay(-200) },
             Removed = [2],
-            Added = [new StudioFile(added, LanguageTag.FromCode("cs"), false, false, "S_TEXT/UTF8", "SubRip/SRT", true, 1)],
+            Added = [new StudioFile(added, LanguageTag.FromCode("cs"), true, false, "S_TEXT/UTF8", "SubRip/SRT", true, 1)],
         };
         var library = Library(work.Path, analysis);
         var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single();
@@ -551,8 +551,9 @@ public sealed class BatchTests
         new Universum.Core.Mega.MegaStore(file).Add("Štúdio", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [item]);
         var stored = new Universum.Core.Mega.MegaStore(file).Batches.Single().Files.Single();
         Assert.True(stored.Timings.Count == 2 && stored.Studio is { Added.Count: 1, Removed: [2] } && stored.Externals.Any(e => e.Path == added) &&
-                    stored.Decisions().Timings[3] == SubtitleTiming.Delay(1500),
-            "the MEGA batch holds the times, the edits and the added file");
+                    stored.Decisions().Timings[3] == SubtitleTiming.Delay(1500) && stored.Forced[external!.Id],
+            "the MEGA batch holds the times, the edits and the added file – forced, as added");
+        Assert.True(item.Target.For(external!.Id) is { Role: TrackRole.Forced }, "the added file is forced subtitles in the plan");
 
         // written: the added file is a track, the English subtitles are left out
         var result = (await RunAsync(work.Path, [item])).Single();

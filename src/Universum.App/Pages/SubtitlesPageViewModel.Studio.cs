@@ -20,8 +20,10 @@ public sealed partial class SubtitlesPageViewModel
     private bool _compare;
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
-    private (string Path, IReadOnlyList<MediaTrack> Externals, Action<StudioEdits> Save, Action Leave)? _task;
+    private (string Path, IReadOnlyList<MediaTrack> Externals, Func<StudioEdits, string?> Save, Action Leave)? _task;
     private bool _openingTask;
+    private int _taskLoad;
+    private int _quiet;
     private bool _hasWork;
     private string _workNote = "";
 
@@ -30,7 +32,8 @@ public sealed partial class SubtitlesPageViewModel
 
     public string TaskText => _task is { } task
         ? $"Úloha Hromadného spracovania: {System.IO.Path.GetFileName(task.Path)}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, " +
-          "ich jazyk a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Opravy textu sa v úlohe nepoužijú."
+          "ich jazyk, Forced a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Názov stopy a príznak pre nepočujúcich dajú " +
+          "pravidlá, opravy textu sa v úlohe nepoužijú."
         : "";
 
     /// <summary>Uložiť do úlohy: the edits go back to Hromadné spracovanie.</summary>
@@ -123,10 +126,20 @@ public sealed partial class SubtitlesPageViewModel
 
     /// <summary>
     /// Upraviť v štúdiu (owner, 30. 10. 2026): a file of Hromadné spracovanie as the analysis has it (with the subtitle
-    /// files found with it) and its edits so far; <paramref name="save"/> gets the edits (Uložiť do úlohy).
+    /// files found with it) and its edits so far; <paramref name="save"/> gets the edits (Uložiť do úlohy) and says why
+    /// Hromadné spracovanie cannot take them (null: taken). False when
+    /// the studio is busy (saving, syncing) – it says so.
     /// </summary>
-    public async Task EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Action<StudioEdits> save, Action leave)
+    public async Task<bool> EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Func<StudioEdits, string?> save, Action leave)
     {
+        if (_busy)
+        {
+            LiveStatus = "Štúdio práve pracuje (ukladá, napasováva alebo sťahuje) – skúste Upraviť v štúdiu o chvíľu.";
+            return false;
+        }
+
+        // a newer task (or another video opened) wins
+        var load = ++_taskLoad;
         _openingTask = true;
         try
         {
@@ -134,71 +147,101 @@ public sealed partial class SubtitlesPageViewModel
         }
         finally
         {
-            _openingTask = false;
+            if (load == _taskLoad)
+            {
+                _openingTask = false;
+            }
         }
 
-        if (_file is null)
+        if (load != _taskLoad || _file is null || !Paths.Same(_file.Path, analysed.Path))
         {
-            return;
+            return false;
         }
 
-        // the subtitle files the analysis found with the video, with its languages
+        // the subtitle files the analysis found with the video, with its languages, and those added here before
         var externals = analysed.Tracks.Where(t => t.ExternalFile is not null).ToList();
-        await AddFilesAsync([.. externals.Select(t => t.ExternalFile!).Where(File.Exists)]);
-        foreach (var track in externals)
+        await AddFilesAsync([.. externals.Select(t => t.ExternalFile!).Concat(edits?.Added.Select(a => a.Path) ?? []).Where(File.Exists)]);
+        if (load != _taskLoad || _file is null || !Paths.Same(_file.Path, analysed.Path))
         {
-            RowOf(track.ExternalFile!)?.Choose(track.Language);
+            return false;
         }
 
-        if (edits is not null)
+        _quiet++;
+        try
         {
-            await AddFilesAsync([.. edits.Added.Select(a => a.Path).Where(File.Exists)]);
-            foreach (var file in edits.Added)
+            foreach (var track in externals)
             {
-                if (RowOf(file.Path) is { } row)
-                {
-                    row.Choose(file.Language);
-                    row.Forced = file.Forced;
-                    row.HearingImpaired = file.HearingImpaired;
-                }
+                RowOf(track.ExternalFile!)?.Choose(track.Language);
             }
 
-            foreach (var row in Rows)
+            if (edits is not null)
             {
-                if (row.ExternalPath is not { } path)
-                {
-                    if (edits.Timings.TryGetValue(row.Track.Id, out var timing))
-                    {
-                        row.SetTiming(timing);
-                    }
-
-                    if (edits.Languages.TryGetValue(row.Track.Id, out var language))
-                    {
-                        row.Choose(language);
-                    }
-
-                    row.Include = !edits.Removed.Contains(row.Track.Id);
-                    continue;
-                }
-
-                if (edits.FileTimings.FirstOrDefault(t => Paths.Same(t.Key, path)).Value is { } fileTiming)
-                {
-                    row.SetTiming(fileTiming);
-                }
-
-                if (edits.FileLanguages.FirstOrDefault(l => Paths.Same(l.Key, path)) is { Key: not null } fileLanguage)
-                {
-                    row.Choose(fileLanguage.Value);
-                }
-
-                row.Include = !edits.RemovedFiles.Any(r => Paths.Same(r, path));
+                Apply(edits);
             }
+        }
+        finally
+        {
+            _quiet--;
+            Changed();
         }
 
         _task = (analysed.Path, externals, save, leave);
         OnPropertyChanged(nameof(IsTask));
         OnPropertyChanged(nameof(TaskText));
         RefreshCommands();
+        return true;
+    }
+
+    // the edits of a task opened again: the rows' own values when they were saved, else the times and choices
+    private void Apply(StudioEdits edits)
+    {
+        foreach (var file in edits.Added)
+        {
+            if (RowOf(file.Path) is { } row)
+            {
+                row.Choose(file.Language);
+                row.Forced = file.Forced;
+                row.HearingImpaired = file.HearingImpaired;
+            }
+        }
+
+        foreach (var row in Rows)
+        {
+            var path = row.ExternalPath;
+            if (edits.States.FirstOrDefault(s => path is null ? s.TrackId == row.Track.Id : s.ExternalFile is { } known && Paths.Same(known, path)) is { } state)
+            {
+                row.Restore(state);
+                continue;
+            }
+
+            if (path is null)
+            {
+                if (edits.Timings.TryGetValue(row.Track.Id, out var timing))
+                {
+                    row.SetTiming(timing);
+                }
+
+                if (edits.Languages.TryGetValue(row.Track.Id, out var language))
+                {
+                    row.Choose(language);
+                }
+
+                row.Include = !edits.Removed.Contains(row.Track.Id);
+                continue;
+            }
+
+            if (edits.FileTimings.FirstOrDefault(t => Paths.Same(t.Key, path)).Value is { } fileTiming)
+            {
+                row.SetTiming(fileTiming);
+            }
+
+            if (edits.FileLanguages.FirstOrDefault(l => Paths.Same(l.Key, path)) is { Key: not null } fileLanguage)
+            {
+                row.Choose(fileLanguage.Value);
+            }
+
+            row.Include = !edits.RemovedFiles.Any(r => Paths.Same(r, path));
+        }
     }
 
     private SubtitleRow? RowOf(string externalFile) => Rows.FirstOrDefault(r => r.ExternalPath is { } path && Paths.Same(path, externalFile));
@@ -207,6 +250,13 @@ public sealed partial class SubtitlesPageViewModel
     {
         if (_task is not { } task)
         {
+            return;
+        }
+
+        if (_file is null || !Paths.Same(_file.Path, task.Path))
+        {
+            LiveStatus = "V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Upraviť v štúdiu.";
+            EndTask();
             return;
         }
 
@@ -223,7 +273,10 @@ public sealed partial class SubtitlesPageViewModel
             return;
         }
 
-        var edits = new StudioEdits();
+        var edits = new StudioEdits { States = [.. Rows.Select(r => r.State())] };
+
+        // a file of the analysis taken off the list (or gone from the disk) is left out
+        edits.RemovedFiles.AddRange(task.Externals.Select(t => t.ExternalFile!).Where(p => RowOf(p) is null));
         foreach (var row in Rows)
         {
             var timing = row.Timing;
@@ -244,6 +297,11 @@ public sealed partial class SubtitlesPageViewModel
                     edits.Languages[row.Track.Id] = row.Language.Tag;
                 }
 
+                if (row.Forced != row.InitialForced)
+                {
+                    edits.Forced[row.Track.Id] = row.Forced;
+                }
+
                 continue;
             }
 
@@ -258,6 +316,11 @@ public sealed partial class SubtitlesPageViewModel
                 {
                     edits.FileLanguages[path] = row.Language.Tag;
                 }
+
+                if (row.Forced != row.InitialForced)
+                {
+                    edits.FileForced[path] = row.Forced;
+                }
             }
             else if (row.Include)
             {
@@ -271,8 +334,14 @@ public sealed partial class SubtitlesPageViewModel
             }
         }
 
+        // the task stays open when Hromadné spracovanie cannot take the edits now (it runs, it ran)
+        if (task.Save(edits) is { } refused)
+        {
+            LiveStatus = refused;
+            return;
+        }
+
         EndTask();
-        task.Save(edits);
     }
 
     private void EndTask()
@@ -314,11 +383,26 @@ public sealed partial class SubtitlesPageViewModel
             return;
         }
 
+        var video = _file.Path;
         await AddFilesAsync([.. work.Tracks.Select(t => t.ExternalFile).OfType<string>().Where(p => File.Exists(p) && RowOf(p) is null)]);
-        foreach (var state in work.Tracks)
+        if (_file is null || !Paths.Same(_file.Path, video))
         {
-            var row = state.TrackId is { } id ? Rows.FirstOrDefault(r => !r.IsExternal && r.Track.Id == id) : state.ExternalFile is { } path ? RowOf(path) : null;
-            row?.Restore(state);
+            return;
+        }
+
+        _quiet++;
+        try
+        {
+            foreach (var state in work.Tracks)
+            {
+                var row = state.TrackId is { } id ? Rows.FirstOrDefault(r => !r.IsExternal && r.Track.Id == id) : state.ExternalFile is { } path ? RowOf(path) : null;
+                row?.Restore(state);
+            }
+        }
+        finally
+        {
+            _quiet--;
+            Changed();
         }
 
         HasWork = true;

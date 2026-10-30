@@ -508,6 +508,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
     private void Changed()
     {
+        // many values set at once (a saved work, a task opened again): computed once at the end
+        if (_quiet > 0)
+        {
+            return;
+        }
+
         OnPropertyChanged(nameof(Blocked));
         OnPropertyChanged(nameof(IsVideo));
         OnPropertyChanged(nameof(IsFiles));

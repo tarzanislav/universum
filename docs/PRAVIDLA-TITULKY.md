@@ -8,9 +8,17 @@ titulkami. Všetko, čo UNIVERSUM zistí samo, je **návrh UNIVERSUM** – použ
 
 ## 1. Jazyk každej titulkovej stopy
 
-- UNIVERSUM prečíta text každej textovej titulkovej stopy (SRT, ASS/SSA, WebVTT, MP4 text): plné stopy cez FFmpeg
-  (prvých 25 minút filmu, jedným čítaním), stopy s malým počtom titulkov (forced) a stopy, ktorých začiatok nestačí,
-  celé cez mkvextract (jedným čítaním). Obrazové titulky (PGS, VobSub) sa čítať nedajú, prázdne stopy sa nečítajú.
+- **Nečítajú sa všetky titulky** (vlastník 30. 10. 2026): ako pri rozpoznávaní jazyka zvuku UNIVERSUM vyberie
+  **niekoľko častí filmu** – päť častí po 90 sekúnd na 20, 35, 50, 65 a 80 % filmu (krátky film: jedna časť od začiatku)
+  –, prečíta ich cez FFmpeg, z prečítaného textu urobí analýzu a jazyk priradí.
+  - Z každej časti najviac **25 titulkov** stopy. Podľa **indexu súboru** (Cues – mkvmerge indexuje každý titulok; číta
+    sa len index, nie film) FFmpeg vie, koľko titulkov v časti je, a po poslednom prestane čítať.
+  - Stopa s malým počtom titulkov (**forced**), ktorá má v týchto častiach menej ako 10 titulkov, sa prečíta aj
+    v **najviac troch ďalších častiach tam, kde podľa indexu jej titulky sú**.
+  - Plná stopa bez indexu sa číta do konca časti; stopa s malým počtom titulkov bez indexu sa nečíta (jazyk ostane zo
+    súboru).
+  - Obrazové titulky (PGS, VobSub) sa čítať nedajú, prázdne stopy sa nečítajú. Bez FFmpeg (nie je nainštalovaný)
+    prečíta celé stopy mkvextract.
 - Zistený jazyk sa zapíše do parametra **Language** stopy – aj keď je v súbore zapísaný iný. Výnimka: len
   najpravdepodobnejší jazyk (bez istých znakov) nikdy neprepíše iný jazyk zapísaný v súbore (napr. *slv*, *eng*) –
   prepíše len neurčený, český alebo slovenský; a angličtina, nemčina … podľa častých slov neprepíšu jazyk, ktorý

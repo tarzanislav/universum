@@ -35,6 +35,7 @@ public sealed class SubtitleRow : ObservableObject
     private string _secondNow = "";
     private string _secondTarget = "";
     private string _syncNote = "";
+    private SubtitleDocument? _document;
 
     public SubtitleRow(MediaTrack track, SubtitleDocument? document, string? externalPath, LanguageTag language, string? name, bool forced, bool hearingImpaired,
         string note, Action changed)
@@ -87,7 +88,18 @@ public sealed class SubtitleRow : ObservableObject
     public MediaTrack Track { get; }
 
     /// <summary>The subtitles with their times: of an external text file; of the video's own track only once read for a change of the text.</summary>
-    public SubtitleDocument? Document { get; set; }
+    public SubtitleDocument? Document
+    {
+        get => _document;
+        set
+        {
+            if (SetProperty(ref _document, value))
+            {
+                OnPropertyChanged(nameof(Format));
+                OnPropertyChanged(nameof(Count));
+            }
+        }
+    }
 
     /// <summary>The external file; null for a track of the video.</summary>
     public string? ExternalPath { get; }

@@ -25,8 +25,8 @@ public sealed record FoundSubtitle(SubtitleFileMatch Match, RelayCommand AddComm
                              (Match.Forced ? ", forced" : "") + (Match.HearingImpaired ? ", pre nepočujúcich" : "");
 }
 
-/// <summary>A subtitle of the preview: its time now, the time it gets, its text.</summary>
-public sealed record SubtitlePreviewRow(string Number, string Before, string After, string Text);
+/// <summary>A subtitle of the preview: its time now, the time it gets, its text; <paramref name="At"/> = the time it gets (the player goes there).</summary>
+public sealed record SubtitlePreviewRow(string Number, string Before, string After, string Text, TimeSpan? At = null);
 
 /// <summary>
 /// Titulky (owner, 30. 10. 2026): the subtitles of a video or of subtitle files – Zmena FPS titulkov, Zmena rýchlosti
@@ -35,7 +35,7 @@ public sealed record SubtitlePreviewRow(string Number, string Before, string Aft
 /// A video is saved as a new file in the library (mkvmerge changes the times: --sync); subtitle files as new SRT files
 /// next to them. Originals are never changed.
 /// </summary>
-public sealed class SubtitlesPageViewModel : ObservableObject
+public sealed partial class SubtitlesPageViewModel : ObservableObject
 {
     private const int FirstExternalId = 1000;
     private readonly AppServices _services;
@@ -67,6 +67,18 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         AddExternalCommand = new AsyncRelayCommand(AddExternalAsync, () => !_busy && _file is not null);
         RemoveCommand = new RelayCommand(Remove, () => !_busy && _selected is { IsExternal: true });
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
+        Player = new Player.PlayerViewModel(services);
+        StartsNowCommand = new RelayCommand(StartsNow, () => Player.IsOpen && _selected is not null);
+        MarkFirstCommand = new RelayCommand(() => MarkPoint(first: true), () => Player.IsOpen && _selected is not null);
+        MarkSecondCommand = new RelayCommand(() => MarkPoint(first: false), () => Player.IsOpen && _selected is not null);
+        SeekToCueCommand = new AsyncRelayCommand<SubtitlePreviewRow>(SeekToCueAsync);
+        Player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(Player.IsOpen))
+            {
+                RefreshCommands();
+            }
+        };
         ClearCommand = new RelayCommand(() =>
         {
             Clear();
@@ -176,8 +188,13 @@ public sealed class SubtitlesPageViewModel : ObservableObject
 
     public bool HasFound => Found.Count > 0;
 
-    /// <summary>Times before and after of the selected subtitles (an external file; the video's track shows examples).</summary>
-    public ObservableCollection<SubtitlePreviewRow> Preview { get; } = [];
+    /// <summary>
+    /// Times before and after of every subtitle of the selected ones (a track of the video before it is read: examples);
+    /// replaced as a whole on each change (thousands of subtitles).
+    /// </summary>
+    public IReadOnlyList<SubtitlePreviewRow> Preview { get => _preview; private set => SetProperty(ref _preview, value); }
+
+    private IReadOnlyList<SubtitlePreviewRow> _preview = [];
 
     public SubtitleRow? SelectedRow
     {
@@ -188,6 +205,7 @@ public sealed class SubtitlesPageViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(HasSelection));
                 UpdatePreview();
+                RefreshPlayer();
                 RefreshCommands();
             }
         }
@@ -304,6 +322,8 @@ public sealed class SubtitlesPageViewModel : ObservableObject
                       (_file.IsMatroska ? "" : " – zmeny textu (konverzia, opravy) sú len pri MKV; časy a pridanie titulkov fungujú.");
             Library.Guess(path);
             FindBeside(path);
+            // owner, 30. 10. 2026: the film plays here with its subtitles (paused at its start)
+            PlayerOpening = Player.OpenAsync(_file);
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException)
         {
@@ -466,7 +486,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         _speech = null;
         Rows.Clear();
         Found.Clear();
-        Preview.Clear();
+        Preview = [];
+        CompareRow = null;
+        _ = Player.CloseAsync();
         SelectedRow = null;
         Result = "";
         _nextId = FirstExternalId;
@@ -481,38 +503,38 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsVideo));
         OnPropertyChanged(nameof(IsFiles));
         UpdatePreview();
+        RefreshPlayer();
         Library?.Update();
         RefreshCommands();
     }
 
     private void UpdatePreview()
     {
-        Preview.Clear();
         if (_selected is not { } row)
         {
+            Preview = [];
             return;
         }
 
         var timing = row.Problem is null ? row.Timing : SubtitleTiming.None;
         if (row.Repaired(row.Document) is { } document)
         {
-            var count = document.Cues.Count;
-            foreach (var at in Enumerable.Range(0, count).Where(i => count <= 10 || i < 7 || i >= count - 2))
+            var rows = new List<SubtitlePreviewRow>(document.Cues.Count);
+            for (var at = 0; at < document.Cues.Count; at++)
             {
                 var cue = document.Cues[at];
                 var moved = timing.Apply(cue.Start);
-                Preview.Add(new SubtitlePreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), SubtitleRow.Clock(cue.Start),
-                    moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved), cue.Text.Replace('\n', ' ')));
+                rows.Add(new SubtitlePreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), SubtitleRow.Clock(cue.Start),
+                    moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved), cue.Text.Replace('\n', ' '), moved));
             }
 
+            Preview = rows;
             return;
         }
 
-        // a track of the video: where subtitles at a few times end up (its text is read only when saving)
-        foreach (var at in new[] { 1, 10, 30, 60, 90 }.Select(m => TimeSpan.FromMinutes(m)).Where(t => _file?.Duration is not { } d || t <= d))
-        {
-            Preview.Add(new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), "(príklad času)"));
-        }
+        // a track of the video not read yet: where subtitles at a few times end up
+        Preview = new[] { 1, 10, 30, 60, 90 }.Select(m => TimeSpan.FromMinutes(m)).Where(t => _file?.Duration is not { } d || t <= d)
+            .Select(at => new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), "(príklad času)")).ToList();
     }
 
     /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
@@ -741,6 +763,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
         TranslateCommand?.NotifyCanExecuteChanged();
         SyncCommand?.NotifyCanExecuteChanged();
         CheckTracksCommand?.NotifyCanExecuteChanged();
+        StartsNowCommand?.NotifyCanExecuteChanged();
+        MarkFirstCommand?.NotifyCanExecuteChanged();
+        MarkSecondCommand?.NotifyCanExecuteChanged();
         StopSyncCommand?.NotifyCanExecuteChanged();
         ApplyProposalCommand?.NotifyCanExecuteChanged();
     }

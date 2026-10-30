@@ -1481,7 +1481,7 @@
                                     </Button.ContextMenu>
                                 </Button>
                                 <Button Content="Prečítať titulky znova" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám (začiatok filmu, pri forced celá stopa). Tu ho prečíta znova pre vybranú skupinu." />
+                                        ToolTip="Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám – niekoľko častí filmu ako pri zvuku (forced titulky tam, kde ich súbor má podľa indexu). Tu ho prečíta znova pre vybranú skupinu." />
                                 <Button Content="Potvrdiť návrhy" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
                             </WrapPanel>
                         </DockPanel>

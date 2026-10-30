@@ -173,7 +173,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     /// <summary>
     /// Použiť pravidlá: the languages of the subtitles are read from their text first (owner, 30. 10. 2026; once for the
-    /// opened file – the start of the film, the whole forced tracks), then the rules fill everything in.
+    /// opened file – a few parts of the film, like the audio), then the rules fill everything in.
     /// </summary>
     public async Task ApplyRulesAsync()
     {

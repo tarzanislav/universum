@@ -1958,10 +1958,10 @@ public sealed class BatchPageViewModel : ObservableObject
     public bool IsReadingSubtitles => _subtitleReading is not null;
 
     /// <summary>
-    /// The language of every text subtitle track (owner, 30. 10. 2026): the first file of each group is read – the start of
-    /// the film by FFmpeg, the whole track by mkvextract when the start holds too little – and the language found is applied
-    /// to the group as UNIVERSUM's suggestion (Czech and Slovak by their letters and words). <paramref name="again"/>: the
-    /// selected group is read once more (Prečítať titulky znova).
+    /// The language of every text subtitle track (owner, 30. 10. 2026): the first file of each group is read – a few parts
+    /// of the film by FFmpeg, like the audio (forced subtitles where the index of the file has them) – and the language
+    /// found is applied to the group as UNIVERSUM's suggestion (Czech and Slovak by their letters and words).
+    /// <paramref name="again"/>: the selected group is read once more (Prečítať titulky znova).
     /// </summary>
     private async Task ReadSubtitlesAsync(bool again)
     {

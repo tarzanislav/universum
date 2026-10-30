@@ -112,4 +112,105 @@ public sealed class SubtitleLanguageTests
         Assert.True(evidence is { IsUsable: true, Source: Universum.Core.Batch.EvidenceSource.SubtitleAnalysis } && evidence.Detail!.StartsWith("isté", StringComparison.Ordinal),
             "applied as UNIVERSUM's suggestion");
     }
+
+    [Test]
+    public async Task TheIndexOfTheFileTellsWhereTheSubtitlesAre()
+    {
+        // mkvmerge indexes every subtitle: only the index is read, never the film
+        await TestData.RequireMkvToolNixAsync();
+        var cues = await MatroskaCues.ReadAsync(TestData.Media("en-und-cz-forced.mkv"));
+        Assert.True(cues.TryGetValue(4, out var forced) && forced.Count == 1, "Forced (track number 4): one subtitle – " + string.Join(", ", cues.Select(c => $"{c.Key}:{c.Value.Count}")));
+        Assert.True(cues.TryGetValue(5, out var full) && full.Count == 2 && full[0] <= full[1], "Czech full (5): two, in order");
+        Assert.True(MatroskaCues.Read(new MemoryStream([1, 2, 3, 4])).Count == 0, "not Matroska: no index");
+        Assert.True((await MatroskaCues.ReadAsync(TestData.Media("en-cz.mp4"))).Count == 0, "MP4: no index");
+    }
+
+    [Test]
+    public void OnlyAFewPartsOfTheFilmAreRead()
+    {
+        // owner, 30. 10. 2026: not all the subtitles – a few parts, like the audio
+        var full = Track(2, 3, 1_200);
+        var forced = Track(3, 4, 30);
+        var noIndex = Track(4, 5, 900);
+        var sparseNoIndex = Track(5, 6, 20);
+        var film = new MediaFile { Path = "Vymyslený film (2024).mkv", ContainerType = "Matroska", Duration = TimeSpan.FromMinutes(100), Tracks = [full, forced, noIndex, sparseNoIndex] };
+        var cues = new Dictionary<int, IReadOnlyList<TimeSpan>>
+        {
+            [3] = Enumerable.Range(0, 1_200).Select(i => TimeSpan.FromSeconds(30 + (i * 5))).ToList(),
+            [4] = Enumerable.Range(0, 30).Select(i => TimeSpan.FromMinutes(7) + TimeSpan.FromSeconds(i * 20)).ToList(),
+        };
+
+        var parts = SubtitleText.Plan(film, film.Tracks, cues);
+        var common = parts.Where(p => p.Reads.Any(r => r.Track == full)).ToList();
+        Assert.Sequence([20, 35, 50, 65, 80], common.Select(p => (int)p.Start.TotalMinutes), "five parts at 20–80 % of the film");
+        Assert.True(common.All(p => p.Reads.Single(r => r.Track == full).Lines is > 0 and <= SubtitleText.LinesPerPart), "the full track: up to 25 subtitles a part");
+        Assert.True(parts.Where(p => p.Reads.Any(r => r.Track == forced)).All(p => p.Start < TimeSpan.FromMinutes(18)) &&
+                    parts.Count(p => p.Reads.Any(r => r.Track == forced)) is > 0 and <= SubtitleText.ExtraParts,
+            "forced: a few parts where the index has them – " + string.Join(" | ", parts.Select(p => p.Start)));
+        Assert.True(common.All(p => p.Reads.Single(r => r.Track == noIndex).Lines is null), "a full track without the index: to the end of the part");
+        Assert.True(parts.All(p => p.Reads.All(r => r.Track != sparseNoIndex)), "few subtitles without the index: not read (FFmpeg would read the whole file)");
+        Assert.True(parts.Sum(p => SubtitleText.PartLength.TotalMinutes) <= 8 * SubtitleText.PartLength.TotalMinutes, "only a few parts");
+
+        var trailer = film with { Duration = TimeSpan.FromMinutes(3) };
+        Assert.Sequence([TimeSpan.Zero], SubtitleText.Plan(trailer, [noIndex], new Dictionary<int, IReadOnlyList<TimeSpan>>()).Select(p => p.Start), "a short film: one part from the start");
+    }
+
+    [Test]
+    public async Task FFmpegReadsThePartsAndStops()
+    {
+        // FFmpeg is asked for each part: from its time, so many subtitles (then it stops) – never the whole file
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var file = await new MkvMergeInspector(installation, new ProcessRunner()).InspectAsync(TestData.Media("en-und-cz-forced.mkv"));
+        var ffmpeg = Path.Combine(Path.GetTempPath(), "UNIVERSUM-tests", "ffmpeg-fake");
+        Directory.CreateDirectory(Path.GetDirectoryName(ffmpeg)!);
+        await File.WriteAllTextAsync(ffmpeg, "");
+        var runner = new PartRunner();
+        var found = await SubtitleText.DetectAsync(installation, runner, ffmpeg, file);
+        Assert.True(runner.Calls.Count > 0 && runner.Calls.All(c => c.FileName == ffmpeg), "only FFmpeg, no mkvextract");
+        Assert.True(runner.Calls.All(c => c.Arguments.Contains("-ss") && c.Arguments.Contains("-frames:s")), "a part: from a time, a number of subtitles");
+        var czech = file.TracksOf(TrackType.Subtitles).First(t => t.Name == "Czech full");
+        Assert.True(found.TryGetValue(czech.Id, out var result) && result is { Language: "cs", Certain: true }, "the text of the parts is analysed: " + result);
+    }
+
+    [Test]
+    public async Task RealFFmpegReadsTheParts()
+    {
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
+        if (ffmpeg is null)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+        }
+
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var file = await new MkvMergeInspector(installation, new ProcessRunner()).InspectAsync(TestData.Media("en-und-cz-forced.mkv"));
+        var found = await SubtitleText.DetectAsync(installation, new ProcessRunner(), ffmpeg, file);
+        var czech = file.TracksOf(TrackType.Subtitles).First(t => t.Name == "Czech full");
+        Assert.True(found.TryGetValue(czech.Id, out var result) && result is { Language: "cs" }, "Czech full read by FFmpeg: " + result);
+    }
+
+    private static MediaTrack Track(int id, int number, long frames) => new()
+    {
+        Id = id, Number = number, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8", IsTextSubtitles = true, StatisticsFrames = frames, StatisticsBytes = frames * 40,
+    };
+
+    // writes Czech subtitles where FFmpeg would write the part of each track
+    private sealed class PartRunner : IProcessRunner
+    {
+        public List<ProcessRequest> Calls { get; } = [];
+
+        public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
+        {
+            Calls.Add(request);
+            for (var i = 0; i + 2 < request.Arguments.Count; i++)
+            {
+                if (request.Arguments[i] == "-f" && request.Arguments[i + 1] == "srt")
+                {
+                    await File.WriteAllTextAsync(request.Arguments[i + 2], "1\n00:00:01,000 --> 00:00:02,000\nŘekl jsem ti, že se vrátím.\n\n", cancellationToken);
+                }
+            }
+
+            return new ProcessResult(0, "", "", TimeSpan.Zero);
+        }
+    }
 }

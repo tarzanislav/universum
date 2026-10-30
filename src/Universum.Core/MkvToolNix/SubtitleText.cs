@@ -5,9 +5,17 @@ using Universum.Core.Processes;
 
 namespace Universum.Core.MkvToolNix;
 
+/// <summary>One part of the film FFmpeg reads for the language of the subtitles.</summary>
+/// <param name="Start">Where the part starts in the film.</param>
+/// <param name="Reads">The tracks read in it.</param>
+public sealed record SubtitlePart(TimeSpan Start, IReadOnlyList<SubtitleRead> Reads);
+
+/// <summary>A track read in a part: the number of its subtitles there by the index of the file, or null (to the end of the part).</summary>
+public sealed record SubtitleRead(MediaTrack Track, int? Lines);
+
 /// <summary>
-/// Extracts the plain text of a text subtitle track (SRT, ASS/SSA, WebVTT) with mkvextract. Note that mkvextract
-/// reads the whole file, so this is done only on request.
+/// The plain text of text subtitle tracks (SRT, ASS/SSA, WebVTT): a whole track by mkvextract (it reads the whole
+/// file – only on request), and a few parts of the film by FFmpeg for the language of every track.
 /// </summary>
 public static partial class SubtitleText
 {
@@ -35,18 +43,110 @@ public static partial class SubtitleText
         }
     }
 
-    /// <summary>Minutes from the start of the film FFmpeg reads for <see cref="SampleAsync"/>.</summary>
-    public const int SampleMinutes = 25;
+    /// <summary>Where the parts of the film start (like the pieces of the audio): 20, 35, 50, 65 and 80 % of the film.</summary>
+    public static readonly IReadOnlyList<double> PartPositions = [0.2, 0.35, 0.5, 0.65, 0.8];
 
-    /// <summary>Fewer words than this from the start of the film: the whole track is read (forced subtitles).</summary>
-    public const int SampleWords = 60;
+    /// <summary>How long a part of the film is.</summary>
+    public static readonly TimeSpan PartLength = TimeSpan.FromSeconds(90);
+
+    /// <summary>At most this many subtitles of a track are read in one part.</summary>
+    public const int LinesPerPart = 25;
+
+    /// <summary>A track with fewer subtitles in the parts (forced) is read also where the index says its subtitles are.</summary>
+    public const int EnoughLines = 10;
+
+    /// <summary>At most this many parts more for such a track.</summary>
+    public const int ExtraParts = 3;
+
+    // FFmpeg seeks to a key frame before the part: it starts a little earlier, so no subtitle at the start is missed
+    private static readonly TimeSpan Preroll = TimeSpan.FromSeconds(1);
 
     /// <summary>
-    /// The text of the text subtitle tracks of a file (owner, 30. 10. 2026: the language of every subtitle track): the
-    /// start of the film read by FFmpeg for the full tracks (one pass for all of them, only the first minutes of the file),
-    /// and the whole track read by mkvextract (one pass) for the tracks with few subtitles (forced) and those whose start
-    /// holds too little text – or for all of them without FFmpeg. Image subtitles (PGS, VobSub) cannot be read, empty tracks
-    /// are left out. Keys are track IDs; a track that could not be read is missing.
+    /// The parts of the film FFmpeg reads (owner, 30. 10. 2026: not all the subtitles – a few parts, read and analysed,
+    /// like the language of the audio): five parts of 90 seconds at 20–80 % of the film, and for a track with few
+    /// subtitles there (forced) up to three parts more where the index of the file (<see cref="MatroskaCues"/>) says its
+    /// subtitles are. A track the index knows is read exactly up to its last subtitle in the part (FFmpeg then stops,
+    /// nothing more is read); a full track the index does not know, to the end of the part; a track with few subtitles the
+    /// index does not know is not read (FFmpeg would have to read to the end of the file to find there is nothing more).
+    /// </summary>
+    /// <param name="cues">The cue times by the Matroska track number (<see cref="MatroskaCues"/>).</param>
+    public static IReadOnlyList<SubtitlePart> Plan(MediaFile file, IReadOnlyList<MediaTrack> tracks, IReadOnlyDictionary<int, IReadOnlyList<TimeSpan>> cues)
+    {
+        IReadOnlyList<TimeSpan> CuesOf(MediaTrack track) =>
+            track.Number is { } number && cues.TryGetValue(number, out var times) ? times : [];
+
+        var length = file.Duration ?? tracks.SelectMany(CuesOf).DefaultIfEmpty().Max();
+        var starts = length <= PartLength * PartPositions.Count
+            ? [TimeSpan.Zero]
+            : PartPositions.Select(p => TimeSpan.FromTicks((long)(length.Ticks * p))).ToList();
+
+        var parts = new List<SubtitlePart>();
+        var planned = tracks.ToDictionary(t => t.Id, _ => 0);
+        foreach (var start in starts)
+        {
+            var reads = new List<SubtitleRead>();
+            foreach (var track in tracks)
+            {
+                var times = CuesOf(track);
+                if (times.Count > 0)
+                {
+                    var lines = Math.Min(LinesPerPart, times.Count(t => t >= start && t < start + PartLength));
+                    if (lines > 0)
+                    {
+                        reads.Add(new SubtitleRead(track, lines));
+                        planned[track.Id] += lines;
+                    }
+                }
+                else if (track.StatisticsFrames is not (> 0 and < ForcedSubtitlesFull))
+                {
+                    reads.Add(new SubtitleRead(track, null));
+                }
+            }
+
+            if (reads.Count > 0)
+            {
+                parts.Add(new SubtitlePart(start, reads));
+            }
+        }
+
+        // forced subtitles where the index has them: a few places spread over the track
+        var extra = new SortedSet<TimeSpan>();
+        foreach (var track in tracks.Where(t => planned[t.Id] < EnoughLines))
+        {
+            var times = CuesOf(track);
+            for (var k = 0; k < ExtraParts && times.Count > planned[track.Id]; k++)
+            {
+                var at = times[(int)((k + 0.5) / ExtraParts * times.Count)];
+                var start = at > Preroll ? at - Preroll : TimeSpan.Zero;
+                if (!parts.Any(p => start >= p.Start && start < p.Start + PartLength) && !extra.Any(e => start >= e && start < e + PartLength))
+                {
+                    extra.Add(start);
+                }
+            }
+        }
+
+        foreach (var start in extra)
+        {
+            var reads = tracks.Where(t => planned[t.Id] < EnoughLines)
+                .Select(t => new SubtitleRead(t, Math.Min(LinesPerPart, CuesOf(t).Count(c => c >= start && c < start + PartLength))))
+                .Where(r => r.Lines > 0)
+                .ToList();
+            if (reads.Count > 0)
+            {
+                parts.Add(new SubtitlePart(start, reads));
+            }
+        }
+
+        return parts.OrderBy(p => p.Start).ToList();
+    }
+
+    private const int ForcedSubtitlesFull = Rules.ForcedSubtitles.FullMinimum;
+
+    /// <summary>
+    /// The text of the text subtitle tracks of a file (owner, 30. 10. 2026: the language of every subtitle track), read in
+    /// a few parts of the film (<see cref="Plan"/>) by FFmpeg – one short run for each part. Without FFmpeg the whole
+    /// tracks are read by mkvextract (Matroska only). Image subtitles (PGS, VobSub) cannot be read, empty tracks are left
+    /// out. Keys are track IDs; a track that could not be read is missing.
     /// </summary>
     public static async Task<IReadOnlyDictionary<int, string>> SampleAsync(
         MkvToolNixInstallation installation, IProcessRunner runner, string? ffmpeg, MediaFile file, IReadOnlyList<MediaTrack> tracks,
@@ -65,53 +165,69 @@ public static partial class SubtitleText
         Directory.CreateDirectory(folder);
         try
         {
-            // FFmpeg ends an output at its first subtitle after the sampled minutes: a track without one there (forced
-            // subtitles, a short track) would make it read the whole file – such tracks of a Matroska file go to mkvextract
-            // right away, all together in one pass; FFmpeg takes only the formats it converts to SRT
-            var sampled = ffmpeg is null || !File.Exists(ffmpeg) ? []
-                : wanted.Where(t => !file.IsMatroska || (Converts(t) && t.StatisticsFrames is null or >= Rules.ForcedSubtitles.FullMinimum)).ToList();
-            if (sampled.Count > 0)
+            if (ffmpeg is not null && File.Exists(ffmpeg))
             {
-                var arguments = new List<string> { "-nostdin", "-hide_banner", "-loglevel", "error", "-i", file.Path };
-                foreach (var track in sampled)
+                var cues = file.IsMatroska ? await MatroskaCues.ReadAsync(file.Path, cancellationToken).ConfigureAwait(false) : new Dictionary<int, IReadOnlyList<TimeSpan>>();
+                var readable = wanted.Where(t => !file.IsMatroska || Converts(t)).ToList();
+                var collected = readable.ToDictionary(t => t.Id, _ => new List<string>());
+                var number = 0;
+                foreach (var part in Plan(file, readable, cues))
                 {
-                    var ordinal = subtitles.FindIndex(s => s.Id == track.Id).ToString(CultureInfo.InvariantCulture);
-                    arguments.AddRange(["-map", "0:s:" + ordinal, "-t", (SampleMinutes * 60).ToString(CultureInfo.InvariantCulture),
-                        "-c:s", "srt", "-f", "srt", Path.Combine(folder, track.Id.ToString(CultureInfo.InvariantCulture) + ".srt")]);
-                }
-
-                try
-                {
-                    await runner.RunAsync(new ProcessRequest(ffmpeg!, arguments) { Timeout = TimeSpan.FromMinutes(10) }, cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception ex) when (ex is TimeoutException or ProcessStartException)
-                {
-                    // what FFmpeg wrote so far is read; the rest is read by mkvextract below
-                }
-
-                foreach (var track in sampled)
-                {
-                    var sample = Path.Combine(folder, track.Id.ToString(CultureInfo.InvariantCulture) + ".srt");
-                    if (File.Exists(sample) && Clean(await File.ReadAllTextAsync(sample, cancellationToken).ConfigureAwait(false)) is { Length: > 0 } text)
+                    number++;
+                    var arguments = new List<string>
                     {
-                        texts[track.Id] = text;
+                        "-nostdin", "-hide_banner", "-loglevel", "error",
+                        "-ss", Seconds(part.Start > Preroll ? part.Start - Preroll : TimeSpan.Zero), "-i", file.Path,
+                    };
+                    foreach (var read in part.Reads)
+                    {
+                        var ordinal = subtitles.FindIndex(s => s.Id == read.Track.Id).ToString(CultureInfo.InvariantCulture);
+                        arguments.AddRange(["-map", "0:s:" + ordinal]);
+                        arguments.AddRange(read.Lines is { } lines
+                            ? ["-frames:s", lines.ToString(CultureInfo.InvariantCulture)]
+                            : ["-t", Seconds(PartLength + Preroll)]);
+                        arguments.AddRange(["-flush_packets", "1", "-c:s", "srt", "-f", "srt", PartFile(folder, read.Track, number)]);
+                    }
+
+                    try
+                    {
+                        await runner.RunAsync(new ProcessRequest(ffmpeg, arguments) { Timeout = TimeSpan.FromMinutes(2) }, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is TimeoutException or ProcessStartException)
+                    {
+                        // what FFmpeg wrote so far is read
+                    }
+
+                    foreach (var read in part.Reads)
+                    {
+                        var sample = PartFile(folder, read.Track, number);
+                        if (File.Exists(sample) && Clean(await File.ReadAllTextAsync(sample, cancellationToken).ConfigureAwait(false)) is { Length: > 0 } text)
+                        {
+                            collected[read.Track.Id].Add(text);
+                        }
                     }
                 }
+
+                foreach (var (id, pieces) in collected.Where(c => c.Value.Count > 0))
+                {
+                    texts[id] = string.Join("\n", pieces);
+                }
+
+                return texts;
             }
 
-            // the whole track where the start of the film had too little (only Matroska; mkvextract reads the whole file once)
-            var whole = wanted.Where(t => !texts.TryGetValue(t.Id, out var text) || WordCount(text) < SampleWords).ToList();
-            if (whole.Count > 0 && file.IsMatroska)
+            // without FFmpeg (not installed): mkvextract reads the whole tracks in one pass (only Matroska)
+            if (file.IsMatroska)
             {
                 var arguments = new List<string> { file.Path, "tracks" };
-                arguments.AddRange(whole.Select(t => t.Id.ToString(CultureInfo.InvariantCulture) + ":" + Path.Combine(folder, t.Id.ToString(CultureInfo.InvariantCulture) + ".full")));
+                arguments.AddRange(wanted.Select(t => t.Id.ToString(CultureInfo.InvariantCulture) + ":" + Path.Combine(folder, t.Id.ToString(CultureInfo.InvariantCulture) + ".full")));
                 using var options = MkvToolNixOptionsFile.Create(arguments);
                 var result = await runner.RunAsync(
                     new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvExtract), [options.Argument]) { Timeout = TimeSpan.FromMinutes(30) },
                     cancellationToken).ConfigureAwait(false);
                 if (result.ExitCode is 0 or 1)
                 {
-                    foreach (var track in whole)
+                    foreach (var track in wanted)
                     {
                         var full = Path.Combine(folder, track.Id.ToString(CultureInfo.InvariantCulture) + ".full");
                         if (File.Exists(full) && Clean(await File.ReadAllTextAsync(full, cancellationToken).ConfigureAwait(false)) is { Length: > 0 } text)
@@ -141,6 +257,11 @@ public static partial class SubtitleText
         return texts;
     }
 
+    private static string PartFile(string folder, MediaTrack track, int part) =>
+        Path.Combine(folder, $"{track.Id.ToString(CultureInfo.InvariantCulture)}-{part.ToString(CultureInfo.InvariantCulture)}.srt");
+
+    private static string Seconds(TimeSpan time) => time.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+
     /// <summary>The language of every text subtitle track of a file, read from its text (track ID → result).</summary>
     public static async Task<IReadOnlyDictionary<int, Text.SubtitleLanguageResult>> DetectAsync(
         MkvToolNixInstallation installation, IProcessRunner runner, string? ffmpeg, MediaFile file, CancellationToken cancellationToken = default)
@@ -169,8 +290,6 @@ public static partial class SubtitleText
     // the Matroska text formats FFmpeg converts to SRT (USF, Kate … are read by mkvextract)
     private static bool Converts(MediaTrack track) =>
         track.CodecId?.ToUpperInvariant() is "S_TEXT/UTF8" or "S_TEXT/ASCII" or "S_TEXT/ASS" or "S_TEXT/SSA" or "S_ASS" or "S_SSA" or "S_TEXT/WEBVTT" or "D_WEBVTT/SUBTITLES";
-
-    private static int WordCount(string text) => text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
     /// <summary>Only the spoken text: no numbers, timings, ASS headers or formatting tags.</summary>
     public static string Clean(string raw)

@@ -17,6 +17,18 @@ public sealed class SubtitleOverlay : FrameworkElement
     public static readonly DependencyProperty SecondaryProperty = DependencyProperty.Register(
         nameof(Secondary), typeof(string), typeof(SubtitleOverlay), new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty PrimaryPictureProperty = DependencyProperty.Register(
+        nameof(PrimaryPicture), typeof(ImageSource), typeof(SubtitleOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty PrimaryPicturePlaceProperty = DependencyProperty.Register(
+        nameof(PrimaryPicturePlace), typeof(Rect), typeof(SubtitleOverlay), new FrameworkPropertyMetadata(Rect.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty SecondaryPictureProperty = DependencyProperty.Register(
+        nameof(SecondaryPicture), typeof(ImageSource), typeof(SubtitleOverlay), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty SecondaryPicturePlaceProperty = DependencyProperty.Register(
+        nameof(SecondaryPicturePlace), typeof(Rect), typeof(SubtitleOverlay), new FrameworkPropertyMetadata(Rect.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+
     private static readonly Typeface Face = new(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
     private static readonly Brush PrimaryFill = Frozen(Brushes.White);
     private static readonly Brush SecondaryFill = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x4D)));
@@ -28,12 +40,34 @@ public sealed class SubtitleOverlay : FrameworkElement
     /// <summary>The subtitles compared with, at the top.</summary>
     public string Secondary { get => (string)GetValue(SecondaryProperty); set => SetValue(SecondaryProperty, value); }
 
+    /// <summary>Picture subtitles (PGS) edited, and where they stand (in the frame's units).</summary>
+    public ImageSource? PrimaryPicture { get => (ImageSource?)GetValue(PrimaryPictureProperty); set => SetValue(PrimaryPictureProperty, value); }
+
+    public Rect PrimaryPicturePlace { get => (Rect)GetValue(PrimaryPicturePlaceProperty); set => SetValue(PrimaryPicturePlaceProperty, value); }
+
+    /// <summary>Picture subtitles compared with (drawn half transparent, where they stand).</summary>
+    public ImageSource? SecondaryPicture { get => (ImageSource?)GetValue(SecondaryPictureProperty); set => SetValue(SecondaryPictureProperty, value); }
+
+    public Rect SecondaryPicturePlace { get => (Rect)GetValue(SecondaryPicturePlaceProperty); set => SetValue(SecondaryPicturePlaceProperty, value); }
+
     protected override void OnRender(DrawingContext drawingContext)
     {
         var size = RenderSize;
         if (size.Width < 10 || size.Height < 10)
         {
             return;
+        }
+
+        if (SecondaryPicture is { } compared && !SecondaryPicturePlace.IsEmpty)
+        {
+            drawingContext.PushOpacity(0.6);
+            drawingContext.DrawImage(compared, SecondaryPicturePlace);
+            drawingContext.Pop();
+        }
+
+        if (PrimaryPicture is { } picture && !PrimaryPicturePlace.IsEmpty)
+        {
+            drawingContext.DrawImage(picture, PrimaryPicturePlace);
         }
 
         // 5 % of the picture's height, as players do

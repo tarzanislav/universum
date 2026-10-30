@@ -25,8 +25,40 @@ public sealed record FoundSubtitle(SubtitleFileMatch Match, RelayCommand AddComm
                              (Match.Forced ? ", forced" : "") + (Match.HearingImpaired ? ", pre nepočujúcich" : "");
 }
 
-/// <summary>A subtitle of the preview: its time now, the time it gets, its text; <paramref name="At"/> = the time it gets (the player goes there).</summary>
-public sealed record SubtitlePreviewRow(string Number, string Before, string After, string Text, TimeSpan? At = null);
+/// <summary>
+/// A subtitle of the list Časy titulkov: its time now, the time it gets (the player goes there), its text – which can be
+/// changed when <see cref="Index"/> says which subtitle it is (lines shown with " | ").
+/// </summary>
+public sealed class SubtitlePreviewRow(string number, string before, string after, string text, TimeSpan? at = null, int? index = null, Action<int, string>? edit = null)
+{
+    private string _text = text;
+
+    public string Number { get; } = number;
+
+    public string Before { get; } = before;
+
+    public string After { get; } = after;
+
+    public TimeSpan? At { get; } = at;
+
+    /// <summary>The place of the subtitle in the subtitles as read (null: it cannot be changed here).</summary>
+    public int? Index { get; } = index;
+
+    public bool IsEditable => Index is not null && edit is not null;
+
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            if (value != _text && Index is { } place && edit is not null)
+            {
+                _text = value;
+                edit(place, value);
+            }
+        }
+    }
+}
 
 /// <summary>
 /// Titulky (owner, 30. 10. 2026): the subtitles of a video or of subtitle files – Zmena FPS titulkov, Zmena rýchlosti
@@ -196,6 +228,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     public IReadOnlyList<SubtitlePreviewRow> Preview { get => _preview; private set => SetProperty(ref _preview, value); }
 
     private IReadOnlyList<SubtitlePreviewRow> _preview = [];
+
+    /// <summary>The subtitle chosen in Časy titulkov (it stays chosen when the list is made anew).</summary>
+    public SubtitlePreviewRow? SelectedPreview { get => _selectedPreview; set => SetProperty(ref _selectedPreview, value); }
+
+    private SubtitlePreviewRow? _selectedPreview;
+    private SubtitleRow? _previewOf;
 
     public SubtitleRow? SelectedRow
     {
@@ -465,6 +503,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             }
 
             Rows.Remove(row);
+            _pictures.Remove(row);
+            _reading.Remove(row);
             SelectedRow = Rows.FirstOrDefault();
             if (_file is not null)
             {
@@ -489,7 +529,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         _speech = null;
         Rows.Clear();
         Found.Clear();
-        Preview = [];
+        ShowPreview(null, []);
+        _pictures.Clear();
+        _reading.Clear();
+        _readingStop.Cancel();
+        _readingStop.Dispose();
+        _readingStop = new CancellationTokenSource();
         CompareRow = null;
         _ = Player.CloseAsync();
         HasWork = false;
@@ -527,30 +572,79 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     {
         if (_selected is not { } row)
         {
-            Preview = [];
+            ShowPreview(null, []);
             return;
         }
 
         var timing = row.Problem is null ? row.Timing : SubtitleTiming.None;
-        if (row.Repaired(row.Document) is { } document)
+        if (row.CanEditCues && row.Document is { } read)
         {
-            var rows = new List<SubtitlePreviewRow>(document.Cues.Count);
-            for (var at = 0; at < document.Cues.Count; at++)
+            // every subtitle as read, with its own text changes – each can be changed (or left out) here
+            var rows = new List<SubtitlePreviewRow>(read.Cues.Count);
+            for (var index = 0; index < read.Cues.Count; index++)
             {
-                var cue = document.Cues[at];
-                var moved = timing.Apply(cue.Start);
-                rows.Add(new SubtitlePreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), SubtitleRow.Clock(cue.Start),
-                    moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved), cue.Text.Replace('\n', ' '), moved));
+                if (row.CueEdits.TryGetValue(index, out var changed) && changed is null)
+                {
+                    continue;
+                }
+
+                var cue = read.Cues[index];
+                rows.Add(PreviewRow((index + 1).ToString(CultureInfo.InvariantCulture), cue.Start, timing, changed ?? cue.Text, index, row));
             }
 
-            Preview = rows;
+            ShowPreview(row, rows);
+            return;
+        }
+
+        if (row.Repaired(row.Document) is { } document)
+        {
+            ShowPreview(row, document.Cues.Select((cue, at) => PreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), cue.Start, timing, cue.Text, null, row)).ToList());
+            return;
+        }
+
+        if (_pictures.TryGetValue(row, out var pictures))
+        {
+            ShowPreview(row, pictures.Select((cue, at) => PreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), cue.Start, timing, "(obrázok)", null, row)).ToList());
             return;
         }
 
         // a track of the video not read yet: where subtitles at a few times end up
-        Preview = new[] { 1, 10, 30, 60, 90 }.Select(m => TimeSpan.FromMinutes(m)).Where(t => _file?.Duration is not { } d || t <= d)
-            .Select(at => new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), "(príklad času)")).ToList();
+        ShowPreview(row, new[] { 1, 10, 30, 60, 90 }.Select(m => TimeSpan.FromMinutes(m)).Where(t => _file?.Duration is not { } d || t <= d)
+            .Select(at => new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), "(príklad času)")).ToList());
     }
+
+    // the list made anew (a change of time or of a text): the subtitle chosen in it stays chosen – the next one when it was
+    // left out; another track starts with none
+    private void ShowPreview(SubtitleRow? row, IReadOnlyList<SubtitlePreviewRow> rows)
+    {
+        var chosen = ReferenceEquals(row, _previewOf) ? _selectedPreview : null;
+        _previewOf = row;
+        Preview = rows;
+        SelectedPreview = chosen is null ? null
+            : chosen.Index is { } index && rows.Any(r => r.Index is not null) ? rows.FirstOrDefault(r => r.Index >= index) ?? rows.LastOrDefault()
+            : rows.FirstOrDefault(r => r.Number.Length > 0 && r.Number == chosen.Number);
+    }
+
+    private SubtitlePreviewRow PreviewRow(string number, TimeSpan start, SubtitleTiming timing, string text, int? index, SubtitleRow row)
+    {
+        var moved = timing.Apply(start);
+        return new SubtitlePreviewRow(number, SubtitleRow.Clock(start), moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved),
+            text.Replace("\n", " | ", StringComparison.Ordinal), moved, index,
+            index is null ? null : (place, value) => EditCueLater(row, place, value));
+    }
+
+    // a text changed in the list ("|" between its lines, as the list shows them; nothing left: the subtitle is left out) –
+    // after the list has finished its edit, as the list is made anew then
+    private static void EditCueLater(SubtitleRow row, int index, string value)
+    {
+        // " | " (as the list shows a new line); a "|" in a word ("|t's" read from a picture) stays
+        var lines = LineSeparator().Split(value).Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
+        var text = lines.Length == 0 ? null : string.Join('\n', lines);
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() => row.EditCue(index, text));
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\s+\|\s+")]
+    private static partial System.Text.RegularExpressions.Regex LineSeparator();
 
     /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
@@ -785,6 +879,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         SaveToTaskCommand?.NotifyCanExecuteChanged();
         LeaveTaskCommand?.NotifyCanExecuteChanged();
         SaveWorkCommand?.NotifyCanExecuteChanged();
+        UndoCueEditsCommand?.NotifyCanExecuteChanged();
         DiscardWorkCommand?.NotifyCanExecuteChanged();
         ApplyProposalCommand?.NotifyCanExecuteChanged();
     }

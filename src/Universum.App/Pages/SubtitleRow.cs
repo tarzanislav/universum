@@ -36,6 +36,11 @@ public sealed class SubtitleRow : ObservableObject
     private string _secondTarget = "";
     private string _syncNote = "";
     private SubtitleDocument? _document;
+    private readonly Dictionary<int, string?> _cueEdits = [];
+
+    // the text each changed subtitle had (the edits of a saved work fit only the same subtitles)
+    private readonly Dictionary<int, string> _cueOriginals = [];
+    private int _droppedEdits;
 
     public SubtitleRow(MediaTrack track, SubtitleDocument? document, string? externalPath, LanguageTag language, string? name, bool forced, bool hearingImpaired,
         string note, Action changed)
@@ -97,6 +102,13 @@ public sealed class SubtitleRow : ObservableObject
             {
                 OnPropertyChanged(nameof(Format));
                 OnPropertyChanged(nameof(Count));
+                if (_cueEdits.Count > 0)
+                {
+                    // a track read later: the saved changes checked against it
+                    CheckCueEdits();
+                    Changed();
+                    OnPropertyChanged(nameof(TextEdited));
+                }
             }
         }
     }
@@ -222,7 +234,92 @@ public sealed class SubtitleRow : ObservableObject
     public bool FixTimes { get => _fixTimes; set => Set(ref _fixTimes, value); }
 
     /// <summary>The text has to be read and written anew (an external text file always; a track of the video for a change of the text).</summary>
-    public bool NeedsText => IsText && (IsExternal || ToSrt || RemoveHearingImpaired || RemoveFormatting || FixTimes);
+    public bool NeedsText => IsText && (IsExternal || ToSrt || RemoveHearingImpaired || RemoveFormatting || FixTimes || TextEdited);
+
+    /// <summary>
+    /// Texts of single subtitles changed in Časy titulkov (owner, 30. 10. 2026), by their place in the subtitles as read;
+    /// null = the subtitle is left out.
+    /// </summary>
+    public IReadOnlyDictionary<int, string?> CueEdits => _cueEdits;
+
+    /// <summary>Some subtitle's text was changed or left out.</summary>
+    public bool TextEdited => _cueEdits.Count > 0;
+
+    /// <summary>Single subtitles can be changed in the list (text read, no repair of the whole text that would renumber them).</summary>
+    public bool CanEditCues => IsText && Document is not null && !RemoveHearingImpaired && !RemoveFormatting && !FixTimes;
+
+    /// <summary>Changes the text of the subtitle at <paramref name="index"/> (null or empty: leaves it out; the text as read: no change).</summary>
+    public void EditCue(int index, string? text)
+    {
+        if (Document is not { } document || index < 0 || index >= document.Cues.Count)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            text = null;
+        }
+
+        _cueOriginals[index] = document.Cues[index].Text;
+        if (text is not null && text == document.Cues[index].Text)
+        {
+            _cueEdits.Remove(index);
+            _cueOriginals.Remove(index);
+        }
+        else
+        {
+            _cueEdits[index] = text;
+        }
+
+        Changed();
+        OnPropertyChanged(nameof(TextEdited));
+    }
+
+    /// <summary>The texts the changed subtitles had (Uložiť prácu keeps them with the changes).</summary>
+    public IReadOnlyDictionary<int, string> CueOriginals => _cueOriginals;
+
+    /// <summary>
+    /// The changes of single subtitles as saved (Uložiť prácu), or none; with the texts they were made on, a change that
+    /// does not fit the subtitles read (another file of the same name) is left out – now or when they are read.
+    /// </summary>
+    public void SetCueEdits(IReadOnlyDictionary<int, string?>? edits, IReadOnlyDictionary<int, string>? originals = null)
+    {
+        _cueEdits.Clear();
+        _cueOriginals.Clear();
+        _droppedEdits = 0;
+        foreach (var (index, text) in edits ?? new Dictionary<int, string?>())
+        {
+            _cueEdits[index] = text;
+            if (originals?.TryGetValue(index, out var original) == true)
+            {
+                _cueOriginals[index] = original;
+            }
+        }
+
+        CheckCueEdits();
+        Changed();
+        OnPropertyChanged(nameof(TextEdited));
+    }
+
+    // the changes kept only where the subtitles read are the ones they were made on
+    private void CheckCueEdits()
+    {
+        if (_document is not { } document || _cueEdits.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var index in _cueEdits.Keys.ToList())
+        {
+            if (index < 0 || index >= document.Cues.Count || (_cueOriginals.TryGetValue(index, out var original) && original != document.Cues[index].Text))
+            {
+                _cueEdits.Remove(index);
+                _cueOriginals.Remove(index);
+                _droppedEdits++;
+            }
+        }
+    }
 
     /// <summary>What is wrong with the values typed (null when nothing).</summary>
     public string? Problem =>
@@ -273,9 +370,20 @@ public sealed class SubtitleRow : ObservableObject
                 parts.Add($"posun {(DelayMilliseconds > 0 ? "+" : "")}{DelayMilliseconds.ToString("#,0", Slovak)} ms");
             }
 
-            if (IsText && (IsExternal ? Document?.Format != "SRT" || Document?.Encoding != "UTF-8" : ToSrt))
+            // a track of the video whose text is written anew becomes SRT (its styles, ASS or WebVTT, are left)
+            if (IsText && (IsExternal ? Document?.Format != "SRT" || Document?.Encoding != "UTF-8" : ToSrt || (NeedsText && Track.CodecId != "S_TEXT/UTF8")))
             {
                 parts.Add("→ SRT");
+            }
+
+            if (TextEdited)
+            {
+                parts.Add($"upravené titulky ({_cueEdits.Count})");
+            }
+
+            if (_droppedEdits > 0)
+            {
+                parts.Add($"{_droppedEdits} uložených úprav textu sa nehodí k titulkom – vynechané");
             }
 
             if (RemoveHearingImpaired)
@@ -319,6 +427,13 @@ public sealed class SubtitleRow : ObservableObject
         if (document is null)
         {
             return null;
+        }
+
+        // the texts changed by hand first (by the place of each subtitle as read)
+        if (_cueEdits.Count > 0)
+        {
+            document = document.With(document.Cues.Select((cue, index) => _cueEdits.TryGetValue(index, out var text) ? text is null ? null : cue with { Text = text } : cue)
+                .OfType<SubtitleCue>());
         }
 
         if (RemoveHearingImpaired)
@@ -400,6 +515,8 @@ public sealed class SubtitleRow : ObservableObject
         RemoveHearingImpaired = RemoveHearingImpaired,
         RemoveFormatting = RemoveFormatting,
         FixTimes = FixTimes,
+        Texts = _cueEdits.Count == 0 ? null : new Dictionary<int, string?>(_cueEdits),
+        TextsBefore = _cueOriginals.Count == 0 ? null : new Dictionary<int, string>(_cueOriginals),
     };
 
     /// <summary>The values saved before (the saved work of the video).</summary>
@@ -422,6 +539,7 @@ public sealed class SubtitleRow : ObservableObject
         RemoveHearingImpaired = state.RemoveHearingImpaired;
         RemoveFormatting = state.RemoveFormatting;
         FixTimes = state.FixTimes;
+        SetCueEdits(state.Texts, state.TextsBefore);
     }
 
     /// <summary>

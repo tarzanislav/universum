@@ -33,6 +33,18 @@ public sealed record MediaTrack
     /// <summary>Video size as "width x height".</summary>
     public string? PixelDimensions { get; init; }
 
+    /// <summary>The size the video is shown at ("1024x576" for anamorphic 720 × 576), or null.</summary>
+    public string? DisplayDimensions { get; init; }
+
+    /// <summary>Width ÷ height as the video is shown (by its display size, else its pixels), or null.</summary>
+    public double? DisplayAspect => Size(DisplayDimensions) ?? Size(PixelDimensions);
+
+    private static double? Size(string? dimensions) =>
+        dimensions?.Split('x') is [var w, var h] && int.TryParse(w, System.Globalization.CultureInfo.InvariantCulture, out var width) &&
+        int.TryParse(h, System.Globalization.CultureInfo.InvariantCulture, out var height) && width > 0 && height > 0
+            ? (double)width / height
+            : null;
+
     public bool IsTextSubtitles { get; init; }
 
     /// <summary>Number of frames from the track statistics tags, when present.</summary>

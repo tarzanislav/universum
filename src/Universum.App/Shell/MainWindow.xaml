@@ -1168,20 +1168,34 @@
                                 </Grid>
                             </TabItem>
                             <TabItem Header="Časy titulkov">
-                                <DataGrid ItemsSource="{Binding Preview}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
-                                          GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionMode="Single"
-                                          ToolTip="Dvojklik: prehrávač ide na titulok">
-                                    <DataGrid.InputBindings>
-                                        <MouseBinding Gesture="LeftDoubleClick" Command="{Binding SeekToCueCommand}"
-                                                      CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
-                                    </DataGrid.InputBindings>
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="#" Binding="{Binding Number}" />
-                                        <DataGridTextColumn Header="Teraz" Binding="{Binding Before}" />
-                                        <DataGridTextColumn Header="Po zmene" Binding="{Binding After}" />
-                                        <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*" />
-                                    </DataGrid.Columns>
-                                </DataGrid>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                               Text="Dvojklik: prehrávač ide na titulok. Text titulku opravíte klávesom F2 alebo kliknutím do vybraného titulku (riadky oddeľuje „ | “ s medzerami, prázdny text titulok vynechá); pravé tlačidlo: odstrániť titulok, vrátiť úpravy. Upravovať sa dá, keď sú vypnuté opravy celého textu (nepočujúci, formátovanie, prekrývanie časov)." />
+                                    <DataGrid ItemsSource="{Binding Preview}" SelectedItem="{Binding SelectedPreview}" AutoGenerateColumns="False" HeadersVisibility="Column"
+                                              GridLinesVisibility="Horizontal" CanUserSortColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
+                                              BeginningEdit="OnCueBeginningEdit" CellEditEnding="OnCueCellEditEnding" SelectionChanged="OnCueSelected"
+                                              Loaded="OnCueGridLoaded">
+                                        <DataGrid.RowStyle>
+                                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                                <!-- double click: the player goes to the subtitle (also over a cell that could be edited) -->
+                                                <EventSetter Event="MouseDoubleClick" Handler="OnCueDoubleClick" />
+                                            </Style>
+                                        </DataGrid.RowStyle>
+                                        <DataGrid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Odstrániť titulok" Command="{Binding RemoveCueCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                                <MenuItem Header="Vrátiť všetky úpravy textu" Command="{Binding UndoCueEditsCommand}" />
+                                            </ContextMenu>
+                                        </DataGrid.ContextMenu>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#" Binding="{Binding Number}" IsReadOnly="True" />
+                                            <DataGridTextColumn Header="Teraz" Binding="{Binding Before}" IsReadOnly="True" />
+                                            <DataGridTextColumn Header="Po zmene" Binding="{Binding After}" IsReadOnly="True" />
+                                            <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </DockPanel>
                             </TabItem>
                             <TabItem Header="Stiahnuť a preložiť">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">

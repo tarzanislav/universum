@@ -1,7 +1,15 @@
 namespace Universum.Core.Subtitles;
 
+/// <summary>Anything shown from a time to a time (a subtitle of text or of pictures).</summary>
+public interface ITimedCue
+{
+    TimeSpan Start { get; }
+
+    TimeSpan End { get; }
+}
+
 /// <summary>One subtitle: when it is shown and its text (lines separated by "\n"; only &lt;i&gt;, &lt;b&gt;, &lt;u&gt; tags).</summary>
-public sealed record SubtitleCue(TimeSpan Start, TimeSpan End, string Text);
+public sealed record SubtitleCue(TimeSpan Start, TimeSpan End, string Text) : ITimedCue;
 
 /// <summary>Subtitles read from a file, in time order.</summary>
 /// <param name="Format">The format they were read from ("SRT", "WebVTT", "ASS/SSA", "TTML", "MicroDVD" …).</param>

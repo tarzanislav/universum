@@ -105,6 +105,7 @@ public static class MkvMergeIdentificationParser
             AudioChannels = Int(properties, "audio_channels"),
             AudioSamplingFrequency = Int(properties, "audio_sampling_frequency"),
             PixelDimensions = String(properties, "pixel_dimensions"),
+            DisplayDimensions = String(properties, "display_dimensions"),
             IsTextSubtitles = Bool(properties, "text_subtitles") ?? false,
             StatisticsFrames = Long(properties, "tag_number_of_frames"),
             StatisticsBytes = Long(properties, "tag_number_of_bytes"),

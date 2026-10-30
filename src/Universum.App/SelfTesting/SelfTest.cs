@@ -1724,6 +1724,70 @@ internal static class SelfTest
 
     // owner, 30. 10. 2026: Titulky – external subtitles found with the video (name, title words), old encodings, FPS and
     // delay (mkvmerge --sync), and subtitle files saved as SRT; invented names only
+    // owner, 30. 10. 2026: picture subtitles (PGS of a Blu-ray) shown in the player – an invented .sup next to a video
+    private static async Task TestPictureSubtitlesAsync(SubtitlesPageViewModel page, MainWindow window, string folder)
+    {
+        var pictures = Path.Combine(folder, "obrazky");
+        Directory.CreateDirectory(pictures);
+        var video = Path.Combine(pictures, "Vymyslený.Obrázkový.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
+        File.WriteAllBytes(Path.Combine(pictures, "Vymyslený.Obrázkový.Film.2026.de.sup"), Sup());
+        await page.LoadAsync([video]);
+        foreach (var found in page.Found.ToList())
+        {
+            found.AddCommand.Execute(null);
+            await WaitFor(() => !page.Rows.All(r => r.ExternalPath != found.Match.Path) && page.OpenVideoCommand.CanExecute(null));
+        }
+
+        var row = page.Rows.FirstOrDefault(r => r.ExternalPath?.EndsWith(".sup", StringComparison.Ordinal) == true);
+        Check(row is { IsText: false }, "studio: the .sup next to the video found – " + string.Join(" | ", page.Rows.Select(r => r.Summary)));
+        if (row is null)
+        {
+            return;
+        }
+
+        page.SelectedRow = row;
+        await page.PlayerOpening;
+        await WaitFor(() => page.Player.FramesShown > 0);
+        await page.Player.SeekAsync(TimeSpan.FromSeconds(1));
+        await WaitFor(() => page.Player.PrimaryPicture is not null);
+        // the 1920 × 1080 canvas in the 1280 × 720 frame: two thirds
+        var place = page.Player.PrimaryPicturePlace;
+        Check(page.Player.PrimaryPicture is BitmapSource { PixelWidth: 6, PixelHeight: 2 } && Math.Abs(place.X - 66.67) < 0.1 && Math.Abs(place.Y - 600) < 0.1 && Math.Abs(place.Width - 4) < 0.01,
+            $"studio: the picture subtitle shown where it stands – {place} | {page.Player.Message}");
+        Check(page.Preview is [{ Text: "(obrázok)", Before: "0:00:00,200" }], "studio: the picture subtitles in Časy titulkov – " + string.Join(" | ", page.Preview.Select(p => p.Before + " " + p.Text)));
+        row.DelayText = "1000";
+        await WaitFor(() => page.Player.PrimaryPicture is null);
+        Check(page.Player.PrimaryPicture is null, "studio: shifted by a second, the picture subtitle is not shown at 1 s any more");
+        await Screenshot(window, "studio-pictures.png");
+        row.DelayText = "0";
+        page.ClearCommand.Execute(null);
+
+        // one invented subtitle 0,2 s – 1,6 s: 6 × 2 pixels at 100, 900 of a 1920 × 1080 canvas (white, a transparent gap, yellow)
+        static byte[] Sup()
+        {
+            var data = new List<byte>();
+            void Segment(double seconds, byte type, byte[] body)
+            {
+                var pts = (uint)Math.Round(seconds * 90000);
+                data.AddRange([(byte)'P', (byte)'G', (byte)(pts >> 24), (byte)(pts >> 16), (byte)(pts >> 8), (byte)pts, 0, 0, 0, 0, type, (byte)(body.Length >> 8), (byte)body.Length]);
+                data.AddRange(body);
+            }
+
+            byte[] window = [0x01, 0x00, 0x00, 0x64, 0x03, 0x84, 0x00, 0x06, 0x00, 0x02];
+            byte[] rle = [0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x86, 0x02, 0x00, 0x00];
+            Segment(0.2, 0x16, [0x07, 0x80, 0x04, 0x38, 0x10, 0x00, 0x00, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x03, 0x84]);
+            Segment(0.2, 0x17, window);
+            Segment(0.2, 0x14, [0x00, 0x00, 0x01, 235, 128, 128, 255, 0x02, 210, 146, 16, 255]);
+            Segment(0.2, 0x15, [0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, (byte)(rle.Length + 4), 0x00, 0x06, 0x00, 0x02, .. rle]);
+            Segment(0.2, 0x80, []);
+            Segment(1.6, 0x16, [0x07, 0x80, 0x04, 0x38, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]);
+            Segment(1.6, 0x17, window);
+            Segment(1.6, 0x80, []);
+            return [.. data];
+        }
+    }
+
     private static async Task TestSubtitlesAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
         var folder = Path.Combine(work, "titulky");
@@ -1779,6 +1843,22 @@ internal static class SelfTest
         page.Player.Pause();
         Check(played > TimeSpan.FromSeconds(1.2) && page.Player.FramesShown > shown, $"studio: playing moves the film on ({played}, {page.Player.FramesShown - shown} pictures)");
         await page.Player.SeekAsync(TimeSpan.FromSeconds(1));
+
+        // owner, 30. 10. 2026: the text of a single subtitle changed in Časy titulkov, a subtitle left out and back
+        Check(page.Preview is [{ IsEditable: true, Index: 0 }] && page.RemoveCueCommand.CanExecute(page.Preview[0]), "studio: the subtitle can be changed in the list");
+        page.RemoveCueCommand.Execute(page.Preview[0]);
+        Check(page.Preview.Count == 0 && slovak.TextEdited && page.UndoCueEditsCommand.CanExecute(null), "studio: the subtitle left out");
+        page.UndoCueEditsCommand.Execute(null);
+        Check(page.Preview.Count == 1 && !slovak.TextEdited, "studio: and back");
+        page.SelectedPreview = page.Preview[0];
+        page.Preview[0].Text = "Ľudia sa vrátia | domov.";
+        await WaitFor(() => slovak.TextEdited);
+        Check(slovak.CueEdits.TryGetValue(0, out var edited) && edited == "Ľudia sa vrátia\ndomov." && page.Preview is [{ Text: "Ľudia sa vrátia | domov." }] &&
+              page.SelectedPreview == page.Preview[0] && page.Player.PrimaryText.Contains("domov.", StringComparison.Ordinal) && !page.Player.PrimaryText.Contains("päť", StringComparison.Ordinal),
+            $"studio: the text changed – „{edited}“ | player „{page.Player.PrimaryText}“");
+        slovak.RemoveHearingImpaired = true;
+        Check(!slovak.CanEditCues && page.Preview is [{ IsEditable: false, Text: "Ľudia sa vrátia | domov." }], "studio: repairs of the whole text work on the changed text, the list cannot be changed then");
+        slovak.RemoveHearingImpaired = false;
         await Screenshot(window, "studio-subtitles.png");
         // automatic sync on a 2-second file: nothing to tell, never a crash
         page.SyncByAudio = true;
@@ -1815,10 +1895,11 @@ internal static class SelfTest
         await page.LoadAsync([video]);
         var restored = page.Rows.FirstOrDefault(r => r.ExternalPath?.EndsWith(".sk.srt", StringComparison.Ordinal) == true);
         Check(page.HasWork && page.WorkNote.StartsWith("Obnovená uložená práca", StringComparison.Ordinal) && page.Rows.Count == 5 &&
-              restored is { FpsFrom.Label: "25", FpsTo.Label: "23,976", DelayText: "250" },
-            $"studio: the work comes back with the video – {page.WorkNote} | {restored?.Summary}");
+              restored is { FpsFrom.Label: "25", FpsTo.Label: "23,976", DelayText: "250", TextEdited: true },
+            $"studio: the work comes back with the video, the changed text too – {page.WorkNote} | {restored?.Summary}");
         page.DiscardWorkCommand.Execute(null);
         Check(!page.HasWork && services.StudioWork.Load(video) is null, "studio: the work discarded");
+        await TestPictureSubtitlesAsync(page, window, folder);
 
         // subtitle files alone: a new SRT in UTF-8 next to them, the original stays
         page.ClearCommand.Execute(null);

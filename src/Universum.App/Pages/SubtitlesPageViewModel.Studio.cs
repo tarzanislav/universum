@@ -7,6 +7,7 @@ using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Playback;
 using Universum.Core.Subtitles;
+using Universum.Core.Subtitles.Pictures;
 
 namespace Universum.App.Pages;
 
@@ -20,6 +21,12 @@ public sealed partial class SubtitlesPageViewModel
     private bool _compare;
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
+
+    // ends the reading of picture subtitles of a video closed
+    private CancellationTokenSource _readingStop = new();
+
+    // the picture subtitles (PGS) read for the player, by row
+    private readonly Dictionary<SubtitleRow, IReadOnlyList<PictureCue>> _pictures = [];
     private (string Path, IReadOnlyList<MediaTrack> Externals, Func<StudioEdits, string?> Save, Action Leave)? _task;
     private bool _openingTask;
     private int _taskLoad;
@@ -98,11 +105,25 @@ public sealed partial class SubtitlesPageViewModel
     /// <summary>…the second point, then the speed and the shift are computed.</summary>
     public RelayCommand MarkSecondCommand { get; }
 
+    /// <summary>Leaves the subtitle of the list out (Časy titulkov, the menu of the right button).</summary>
+    public RelayCommand<SubtitlePreviewRow> RemoveCueCommand { get; private set; } = null!;
+
+    /// <summary>Undoes every change of single subtitles of the selected ones.</summary>
+    public RelayCommand UndoCueEditsCommand { get; private set; } = null!;
+
     /// <summary>The player goes to a subtitle of the list (double click).</summary>
     public AsyncRelayCommand<SubtitlePreviewRow> SeekToCueCommand { get; }
 
     private void CreateTaskCommands()
     {
+        RemoveCueCommand = new RelayCommand<SubtitlePreviewRow>(cue =>
+        {
+            if (cue?.Index is { } index && _selected is { } row)
+            {
+                row.EditCue(index, null);
+            }
+        }, cue => cue?.IsEditable == true);
+        UndoCueEditsCommand = new RelayCommand(() => _selected?.SetCueEdits(null), () => _selected?.TextEdited == true);
         SaveToTaskCommand = new RelayCommand(SaveToTask, () => !_busy && _task is not null);
         LeaveTaskCommand = new RelayCommand(() =>
         {
@@ -266,9 +287,9 @@ public sealed partial class SubtitlesPageViewModel
             return;
         }
 
-        if (Rows.Any(r => r.Include && (r.RemoveHearingImpaired || r.RemoveFormatting || r.FixTimes || (!r.IsExternal && r.ToSrt))))
+        if (Rows.Any(r => r.Include && (r.RemoveHearingImpaired || r.RemoveFormatting || r.FixTimes || r.TextEdited || (!r.IsExternal && r.ToSrt))))
         {
-            LiveStatus = "Opravy textu (konverzia stopy, prvky pre nepočujúcich, formátovanie, prekrývanie) sa v úlohe nepoužijú – zrušte ich, " +
+            LiveStatus = "Opravy textu (zmenené titulky, konverzia stopy, prvky pre nepočujúcich, formátovanie, prekrývanie) sa v úlohe nepoužijú – zrušte ich, " +
                          "alebo uložte video hneď tlačidlom Uložiť.";
             return;
         }
@@ -418,12 +439,14 @@ public sealed partial class SubtitlesPageViewModel
             return;
         }
 
-        Player.SetSubtitles(Timeline(_selected), Compare && _compareRow != _selected ? Timeline(_compareRow) : SubtitleTimeline.Empty);
+        var compared = Compare && _compareRow != _selected ? _compareRow : null;
+        Player.SetSubtitles(Timeline(_selected), Timeline(compared));
+        Player.SetPictures(Pictures(_selected), Pictures(compared));
     }
 
     private SubtitleTimeline Timeline(SubtitleRow? row)
     {
-        if (row is null || !Rows.Contains(row))
+        if (row is null || !Rows.Contains(row) || !row.IsText)
         {
             return SubtitleTimeline.Empty;
         }
@@ -438,22 +461,73 @@ public sealed partial class SubtitlesPageViewModel
         return row.Repaired(row.Document) is { } document ? new SubtitleTimeline(timing.Apply(document).Cues) : SubtitleTimeline.Empty;
     }
 
-    // a text track of the video is read once for the player (mkvextract reads the whole file); pictures (PGS) are not drawn
+    // picture subtitles with the row's times
+    private PictureTimeline Pictures(SubtitleRow? row)
+    {
+        if (row is null || !Rows.Contains(row) || row.IsText)
+        {
+            return PictureTimeline.Empty;
+        }
+
+        if (!_pictures.TryGetValue(row, out var pictures))
+        {
+            ReadTrack(row);
+            return PictureTimeline.Empty;
+        }
+
+        var timing = row.Problem is null ? row.Timing : SubtitleTiming.None;
+        return new PictureTimeline(timing.IsNone ? pictures : pictures.Select(c => c with { Start = timing.Apply(c.Start), End = timing.Apply(c.End) }));
+    }
+
+    // a track is read once for the player (a track of the video: mkvextract reads the whole file); VobSub is not drawn yet
     private void ReadTrack(SubtitleRow row)
     {
-        if (!row.IsText)
+        if (!row.IsText && !PictureSubtitles.CanShow(row.Track))
         {
-            LiveStatus = $"Stopa {row.Track.Id} má obrázkové titulky ({row.Format}) – prehrávač ich zatiaľ nezobrazí; časy sa uložia správne.";
+            LiveStatus = $"Stopa {row.Track.Id} má obrázkové titulky {row.Format} – tie prehrávač zatiaľ nezobrazí (PGS áno); časy sa uložia správne.";
             return;
         }
 
-        if (_file is not { IsMatroska: true } file || _services.CurrentMkvToolNix is not { } installation || !_reading.Add(row))
+        if (_file is not { } file || _services.CurrentMkvToolNix is not { } installation || (!file.IsMatroska && row.ExternalPath is null) || !_reading.Add(row))
         {
             return;
         }
 
-        LiveStatus = $"Načítavam titulky stopy {row.Track.Id} pre prehrávač (číta sa celý súbor)…";
-        _ = ReadTrackAsync(row, file, installation);
+        LiveStatus = $"Načítavam titulky {(row.IsExternal ? "súboru" : $"stopy {row.Track.Id}")} pre prehrávač{(row.IsExternal ? "" : " (číta sa celý súbor)")}…";
+        _ = row.IsText ? ReadTrackAsync(row, file, installation) : ReadPicturesAsync(row, file, installation);
+    }
+
+    // picture subtitles are read once a video (mkvextract reads the whole file): also none or a failure is kept, so a
+    // change of the times does not read them again; another video stops the reading
+    private async Task ReadPicturesAsync(SubtitleRow row, Core.Media.MediaFile file, MkvToolNixInstallation installation)
+    {
+        var stop = _readingStop.Token;
+        try
+        {
+            var pictures = await PictureSubtitles.ExtractAsync(installation, _services.Runner, file, row.Track, stop);
+            if (!ReferenceEquals(_file, file))
+            {
+                return;
+            }
+
+            _pictures[row] = pictures;
+            LiveStatus = pictures.Count == 0 ? $"Obrázkové titulky {row.Source} sa nepodarilo prečítať (žiadne titulky)."
+                : $"Obrázkové titulky {row.Source} sú načítané ({pictures.Count}).";
+            UpdatePreview();
+            RefreshPlayer();
+        }
+        catch (OperationCanceledException)
+        {
+            // another video
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
+        {
+            if (ReferenceEquals(_file, file))
+            {
+                _pictures[row] = [];
+                LiveStatus = $"Obrázkové titulky {row.Source} sa nepodarilo prečítať: {ex.Message}";
+            }
+        }
     }
 
     private async Task ReadTrackAsync(SubtitleRow row, Core.Media.MediaFile file, MkvToolNixInstallation installation)
@@ -470,36 +544,54 @@ public sealed partial class SubtitlesPageViewModel
             }
             else if (document is null)
             {
-                _reading.Remove(row);
+                // not read again for every change (the whole file is read): when the video is opened again
                 LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať.";
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
         {
-            // tried again when the track is chosen again
-            _reading.Remove(row);
             LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať: {ex.Message}";
         }
     }
 
+    // the subtitle of the selected ones nearest to the moment: its time shown and its time as read (text or picture)
+    private (TimeSpan Shown, TimeSpan Read, string Label)? NearestCue(SubtitleRow row)
+    {
+        var now = Player.Now;
+        var timing = row.Problem is null ? row.Timing : SubtitleTiming.None;
+        if (row.IsText && Player.Primary.Nearest(now) is { } cue)
+        {
+            var read = row.Repaired(row.Document)?.Cues.FirstOrDefault(c => c.Text == cue.Text && (timing.Apply(c.Start) - cue.Start).Duration() < TimeSpan.FromMilliseconds(2));
+            return read is null ? null : (cue.Start, read.Start, Short(cue.Text));
+        }
+
+        if (!row.IsText && _pictures.TryGetValue(row, out var pictures) &&
+            pictures.MinBy(p => (timing.Apply(p.Start) - now).Duration()) is { } picture)
+        {
+            return (timing.Apply(picture.Start), picture.Start, $"obrázok z {SubtitleRow.Clock(picture.Start)}");
+        }
+
+        return null;
+    }
+
     private void StartsNow()
     {
-        if (_selected is not { } row || Player.Primary.Nearest(Player.Now) is not { } cue)
+        if (_selected is not { } row || NearestCue(row) is not { } cue)
         {
             LiveStatus = "Pri prehrávači nie je žiadny titulok vybraných titulkov.";
             return;
         }
 
         var now = Player.Now;
-        var by = (long)Math.Round((now - cue.Start).TotalMilliseconds);
+        var by = (long)Math.Round((now - cue.Shown).TotalMilliseconds);
         row.DelayText = (row.DelayMilliseconds + by).ToString(CultureInfo.InvariantCulture);
-        LiveStatus = $"Posun {(by >= 0 ? "+" : "−")}{Math.Abs(by).ToString("#,0", CultureInfo.GetCultureInfo("sk-SK"))} ms: „{Short(cue.Text)}“ začína v {SubtitleRow.Clock(now)} " +
+        LiveStatus = $"Posun {(by >= 0 ? "+" : "−")}{Math.Abs(by).ToString("#,0", CultureInfo.GetCultureInfo("sk-SK"))} ms: „{cue.Label}“ začína v {SubtitleRow.Clock(now)} " +
                      $"(posun spolu {row.DelayMilliseconds.ToString("#,0", CultureInfo.GetCultureInfo("sk-SK"))} ms).";
     }
 
     private void MarkPoint(bool first)
     {
-        if (_selected is not { } row || Player.Primary.Nearest(Player.Now) is not { } cue || Original(row, cue) is not { } original)
+        if (_selected is not { } row || NearestCue(row) is not { } cue)
         {
             LiveStatus = "Pri prehrávači nie je žiadny titulok vybraných titulkov.";
             return;
@@ -508,24 +600,17 @@ public sealed partial class SubtitlesPageViewModel
         var now = SubtitleRow.Clock(Player.Now);
         if (first)
         {
-            row.FirstNow = SubtitleRow.Clock(original);
+            row.FirstNow = SubtitleRow.Clock(cue.Read);
             row.FirstTarget = now;
-            LiveStatus = $"1. bod: „{Short(cue.Text)}“ ({row.FirstNow}) patrí do {now}. Pustite film ďalej a pri titulku ku koncu dajte 2. bod.";
+            LiveStatus = $"1. bod: „{cue.Label}“ ({row.FirstNow}) patrí do {now}. Pustite film ďalej a pri titulku ku koncu dajte 2. bod.";
         }
         else
         {
-            row.SecondNow = SubtitleRow.Clock(original);
+            row.SecondNow = SubtitleRow.Clock(cue.Read);
             row.SecondTarget = now;
             row.TwoPointsCommand.Execute(null);
-            LiveStatus = $"2. bod: „{Short(cue.Text)}“ ({row.SecondNow}) patrí do {now}. {row.SyncNote}";
+            LiveStatus = $"2. bod: „{cue.Label}“ ({row.SecondNow}) patrí do {now}. {row.SyncNote}";
         }
-    }
-
-    // the time a subtitle shown by the player has in the subtitles themselves (before the changes)
-    private static TimeSpan? Original(SubtitleRow row, SubtitleCue shown)
-    {
-        var timing = row.Problem is null ? row.Timing : SubtitleTiming.None;
-        return row.Repaired(row.Document)?.Cues.FirstOrDefault(c => c.Text == shown.Text && (timing.Apply(c.Start) - shown.Start).Duration() < TimeSpan.FromMilliseconds(2))?.Start;
     }
 
     private async Task SeekToCueAsync(SubtitlePreviewRow? row)

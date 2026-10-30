@@ -7,10 +7,16 @@ namespace Universum.Core.Playback;
 /// <param name="AudioTracks">How many audio tracks the file has (0 = none).</param>
 public sealed record PlayerSource(string Path, TimeSpan Duration, TimeSpan Origin, bool HasVideo, double? FramesPerSecond, int AudioTracks)
 {
+    /// <summary>Width ÷ height of the picture as shown (the decoder fits it so; picture subtitles lie on it), or null.</summary>
+    public double? DisplayAspect { get; init; }
+
     /// <summary>The source of a film read by MKVToolNix, with its first timestamp.</summary>
     public static PlayerSource Of(MediaFile file, TimeSpan origin) =>
         new(file.Path, file.Duration ?? TimeSpan.Zero, origin, file.TracksOf(TrackType.Video).Any(),
-            file.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond, file.TracksOf(TrackType.Audio).Count());
+            file.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond, file.TracksOf(TrackType.Audio).Count())
+        {
+            DisplayAspect = file.TracksOf(TrackType.Video).FirstOrDefault()?.DisplayAspect,
+        };
 }
 
 /// <summary>

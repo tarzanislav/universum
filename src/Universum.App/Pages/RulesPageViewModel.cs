@@ -379,7 +379,7 @@ public sealed class RulesPageViewModel : ObservableObject
                     : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? "návrh UNIVERSUM: forced – " + amount
                     : "",
                 ForcedChanged = ForcedChanged,
-                NameChanged = NameChanged,
+                NameWritten = NameWritten,
             });
         }
 
@@ -423,7 +423,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private void ForcedChanged(RuleRow row, bool forced) => Later(() => ChooseForced(row.TrackId, forced));
 
-    private void NameChanged(RuleRow row, string name) => Later(() => ChooseName(row.TrackId, name));
+    private void NameWritten(RuleRow row, string name) => Later(() => ChooseName(row.TrackId, name));
 
     /// <summary>
     /// The name of an audio or subtitle track as the user writes it (also used by the self-test); the rules' own name

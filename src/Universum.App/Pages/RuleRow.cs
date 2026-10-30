@@ -172,7 +172,7 @@ public sealed class RuleRow : ObservableObject
     public string NameAfter => Target.Name ?? "";
 
     /// <summary>Called when the user writes a track name.</summary>
-    public Action<RuleRow, string>? NameChanged { get; init; }
+    public Action<RuleRow, string>? NameWritten { get; init; }
 
     /// <summary>An audio or subtitle track kept: its name can be written (owner, 30. 10. 2026).</summary>
     public bool CanName => Target.Type is TrackType.Audio or TrackType.Subtitles && !IsRemovedByLanguage;
@@ -185,7 +185,7 @@ public sealed class RuleRow : ObservableObject
         {
             if (value.Trim() != NameAfter)
             {
-                NameChanged?.Invoke(this, value);
+                NameWritten?.Invoke(this, value);
             }
         }
     }

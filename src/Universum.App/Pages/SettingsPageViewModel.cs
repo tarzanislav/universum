@@ -55,6 +55,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         NewsSources = new NewsSourcesViewModel(services);
         InterestSources = new InterestSourcesViewModel(services);
         SubtitleAccounts = new SubtitleAccountsViewModel(services);
+        SeriesMemory = new SeriesMemoryViewModel(services);
         Load(services.Profile);
     }
 
@@ -71,6 +72,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>OpenSubtitles.com and svsub.net accounts (Titulky).</summary>
     public SubtitleAccountsViewModel SubtitleAccounts { get; }
+
+    /// <summary>Napovedkyňa seriálov: the series remembered with their titles.</summary>
+    public SeriesMemoryViewModel SeriesMemory { get; }
 
     /// <summary>Asks the main window to open the update window.</summary>
     public event Action? ShowUpdatesRequested;

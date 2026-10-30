@@ -44,6 +44,7 @@ public sealed class RulesPageViewModel : ObservableObject
     private string _episodeText = "";
     private string _episodeNote = "";
     private Placement? _placement;
+    private TitleInfo? _rememberedSeries;
     private string _target = "";
     private TmdbTitle? _tmdbTitle;
     private string _titleNote = "";
@@ -511,18 +512,34 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         var guess = TitleGuess.ForFile(path);
         _kind = guess.Kind;
-        _titleText = guess.TitleText;
+        // napovedkyňa (owner, 30. 10. 2026): a series processed before gets its remembered title – no search
+        _rememberedSeries = _services.RememberedSeriesFor(path);
+        _titleText = _rememberedSeries?.FolderName ?? guess.TitleText;
         // Season 00 or a regular season: asked – the field stays empty until the user answers
         _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
         _episodeNote = LibraryTargetPicker.EpisodeNote(guess.Episode);
         _tmdbTitle = null;
-        TitleNote = "";
+        TitleNote = _rememberedSeries is null ? "" : "Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).";
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(TitleText));
         OnPropertyChanged(nameof(EpisodeText));
+    }
+
+    // the series to remember after the file went into the library: the remembered one while its name stands in the field
+    // (it keeps its TMDB ID), otherwise the typed one with the ID of the TMDB title chosen for it
+    private TitleInfo? SeriesToRemember()
+    {
+        if (_kind != MediaKind.Series || TitleGuess.Typed(_kind, TitleText) is not { } title)
+        {
+            return null;
+        }
+
+        return _rememberedSeries is { } remembered && remembered.FolderName == title.FolderName ? remembered
+            : _tmdbTitle is { Kind: MediaKind.Series } chosen && title.TmdbId is null ? title with { TmdbId = chosen.Id }
+            : title;
     }
 
     /// <summary>Computes the place in the library from the title, episode and the planned result.</summary>
@@ -656,8 +673,14 @@ public sealed class RulesPageViewModel : ObservableObject
         try
         {
             var processor = _services.Processor(_services.CurrentMkvToolNix);
+            var series = SeriesToRemember();
             var result = await processor.ProcessAsync(_plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
             _undoRecord = result.UndoRecordPath;
+            if (result.Status is ProcessingStatus.Done or ProcessingStatus.Unchanged or ProcessingStatus.AlreadyInLibrary)
+            {
+                _services.RememberSeries(series, result.SourcePath);
+            }
+
             var cache = _services.Inspector(_services.CurrentMkvToolNix);
             cache.Invalidate(result.SourcePath);
             if (result.OutputPath is not null)
@@ -705,6 +728,7 @@ public sealed class RulesPageViewModel : ObservableObject
             }
         });
         _services.Enqueue(job);
+        _services.RememberSeries(SeriesToRemember(), _plan.Target.Source.Path);
         Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
     }
 

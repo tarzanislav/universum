@@ -80,6 +80,9 @@ public sealed class LibraryJob(LibraryLayout layout)
 
     public TitleInfo? SeriesSuggestion { get; set; }
 
+    /// <summary>The series name read from the names of the folder or the files (the suggestion before any service).</summary>
+    public NameGuess? SeriesNameGuess { get; private set; }
+
     /// <summary>Confirmed film titles by file path.</summary>
     public Dictionary<string, TitleInfo> Movies { get; } = new(Paths.Comparer);
 
@@ -157,7 +160,8 @@ public sealed class LibraryJob(LibraryLayout layout)
         }
         else if (TitleGuess.Preferred(fromFolder, fromFile) is { } seriesGuess)
         {
-            job.SeriesSuggestion = Title(MediaKind.Series, seriesGuess with { Year = seriesGuess.Year ?? fromFolder?.Year });
+            job.SeriesNameGuess = seriesGuess with { Year = seriesGuess.Year ?? fromFolder?.Year };
+            job.SeriesSuggestion = Title(MediaKind.Series, job.SeriesNameGuess);
         }
 
         // films: each file, named by its own folder when it has one with a year, otherwise by the file name
@@ -390,6 +394,68 @@ public sealed class LibraryJob(LibraryLayout layout)
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// The names a file of a series carries: its series folder below TVSHOWS (or the name the analysed folder gives), and
+    /// the series name at the start of its own name – what napovedkyňa remembers the series under.
+    /// </summary>
+    public IReadOnlyList<NameGuess> SeriesNamesOf(string path)
+    {
+        var names = new List<NameGuess>();
+        if (Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer)) is { } unit)
+        {
+            if (unit is { Kind: MediaKind.Series, Name: { } folder })
+            {
+                names.Add(folder);
+            }
+        }
+        else if (SeriesNameGuess is { } guess)
+        {
+            names.Add(guess);
+        }
+
+        if (SeriesNameOfFiles([path], Root) is { } own)
+        {
+            names.Add(own);
+        }
+
+        return names;
+    }
+
+    /// <summary>
+    /// Napovedkyňa (owner, 30. 10. 2026): series processed before get their remembered title at once – the series of the
+    /// folder (when the files look like episodes and none is chosen yet; the kind is then confirmed), and each series
+    /// folder of TVSHOWS. A title the user or the names already give stays. Returns the titles given.
+    /// </summary>
+    public IReadOnlyList<TitleInfo> ApplyMemory(SeriesMemory memory, IReadOnlyCollection<string> files)
+    {
+        var given = new List<TitleInfo>();
+        if (Units is { } units)
+        {
+            foreach (var unit in units.Where(u => u is { Kind: MediaKind.Series, Sorted: true }))
+            {
+                var open = unit.Files.Where(f => !SeriesOfFile.ContainsKey(f)).ToList();
+                if (open.Count > 0 && memory.Find([unit.Name, .. open.Select(f => SeriesNameOfFiles([f], Root))]) is { } title)
+                {
+                    foreach (var file in open)
+                    {
+                        SeriesOfFile[file] = title;
+                    }
+
+                    given.Add(title);
+                }
+            }
+        }
+        else if (_kind == MediaKind.Series && Series is null && memory.Find([SeriesNameGuess, SeriesNameOfFiles(files, Root)]) is { } title)
+        {
+            Series = title;
+            SeriesUnverified = false;
+            Kind = MediaKind.Series;
+            given.Add(title);
+        }
+
+        return given;
     }
 
     /// <summary>

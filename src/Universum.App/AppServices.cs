@@ -273,6 +273,30 @@ public sealed class AppServices
     private HistraListStore? _histraListStore;
 
     /// <summary>
+    /// Napovedkyňa (owner, 30. 10. 2026): the series processed before with the titles chosen for them on TMDB and HISTRA –
+    /// the next episodes get them without a search (a file of this Windows account, never sent anywhere).
+    /// </summary>
+    public SeriesMemory SeriesMemory => _seriesMemory ??= new(AppSettings.SeriesMemoryFile);
+
+    private SeriesMemory? _seriesMemory;
+
+    /// <summary>Napovedkyňa for one file (Single spracovanie, the tools): the remembered series its names point to, or null.</summary>
+    public TitleInfo? RememberedSeriesFor(string path)
+    {
+        var guess = TitleGuess.ForFile(path);
+        return guess.Kind == MediaKind.Series ? SeriesMemory.Find([guess.Title, LibraryJob.SeriesNameOfFiles([path])]) : null;
+    }
+
+    /// <summary>Remembers the series a file goes into the library as, under the names the file carries (napovedkyňa).</summary>
+    public void RememberSeries(TitleInfo? series, string path)
+    {
+        if (series is { Kind: MediaKind.Series })
+        {
+            SeriesMemory.Remember(series, [TitleGuess.ForFile(path).Title?.Name, LibraryJob.SeriesNameOfFiles([path])?.Name], DateTime.UtcNow);
+        }
+    }
+
+    /// <summary>
     /// The HTTP client of the news: without cookies (no site can follow the user), at most three redirects (each checked
     /// to stay on the site), compressed answers allowed.
     /// </summary>
@@ -754,6 +778,9 @@ public sealed class AppSettings
 
     /// <summary>The user's marks of titles (chosen, notes).</summary>
     public static string MarksFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news-marks.json");
+
+    /// <summary>Napovedkyňa: the series processed before and their titles.</summary>
+    public static string SeriesMemoryFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "napovedkyna.json");
 
     /// <summary>The HISTRA lists imported into UNIVERSUM.</summary>
     public static string HistraListsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "histra-lists.json");

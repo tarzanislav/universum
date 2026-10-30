@@ -3242,6 +3242,30 @@
                             <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding SeriesMemory}">
+                        <StackPanel>
+                            <TextBlock Text="Napovedkyňa seriálov" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="Seriály, ktoré spracúvate pravidelne: keď ich epizódy idú do knižnice, UNIVERSUM si zapamätá názov z TMDB a HISTRA a mená, podľa ktorých ich spoznal (priečinok, začiatok mena súboru). Ďalšie epizódy ho dostanú hneď – bez hľadania; zmeniť ho môžete. Zlý seriál tu zabudnite. Ukladá sa len pre váš účet Windows, nikam sa neposiela." />
+                            <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,2">
+                                            <Button DockPanel.Dock="Right" Content="Zabudnúť" Padding="10,2" VerticalAlignment="Center"
+                                                    Command="{Binding DataContext.ForgetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap">
+                                                    <Run Text="{Binding Names, Mode=OneWay}" /> · <Run Text="{Binding Used, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding SubtitleAccounts}">
                         <StackPanel>
                             <TextBlock Text="Titulky – sťahovanie a preklad (vaše účty)" FontWeight="SemiBold" />

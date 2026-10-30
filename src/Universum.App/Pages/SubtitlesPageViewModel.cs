@@ -869,7 +869,9 @@ public sealed class SubtitlesPageViewModel : ObservableObject
                 return;
             }
 
-            var translated = await client.TranslateAsync(SrtWriter.Write(document), TranslateTo, _services.SvSubProvider, new Progress<string>(s => OnlineStatus = "svsub.net: " + s));
+            var source = row.Language.Tag.IsUndetermined ? null : row.Language.Tag.Primary;
+            var translated = await client.TranslateAsync(SrtWriter.Write(document), TranslateTo, _services.SvSubProvider, new Progress<string>(s => OnlineStatus = "svsub.net: " + s),
+                model: _services.SvSubModel, sourceLanguage: source);
             var saved = await SubtitleDownloads.SaveBesideAsync(anchor, SubtitleReader.Read(translated), TranslateTo, row.HearingImpaired, row.Forced);
             _taken.Add(saved);
             OnlineStatus = $"Preložené ({row.Language.Tag.Primary} → {TranslateTo}) a uložené vedľa videa ako {Path.GetFileName(saved)}; " +

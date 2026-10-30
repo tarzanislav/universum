@@ -63,11 +63,12 @@ public sealed class SubtitleDownloadTests
         var states = new List<string>();
         var svsub = new SvSubClient(new HttpClient(handler), "svs_token123") { PollInterval = TimeSpan.Zero };
         var translated = await svsub.TranslateAsync("1\r\n00:00:01,000 --> 00:00:02,000\r\nHello.\r\n", "cs", "openai",
-            new SyncProgress<string>(states.Add));
+            new SyncProgress<string>(states.Add), model: "gpt-6-astra", sourceLanguage: "en");
         Assert.True(translated.Contains("Ahoj.", StringComparison.Ordinal), "the translation");
         var create = handler.Requests.First();
         Assert.True(create.Headers.Contains("Authorization: Bearer svs_token123") && create.Body.Contains("\"fileName\":\"titulky.srt\"", StringComparison.Ordinal) &&
-                    create.Body.Contains("\"provider\":\"openai\"", StringComparison.Ordinal) && create.Body.Contains("\"targetLang\":\"cs\"", StringComparison.Ordinal),
+                    create.Body.Contains("\"provider\":\"openai\"", StringComparison.Ordinal) && create.Body.Contains("\"targetLang\":\"cs\"", StringComparison.Ordinal) &&
+                    create.Body.Contains("\"model\":\"gpt-6-astra\"", StringComparison.Ordinal) && create.Body.Contains("\"sourceLang\":\"en\"", StringComparison.Ordinal),
             "the token, a neutral file name, the provider and the language: " + create.Body);
         Assert.True(handler.Requests.Last().Method == "DELETE" && svsub.JobDeleted, "the job is deleted afterwards");
         Assert.True(states.Any(s => s.Contains("40 %", StringComparison.Ordinal)), "progress: " + string.Join(" | ", states));

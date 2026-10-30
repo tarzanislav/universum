@@ -33,20 +33,34 @@ public sealed class SvSubClient(HttpClient http, string token)
     /// <paramref name="provider"/> ("openai" …) and returns the translated SRT.
     /// </summary>
     /// <param name="progress">The state of the job, in Slovak.</param>
-    public async Task<string> TranslateAsync(string srt, string targetLanguage, string provider, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    /// <param name="model">The AI model ("gpt-6-astra"); null = the service's default (owner, 30. 10. 2026: verified – the service uses it).</param>
+    /// <param name="sourceLanguage">The language of the subtitles ("en"); null = the service finds it.</param>
+    public async Task<string> TranslateAsync(string srt, string targetLanguage, string provider, IProgress<string>? progress = null, CancellationToken cancellationToken = default,
+        string? model = null, string? sourceLanguage = null)
     {
         if (Encoding.UTF8.GetByteCount(srt) > MaximumBytes)
         {
             throw new SubtitleServiceException("svsub.net: titulky sú väčšie ako 5 MB.");
         }
 
-        var created = await SendAsync(HttpMethod.Post, "jobs", new JsonObject
+        var body = new JsonObject
         {
             ["fileName"] = "titulky.srt",
             ["content"] = srt,
             ["provider"] = provider,
             ["targetLang"] = targetLanguage,
-        }, cancellationToken).ConfigureAwait(false);
+        };
+        if (!string.IsNullOrWhiteSpace(model))
+        {
+            body["model"] = model.Trim();
+        }
+
+        if (sourceLanguage is { Length: 2 or 3 } source && source.All(char.IsAsciiLetterLower) && source != targetLanguage)
+        {
+            body["sourceLang"] = source;
+        }
+
+        var created = await SendAsync(HttpMethod.Post, "jobs", body, cancellationToken).ConfigureAwait(false);
         var id = Id(created) ?? throw new SubtitleServiceException("svsub.net: služba nevrátila číslo úlohy.");
         try
         {

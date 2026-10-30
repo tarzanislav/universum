@@ -399,11 +399,19 @@ public sealed class AppServices
     /// <summary>The AI provider svsub.net translates with ("openai" by default).</summary>
     public string SvSubProvider => Settings.SvSubProvider is { Length: > 0 } provider ? provider : "openai";
 
-    /// <summary>Stores the svsub.net token (empty removes it, encrypted) and the AI provider.</summary>
-    public void SetSvSub(string? token, string? provider)
+    /// <summary>The AI model svsub.net translates with (owner: "gpt-6-astra").</summary>
+    public string SvSubModel => Settings.SvSubModel ?? "gpt-6-astra";
+
+    /// <summary>Stores the svsub.net token (empty removes it, encrypted), the AI provider and the model (empty = the service's default).</summary>
+    public void SetSvSub(string? token, string? provider, string? model = null)
     {
         Settings.SvSubTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
         Settings.SvSubProvider = string.IsNullOrWhiteSpace(provider) ? null : provider.Trim().ToLowerInvariant();
+        if (model is not null)
+        {
+            Settings.SvSubModel = model.Trim();
+        }
+
         Settings.Save();
     }
 
@@ -677,6 +685,9 @@ public sealed class AppSettings
     public string? SvSubTokenProtected { get; set; }
 
     public string? SvSubProvider { get; set; }
+
+    /// <summary>svsub.net: the AI model (null = "gpt-6-astra", empty = the service's default).</summary>
+    public string? SvSubModel { get; set; }
 
     /// <summary>The language of Zaujímavosti ("sk", later "cs" or "en").</summary>
     public string InterestLanguage { get; set; } = "sk";

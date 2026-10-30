@@ -89,6 +89,20 @@ nový súbor v knižnici, súbory titulkov ako nové SRT vedľa pôvodných (nik
   oprava prekrývania a príliš krátkych časov (najmenej 0,7 s).
 - Pravidlá UNIVERSUM (poradie, príznaky, Forced, odstránenie prázdnych stôp) sa použijú, ak sú zapnuté; keď ich
   zastaví neurčený jazyk inej stopy, stránka to povie.
+- Súbory titulkov sa ukladajú ako **SRT alebo WebVTT** (UTF-8).
+- **Automatické napasovanie** vybraných titulkov:
+  - **podľa zvuku** – osem častí filmu po 2,5 minúty (8–92 % filmu): kde sa hovorí (pásmo hlasu 200–3 500 Hz, hlasitosť
+    každých 10 ms nad tichom časti); pre každú časť sa nájde posun titulkov (±90 s) s najviac rečou pod titulkami;
+    skúšajú sa aj pomery FPS (25 ↔ 23,976 …); časti, ktoré sa zhodujú, dajú posun a zvyšok zmeny rýchlosti;
+  - **podľa titulkov**, ktoré k filmu sedia (aj v inom jazyku), rovnakým spôsobom;
+  - **oboje** – keď sa zhodnú (do 0,3 s na začiatku, v strede a na konci filmu), je to isté; inak upozornenie.
+  - Spoľahlivý výsledok (zhoduje sa aspoň polovica častí) nastaví pri titulkoch **zmenu FPS** (keď ide presne o pomer
+    FPS, aj 23,978 špeciálne), inak **rýchlosť**, a **posun**; malá zmena rýchlosti, ktorá žiadny titulok neposunie
+    o viac ako 0,12 s, sa nenastaví. **Neistý výsledok sa sám nepoužije** – vlastné hodnoty ostanú, návrh nastaví až
+    tlačidlo „Použiť návrh“. Čítanie zvuku sa dá zastaviť.
+  - Časy zvuku sú časy súboru (MKV, ktorého prvý čas nie je 0, ich má posunuté rovnako ako titulky).
+- **Skontrolovať titulky videa:** každá titulková stopa videa (časy z indexu súboru) sa porovná so zvukom – sedí,
+  mešká, ide skôr, iné FPS. Obrázkové titulky (PGS) bez dĺžok v indexe sa berú po dvojiciach zobrazenie–zmazanie.
 
 ## 6. Externé titulky
 
@@ -109,12 +123,15 @@ nový súbor v knižnici, súbory titulkov ako nové SRT vedľa pôvodných (nik
 
 - **OpenSubtitles.com** (anglické titulky, aj SDH): vlastný API kľúč a účet v Nastaveniach (šifrovane). Hľadá sa podľa
   TMDB ID titulu (inak podľa názvu a roku) a epizódy; sťahovanie potrebuje prihlásenie (denný limit podľa účtu).
+  Pri každom výsledku: **FPS titulkov oproti FPS filmu** („FPS sedí“, „FPS 25 ≠ film 23,976“, „FPS neuvedené“ – nie
+  všetky titulky ho majú) a **zhoda releasu** s názvom súboru (rozlíšenie, zdroj, kodek, skupina); poradie: sediace
+  FPS, potom zhoda releasu, potom počet stiahnutí.
 - **opensubtitles.org:** staré rozhranie neprijíma nové programy – len cez prehliadač.
 - **titulky.com** (CZ/SK): pravidlá stránky povoľujú len prehliadač, automatické sťahovanie programom zakazujú.
   UNIVERSUM otvorí hľadanie titulu v prehliadači; stiahnuté titulky (aj ZIP) do 30 minút sám vezme zo Stiahnutých
   súborov. **edna.cz:** rozhranie pre programy nemá – len prehliadač.
-- **Preklad (svsub.net),** keď titulky neexistujú: vlastný token v Nastaveniach (šifrovane), poskytovateľ AI (napr.
-  openai; model sa vyberá v nastaveniach služby), cieľový jazyk (cs, sk, en) – zdrojový a cieľový jazyk nesmú byť
-  rovnaké. Posielajú sa len titulky pod neutrálnym názvom, úloha sa po stiahnutí prekladu na službe zmaže.
+- **Preklad (svsub.net),** keď titulky neexistujú: vlastný token v Nastaveniach (šifrovane), poskytovateľ AI (openai,
+  anthropic, gemini, deepseek), **model AI** (predvolene gpt-6-astra), zdrojový jazyk podľa stopy, cieľový jazyk (cs,
+  sk, en) – zdrojový a cieľový jazyk nesmú byť rovnaké. Úroveň uvažovania služba nepozná. Posielajú sa len titulky pod neutrálnym názvom, úloha sa po stiahnutí prekladu na službe zmaže.
 - Stiahnuté a preložené titulky sa uložia **vedľa videa** ako *Názov videa.jazyk(.sdh)(.forced).srt* (nikdy cez
   existujúci súbor), takže ich každé spracovanie nájde ako externé titulky.

@@ -346,6 +346,30 @@ public sealed class SubtitleRow : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The result of automatic sync: a change of the frame rate it found as Zmena FPS, any other change of speed as
+    /// Zmena rýchlosti, and the delay.
+    /// </summary>
+    public void ApplySync(Core.Subtitles.Sync.SyncResult result)
+    {
+        var timing = result.Timing;
+        if (result.Rates is { } rates)
+        {
+            FpsFrom = rates.From;
+            FpsTo = rates.To;
+            SpeedText = "0";
+        }
+        else
+        {
+            FpsFrom = null;
+            FpsTo = null;
+            SpeedText = timing.Numerator == timing.Denominator ? "0" : (((decimal)timing.Denominator / timing.Numerator - 1) * 100).ToString("0.######", Slovak);
+        }
+
+        DelayText = timing.DelayMilliseconds.ToString(CultureInfo.InvariantCulture);
+        SyncNote = result.Detail;
+    }
+
     private void TwoPoints()
     {
         if (ParseClock(FirstNow) is not { } first || ParseClock(FirstTarget) is not { } firstTarget ||

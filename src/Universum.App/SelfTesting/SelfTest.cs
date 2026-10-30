@@ -1751,6 +1751,12 @@ internal static class SelfTest
         slovak.DelayText = "250";
         Check(page.Preview.Count == 1 && page.Preview[0].After == "0:00:00,771", "subtitles: 25 → 23,976 FPS and +250 ms in the preview – " + string.Join(" | ", page.Preview.Select(p => p.After)));
         Check(slovak.Summary.Contains("FPS 25 → 23,976", StringComparison.Ordinal) && slovak.Summary.Contains("posun +250 ms", StringComparison.Ordinal), "subtitles: the summary – " + slovak.Summary);
+        // automatic sync on a 2-second file: nothing to tell, never a crash
+        page.SyncByAudio = true;
+        await page.SyncCommand.ExecuteAsync(null);
+        Check(page.SyncStatus.Length > 0 && slovak.DelayText == "250", "subtitles: automatic sync says something and changes nothing it cannot tell – " + page.SyncStatus);
+        await page.CheckTracksCommand.ExecuteAsync(null);
+        Check(page.SyncStatus.Length > 0, "subtitles: the check of the video's tracks – " + page.SyncStatus);
         slovak.SpeedText = "-100";
         Check(slovak.Problem is not null && !page.SaveCommand.CanExecute(null), "subtitles: −100 % is not possible");
         slovak.SpeedText = "0";
@@ -1782,6 +1788,10 @@ internal static class SelfTest
         var srt = Path.ChangeExtension(vtt, ".srt");
         Check(File.Exists(srt) && File.ReadAllText(srt).Contains("00:00:00,300 --> 00:00:01,000", StringComparison.Ordinal) && File.Exists(vtt),
             "subtitles: converted to SRT next to it, the original kept – " + page.Result);
+        page.OutputFormat = "WebVTT";
+        await page.SaveCommand.ExecuteAsync(null);
+        var newVtt = Path.Combine(folder, "vymysleny_titulkovy_film_2026_en (upravené).vtt");
+        Check(File.Exists(newVtt) && File.ReadAllText(newVtt).StartsWith("WEBVTT", StringComparison.Ordinal), "subtitles: saved as WebVTT too, never over the original – " + page.Result);
     }
 
     private static async Task TestBatchPageAsync(MainViewModel model, MainWindow window, AppServices services)

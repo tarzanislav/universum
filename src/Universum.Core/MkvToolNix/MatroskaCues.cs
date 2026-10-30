@@ -21,6 +21,7 @@ public static class MatroskaCues
     private const uint CueTime = 0xB3;
     private const uint CueTrackPositions = 0xB7;
     private const uint CueTrack = 0xF7;
+    private const uint CueDuration = 0xB2;
     private const uint Cluster = 0x1F43B675;
 
     // an index larger than this is not an index (a damaged file)
@@ -44,12 +45,35 @@ public static class MatroskaCues
         }, cancellationToken);
 
     /// <summary>The cue times of every track of a Matroska stream (key = track number); empty without an index.</summary>
-    public static IReadOnlyDictionary<int, IReadOnlyList<TimeSpan>> Read(Stream stream)
+    public static IReadOnlyDictionary<int, IReadOnlyList<TimeSpan>> Read(Stream stream) =>
+        Entries(stream).ToDictionary(t => t.Key, t => (IReadOnlyList<TimeSpan>)t.Value.Select(e => e.Start).ToList());
+
+    /// <summary>
+    /// The cue points of every track with how long each lasts when the index says it (mkvmerge writes it for text
+    /// subtitles) – the timing of a subtitle track without reading the film (automatic sync; SubtitleSync.Intervals).
+    /// </summary>
+    public static Task<IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>> ReadPointsAsync(string path, CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096);
+                return (IReadOnlyDictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>)Entries(stream).ToDictionary(
+                    t => t.Key, t => (IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>)t.Value);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return new Dictionary<int, IReadOnlyList<(TimeSpan Start, TimeSpan? Duration)>>();
+            }
+        }, cancellationToken);
+
+    // the cue points of every track (key = track number), sorted by time: the time and the duration when the index has it
+    private static Dictionary<int, List<(TimeSpan Start, TimeSpan? Duration)>> Entries(Stream stream)
     {
         if (Header(stream, 0) is not { Id: EbmlHeader, Size: { } headerSize } header ||
             Header(stream, header.Data + (long)headerSize) is not { Id: Segment } segment)
         {
-            return None;
+            return [];
         }
 
         var start = segment.Data;
@@ -131,14 +155,15 @@ public static class MatroskaCues
 
         if (cues is not { } cuesPosition || Body(stream, cuesPosition, Cues, MaximumCues) is not { } index)
         {
-            return None;
+            return [];
         }
 
-        var times = new Dictionary<int, List<TimeSpan>>();
+        var entries = new Dictionary<int, List<(TimeSpan Start, TimeSpan? Duration)>>();
+        TimeSpan Time(ulong ticks) => TimeSpan.FromTicks((long)Math.Min((decimal)long.MaxValue, (decimal)ticks * scale / 100));
         foreach (var point in Children(index, 0, index.Length).Where(c => c.Id == CuePoint))
         {
             ulong? time = null;
-            var tracks = new List<int>();
+            var positions = new List<(int Track, ulong? Duration)>();
             foreach (var child in Children(index, point.Start, point.Start + point.Length))
             {
                 if (child.Id == CueTime)
@@ -147,8 +172,24 @@ public static class MatroskaCues
                 }
                 else if (child.Id == CueTrackPositions)
                 {
-                    tracks.AddRange(Children(index, child.Start, child.Start + child.Length).Where(c => c.Id == CueTrack)
-                        .Select(c => (int)Unsigned(index, c.Start, c.Length)));
+                    int? track = null;
+                    ulong? duration = null;
+                    foreach (var part in Children(index, child.Start, child.Start + child.Length))
+                    {
+                        if (part.Id == CueTrack)
+                        {
+                            track = (int)Unsigned(index, part.Start, part.Length);
+                        }
+                        else if (part.Id == CueDuration)
+                        {
+                            duration = Unsigned(index, part.Start, part.Length);
+                        }
+                    }
+
+                    if (track is { } number)
+                    {
+                        positions.Add((number, duration));
+                    }
                 }
             }
 
@@ -157,19 +198,23 @@ public static class MatroskaCues
                 continue;
             }
 
-            var at = TimeSpan.FromTicks((long)Math.Min((decimal)long.MaxValue, (decimal)ticks * scale / 100));
-            foreach (var track in tracks)
+            foreach (var (track, duration) in positions)
             {
-                if (!times.TryGetValue(track, out var list))
+                if (!entries.TryGetValue(track, out var list))
                 {
-                    times[track] = list = [];
+                    entries[track] = list = [];
                 }
 
-                list.Add(at);
+                list.Add((Time(ticks), duration is { } length ? Time(length) : null));
             }
         }
 
-        return times.ToDictionary(t => t.Key, t => (IReadOnlyList<TimeSpan>)t.Value.Order().ToList());
+        foreach (var list in entries.Values)
+        {
+            list.Sort((a, b) => a.Start.CompareTo(b.Start));
+        }
+
+        return entries;
     }
 
     // the ID, the size (null = unknown) and where the data starts, of the element at the position; null past the end

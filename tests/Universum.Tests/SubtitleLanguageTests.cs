@@ -52,6 +52,54 @@ public sealed class SubtitleLanguageTests
     }
 
     [Test]
+    public void LanguagesWithOtherLettersAreNeitherCzechNorSlovak()
+    {
+        // review: French ô, Finnish ä, Spanish, Italian, Romanian, Croatian, Turkish – invented sentences
+        string[] others =
+        [
+            "Il est trop tôt. L'hôtel est fermé, je ne sais pas où il est allé. Pourquoi tu es là? On doit partir tout de suite.",
+            "Mitä sinä täällä teet? Tämä talo on minun. En tiedä, missä hän on. Hän lähti pois tänään ja sanoi, että palaa huomenna.",
+            "Pensé que te habías ido. No sé si lo lograremos. Tenemos que irnos ahora, antes de que vuelva. Esta es mi casa. Se fue.",
+            "Che cosa fai qui? Pensavo che fossi andato via. Non so se ce la faremo. Perché non me l'ha detto? Questa è la mia casa.",
+            "Ce se întâmplă aici? Nu știu ce să fac. Se pare că a plecat. Ne vedem mâine? Nu se poate așa ceva. Ea se duce acasă.",
+            "Ce se intampla aici? Nu stiu ce sa fac. Se pare ca a plecat. Ne vedem maine? Nu se poate asa ceva. Ea se duce acasa. Se face tarziu.",
+            "Što se dogodilo? Ne znam, nisam bio tamo. Moramo se vratiti kući. Ne mogu više čekati. Što ćemo sada? Ne brini, sve će biti u redu.",
+            "Burada ne yapıyorsun? Gittiğini sanıyordum. Başarabilir miyiz bilmiyorum. Hemen gitmeliyiz, o dönmeden önce. Neden bana söylemedi?",
+            "Wir gehen nach Hause, Mädchen. Das ist ein Problem.",
+        ];
+        foreach (var text in others)
+        {
+            Assert.True(SubtitleLanguage.Detect(text) is null or { Language: not "cs" and not "sk" }, "not Czech or Slovak: " + text[..30] + " → " + SubtitleLanguage.Detect(text));
+        }
+
+        var english = string.Join(" ", Enumerable.Repeat("I don't know what you are doing here, it's not your house and you can go to the café.", 3));
+        Assert.True(SubtitleLanguage.Detect(english) is { Language: "en" }, "a café in English subtitles stays English");
+    }
+
+    [Test]
+    public void WithoutDiacriticsOnlyTheMostProbable()
+    {
+        var czech = SubtitleLanguage.Detect("Co tady delas? Myslel jsem, ze jsi odesel. Nevim, jestli to zvladneme. Jsem tady pro tebe. Chci ti neco ukazat. Co se stalo?");
+        Assert.True(czech is { Language: "cs", Certain: false, CzechOrSlovak: false }, "Czech without diacritics: " + czech);
+        var slovak = SubtitleLanguage.Detect("Co tu robis? Myslel som, ze si odisiel. Neviem, ci to zvladneme. Som tu pre teba. Chcem ti nieco ukazat. Co sa stalo?");
+        Assert.True(slovak is { Language: "sk", Certain: false }, "Slovak without diacritics: " + slovak);
+    }
+
+    [Test]
+    public void AGuessNeverReplacesAnotherLanguageOfTheFile()
+    {
+        var guess = new SubtitleLanguageResult("cs", false, "bez diakritiky – overte");
+        Assert.True(guess.Replaces(LanguageTag.Undetermined) && guess.Replaces(LanguageTag.FromCode("sk")), "undetermined, Slovak: replaced");
+        Assert.True(!guess.Replaces(LanguageTag.FromCode("slv")) && !guess.Replaces(LanguageTag.FromCode("eng")), "Slovenian, English in the file stay");
+        Assert.True(new SubtitleLanguageResult("cs", true, "ř").Replaces(LanguageTag.FromCode("eng")), "certain Czech replaces English (EN that is Czech)");
+        Assert.True(new SubtitleLanguageResult("sk", false, "– overte", CzechOrSlovak: true).Replaces(LanguageTag.FromCode("eng")),
+            "surely Czech or Slovak replaces English even when which of the two is uncertain");
+        var german = new SubtitleLanguageResult("de", true, "podľa častých slov");
+        Assert.True(german.Replaces(LanguageTag.FromCode("eng")) && !german.Replaces(LanguageTag.FromCode("nld")),
+            "a language the detector cannot tell (Dutch) stays as the file has it");
+    }
+
+    [Test]
     public async Task EverySubtitleTrackOfAFileIsRead()
     {
         // without FFmpeg the whole tracks are read by mkvextract; the Czech full subtitles are certainly Czech

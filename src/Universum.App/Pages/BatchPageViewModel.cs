@@ -196,6 +196,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        _subtitleReading?.Cancel();
         _analysis = null;
         _items = [];
         _library = null;
@@ -953,6 +954,9 @@ public sealed class BatchPageViewModel : ObservableObject
         _results = [];
         Finish = null;
 
+        // the subtitles of the previous analysis are no longer read: this one reads its own when it is done
+        await StopReadingSubtitlesAsync();
+
         // nothing of a previous folder stays ready to run while (or if) this one is read
         _analysis = null;
         _items = [];
@@ -1392,7 +1396,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var (key, track) in SlotKey.Of(group.Representative))
         {
-            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot));
+            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot, _services.Profile));
         }
 
         ArrangeSlots();
@@ -1936,8 +1940,16 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>Recognises the language of undetermined text subtitles of the selected group (reads the representative file).</summary>
-    // the subtitle reading running in the background (null when none)
+    // the subtitle reading running in the background (null when none) and its end
     private CancellationTokenSource? _subtitleReading;
+    private Task _subtitleReadingDone = Task.CompletedTask;
+
+    /// <summary>Stops the subtitle reading and waits until it has ended (a new analysis, Vymazať frontu).</summary>
+    private async Task StopReadingSubtitlesAsync()
+    {
+        _subtitleReading?.Cancel();
+        await _subtitleReadingDone;
+    }
 
     // what was read, by the file (path, size, time): an analysis again or a group shown again reads nothing twice
     private readonly Dictionary<string, IReadOnlyDictionary<int, SubtitleLanguageResult>> _subtitleLanguages = new(Paths.Comparer);
@@ -1966,23 +1978,25 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var cancellation = new CancellationTokenSource();
+        var done = new TaskCompletionSource();
         _subtitleReading = cancellation;
+        _subtitleReadingDone = done.Task;
         OnPropertyChanged(nameof(IsReadingSubtitles));
         RefreshCommands();
-        string? ffmpeg;
-        try
-        {
-            ffmpeg = (await _services.SpeechAsync(cancellation.Token)).Ffmpeg;
-        }
-        catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException or OperationCanceledException)
-        {
-            // without FFmpeg mkvextract reads the whole tracks
-            ffmpeg = null;
-        }
-
         int read = 0, certain = 0, probable = 0;
         try
         {
+            string? ffmpeg;
+            try
+            {
+                ffmpeg = (await _services.SpeechAsync(cancellation.Token)).Ffmpeg;
+            }
+            catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
+            {
+                // without FFmpeg mkvextract reads the whole tracks
+                ffmpeg = null;
+            }
+
             foreach (var group in groups)
             {
                 cancellation.Token.ThrowIfCancellationRequested();
@@ -2001,6 +2015,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 var slots = SlotKey.Of(file).ToDictionary(x => x.Track.Id, x => x.Key);
+                group.Detected.Clear();
                 foreach (var (id, result) in found.Where(f => slots.ContainsKey(f.Key)))
                 {
                     group.Detected[slots[id]] = SubtitleText.Evidence(result);
@@ -2022,6 +2037,10 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             RunState = "Čítanie titulkov zastavené – jazyky ostávajú, ako ich má súbor.";
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Core.Processes.ProcessStartException or TimeoutException or MkvToolNixException)
+        {
+            RunState = "Titulky sa nepodarilo prečítať – jazyky ostávajú, ako ich má súbor: " + ex.Message;
+        }
         finally
         {
             if (ReferenceEquals(_subtitleReading, cancellation))
@@ -2036,6 +2055,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
 
             RefreshCommands();
+            done.TrySetResult();
         }
     }
 

@@ -4,8 +4,24 @@ namespace Universum.Core.Text;
 
 /// <summary>The language of a subtitle text: certain, or the most probable one (the user is told).</summary>
 /// <param name="Language">Primary language subtag ("cs", "sk", "en" …).</param>
+/// <param name="Certain">The language is certain (else only the most probable one – "overte").</param>
 /// <param name="Detail">What decided it, in Slovak ("ř, ě, ů 14×, české slová 9×").</param>
-public sealed record SubtitleLanguageResult(string Language, bool Certain, string Detail);
+/// <param name="CzechOrSlovak">
+/// The text is certainly Czech or Slovak (their letters and words) – only which of the two may be uncertain.
+/// </param>
+public sealed record SubtitleLanguageResult(string Language, bool Certain, string Detail, bool CzechOrSlovak = false)
+{
+    /// <summary>
+    /// The result replaces the language the file has for the track: an undetermined one always; Czech or Slovak read
+    /// from their letters and words any language (owner, 29. 10.: "EN" that is Czech), a mere guess between them only
+    /// Czech or Slovak. Another language (English, German …, told by frequent words) replaces only a language the
+    /// detector knows – never Dutch, Spanish or Slovenian written in the file, which it cannot tell.
+    /// </summary>
+    public bool Replaces(Media.LanguageTag inFile) =>
+        inFile.IsUndetermined
+        || (Language is "cs" or "sk" ? Certain || CzechOrSlovak || inFile.IsCzechOrSlovak
+            : inFile.IsCzechOrSlovak || SubtitleLanguage.Detectable.Contains(inFile.Primary));
+}
 
 /// <summary>
 /// The language of subtitles from their text (owner, 30. 10. 2026). Czech and Slovak – often mixed up in files – are told
@@ -16,15 +32,31 @@ public sealed record SubtitleLanguageResult(string Language, bool Certain, strin
 /// are only a weak sign (Czech has them too: podzim, džus).</item>
 /// </list>
 /// Signs of one language only make it certain; signs of both decide by their count (a Czech name in Slovak subtitles
-/// does not make them Czech). German, Polish and Hungarian texts (ä is German too) are recognised first.
+/// does not make them Czech). A text with letters Czech and Slovak never use (German ö, French è, Spanish ñ, Croatian ć,
+/// Romanian ș …) is neither; ä and ô alone (German, French, Finnish have them too) make Slovak only probable; without any
+/// diacritics (old subtitles) the short words decide – only as the most probable language.
 /// </summary>
 public static class SubtitleLanguage
 {
     private const string CzechLetters = "ěřů";
-    private const string SlovakLetters = "äĺľôŕ";
 
-    // letters of languages with ä, ó … that Czech and Slovak do not use: such a text is not Czech or Slovak
-    private const string OtherLetters = "öüßłąęśźżńőű";
+    // the letters only Slovak has; ä and ô are Slovak too, but also German, French, Finnish – alone only a weak sign
+    private const string SlovakLetters = "ĺľŕ";
+    private const string SlovakWeakLetters = "äô";
+
+    // the whole Czech and Slovak alphabet beyond a–z: any other letter (ö, è, ñ, ć, ș, ł, Cyrillic …) is another language
+    private const string Alphabet = "áäčďéěíĺľňóôŕřšťúůýž";
+
+    // the letters with a háček only Czech and Slovak (of the languages in films) write this often
+    private const string Hacek = "čďňšťž";
+
+    // short words of the Czech and Slovak lists other languages write as well (Romanian, Italian, Spanish, Croatian,
+    // Slovenian, Polish, Swedish): they do not tell a text without diacritics is Czech or Slovak
+    private static readonly HashSet<string> Shared = new(
+        ["se", "ne", "co", "sa", "ste", "so", "ma", "ako", "nie", "som", "ano", "pro", "jak", "nic", "ve", "vo"], StringComparer.Ordinal);
+
+    /// <summary>Signs of Czech or Slovak count only when there are this many words (a name in English subtitles is not Czech).</summary>
+    private const int ManyWords = 100;
 
     private static readonly HashSet<string> CzechWords = new(
         [
@@ -51,59 +83,115 @@ public static class SubtitleLanguage
 
         var lower = text.Normalize(System.Text.NormalizationForm.FormC).ToLower(CultureInfo.InvariantCulture);
         var other = TextLanguageDetector.Detect(lower);
-        var foreign = lower.Count(c => OtherLetters.Contains(c));
         if (other is not null and not "cs" and not "sk")
         {
-            return new SubtitleLanguageResult(other, true, "podľa častých slov a písmen");
+            // Turkish taken for German (ö, ü), Dutch for English …: letters the language does not write say it is another one
+            return Strange(lower, other) ? null : new SubtitleLanguageResult(other, true, "podľa častých slov a písmen");
         }
 
-        // a short text with German, Polish or Hungarian letters is none of the two – nothing to say
-        if (foreign > 0 && foreign * 4 >= lower.Count(c => CzechLetters.Contains(c) || SlovakLetters.Contains(c)))
+        // letters Czech and Slovak never use (and the Spanish ¿ ¡): another language – unless one or a few in a long text (names)
+        var diacritics = lower.Count(c => Alphabet.Contains(c));
+        var foreign = lower.Count(c => (char.IsLetter(c) && c > '\u007f' && !Alphabet.Contains(c)) || c is '¿' or '¡');
+        if (foreign > 1 && foreign * 20 >= diacritics)
         {
-            return other is null ? null : new SubtitleLanguageResult(other, false, "podľa častých slov");
+            return null;
         }
 
         var words = Words(lower).ToList();
         var czechLetters = lower.Count(c => CzechLetters.Contains(c));
         var slovakLetters = lower.Count(c => SlovakLetters.Contains(c));
+        var slovakWeak = lower.Count(c => SlovakWeakLetters.Contains(c));
         var czechWords = words.Count(CzechWords.Contains);
         var slovakWords = words.Count(SlovakWords.Contains);
         var czech = czechLetters + czechWords;
         var slovak = slovakLetters + slovakWords;
-        var weak = Occurrences(lower, "dz") + Occurrences(lower, "dž");
+        var (czechShort, slovakShort) = CzechOrSlovak.Count(lower);
+        var (czechOwn, slovakOwn) = CzechOrSlovak.CountWithout(Shared, lower);
+        var dz = Occurrences(lower, "dz") + Occurrences(lower, "dž");
+        var hacek = lower.Count(c => Hacek.Contains(c));
 
         if (czech > 0 || slovak > 0)
         {
-            var detail = Detail(czechLetters, czechWords, slovakLetters, slovakWords);
+            var detail = Detail(czechLetters, czechWords, slovakLetters + slovakWeak, slovakWords);
             if (slovak == 0)
             {
-                return new SubtitleLanguageResult("cs", true, detail);
+                // ä, ô beside Czech signs: Slovak signs too (Czech never writes them)
+                return slovakWeak == 0 ? new SubtitleLanguageResult("cs", true, detail, true) : Both("cs", czech, slovakWeak, detail, other);
             }
 
             if (czech == 0)
             {
-                return new SubtitleLanguageResult("sk", true, detail);
+                return new SubtitleLanguageResult("sk", true, detail, true);
             }
 
-            // signs of both: the clear majority decides (a name, a quotation in the other language)
-            var (winner, more, fewer) = czech >= slovak ? ("cs", czech, slovak) : ("sk", slovak, czech);
-            return more >= 5 * fewer ? new SubtitleLanguageResult(winner, true, detail)
-                : more > fewer ? new SubtitleLanguageResult(winner, false, detail + " – overte")
-                : new SubtitleLanguageResult(other ?? "cs", false, detail + " – nerozhodné, overte");
+            return Both(czech >= slovak + slovakWeak ? "cs" : "sk", czech, slovak + slovakWeak, detail, other);
         }
 
-        // no letter or word of the lists: the short words of each (se / sa, jsem / som …) and the weak dz, dž
-        var (czechShort, slovakShort) = CzechOrSlovak.Count(lower);
-        if (czechShort + slovakShort + weak > 0 && (other is "cs" or "sk" || czechShort + slovakShort >= 3))
+        // ä and ô only (German, French, Finnish have them too): Slovak only when Czech and Slovak are there besides them
+        if (slovakWeak > 0)
         {
-            var slovakScore = slovakShort + (weak * 0.5);
-            var language = slovakScore > czechShort ? "sk" : "cs";
-            return new SubtitleLanguageResult(language, false,
-                $"bez českých a slovenských písmen – podľa krátkych slov (české {czechShort}×, slovenské {slovakShort}×" +
-                (weak > 0 ? $", dz/dž {weak}×" : "") + ") – overte");
+            return hacek > 0 || slovakOwn > czechOwn
+                ? new SubtitleLanguageResult("sk", false, $"len ä, ô {slovakWeak}× – overte")
+                : null;
         }
 
-        return other is null ? null : new SubtitleLanguageResult(other, false, "podľa častých slov – overte");
+        // no letter or word of the lists – subtitles without diacritics: the short words of each (jsem / som, tady / teraz …)
+        // and the weak dz, dž; the words other languages write too (se, ne, ste, ako …: Romanian, Italian, Croatian
+        // subtitles are often without diacritics as well) do not count; never a text with other diacritics (a long Czech or
+        // Slovak text always has ě or ľ, ô …)
+        var plain = diacritics <= Math.Max(2, lower.Count(char.IsLetter) / 500);
+        var share = words.Count == 0 ? 0 : (czechShort + slovakShort) / (double)words.Count;
+        if (plain && czechOwn + slovakOwn >= 3 && share >= 0.06)
+        {
+            var language = slovakOwn + (dz * 0.5) > czechOwn ? "sk" : "cs";
+            return new SubtitleLanguageResult(language, false,
+                $"bez diakritiky – podľa krátkych slov (české {czechOwn}×, slovenské {slovakOwn}×" + (dz > 0 ? $", dz/dž {dz}×" : "") + ") – overte");
+        }
+
+        // a short text with háčky but none of the letters above (forced subtitles: "Ako sa máš?"): all the short words
+        // and dz, dž – at least one of them only Czech or Slovak writes
+        if (hacek > 0 && words.Count < ManyWords && czechOwn + slovakOwn >= 1 && czechShort + slovakShort >= 3)
+        {
+            var language = slovakShort + (dz * 0.5) > czechShort ? "sk" : "cs";
+            return new SubtitleLanguageResult(language, false,
+                $"krátky text bez ě, ř, ů, ľ, ô – podľa krátkych slov (české {czechShort}×, slovenské {slovakShort}×" + (dz > 0 ? $", dz/dž {dz}×" : "") + ") – overte");
+        }
+
+        // a short text with háčky but without ě, ř, ů, ľ … (forced subtitles): the most probable by the frequent words; in
+        // a long text it is Slovenian, Croatian, Lithuanian – none of the two; without háčky nothing to say
+        return other is null || words.Count >= ManyWords || hacek == 0 ? null
+            : new SubtitleLanguageResult(other, false, "podľa častých slov – overte");
+    }
+
+    /// <summary>The languages <see cref="TextLanguageDetector"/> tells apart (any other one it cannot recognise).</summary>
+    public static readonly IReadOnlySet<string> Detectable = new HashSet<string>(["cs", "sk", "en", "de", "pl", "hu", "ru", "uk"], StringComparer.Ordinal);
+
+    // the letters beyond a–z each language of the detector writes
+    private static readonly Dictionary<string, string> Letters = new(StringComparer.Ordinal)
+    {
+        ["en"] = "", ["de"] = "äöüß", ["pl"] = "ąćęłńóśźż", ["hu"] = "áéíóöőúüű",
+    };
+
+    // more than one letter in fifty the language never writes (a name, a loan word "café" is fewer; Turkish ı, ş, ğ many more)
+    private static bool Strange(string text, string language)
+    {
+        if (!Letters.TryGetValue(language, out var own))
+        {
+            return false;
+        }
+
+        var letters = text.Count(char.IsLetter);
+        var strange = text.Count(c => char.IsLetter(c) && c > '\u007f' && !own.Contains(c));
+        return strange > 2 && strange * 50 > letters;
+    }
+
+    // signs of both languages: the clear majority decides (a name, a quotation in the other language)
+    private static SubtitleLanguageResult Both(string winner, int czech, int slovak, string detail, string? other)
+    {
+        var (more, fewer) = winner == "cs" ? (czech, slovak) : (slovak, czech);
+        return more >= 5 * fewer ? new SubtitleLanguageResult(winner, true, detail, true)
+            : more > fewer ? new SubtitleLanguageResult(winner, false, detail + " – overte", true)
+            : new SubtitleLanguageResult(other ?? winner, false, detail + " – nerozhodné, overte", true);
     }
 
     private static string Detail(int czechLetters, int czechWords, int slovakLetters, int slovakWords)

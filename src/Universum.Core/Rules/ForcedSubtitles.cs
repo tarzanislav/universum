@@ -6,8 +6,9 @@ namespace Universum.Core.Rules;
 /// <summary>
 /// Forced subtitles recognised by their amount (owner, 30. 10. 2026): forced subtitles hold far fewer subtitles – and
 /// far fewer bytes – than full ones. The track statistics of the file (number of subtitles, bytes) are compared with the
-/// fullest subtitle track of the same file, or, when it is the only one, with the length of the film. It is UNIVERSUM's
-/// suggestion: a choice of the user wins.
+/// fullest subtitle track of the same kind in the same file – text with text, image (PGS, VobSub) with image: an image
+/// track counts two frames for a subtitle (shown, cleared) and megabytes of pictures –, or, when there is no full one of
+/// its kind, with the length of the film. It is UNIVERSUM's suggestion: a choice of the user wins.
 /// </summary>
 public static class ForcedSubtitles
 {
@@ -17,7 +18,7 @@ public static class ForcedSubtitles
     /// <summary>The fullest track must hold at least this many subtitles to compare with (a short film has few anyway).</summary>
     public const int FullMinimum = 100;
 
-    /// <summary>The only subtitle track is forced with fewer subtitles per minute of the film than this.</summary>
+    /// <summary>A track without a full one of its kind is forced with fewer subtitles per minute of the film than this.</summary>
     public const double PerMinute = 1.5;
 
     /// <summary>
@@ -31,7 +32,7 @@ public static class ForcedSubtitles
             return null;
         }
 
-        var fullest = file.Tracks.Where(t => t.Type == TrackType.Subtitles && t.Id != track.Id && t.StatisticsFrames is > 0)
+        var fullest = file.Tracks.Where(t => t.Type == TrackType.Subtitles && t.Id != track.Id && t.IsTextSubtitles == track.IsTextSubtitles && t.StatisticsFrames is > 0)
             .OrderByDescending(t => t.StatisticsFrames).FirstOrDefault();
         if (fullest is { StatisticsFrames: { } full } && full >= FullMinimum)
         {
@@ -39,7 +40,7 @@ public static class ForcedSubtitles
             var fewer = frames <= full * Share;
             var smaller = track.StatisticsBytes is not { } bytes || fullest.StatisticsBytes is not { } fullBytes || fullBytes <= 0 || bytes <= fullBytes * Share;
             return fewer && smaller
-                ? $"{Count(frames)} titulkov oproti {Count(full)} v najväčšej titulkovej stope"
+                ? $"{Count(frames)} titulkov oproti {Count(full)} v najväčšej {(track.IsTextSubtitles ? "textovej" : "obrázkovej")} titulkovej stope"
                 : null;
         }
 

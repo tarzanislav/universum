@@ -164,6 +164,26 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void ImageSubtitlesAreNotComparedWithText()
+    {
+        // review: PGS counts two frames for a subtitle and megabytes of pictures – full Czech SRT beside English SDH in
+        // PGS stays full; image tracks are compared with image tracks
+        var czech = Subs(2, "cze", null) with { StatisticsFrames = 1_000, StatisticsBytes = 45_000, IsTextSubtitles = true };
+        var pgs = Subs(3, "eng", "SDH") with { CodecId = "S_HDMV/PGS", StatisticsFrames = 3_600, StatisticsBytes = 40_000_000 };
+        var film = File(Video(0), Audio(1, "cze", null), czech, pgs) with { Duration = TimeSpan.FromMinutes(110) };
+        Assert.True(ForcedSubtitles.ByAmount(film, czech) is null, "full Czech SRT is not forced beside PGS");
+        Assert.True(UniversumRules.Apply(film).For(2).Role == TrackRole.Main, "and stays the main Czech subtitles");
+
+        var forcedPgs = Subs(4, "cze", null) with { CodecId = "S_HDMV/PGS", StatisticsFrames = 120, StatisticsBytes = 1_500_000 };
+        Assert.True(ForcedSubtitles.ByAmount(film with { Tracks = [.. film.Tracks, forcedPgs] }, forcedPgs)?.Contains("obrázkovej", StringComparison.Ordinal) == true,
+            "few PGS frames against the full PGS track: forced");
+        var forcedText = Subs(5, "cze", null) with { StatisticsFrames = 40, IsTextSubtitles = true };
+        var alone = File(Video(0), forcedText, pgs) with { Duration = TimeSpan.FromMinutes(110) };
+        Assert.True(ForcedSubtitles.ByAmount(alone, forcedText)?.Contains("minút", StringComparison.Ordinal) == true,
+            "the only text track is compared with the length of the film");
+    }
+
+    [Test]
     public void EmptySubtitlesAreRemoved()
     {
         // owner, 30. 10. 2026: a subtitle track without a single subtitle is removed from the container

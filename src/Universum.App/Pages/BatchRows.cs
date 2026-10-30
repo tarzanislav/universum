@@ -49,10 +49,12 @@ public sealed class SlotRow : ObservableObject
     private LanguageEvidence? _evidence;
 
     private readonly Action<SlotRow, int>? _move;
+    private readonly RuleProfile _profile;
     private bool _removedByLanguage;
 
-    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null)
+    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null, RuleProfile? profile = null)
     {
+        _profile = profile ?? RuleProfile.Default;
         Group = group;
         Key = key;
         Track = track;
@@ -213,7 +215,7 @@ public sealed class SlotRow : ObservableObject
     /// </summary>
     public string ForcedHint => !IsSubtitles || Group.Decisions.Forced.ContainsKey(Key) ? ""
         : Track.Flags.Forced ? "forced v súbore"
-        : Core.Text.Words.ContainsAny(Track.Name, RuleProfile.Default.ForcedKeywords) ? "forced podľa názvu"
+        : Core.Text.Words.ContainsAny(Track.Name, _profile.ForcedKeywords) ? "forced podľa názvu"
         : ForcedSubtitles.ByAmount(Group.Representative, Track) is { } amount ? $"NÁVRH UNIVERSUM: forced – {amount}"
         : "";
 

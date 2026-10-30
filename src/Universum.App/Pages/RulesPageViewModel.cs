@@ -271,10 +271,14 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         // the language that applies without a choice (read from the subtitles, else the file's) needs no choice
         var language = LanguageTag.FromCode(code);
+        var source = _file?.Tracks.FirstOrDefault(t => t.Id == trackId);
         var automatic = _detected.TryGetValue(trackId, out var read) ? read.Language
-            : _file?.Tracks.FirstOrDefault(t => t.Id == trackId) is { Language.IsUndetermined: false } track ? track.Language.Primary
+            : source is { Language.IsUndetermined: false } ? source.Language.Primary
             : null;
-        if (automatic is not null && string.Equals(automatic, language.Primary, StringComparison.OrdinalIgnoreCase))
+
+        // while the subtitles are read, a choice is kept even when it is the file's language: what is read must not replace it
+        var reading = _subtitleReading is not null && source is { Type: TrackType.Subtitles, IsTextSubtitles: true };
+        if (!reading && automatic is not null && string.Equals(automatic, language.Primary, StringComparison.OrdinalIgnoreCase))
         {
             _languages.Remove(trackId);
         }

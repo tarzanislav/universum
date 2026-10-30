@@ -44,9 +44,21 @@ public sealed record MediaTrack
     /// <summary>Bits per second from the track statistics tags, when present.</summary>
     public long? StatisticsBitsPerSecond { get; init; }
 
+    /// <summary>The duration of one frame in nanoseconds (video: 41 708 333 = 23,976 frames a second), when the file says it.</summary>
+    public long? DefaultDurationNanoseconds { get; init; }
+
+    /// <summary>Frames a second of a video track (from <see cref="DefaultDurationNanoseconds"/>), or null.</summary>
+    public double? FramesPerSecond => DefaultDurationNanoseconds is > 0 and var duration ? 1_000_000_000.0 / duration : null;
+
     /// <summary>Number of index (cue) entries; 0 for a video track means seeking will be slow or broken.</summary>
     public int? IndexEntries { get; init; }
 
     /// <summary>Number of tag entries attached to this track.</summary>
     public int TagEntries { get; init; }
+
+    /// <summary>
+    /// The external file the track comes from – a subtitle file added to the video (owner, 30. 10. 2026); null for the
+    /// file's own tracks. Its ID is UNIVERSUM's own (not one of the file's), the track is the first one of that file.
+    /// </summary>
+    public string? ExternalFile { get; init; }
 }

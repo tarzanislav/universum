@@ -21,5 +21,14 @@ public sealed record TrackTarget(MediaTrack Source, string? Name, LanguageTag La
     public bool OtherFlagsChanged =>
         (Source.Flags with { Default = false, Enabled = false, Forced = false }) != (Flags with { Default = false, Enabled = false, Forced = false });
 
-    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged;
+    /// <summary>New times of subtitles (Zmena FPS, rýchlosti, Posun – owner, 30. 10. 2026); null keeps them.</summary>
+    public Subtitles.SubtitleTiming? Timing { get; init; }
+
+    /// <summary>The times of the subtitles change.</summary>
+    public bool TimingChanged => Timing is { IsNone: false };
+
+    /// <summary>The track is added from an external file (subtitles lying with the video).</summary>
+    public bool IsAdded => Source.ExternalFile is not null;
+
+    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged || TimingChanged || IsAdded;
 }

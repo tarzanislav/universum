@@ -54,7 +54,9 @@ public static class TargetVerifier
         Check(problems, !target.TitleChanged || (result.Title ?? "") == (target.ResultTitle ?? ""), $"title '{result.Title}', expected '{target.ResultTitle}'");
         if (source.Duration is { } before && result.Duration is { } after)
         {
-            Check(problems, Math.Abs((after - before).TotalSeconds) <= 1, $"duration {after}, expected {before}");
+            // added subtitles and new times may end after the video: the file is then longer, never shorter
+            Check(problems, target.AddsFiles || target.TimingChanged ? (before - after).TotalSeconds <= 1 : Math.Abs((after - before).TotalSeconds) <= 1,
+                $"duration {after}, expected {before}");
         }
 
         return problems;

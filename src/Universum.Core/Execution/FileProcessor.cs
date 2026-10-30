@@ -39,7 +39,7 @@ public sealed class FileProcessor(
     /// (MEGA spracovanie keeps it with a batch).
     /// </summary>
     public static string StructureOf(MediaFile file) =>
-        string.Join("\n", new[] { $"tags:{file.GlobalTagEntries};chapters:{file.ChapterEntries}" }.Concat(file.Tracks.Select(t =>
+        string.Join("\n", new[] { $"tags:{file.GlobalTagEntries};chapters:{file.ChapterEntries}" }.Concat(file.Tracks.Where(t => t.ExternalFile is null).Select(t =>
             $"{t.Id}|{t.Type}|{t.Number}|{t.Uid}|{t.CodecId}|{t.Name}|{t.Language.Legacy}|{t.Language.Ietf}|{t.Flags}|{t.TagEntries}")));
 
     /// <summary>Extension of results being written; not a video extension, so media servers ignore them. Safe to delete.</summary>
@@ -97,10 +97,15 @@ public sealed class FileProcessor(
                 return Result(plan, ProcessingStatus.Failed, null, null, ["the file no longer exists; analyse the folder again"]);
             }
 
-            // the plan is valid only for the file as it was analysed
-            if (!SameStructure(await _inspector.InspectAsync(source, cancellationToken), plan.Target.Source))
+            // the plan is valid only for the file as it was analysed (external subtitle files are not in it)
+            if (!SameStructure(await _inspector.InspectAsync(source, cancellationToken), plan.Target.Source with { Tracks = plan.Target.Source.Tracks.Where(t => t.ExternalFile is null).ToList() }))
             {
                 return Result(plan, ProcessingStatus.Failed, null, null, ["the file changed since the analysis; analyse it again"]);
+            }
+
+            if (plan.Target.Tracks.FirstOrDefault(t => t.IsAdded && !File.Exists(t.Source.ExternalFile)) is { } missing)
+            {
+                return Result(plan, ProcessingStatus.Failed, null, null, [$"the subtitle file {Path.GetFileName(missing.Source.ExternalFile)} no longer exists"]);
             }
 
             var sourceSize = new FileInfo(source).Length;
@@ -587,7 +592,32 @@ public sealed class FileProcessor(
         if (plan.Method == WriteMethod.Remux)
         {
             using var chapters = ChaptersFile.For(plan.Target);
-            result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path), progress, cancellationToken);
+            // external text subtitles (owner, 30. 10. 2026): any format and encoding, written as SRT in UTF-8 for mkvmerge
+            var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "external-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var (inputs, problem) = await Subtitles.ExternalSubtitleTracks.ConvertAsync(plan.Target, folder, cancellationToken).ConfigureAwait(false);
+                if (problem is not null)
+                {
+                    return [problem];
+                }
+
+                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs), progress, cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(folder))
+                    {
+                        Directory.Delete(folder, recursive: true);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // a temporary folder left behind is harmless
+                }
+            }
         }
         else
         {

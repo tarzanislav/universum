@@ -368,6 +368,53 @@ public sealed class AppServices
     /// <summary>Raised when a source of Zaujímavosti was added, removed, switched on or off.</summary>
     public event Action? FeedSourcesChanged;
 
+    // owner, 30. 10. 2026: subtitles from OpenSubtitles.com and translations by svsub.net with the user's own accounts,
+    // kept encrypted for this Windows account (like the DeepL key)
+    private static readonly HttpClient SubtitleHttp = new() { Timeout = TimeSpan.FromSeconds(60) };
+
+    /// <summary>The name and version UNIVERSUM introduces itself with to subtitle services.</summary>
+    public static string SubtitleUserAgent { get; } = "UNIVERSUM v" + (typeof(AppServices).Assembly.GetName().Version?.ToString(3) ?? "0");
+
+    /// <summary>OpenSubtitles.com: the API key, the user name and the password (null when not set).</summary>
+    public (string? Key, string? User, string? Password) OpenSubtitlesAccount =>
+        (Settings.OpenSubtitlesKeyProtected is { Length: > 0 } key ? UserSecret.Unprotect(key) : null, Settings.OpenSubtitlesUser,
+            Settings.OpenSubtitlesPasswordProtected is { Length: > 0 } password ? UserSecret.Unprotect(password) : null);
+
+    /// <summary>Stores the OpenSubtitles.com account (empty removes it); the key and the password encrypted.</summary>
+    public void SetOpenSubtitlesAccount(string? key, string? user, string? password)
+    {
+        Settings.OpenSubtitlesKeyProtected = string.IsNullOrWhiteSpace(key) ? null : UserSecret.Protect(key.Trim());
+        Settings.OpenSubtitlesUser = string.IsNullOrWhiteSpace(user) ? null : user.Trim();
+        Settings.OpenSubtitlesPasswordProtected = string.IsNullOrEmpty(password) ? null : UserSecret.Protect(password);
+        Settings.Save();
+    }
+
+    /// <summary>An OpenSubtitles.com client with the user's key; null without one.</summary>
+    public Core.Subtitles.Download.OpenSubtitlesClient? OpenSubtitles() =>
+        OpenSubtitlesAccount.Key is { } key ? new Core.Subtitles.Download.OpenSubtitlesClient(SubtitleHttp, key, SubtitleUserAgent) : null;
+
+    /// <summary>The svsub.net token (null when not set).</summary>
+    public string? SvSubToken => Settings.SvSubTokenProtected is { Length: > 0 } token ? UserSecret.Unprotect(token) : null;
+
+    /// <summary>The AI provider svsub.net translates with ("openai" by default).</summary>
+    public string SvSubProvider => Settings.SvSubProvider is { Length: > 0 } provider ? provider : "openai";
+
+    /// <summary>Stores the svsub.net token (empty removes it, encrypted) and the AI provider.</summary>
+    public void SetSvSub(string? token, string? provider)
+    {
+        Settings.SvSubTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
+        Settings.SvSubProvider = string.IsNullOrWhiteSpace(provider) ? null : provider.Trim().ToLowerInvariant();
+        Settings.Save();
+    }
+
+    /// <summary>An svsub.net client with the user's token; null without one.</summary>
+    public Core.Subtitles.Download.SvSubClient? SvSub() =>
+        SvSubToken is { } token ? new Core.Subtitles.Download.SvSubClient(SubtitleHttp, token) : null;
+
+    /// <summary>The user's Downloads folder (titulky.com: the downloaded subtitles are taken from there).</summary>
+    public static string DownloadsFolder => Environment.GetEnvironmentVariable("UNIVERSUM_DOWNLOADS_DIR") is { Length: > 0 } custom ? custom
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
     /// <summary>The user's DeepL key (protected for this Windows account); null without one.</summary>
     public string? DeepLKey => Settings.DeepLKeyProtected is { Length: > 0 } stored ? UserSecret.Unprotect(stored) : null;
 
@@ -618,6 +665,18 @@ public sealed class AppSettings
 
     /// <summary>The DeepL key, protected for the Windows account.</summary>
     public string? DeepLKeyProtected { get; set; }
+
+    /// <summary>OpenSubtitles.com: the API key (protected), the user name, the password (protected).</summary>
+    public string? OpenSubtitlesKeyProtected { get; set; }
+
+    public string? OpenSubtitlesUser { get; set; }
+
+    public string? OpenSubtitlesPasswordProtected { get; set; }
+
+    /// <summary>svsub.net: the token (protected) and the AI provider ("openai").</summary>
+    public string? SvSubTokenProtected { get; set; }
+
+    public string? SvSubProvider { get; set; }
 
     /// <summary>The language of Zaujímavosti ("sk", later "cs" or "en").</summary>
     public string InterestLanguage { get; set; } = "sk";

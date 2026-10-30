@@ -67,3 +67,54 @@ titulky všetkých jazykov.
 - *Default = nie, Enabled = áno, Forced = nie*; titulky pre nepočujúcich (SDH, CC …) majú príznak *pre nepočujúcich*.
 - Poradie: CZ, SK, EN, PL, HU, RU, potom jazyky zvukových stôp; ostatné jazyky sa odstránia (dajú sa ponechať).
 - **Prázdna titulková stopa** (bez jediného titulku podľa štatistík súboru) sa odstráni.
+
+## 5. Úpravy titulkov (stránka Titulky)
+
+Stránka **Titulky** (MULTIPLEXING) otvorí video alebo súbory titulkov. Originály sa nikdy nemenia: video sa uloží ako
+nový súbor v knižnici, súbory titulkov ako nové SRT vedľa pôvodných (nikdy cez existujúci súbor).
+
+- **Zmena FPS titulkov:** pôvodné a nové FPS z ponuky 23,976; 24; 25; 29,97; 30; 50; 23,978 (špeciálne). Časy sa
+  násobia pomerom pôvodné / nové (25 → 23,976: o 4,27 % neskôr).
+- **Zmena rýchlosti titulkov (percentá):** posuvník a pole od −99 do +100 %, tlačidlá ±0,1 % a ±1 %; +100 % =
+  titulky dvakrát rýchlejšie, −50 % = dvakrát pomalšie; −100 % nie je možné (titulky by stáli).
+- **Posun (Delay v ms):** 1000 = 1 sekunda; kladné = neskôr, záporné = skôr; tlačidlá ±100 a ±1000.
+- Poradie: FPS, potom rýchlosť, potom posun. Vo videu to zapíše mkvmerge (`--sync`) – funguje aj pre obrazové titulky
+  (PGS, VobSub). Náhľad ukazuje časy pred a po zmene.
+- **Synchronizácia podľa dvoch titulkov:** kedy je titulok teraz a kedy má byť – pre jeden na začiatku a jeden na
+  konci; UNIVERSUM vypočíta rýchlosť a posun.
+- **Konverzia do SRT** (UTF-8) z WebVTT, TTML/DFXP, ASS/SSA, SAMI, SubViewer, MicroDVD (podľa FPS videa alebo hlavičky),
+  MPL2, TMPlayer – formát podľa obsahu, nie podľa prípony (.txt, .sub). Kódovanie sa rozpozná (UTF-8, UTF-16,
+  Windows-1250, ISO-8859-2, Windows-1252).
+- **Opravy textu:** odstránenie prvkov pre nepočujúcich ([hudba], (smiech), MENO:), formátovania (kurzíva, tučné),
+  oprava prekrývania a príliš krátkych časov (najmenej 0,7 s).
+- Pravidlá UNIVERSUM (poradie, príznaky, Forced, odstránenie prázdnych stôp) sa použijú, ak sú zapnuté; keď ich
+  zastaví neurčený jazyk inej stopy, stránka to povie.
+
+## 6. Externé titulky
+
+- Externé titulky sú súbory titulkov priložené k videu, ku ktorému patria (textové aj obrazové .sup, .idx).
+- **Patria k videu,** keď:
+  1. sa volajú **rovnako ako video** (aj s jazykom alebo „forced“ za názvom: *Film.cze.forced.srt*) – najistejšie;
+  2. sa zhodujú **slová názvu** (bodky, podčiarkovníky a pomlčky medzi slovami nevadia) a rok, ak ho majú oba;
+  3. pri **epizóde** navyše vždy **rovnaká séria a epizóda** (S01E1 = S01E01 = 1x01); titulky inej epizódy alebo
+     iného filmu nepatria nikdy;
+  4. v priečinku s **jediným videom** aj súbor bez názvu titulu (*titulky.srt*).
+- **Jazyk** z textu (časť 1 – návrh UNIVERSUM), inak z názvu (cs, cz, cze, czech, sk, slo, en, eng …); *forced*
+  v názve = forced, *sdh, cc, hi* = pre nepočujúcich.
+- Single, Hromadné aj MEGA spracovanie ich pridajú ako stopy videa – pravidlá ich zoradia a nastavia ako ostatné
+  titulky; pri zápise sa textové prevedú do SRT v UTF-8. MEGA dávka si pamätá veľkosť a čas súboru – zmenený alebo
+  chýbajúci súbor titulkov = video sa preskočí.
+
+## 7. Stiahnutie a preklad titulkov
+
+- **OpenSubtitles.com** (anglické titulky, aj SDH): vlastný API kľúč a účet v Nastaveniach (šifrovane). Hľadá sa podľa
+  TMDB ID titulu (inak podľa názvu a roku) a epizódy; sťahovanie potrebuje prihlásenie (denný limit podľa účtu).
+- **opensubtitles.org:** staré rozhranie neprijíma nové programy – len cez prehliadač.
+- **titulky.com** (CZ/SK): pravidlá stránky povoľujú len prehliadač, automatické sťahovanie programom zakazujú.
+  UNIVERSUM otvorí hľadanie titulu v prehliadači; stiahnuté titulky (aj ZIP) do 30 minút sám vezme zo Stiahnutých
+  súborov. **edna.cz:** rozhranie pre programy nemá – len prehliadač.
+- **Preklad (svsub.net),** keď titulky neexistujú: vlastný token v Nastaveniach (šifrovane), poskytovateľ AI (napr.
+  openai; model sa vyberá v nastaveniach služby), cieľový jazyk (cs, sk, en) – zdrojový a cieľový jazyk nesmú byť
+  rovnaké. Posielajú sa len titulky pod neutrálnym názvom, úloha sa po stiahnutí prekladu na službe zmaže.
+- Stiahnuté a preložené titulky sa uložia **vedľa videa** ako *Názov videa.jazyk(.sdh)(.forced).srt* (nikdy cez
+  existujúci súbor), takže ich každé spracovanie nájde ako externé titulky.

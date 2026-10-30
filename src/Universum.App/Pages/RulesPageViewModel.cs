@@ -252,7 +252,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
         try
         {
-            _file = await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path);
+            _file = await WithExternalSubtitlesAsync(await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path));
             Recalculate();
             _ = ReadSubtitlesAsync(installation, _file);
         }
@@ -388,11 +388,15 @@ public sealed class RulesPageViewModel : ObservableObject
             WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice.",
             WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({ChangeCount(_plan.Changes.Count)}) – trvá to pár sekúnd.",
             _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
+            _ when target.AddsFiles || target.TimingChanged => $"Vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
             _ => $"Mení sa poradie stôp – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
         } + (target.RemovedByLanguage.Count > 0
                 ? " Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): " + string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))) + "."
                 : "")
           + (target.RemovedEmpty.Count > 0 ? $" Odstránia sa prázdne titulkové stopy (bez titulkov): {target.RemovedEmpty.Count}." : "")
+          + (target.Tracks.Count(t => t.IsAdded) is > 0 and var added
+              ? $" Pridajú sa externé titulky pri videu ({added}): " + string.Join(", ", target.Tracks.Where(t => t.IsAdded).Select(t => Path.GetFileName(t.Source.ExternalFile))) + "."
+              : "")
           + (_subtitleReading is not null ? " Čítam titulky (jazyk každej titulkovej stopy)…" : "")
           + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
@@ -477,6 +481,21 @@ public sealed class RulesPageViewModel : ObservableObject
             }
 
             RefreshCommands();
+        }
+    }
+
+    // owner, 30. 10. 2026 (bod 5): subtitle files lying with the video belong to it and are added as its tracks
+    private async Task<MediaFile> WithExternalSubtitlesAsync(MediaFile file)
+    {
+        try
+        {
+            var siblings = Directory.EnumerateFiles(Path.GetDirectoryName(file.Path)!).ToList();
+            var videos = Math.Max(1, siblings.Count(f => Core.Batch.BatchAnalyzer.VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant())));
+            return await Core.Subtitles.ExternalSubtitleTracks.AddAsync(file, siblings, videos, _services.Profile.ForcedKeywords);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return file;
         }
     }
 

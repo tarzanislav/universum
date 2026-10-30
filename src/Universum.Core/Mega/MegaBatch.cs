@@ -95,6 +95,12 @@ public sealed class MegaFile
     /// </summary>
     public RuleProfile? Profile { get; init; }
 
+    /// <summary>
+    /// External subtitle files added to the video (owner, 30. 10. 2026): their tracks as analysed, with the size and time
+    /// of each file – a file changed or missing at the run is not written with decisions made for another one.
+    /// </summary>
+    public List<MegaExternal> Externals { get; init; } = [];
+
     /// <summary>The user chose to write it although it waited for a check (Aj tak) – kept when the batch is edited.</summary>
     public bool ProcessAnyway { get; init; }
 
@@ -147,8 +153,37 @@ public sealed class MegaFile
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
             Profile = profile,
+            Externals = item.File.Tracks.Where(t => t.ExternalFile is not null).Select(MegaExternal.Of).ToList(),
         };
     }
+}
+
+/// <summary>An external subtitle file of a MEGA file: its track (ID, codec, language, name, flags, count) and the file's size and time.</summary>
+public sealed record MegaExternal(
+    int Id, string Path, long Size, DateTime ModifiedUtc, string CodecId, string Codec, bool IsText, LanguageTag Language, string? Name, bool HearingImpaired, long? Frames)
+{
+    public static MegaExternal Of(MediaTrack track)
+    {
+        var info = new FileInfo(track.ExternalFile!);
+        return new MegaExternal(track.Id, track.ExternalFile!, info.Exists ? info.Length : -1, info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue,
+            track.CodecId ?? "", track.Codec, track.IsTextSubtitles, track.Language, track.Name, track.Flags.HearingImpaired, track.StatisticsFrames);
+    }
+
+    /// <summary>The file is as it was when the batch was made.</summary>
+    public bool Unchanged
+    {
+        get
+        {
+            var info = new FileInfo(Path);
+            return info.Exists && info.Length == Size && info.LastWriteTimeUtc == ModifiedUtc;
+        }
+    }
+
+    public MediaTrack ToTrack() => new()
+    {
+        Id = Id, Type = TrackType.Subtitles, CodecId = CodecId, Codec = Codec, IsTextSubtitles = IsText, Language = Language, Name = Name,
+        Flags = new TrackFlags(Default: false, Forced: false, HearingImpaired: HearingImpaired), StatisticsFrames = Frames, ExternalFile = Path,
+    };
 }
 
 /// <summary>

@@ -54,6 +54,20 @@ public static class BatchAnalyzer
 
     private static readonly string[] Extensions = [.. VideoExtensions, FileProcessor.TemporaryExtension];
 
+    // the files of a folder and how many videos it holds (external subtitles); nothing when it cannot be read
+    private static (IReadOnlyList<string> Files, int Videos) Listing(string directory)
+    {
+        try
+        {
+            var files = Directory.EnumerateFiles(directory).ToList();
+            return (files, Math.Max(1, files.Count(f => VideoExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return ([], 1);
+        }
+    }
+
     /// <summary>Video formats mkvmerge cannot read (named when nothing else is found).</summary>
     private static readonly string[] Unsupported = [".wmv", ".asf", ".dvr-ms", ".wtv"];
 
@@ -195,9 +209,13 @@ public static class BatchAnalyzer
         IEnumerable<string>? excludeDirectories = null,
         CancellationToken cancellationToken = default,
         IProgress<MediaFile>? found = null,
-        IReadOnlyList<string>? only = null)
+        IReadOnlyList<string>? only = null,
+        bool externalSubtitles = true)
     {
         folder = Path.GetFullPath(folder);
+        // owner, 30. 10. 2026 (bod 5): subtitle files lying with a video belong to it – each folder is listed once
+        var folders = new System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<(IReadOnlyList<string> Files, int Videos)>>(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
         // listing a big network folder takes a while: off the caller's thread, and it can be stopped; chosen files
         // (episodes sent from Novinky) are analysed as they are, in natural order
@@ -215,6 +233,15 @@ public static class BatchAnalyzer
                 try
                 {
                     var file = await inspector.InspectAsync(files[index], token).ConfigureAwait(false);
+                    if (externalSubtitles && file.IsRecognized && file.IsSupported)
+                    {
+                        var (siblings, videos) = folders.GetOrAdd(Path.GetDirectoryName(file.Path)!, directory => new Lazy<(IReadOnlyList<string>, int)>(() => Listing(directory))).Value;
+                        if (siblings.Any(s => Subtitles.ExternalSubtitles.Extensions.Contains(Path.GetExtension(s))))
+                        {
+                            file = await Subtitles.ExternalSubtitleTracks.AddAsync(file, siblings, videos, null, token).ConfigureAwait(false);
+                        }
+                    }
+
                     results[index] = !file.IsRecognized || !file.IsSupported
                         ? (null, file.Errors.FirstOrDefault() ?? "mkvmerge tento formát nevie spracovať")
                         : !file.IsMatroska && !file.TracksOf(TrackType.Video).Any()

@@ -67,7 +67,9 @@ public static class MkvToolNixArguments
 
     /// <summary>mkvmerge arguments that write the target state to a new file (track order may change).</summary>
     /// <param name="chaptersXml">Chapter file written from <see cref="TargetState.NewChapters"/> (null = none).</param>
-    public static IReadOnlyList<string> Remux(TargetState target, string sourcePath, string outputPath, string? chaptersXml = null)
+    /// <param name="externalInputs">The files mkvmerge reads for added tracks (external subtitles converted to SRT in UTF-8), by their original path.</param>
+    public static IReadOnlyList<string> Remux(
+        TargetState target, string sourcePath, string outputPath, string? chaptersXml = null, IReadOnlyDictionary<string, string>? externalInputs = null)
     {
         var arguments = new List<string> { "--gui-mode", "--output", outputPath };
         if (target.TitleChanged)
@@ -80,34 +82,15 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--no-global-tags", "--no-track-tags", "--disable-track-statistics-tags"]);
         }
 
-        if (target.Removed.Count > 0)
+        if (target.RemovedFromFile.Any() || target.Tracks.Any(t => t.IsAdded))
         {
             AddSelection(arguments, target, TrackType.Audio, "--audio-tracks", "--no-audio");
             AddSelection(arguments, target, TrackType.Subtitles, "--subtitle-tracks", "--no-subtitles");
         }
 
-        foreach (var track in target.Tracks)
+        foreach (var track in target.Tracks.Where(t => !t.IsAdded))
         {
-            var id = track.TrackId.ToString(CultureInfo.InvariantCulture);
-            arguments.AddRange(["--track-name", $"{id}:{track.Name}"]);
-            if (track.LanguageChanged)
-            {
-                arguments.AddRange(["--language", $"{id}:{Code(track.Language)}"]);
-            }
-
-            arguments.AddRange(["--default-track-flag", $"{id}:{Bit(track.Flags.Default)}"]);
-            arguments.AddRange(["--track-enabled-flag", $"{id}:{Bit(track.Flags.Enabled)}"]);
-            arguments.AddRange(["--forced-display-flag", $"{id}:{Bit(track.Flags.Forced)}"]);
-
-            // the other flags are written only when the rules change them (mkvmerge keeps them from the source otherwise)
-            if (track.OtherFlagsChanged)
-            {
-                arguments.AddRange(["--hearing-impaired-flag", $"{id}:{Bit(track.Flags.HearingImpaired)}"]);
-                arguments.AddRange(["--visual-impaired-flag", $"{id}:{Bit(track.Flags.VisualImpaired)}"]);
-                arguments.AddRange(["--text-descriptions-flag", $"{id}:{Bit(track.Flags.TextDescriptions)}"]);
-                arguments.AddRange(["--original-flag", $"{id}:{Bit(track.Flags.Original)}"]);
-                arguments.AddRange(["--commentary-flag", $"{id}:{Bit(track.Flags.Commentary)}"]);
-            }
+            AddTrackOptions(arguments, track, track.TrackId.ToString(CultureInfo.InvariantCulture), track.LanguageChanged, track.OtherFlagsChanged);
         }
 
         if (target.ChaptersChanged)
@@ -122,8 +105,57 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--chapters", chaptersXml]);
         }
 
-        arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => "0:" + t.TrackId.ToString(CultureInfo.InvariantCulture)))]);
+        // external subtitle files (owner, 30. 10. 2026): each one more input with one track, its values always written –
+        // the file itself has none; UNIVERSUM's own SRT files are UTF-8
+        var inputs = new Dictionary<int, int>();
+        foreach (var added in target.Tracks.Where(t => t.IsAdded))
+        {
+            inputs[added.TrackId] = inputs.Count + 1;
+            var input = externalInputs?.GetValueOrDefault(added.Source.ExternalFile!) ?? added.Source.ExternalFile!;
+            if (added.Source.IsTextSubtitles)
+            {
+                arguments.AddRange(["--sub-charset", "0:UTF-8"]);
+            }
+
+            AddTrackOptions(arguments, added, "0", writeLanguage: !added.Language.IsUndetermined, writeOtherFlags: true);
+            // one track of each added file (a VobSub .idx may hold several languages)
+            arguments.AddRange(["--subtitle-tracks", "0", "--no-global-tags", "--no-chapters", input]);
+        }
+
+        arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => t.IsAdded
+            ? inputs[t.TrackId].ToString(CultureInfo.InvariantCulture) + ":0"
+            : "0:" + t.TrackId.ToString(CultureInfo.InvariantCulture)))]);
         return arguments;
+    }
+
+    // the name, language, flags and new times of one track ("--track-name 3:…" for the file's own, "0:…" for an added file)
+    private static void AddTrackOptions(List<string> arguments, TrackTarget track, string id, bool writeLanguage, bool writeOtherFlags)
+    {
+        arguments.AddRange(["--track-name", $"{id}:{track.Name}"]);
+        if (writeLanguage)
+        {
+            arguments.AddRange(["--language", $"{id}:{Code(track.Language)}"]);
+        }
+
+        arguments.AddRange(["--default-track-flag", $"{id}:{Bit(track.Flags.Default)}"]);
+        arguments.AddRange(["--track-enabled-flag", $"{id}:{Bit(track.Flags.Enabled)}"]);
+        arguments.AddRange(["--forced-display-flag", $"{id}:{Bit(track.Flags.Forced)}"]);
+
+        // the other flags are written only when the rules change them (mkvmerge keeps them from the source otherwise)
+        if (writeOtherFlags)
+        {
+            arguments.AddRange(["--hearing-impaired-flag", $"{id}:{Bit(track.Flags.HearingImpaired)}"]);
+            arguments.AddRange(["--visual-impaired-flag", $"{id}:{Bit(track.Flags.VisualImpaired)}"]);
+            arguments.AddRange(["--text-descriptions-flag", $"{id}:{Bit(track.Flags.TextDescriptions)}"]);
+            arguments.AddRange(["--original-flag", $"{id}:{Bit(track.Flags.Original)}"]);
+            arguments.AddRange(["--commentary-flag", $"{id}:{Bit(track.Flags.Commentary)}"]);
+        }
+
+        // Zmena FPS, rýchlosti, Posun (owner, 30. 10. 2026): mkvmerge multiplies the times and moves them
+        if (track.Timing is { IsNone: false } timing)
+        {
+            arguments.AddRange(["--sync", $"{id}:{timing.MkvMergeValue}"]);
+        }
     }
 
     /// <summary>Selects a track by its Matroska track number ("track:@3"), or by position when it is unknown.</summary>
@@ -136,15 +168,19 @@ public static class MkvToolNixArguments
     public static string Code(LanguageTag language) =>
         !string.IsNullOrWhiteSpace(language.Ietf) && !language.IsUndetermined ? language.Ietf : language.Legacy;
 
-    /// <summary>Keeps only the target's tracks of one type ("--audio-tracks 1,3" or "--no-audio").</summary>
+    /// <summary>Keeps only the target's tracks of one type of the file itself ("--audio-tracks 1,3" or "--no-audio").</summary>
     private static void AddSelection(List<string> arguments, TargetState target, TrackType type, string keepOption, string noneOption)
     {
-        var kept = target.Tracks.Where(t => t.Type == type).Select(t => t.TrackId.ToString(CultureInfo.InvariantCulture)).ToList();
+        var kept = target.Tracks.Where(t => t.Type == type && !t.IsAdded).Select(t => t.TrackId.ToString(CultureInfo.InvariantCulture)).ToList();
+        var own = target.Source.Tracks.Any(t => t.Type == type && t.ExternalFile is null);
         if (kept.Count == 0)
         {
-            arguments.Add(noneOption);
+            if (own)
+            {
+                arguments.Add(noneOption);
+            }
         }
-        else if (target.Removed.Any(t => t.Type == type))
+        else if (target.RemovedFromFile.Any(t => t.Type == type))
         {
             arguments.AddRange([keepOption, string.Join(",", kept)]);
         }

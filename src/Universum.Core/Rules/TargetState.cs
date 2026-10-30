@@ -37,7 +37,7 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     public string? ResultTitle => TitleChanged ? (NewTitle!.Length == 0 ? null : NewTitle) : Source.Title;
 
     /// <summary>True when the track order differs from the file (requires writing a new file).</summary>
-    public bool OrderChanged => !Tracks.Select(t => t.TrackId).SequenceEqual(Source.Tracks.Select(t => t.Id));
+    public bool OrderChanged => !Tracks.Where(t => !t.IsAdded).Select(t => t.TrackId).SequenceEqual(Source.Tracks.Where(t => t.ExternalFile is null).Select(t => t.Id));
 
     public bool TagsChanged => RemoveTags && Source.HasTags;
 
@@ -47,11 +47,23 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// </summary>
     public bool ContainerChanged => !Source.IsMatroska;
 
-    public bool HasChanges => ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || Removed.Count > 0 ||
+    /// <summary>External files are added to the video (subtitles lying with it).</summary>
+    public bool AddsFiles => Tracks.Any(t => t.IsAdded);
+
+    /// <summary>The times of some subtitles change.</summary>
+    public bool TimingChanged => Tracks.Any(t => t.TimingChanged);
+
+    /// <summary>Tracks of the file itself left out (an external file not added is no change of the file).</summary>
+    public IEnumerable<MediaTrack> RemovedFromFile => Removed.Where(t => t.ExternalFile is null);
+
+    public bool HasChanges => ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || RemovedFromFile.Any() ||
                               Tracks.Any(t => t.HasChanges);
 
-    /// <summary>A new file must be written (another container, order, removed tracks, index repair); otherwise a header edit is enough.</summary>
-    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex;
+    /// <summary>
+    /// A new file must be written (another container, order, removed tracks, index repair, added files, new times of
+    /// subtitles); otherwise a header edit is enough.
+    /// </summary>
+    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged;
 
     public bool IsBlocked => Issues.Any(i => i.IsBlocking);
 

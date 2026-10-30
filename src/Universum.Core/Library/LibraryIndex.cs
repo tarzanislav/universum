@@ -63,10 +63,21 @@ public sealed class LibraryIndex
         foreach (var track in target.Tracks)
         {
             text.Append(CultureInfo.InvariantCulture, $"{track.TrackId}|{track.Type}|{track.Language.Ietf ?? track.Language.Legacy}|{track.Flags.Default}{track.Flags.Enabled}{track.Flags.Forced}|{track.Role}|")
-                .Append(track.Type == TrackType.Video ? "" : track.Name ?? "").Append('\n');
+                .Append(track.Type == TrackType.Video ? "" : track.Name ?? "");
+            if (track.Timing is { IsNone: false } timing)
+            {
+                text.Append("|sync:").Append(timing.MkvMergeValue);
+            }
+
+            if (track.Source.ExternalFile is { } external)
+            {
+                text.Append("|file:").Append(ContentHash(external));
+            }
+
+            text.Append('\n');
         }
 
-        text.Append("removed:").AppendJoin(',', target.Removed.Select(t => t.Id)).Append(";tags:").Append(target.RemoveTags).Append(";index:").Append(target.RepairIndex);
+        text.Append("removed:").AppendJoin(',', target.RemovedFromFile.Select(t => t.Id)).Append(";tags:").Append(target.RemoveTags).Append(";index:").Append(target.RepairIndex);
         if (target.TitleChanged)
         {
             text.Append(";title:").Append(target.ResultTitle);
@@ -77,6 +88,19 @@ public sealed class LibraryIndex
             text.Append(";chapters:").AppendJoin('|', chapters.OrderBy(c => c.Start).Select(c => $"{c.Start.Ticks}/{c.Name}/{c.Language.Primary}"));
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())))[..24];
+    }
+
+    // an added subtitle file is known by its content (another file of the same name is another result)
+    private static string ContentHash(string path)
+    {
+        try
+        {
+            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))[..16];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "missing";
+        }
     }
 
     /// <summary>Target of a result whose edit was undone: what it holds is not known, a later run replaces it.</summary>

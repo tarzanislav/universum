@@ -79,6 +79,18 @@ public sealed class JobQueuePageViewModel : ObservableObject
         }
     }
 
+    /// <summary>A sound when all the jobs are done (also in Nastavenia).</summary>
+    public bool FinishSound
+    {
+        get => _services.Settings.FinishSound;
+        set
+        {
+            _services.Settings.FinishSound = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>"Beží 1, čakajú 2" and the like.</summary>
     public string State
     {

@@ -286,7 +286,11 @@ internal static class SelfTest
         Check(services.HistraToken is null, "settings: HISTRA token removed");
 
         await TestSeriesNewsAsync(model, window, services);
+        var sounds = new List<bool>();
+        services.PlayFinishSound = sounds.Add;
         await TestBatchPageAsync(model, window, services);
+        await WaitFor(() => sounds.Count > 0);
+        Check(sounds.Count > 0 && services.Settings.FinishSound, "queue: the sound of the end after Hromadné spracovanie");
 
         // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM
         var updates = await services.Updates.CheckAsync();

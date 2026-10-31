@@ -38,6 +38,28 @@ public sealed class JobTests
     }
 
     [Test]
+    public async Task TheEndOfTheQueueIsAnnounced()
+    {
+        var queue = new JobQueue();
+        var order = new List<string>();
+        var ends = new List<IReadOnlyList<Job>>();
+        queue.Finished += ends.Add;
+        queue.Add(new TestJob("A", order));
+        queue.Add(new TestJob("B", order) { Fail = true });
+        await queue.Start();
+        Assert.True(ends is [{ Count: 2 } run] && run.Any(j => j.Status == JobStatus.Failed), "all done: announced once, with the failed job");
+
+        var slow = new TestJob("slow", order) { Delay = TimeSpan.FromMilliseconds(200) };
+        queue.Add(slow);
+        queue.Add(new TestJob("later", order));
+        var running = queue.Start();
+        await Task.Delay(50);
+        queue.Stop();
+        await running;
+        Assert.Equal(1, ends.Count, "stopped by the user with jobs waiting: no sound");
+    }
+
+    [Test]
     public async Task RunningJobCanBeCancelledWaitingOneTakenOut()
     {
         var queue = new JobQueue();

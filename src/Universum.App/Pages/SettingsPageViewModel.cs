@@ -68,6 +68,18 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
 
+    /// <summary>A sound when all the jobs are done (owner, 29. 10. 2026; also on Fronta úloh).</summary>
+    public bool FinishSound
+    {
+        get => _services.Settings.FinishSound;
+        set
+        {
+            _services.Settings.FinishSound = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>TMDB poster: drawing by AI (Cloudflare, OpenAI) and the ratings of OMDb.</summary>
     public PosterServicesViewModel PosterServices { get; }
 

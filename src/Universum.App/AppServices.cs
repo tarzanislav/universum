@@ -613,7 +613,26 @@ public sealed class AppServices
     public event Action? WeatherChanged;
 
     /// <summary>The job queue (one for the whole program; jobs run one after another).</summary>
-    public Universum.Core.Jobs.JobQueue Jobs { get; } = new();
+    public Universum.Core.Jobs.JobQueue Jobs => _jobs ??= Queue();
+
+    private Universum.Core.Jobs.JobQueue? _jobs;
+
+    /// <summary>How the end of the queue is announced (the self-test records it instead of a sound).</summary>
+    public Action<bool> PlayFinishSound { get; set; } = FinishSound.Play;
+
+    // the queue, with the sound of its end (owner, 29. 10. 2026: Hromadné spracovanie and the queue; can be switched off)
+    private Universum.Core.Jobs.JobQueue Queue()
+    {
+        var queue = new Universum.Core.Jobs.JobQueue();
+        queue.Finished += jobs =>
+        {
+            if (Settings.FinishSound)
+            {
+                PlayFinishSound(jobs.Any(j => j.Status is Universum.Core.Jobs.JobStatus.Failed || j.Errors > 0));
+            }
+        };
+        return queue;
+    }
 
     /// <summary>Adds a job; starts the queue when the settings say so.</summary>
     public void Enqueue(Universum.Core.Jobs.Job job) => Jobs.Add(job, Settings.AutoStartQueue);
@@ -737,6 +756,9 @@ public sealed class AppSettings
 
     /// <summary>The job queue starts as soon as a job is added.</summary>
     public bool AutoStartQueue { get; set; } = true;
+
+    /// <summary>A sound when the queue (Hromadné spracovanie too) has done all its jobs (owner, 29. 10. 2026).</summary>
+    public bool FinishSound { get; set; } = true;
 
     public DateTime? LastUpdateCheckUtc { get; set; }
 

@@ -115,16 +115,31 @@ public sealed class DashboardPageViewModel : ObservableObject
 
     public string TimeText => _now.ToString("HH:mm", Slovak);
 
-    public string DateText => Capitalized(SlovakCalendar.LongDate(Today));
+    public string DateText => Capitalized(CalendarTexts.LongDate(Today, Language));
 
-    public string NameDayText => SlovakCalendar.NameDayText(Today);
+    /// <summary>The name day of today in the language of the interface (owner, 31. 10. 2026: UNIVERSUM's own calendar of names).</summary>
+    public string NameDayText => NameDays.Text(Today, Language);
 
-    public string TomorrowText => SlovakCalendar.NameDay(Today.AddDays(1)) switch
+    public string TomorrowText
     {
-        { Count: 0 } => "Zajtra: " + (SlovakCalendar.DayWithoutName(Today.AddDays(1)) ?? ""),
-        { Count: 1 } names => "Zajtra má meniny " + names[0],
-        var names => "Zajtra majú meniny " + string.Join(", ", names),
-    };
+        get
+        {
+            var tomorrow = Today.AddDays(1);
+            var names = NameDays.Of(tomorrow, Language);
+            return (Language, names.Count) switch
+            {
+                (_, 0) => (Language switch { "cs" => "Zítra: ", "en" => "Tomorrow: ", _ => "Zajtra: " }) + (NameDays.DayWithoutName(tomorrow, Language) ?? "–"),
+                ("cs", 1) => "Zítra má svátek " + names[0],
+                ("cs", _) => "Zítra mají svátek " + string.Join(", ", names),
+                ("en", _) => "Tomorrow: " + string.Join(", ", names),
+                (_, 1) => "Zajtra má meniny " + names[0],
+                _ => "Zajtra majú meniny " + string.Join(", ", names),
+            };
+        }
+    }
+
+    // the language of the names: the language of the interface
+    private static string Language => Localization.Loc.Language;
 
     public string DayInfo => $"{ISOWeek.GetWeekOfYear(_now)}. týždeň · {_now.DayOfYear}. deň roka · " +
                              (new DateTime(_now.Year, 12, 31) - _now.Date).Days switch

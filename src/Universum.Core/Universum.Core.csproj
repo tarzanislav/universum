@@ -10,6 +10,9 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Slovak calendar of names: data of name-day-calendar (MIT, Peter Knezek), see THIRD-PARTY-NOTICES.md -->
-    <EmbeddedResource Include="Calendar\sk-namedays.txt" LogicalName="Universum.Core.Calendar.sk-namedays.txt" />
+    <EmbeddedResource Include="Calendar\namedays.txt" LogicalName="Universum.Core.Calendar.namedays.txt" />
+    <EmbeddedResource Include="Calendar\english-names.txt" LogicalName="Universum.Core.Calendar.english-names.txt" />
+    <EmbeddedResource Include="Calendar\holidays.txt" LogicalName="Universum.Core.Calendar.holidays.txt" />
+    <EmbeddedResource Include="Calendar\school-holidays.txt" LogicalName="Universum.Core.Calendar.school-holidays.txt" />
   </ItemGroup>
 </Project>

@@ -37,6 +37,12 @@ public sealed class JobQueue
     /// <summary>Raised when a job starts or finishes.</summary>
     public event Action<Job>? JobChanged;
 
+    /// <summary>
+    /// Raised when the queue has run every waiting job (not when it was stopped), with the jobs of this run – the sound of
+    /// the end (owner, 29. 10. 2026).
+    /// </summary>
+    public event Action<IReadOnlyList<Job>>? Finished;
+
     /// <summary>Adds a job at the end; with <paramref name="start"/> the queue starts if it is not running.</summary>
     public void Add(Job job, bool start = false)
     {
@@ -166,10 +172,24 @@ public sealed class JobQueue
 
     private async Task RunAsync()
     {
+        var ran = new List<Job>();
+        var drained = false;
         try
         {
-            while (_started && Next() is { } job)
+            while (true)
             {
+                if (!_started)
+                {
+                    break;
+                }
+
+                if (Next() is not { } job)
+                {
+                    drained = true;
+                    break;
+                }
+
+                ran.Add(job);
                 using var cancellation = new CancellationTokenSource();
                 _current = cancellation;
                 _running = job;
@@ -187,6 +207,11 @@ public sealed class JobQueue
             _running = null;
             _started = false;
             Changed?.Invoke();
+        }
+
+        if (drained && ran.Count > 0)
+        {
+            Finished?.Invoke(ran);
         }
     }
 

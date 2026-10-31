@@ -704,7 +704,7 @@ public sealed class OcrRun
     private static List<(string Raw, float Cost)> Variants(OcrCluster[] pieces, string raw)
     {
         var caron = Caron(pieces);
-        const int width = 256;
+        const int width = 96;
         var beam = new List<(string Raw, float Cost)> { ("", 0) };
         foreach (var piece in pieces)
         {
@@ -780,7 +780,8 @@ public sealed class OcrRun
             }
         }
 
-        if (piece.Text is [var letter] && char.IsLetter(letter))
+        // another accent: a doubtful letter, or one not near its template (a near match is surely its own letter)
+        if (piece.Text is [var letter] && char.IsLetter(letter) && (!piece.Sure || piece.Distance >= 0.08f))
         {
             foreach (var other in Accents.Family(letter))
             {

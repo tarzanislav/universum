@@ -1954,6 +1954,7 @@ internal static class SelfTest
         page.DeleteAllCommand.Execute(null);
         await WaitFor(() => page.Logs.Count == 0);
         Check(page.Logs.Count == 0 && services.ProcessingLogs.All().Count == 0, "logs: all deleted");
+    }
 
     // owner, 31. 10. 2026: Text z obrázkov – UNIVERSUM's own OCR reads invented PGS subtitles drawn in Arial (a white text
     // with a black outline, as on a Blu-ray); a shape no font has (■) is asked once and kept; the text is saved next to

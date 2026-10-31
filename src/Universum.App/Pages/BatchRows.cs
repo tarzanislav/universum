@@ -556,6 +556,20 @@ public sealed class FileRow : ObservableObject
     /// <summary>Confirms the suggested title HISTRA did not confirm.</summary>
     public CommunityToolkit.Mvvm.Input.RelayCommand ConfirmCommand => _confirm ??= new(() => page.ConfirmTitle(Item.File.Path));
 
+    /// <summary>Doplnok k názvu (owner, 31. 10. 2026): written or chosen, put into the name before the size class.</summary>
+    public string Addition
+    {
+        get => Item.Group.Decisions.Additions.GetValueOrDefault(Item.File.Path, "");
+        set
+        {
+            page.SetAddition(Item.File.Path, value);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>The additions offered to choose.</summary>
+    public IReadOnlyList<string> AdditionChoices => Universum.Core.Library.LibraryNames.AdditionChoices;
+
     /// <summary>Planned place in the library, relative to the output folder.</summary>
     public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
 

@@ -204,6 +204,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         _studioEdits.Clear();
+        _additions.Clear();
 
         _subtitleReading?.Cancel();
         _analysis = null;
@@ -375,6 +376,9 @@ public sealed class BatchPageViewModel : ObservableObject
     // the studio's edits by the files' paths: given again to the groups of every new analysis of the folder
     private readonly Dictionary<string, StudioEdits> _studioEdits = new(Paths.Comparer);
 
+    // Doplnok k názvu by the files' paths: given again to the groups of every new analysis of the folder
+    private readonly Dictionary<string, string> _additions = new(Paths.Comparer);
+
     private void ApplyStudioEdits()
     {
         foreach (var group in _analysis?.Groups ?? [])
@@ -385,8 +389,52 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     group.Decisions.Studio[file.Path] = edits;
                 }
+
+                if (_additions.TryGetValue(file.Path, out var addition))
+                {
+                    group.Decisions.Additions[file.Path] = addition;
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// Doplnok k názvu of one file (owner, 31. 10. 2026: written or chosen – "Directors Cut", "Remaster"); it goes into the
+    /// name before the size class. A text that cannot be used is said and not taken.
+    /// </summary>
+    public void SetAddition(string path, string? text)
+    {
+        if (_analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path))) is not { } group || IsRunning)
+        {
+            return;
+        }
+
+        var key = group.Files.First(f => Paths.Same(f.Path, path)).Path;
+        var (addition, problem) = LibraryNames.Addition(text);
+        if (problem is not null)
+        {
+            RunState = $"{Path.GetFileName(path)}: {problem}";
+            return;
+        }
+
+        if (addition == group.Decisions.Additions.GetValueOrDefault(key))
+        {
+            return;
+        }
+
+        if (addition is null)
+        {
+            group.Decisions.Additions.Remove(key);
+            _additions.Remove(key);
+        }
+        else
+        {
+            group.Decisions.Additions[key] = addition;
+            _additions[key] = addition;
+        }
+
+        Replan();
+        RunState = addition is null ? $"{Path.GetFileName(path)}: bez doplnku k názvu." : $"{Path.GetFileName(path)}: doplnok k názvu „{addition}“ – nová verzia titulu v knižnici.";
     }
 
     /// <summary>The analysed files, by group (for the Information page).</summary>
@@ -2727,6 +2775,12 @@ public sealed class BatchPageViewModel : ObservableObject
                 if (file.ProcessAnyway)
                 {
                     group.Decisions.ProcessAnyway.Add(path);
+                }
+
+                if (file.Addition is { Length: > 0 } addition)
+                {
+                    group.Decisions.Additions[path] = addition;
+                    _additions[path] = addition;
                 }
 
                 if (file.Studio is { } studio)

@@ -44,6 +44,7 @@ public sealed class RulesPageViewModel : ObservableObject
     private string? _undoRecord;
     private MediaKind _kind = MediaKind.Movie;
     private string _titleText = "";
+    private string _addition = "";
     private string _episodeText = "";
     private string _episodeNote = "";
     private Placement? _placement;
@@ -105,6 +106,8 @@ public sealed class RulesPageViewModel : ObservableObject
         _titleText = "";
         _episodeText = "";
         _episodeNote = "";
+        _addition = "";
+        OnPropertyChanged(nameof(Addition));
         Rows.Clear();
         FileName = "";
         Issues = "";
@@ -220,6 +223,30 @@ public sealed class RulesPageViewModel : ObservableObject
             }
         }
     }
+
+    /// <summary>Doplnok k názvu (owner, 31. 10. 2026: as in Hromadné spracovanie): put into the name before the size class.</summary>
+    public string Addition
+    {
+        get => _addition;
+        set
+        {
+            var (addition, problem) = LibraryNames.Addition(value);
+            if (problem is not null)
+            {
+                TitleNote = problem;
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SetProperty(ref _addition, addition ?? ""))
+            {
+                UpdateTarget();
+            }
+        }
+    }
+
+    /// <summary>The additions offered to choose.</summary>
+    public IReadOnlyList<string> AdditionChoices => LibraryNames.AdditionChoices;
 
     /// <summary>Where the result goes (or why it cannot go anywhere yet).</summary>
     public string Target { get => _target; private set => SetProperty(ref _target, value); }
@@ -556,6 +583,8 @@ public sealed class RulesPageViewModel : ObservableObject
         _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
         _episodeNote = LibraryTargetPicker.EpisodeNote(guess.Episode);
         _tmdbTitle = null;
+        _addition = "";
+        OnPropertyChanged(nameof(Addition));
         TitleNote = _rememberedSeries is null ? "" : "Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).";
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
@@ -612,7 +641,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
         else
         {
-            _placement = layout.Place(_plan.Target, title, episode, _services.Profile);
+            _placement = layout.Place(_plan.Target, title, episode, _services.Profile).WithAddition(_addition);
             var size = SourceSize();
             Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
                 ? "Súbor už je v knižnici na svojom mieste."

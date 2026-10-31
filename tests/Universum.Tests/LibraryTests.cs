@@ -62,6 +62,31 @@ public sealed class LibraryTests
     }
 
     [Test]
+    public void AdditionToTheName()
+    {
+        // owner, 31. 10. 2026: Doplnok k názvu – another version of the title, before the size class UNIVERSUM gives
+        var layout = new LibraryLayout(Path.GetFullPath("/out"));
+        var target = Target(Video("1920x1080"), Audio("cs"), Audio("en"), Subtitles("cs"));
+        var plain = layout.Place(target, new TitleInfo(MediaKind.Movie, "Creep", 2004), null, RuleProfile.Default);
+        var placement = plain.WithAddition("  Directors   Cut ");
+        Assert.Equal("Creep (2004) - CZ EN FHD H264 Directors Cut BIG.mkv", placement.FileName(5 * GiB));
+        Assert.Equal("Creep (2004) - CZ EN FHD H264 Directors Cut BIG2.mkv", placement.FileName(5 * GiB, 2), "the version number stays UNIVERSUM's");
+        Assert.True(placement.IsLibraryName("Creep (2004) - CZ EN FHD H264 Directors Cut BIG.mkv") && placement.IsVersionName("Creep (2004) - CZ EN FHD H264 Directors Cut SMALL.mkv"),
+            "still a name of the library");
+        Assert.True(!plain.IsVersionName("Creep (2004) - CZ EN FHD H264 Directors Cut BIG.mkv") && !placement.IsVersionName("Creep (2004) - CZ EN FHD H264 BIG.mkv"),
+            "a version of its own beside the one without the addition");
+        Assert.Equal("Creep (2004) - CZ EN FHD H264 2 SMALL.mkv", plain.WithAddition("2").FileName(GiB), "a number");
+        Assert.Equal(plain, plain.WithAddition("a/b"), "a text that cannot be used is left out");
+        Assert.Equal(plain, plain.WithAddition(" "), "empty");
+
+        Assert.Equal<string?>("Remaster", LibraryNames.Addition(" Remaster ").Addition, "trimmed");
+        Assert.True(LibraryNames.Addition("..\\Cesta").Problem is not null && LibraryNames.Addition("Verzia: 2").Problem is not null, "no paths, no signs Windows does not allow");
+        Assert.True(LibraryNames.Addition("BIG").Problem is not null && LibraryNames.Addition("Verzia SMALL").Problem is not null, "the size class is UNIVERSUM's");
+        Assert.True(LibraryNames.Addition(new string('a', 31)).Problem is not null && LibraryNames.Addition(new string('a', 30)).Addition is not null, "at most 30 signs");
+        Assert.True(LibraryNames.AdditionChoices.SequenceEqual(["Directors Cut", "Remaster"]), "the choices the owner gave");
+    }
+
+    [Test]
     public void EpisodePlacement()
     {
         var layout = new LibraryLayout(Path.GetFullPath("/out"));

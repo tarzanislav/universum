@@ -69,7 +69,7 @@ public sealed class MegaJob(
             return (null, "pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní");
         }
 
-        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile);
+        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile).WithAddition(file.Addition);
         var group = new BatchGroup("MEGA", 0);
         group.Files.Add(media);
         var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target), new TemplateMatch([], [], []),

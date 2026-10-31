@@ -2356,6 +2356,18 @@ internal static class SelfTest
 
             // the library names a film in Latin script without its ID (13.2); the title is the one of the ID
             Check(batch.Library!.TitleFor(byId.Item.File.Path)?.FolderName == "The Golden Carp (2021)", "batch: a film named by its TMDB ID – " + batch.RunState);
+
+            // owner, 31. 10. 2026: Doplnok k názvu – chosen, in the name before the size class; a size class is refused
+            var versioned = batch.FileRows[1];
+            versioned.Addition = "Directors Cut";
+            var withAddition = batch.FileRows.First(f => Core.IO.Paths.Same(f.Item.File.Path, versioned.Item.File.Path));
+            Check(withAddition.Target.Contains("Directors Cut ", StringComparison.Ordinal) && withAddition.Addition == "Directors Cut",
+                "batch: Doplnok k názvu in the target – " + withAddition.Target);
+            withAddition.Addition = "BIG";
+            Check(withAddition.Addition == "Directors Cut" && batch.RunState.Contains("Veľkostnú triedu", StringComparison.Ordinal), "batch: a size class is no addition – " + batch.RunState);
+            withAddition.Addition = "";
+            Check(!batch.FileRows.First(f => Core.IO.Paths.Same(f.Item.File.Path, versioned.Item.File.Path)).Target.Contains("Directors Cut", StringComparison.Ordinal),
+                "batch: the addition taken away");
             services.TitlesForSelfTest = null;
 
             Directory.Delete(speech, recursive: true);

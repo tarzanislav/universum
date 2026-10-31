@@ -272,6 +272,16 @@ public sealed class BatchTests
         Assert.Sequence([ReviewReasonKind.OtherSeries], Kinds(P("Season 1", "Iny.Serial.S01E05.mkv")), "another series");
         Assert.Sequence([], Kinds(P("Season 1", "Vymysleny.Serial.S01E01.mkv")));
         Assert.Sequence([ReviewReasonKind.ExtraFile], Kinds(P("Season 2", "Extras", "Vymysleny Serial E09.mkv")), "an extra is no episode");
+
+        // owner, 31. 10. 2026: Doplnok k názvu makes the second file another version of the episode – no longer a duplicate
+        var second = P("Season 1", "Vymysleny.Serial.S01E03.v2.mkv");
+        items.Single(i => Paths.Same(i.File.Path, second)).Group.Decisions.Additions[second] = "v2";
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
+        Assert.Sequence([], Kinds(second), "another version");
+        Assert.True(Path.GetFileName(items.Single(i => Paths.Same(i.File.Path, second)).PlannedPath)?.StartsWith("Vymyslený seriál S01E03 - v2 ", StringComparison.Ordinal) == true,
+            "the addition in the name: " + items.Single(i => Paths.Same(i.File.Path, second)).PlannedPath);
+        items.Single(i => Paths.Same(i.File.Path, second)).Group.Decisions.Additions.Remove(second);
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: job);
         foreach (var item in items.Where(i => i.PlannedPath is not null))
         {
             var season = Path.GetFileName(Path.GetDirectoryName(item.PlannedPath))!;

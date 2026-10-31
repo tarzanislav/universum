@@ -32,6 +32,14 @@ public sealed class HistraListsPageViewModel : ObservableObject
         SyncCommand = new AsyncRelayCommand(SyncAsync, () => !Busy && CanUse && Lists.Count > 0);
         StopCommand = new RelayCommand(() => _work?.Cancel(), () => Busy);
         CloseDetailCommand = new RelayCommand(() => Selected = null);
+        ToPosterCommand = new AsyncRelayCommand(async () =>
+        {
+            if (Card is { TmdbId: { } id } card)
+            {
+                await OpenInPoster(card.Kind, id);
+            }
+        }, () => Card?.TmdbId is not null);
+        ToSingleCommand = new AsyncRelayCommand(ToSingleAsync, () => Card is not null);
         services.HistraChanged += Refresh;
         services.PostersChanged += () =>
         {
@@ -69,6 +77,44 @@ public sealed class HistraListsPageViewModel : ObservableObject
 
     public RelayCommand CloseDetailCommand { get; }
 
+    /// <summary>Otvoriť v TMDB Poster (owner, 31. 10. 2026): the title shown opens there (it needs its TMDB ID).</summary>
+    public AsyncRelayCommand ToPosterCommand { get; }
+
+    /// <summary>Do Single spracovania (owner, 31. 10. 2026): the title is looked for in the input folder and goes to processing.</summary>
+    public AsyncRelayCommand ToSingleCommand { get; }
+
+    /// <summary>Opens a title in TMDB poster (set by the main window).</summary>
+    public Func<MediaKind, int, Task> OpenInPoster { get; set; } = (_, _) => Task.CompletedTask;
+
+    /// <summary>
+    /// Sends a title to processing (set by the main window): its kind, names, year and caption; what happened in words when
+    /// it was not sent, null when it was.
+    /// </summary>
+    public Func<MediaKind, IReadOnlyList<string>, int?, string, Task<string?>> SendToSingle { get; set; } = (_, _, _, _) => Task.FromResult<string?>("Nedá sa.");
+
+    // the names of the title shown: TMDB's when its detail came, else HISTRA's
+    private async Task ToSingleAsync()
+    {
+        if (Card is not { } card)
+        {
+            return;
+        }
+
+        var item = Selected?.Item;
+        var (names, year, caption) = card.Details is { } details
+            ? (details.Names, details.Year, card.MainName)
+            : item is not null
+                ? ((IReadOnlyList<string>)new[] { item.OriginalTitle, item.Title }.Where(n => n.Length > 0).Distinct(StringComparer.Ordinal).ToList(), item.Year,
+                    item.Year is { } y ? $"{item.OriginalTitle} ({y})" : item.OriginalTitle)
+                : ([], null, card.MainName);
+        if (names.Count == 0)
+        {
+            return;
+        }
+
+        Status = "Hľadám titul vo vstupnom priečinku…";
+        Status = await SendToSingle(card.Kind, names, year, caption) ?? "";
+    }
     /// <summary>Shows the import window; the self-test answers instead.</summary>
     public Func<HistraImportViewModel, bool> ShowImport { get; set; } = model =>
         new HistraImportWindow(model) { Owner = Application.Current.MainWindow }.ShowDialog() == true;
@@ -129,7 +175,18 @@ public sealed class HistraListsPageViewModel : ObservableObject
     /// The card of the title chosen (owner, 31. 10. 2026: as in TMDB poster – HISTRA's data at once, TMDB's detail when it
     /// comes); a film of its collection opens in it.
     /// </summary>
-    public TitleCardViewModel? Card { get => _card; private set => SetProperty(ref _card, value); }
+    public TitleCardViewModel? Card
+    {
+        get => _card;
+        private set
+        {
+            if (SetProperty(ref _card, value))
+            {
+                ToPosterCommand.NotifyCanExecuteChanged();
+                ToSingleCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
 
     private TitleCardViewModel CardOf(HistraItemRow row)
     {

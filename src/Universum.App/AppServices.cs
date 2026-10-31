@@ -60,6 +60,46 @@ public sealed class AppServices
         Settings.Save();
         EnsureSortingFolders();
         InputDirectoryChanged?.Invoke();
+        RestartWatch();
+    }
+
+    private Universum.Core.IO.FolderWatch? _watch;
+
+    /// <summary>
+    /// Films and episodes that came into the input folder while UNIVERSUM runs (owner, 31. 10. 2026: tell and offer – they
+    /// go to Hromadné spracovanie only on the user's click). Changed on the window's thread.
+    /// </summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> Arrivals { get; } = [];
+
+    /// <summary>How long a new file must stay the same before it is told (10 s; the self-test shortens it).</summary>
+    public TimeSpan WatchSettle { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Watches the input folder (again) as the settings say; a folder that cannot be watched is simply not.</summary>
+    public void RestartWatch()
+    {
+        _watch?.Dispose();
+        _watch = null;
+        if (!Settings.WatchInput || InputDirectory is not { } folder || !Directory.Exists(folder))
+        {
+            return;
+        }
+
+        try
+        {
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            _watch = new Universum.Core.IO.FolderWatch(folder, WatchSettle, path => Library?.HoldsResult(path) == true);
+            _watch.Arrived += files => dispatcher.BeginInvoke(() =>
+            {
+                foreach (var file in files.Where(f => !Arrivals.Contains(f, Universum.Core.IO.Paths.Comparer)))
+                {
+                    Arrivals.Add(file);
+                }
+            });
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            _watch = null;
+        }
     }
 
     /// <summary>
@@ -779,6 +819,9 @@ public sealed class AppSettings
 
     /// <summary>The job queue starts as soon as a job is added.</summary>
     public bool AutoStartQueue { get; set; } = true;
+
+    /// <summary>The input folder is watched: new films and episodes are told (owner, 31. 10. 2026).</summary>
+    public bool WatchInput { get; set; } = true;
 
     /// <summary>Hromadné spracovanie: the panels below the tables hidden (more room in a small window).</summary>
     public bool BatchPanelsHidden { get; set; }

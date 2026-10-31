@@ -1130,6 +1130,18 @@ internal static class SelfTest
             "input folder: one setting for every page");
         Check(page.Status.StartsWith("Vstupný priečinok je nastavený", StringComparison.Ordinal), "novinky: the old message goes once the folder is set – " + page.Status);
 
+        // owner, 31. 10. 2026: the input folder watched – a film copied in is told (nothing is processed by itself)
+        services.WatchSettle = TimeSpan.FromMilliseconds(500);
+        services.RestartWatch();
+        var arriving = Path.Combine(input, "Vymyslený.Prichádzajúci.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), arriving, overwrite: true);
+        await WaitFor(() => services.Arrivals.Any(a => a.EndsWith("Prichádzajúci.Film.2026.mkv", StringComparison.Ordinal)));
+        Check(model.HasArrivals && model.ArrivalsText.Contains("Prichádzajúci", StringComparison.Ordinal), "input folder: a new film is told – " + model.ArrivalsText);
+        await Screenshot(window, "input-arrivals.png");
+        model.DismissArrivalsCommand.Execute(null);
+        Check(!model.HasArrivals, "input folder: the notice hidden");
+        File.Delete(arriving);
+
         // the mark of a series: the same in Premiéry
         show.IsChosen = true;
         show.Note = "pozrieť s rodinou";

@@ -68,6 +68,19 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
 
+    /// <summary>The input folder is watched: new films and episodes are told (owner, 31. 10. 2026).</summary>
+    public bool WatchInput
+    {
+        get => _services.Settings.WatchInput;
+        set
+        {
+            _services.Settings.WatchInput = value;
+            _services.Settings.Save();
+            _services.RestartWatch();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>A sound when all the jobs are done (owner, 29. 10. 2026; also on Fronta úloh).</summary>
     public bool FinishSound
     {

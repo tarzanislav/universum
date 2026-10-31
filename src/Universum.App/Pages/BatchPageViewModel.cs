@@ -1309,6 +1309,21 @@ public sealed class BatchPageViewModel : ObservableObject
     /// analysed one), the kind is series and the series' title is typed in (original title and year – confirmed on
     /// TMDB and HISTRA as any other title). <paramref name="further"/>: files of other series sent at the same time.
     /// </summary>
+    /// <summary>Films and episodes chosen (new in the input folder): analysed as a folder of them; false while it is busy.</summary>
+    public async Task<bool> AnalyzeChosenAsync(IReadOnlyList<string> files)
+    {
+        if (Busy || IsRunning || files.Count == 0)
+        {
+            return false;
+        }
+
+        Folder = CommonFolder(files);
+        _only = files;
+        _sentSeries = null;
+        await AnalyzeAsync();
+        return true;
+    }
+
     public async Task AnalyzeFilesAsync(IReadOnlyList<string> files, string seriesTitle, IReadOnlyDictionary<string, string>? further = null)
     {
         if (Busy || files.Count == 0)

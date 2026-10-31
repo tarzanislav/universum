@@ -1,3 +1,4 @@
+using Universum.App.Localization;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
@@ -60,34 +61,34 @@ public sealed class MainViewModel : ObservableObject
         services.RestartWatch();
 
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
-        var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
-        var multiplexing = new ToolGroup("MULTIPLEXING", Color.FromRgb(0x4A, 0x7B, 0xD9));
-        var studios = new ToolGroup("EDITÁCIA VIDEOSTÔP (video, audio, titulky)", Color.FromRgb(0x2B, 0xA6, 0xA6));
-        var templates = new ToolGroup("ŠABLÓNY (TEMPLATE)", Color.FromRgb(0x3E, 0xA8, 0x5F));
-        var statistics = new ToolGroup("ŠTATISTIKA", Color.FromRgb(0xD9, 0x8B, 0x2B));
+        var news = new ToolGroup(Loc.T("NOVINKY A OBSAH"), Color.FromRgb(0x9B, 0x6B, 0xD6));
+        var multiplexing = new ToolGroup(Loc.T("MULTIPLEXING"), Color.FromRgb(0x4A, 0x7B, 0xD9));
+        var studios = new ToolGroup(Loc.T("EDITÁCIA VIDEOSTÔP (video, audio, titulky)"), Color.FromRgb(0x2B, 0xA6, 0xA6));
+        var templates = new ToolGroup(Loc.T("ŠABLÓNY (TEMPLATE)"), Color.FromRgb(0x3E, 0xA8, 0x5F));
+        var statistics = new ToolGroup(Loc.T("ŠTATISTIKA"), Color.FromRgb(0xD9, 0x8B, 0x2B));
         Tools =
         [
-            new("Dashboard", "\uE80F", Dashboard),
-            new("Premiéry", "\uE8B2", Premieres, news),
-            new("Novinky – Seriály", "\uE7F4", SeriesNews, news),
-            new("Listy z HISTRA", "\uE8F1", HistraLists, news),
-            new("TMDB poster", "\uE8B9", Posters, news),
-            new("Zaujímavosti", "\uE734", Interests, news),
-            new("Zlučovanie", "\uE71D", Mux, multiplexing),
-            new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
-            new("Kapitoly", "\uE8FD", Chapters, multiplexing),
-            new("Informácie", "\uE946", Info, multiplexing),
+            new(Loc.T("Dashboard"), "\uE80F", Dashboard),
+            new(Loc.T("Premiéry"), "\uE8B2", Premieres, news),
+            new(Loc.T("Novinky – Seriály"), "\uE7F4", SeriesNews, news),
+            new(Loc.T("Listy z HISTRA"), "\uE8F1", HistraLists, news),
+            new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
+            new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
+            new(Loc.T("Zlučovanie"), "\uE71D", Mux, multiplexing),
+            new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
+            new(Loc.T("Kapitoly"), "\uE8FD", Chapters, multiplexing),
+            new(Loc.T("Informácie"), "\uE946", Info, multiplexing),
             // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
-            new("Úprava videostopy", "\uE714", Video, studios),
-            new("Úprava audiostopy", "\uE8D6", Audio, studios),
-            new("Úprava titulkostopy", "\uE7F0", Subtitles, studios),
-            new("Single spracovanie", "\uE90F", Rules, templates),
-            new("Hromadné spracovanie", "\uE8B7", Batch, templates),
-            new("MEGA spracovanie", "\uE945", Mega, templates),
-            new("Fronta úloh", "\uE823", Queue, statistics),
-            new("Výstup úloh", "\uE7C3", Output, statistics),
-            new("Záznamy spracovania", "\uE81C", Logs, statistics),
-            new("Nastavenia", "\uE713", Settings, statistics),
+            new(Loc.T("Úprava videostopy"), "\uE714", Video, studios),
+            new(Loc.T("Úprava audiostopy"), "\uE8D6", Audio, studios),
+            new(Loc.T("Úprava titulkostopy"), "\uE7F0", Subtitles, studios),
+            new(Loc.T("Single spracovanie"), "\uE90F", Rules, templates),
+            new(Loc.T("Hromadné spracovanie"), "\uE8B7", Batch, templates),
+            new(Loc.T("MEGA spracovanie"), "\uE945", Mega, templates),
+            new(Loc.T("Fronta úloh"), "\uE823", Queue, statistics),
+            new(Loc.T("Výstup úloh"), "\uE7C3", Output, statistics),
+            new(Loc.T("Záznamy spracovania"), "\uE81C", Logs, statistics),
+            new(Loc.T("Nastavenia"), "\uE713", Settings, statistics),
         ];
         var view = new ListCollectionView(Tools.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ToolItem.Group)));

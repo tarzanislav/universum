@@ -58,7 +58,7 @@ public sealed class MegaJob(
         // external subtitle files of the video: only as they were when the batch was made
         if (file.Externals.FirstOrDefault(e => !e.Unchanged) is { } changed)
         {
-            return (null, $"externé titulky {System.IO.Path.GetFileName(changed.Path)} sa medzičasom zmenili alebo chýbajú – treba ho znova pripraviť v Hromadnom spracovaní");
+            return (null, $"pridaný súbor {System.IO.Path.GetFileName(changed.Path)} (titulky alebo zvuk) sa medzičasom zmenil alebo chýba – treba ho znova pripraviť v Hromadnom spracovaní");
         }
 
         media = media with { Tracks = [.. media.Tracks, .. file.Externals.Select(e => e.ToTrack())] };

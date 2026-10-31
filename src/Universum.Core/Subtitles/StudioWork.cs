@@ -52,8 +52,8 @@ public sealed record StudioTrackState
     public Dictionary<int, string>? TextsBefore { get; init; }
 }
 
-/// <summary>The work on the subtitles of one video, saved to go on later (owner, 30. 10. 2026: Uložiť prácu).</summary>
-public sealed record StudioWork
+/// <summary>The work on one video saved to go on later (owner, 30. 10. 2026: Uložiť prácu) – what every studio keeps of it.</summary>
+public abstract record VideoWork
 {
     public required string Video { get; init; }
 
@@ -63,27 +63,32 @@ public sealed record StudioWork
     public DateTime ModifiedUtc { get; init; }
 
     public DateTime SavedUtc { get; init; }
+}
 
+/// <summary>The work on the subtitles of one video (Úprava titulkostopy).</summary>
+public sealed record StudioWork : VideoWork
+{
     public List<StudioTrackState> Tracks { get; init; } = [];
 }
 
 /// <summary>
-/// Saved work of Úprava titulkostopy: one JSON file a video in a folder of the Windows account (named by a hash of the
-/// video's path, never sent anywhere); it is offered again when the same, unchanged video is opened.
+/// Saved work of a studio: one JSON file a video in a folder of the Windows account (named by a hash of the video's
+/// path, never sent anywhere); it is offered again when the same, unchanged video is opened.
 /// </summary>
-public sealed class StudioWorkStore(string folder)
+public class VideoWorkStore<TWork>(string folder)
+    where TWork : VideoWork
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
     public string Folder { get; } = folder;
 
     /// <summary>The work saved for the video as it is now, or null.</summary>
-    public StudioWork? Load(string video)
+    public TWork? Load(string video)
     {
         try
         {
             var file = FileOf(video);
-            if (!File.Exists(file) || JsonSerializer.Deserialize<StudioWork>(File.ReadAllBytes(file), Options) is not { } work)
+            if (!File.Exists(file) || JsonSerializer.Deserialize<TWork>(File.ReadAllBytes(file), Options) is not { } work)
             {
                 return null;
             }
@@ -97,13 +102,13 @@ public sealed class StudioWorkStore(string folder)
         }
     }
 
-    /// <summary>Saves the work (the video's size and time are taken now).</summary>
-    public StudioWork Save(string video, IReadOnlyList<StudioTrackState> tracks, DateTime nowUtc)
+    /// <summary>Saves the work, with the video's size and time as they are now.</summary>
+    public TWork Save(TWork work)
     {
-        var info = new FileInfo(video);
-        var work = new StudioWork { Video = video, Size = info.Length, ModifiedUtc = info.LastWriteTimeUtc, SavedUtc = nowUtc, Tracks = [.. tracks] };
+        var info = new FileInfo(work.Video);
+        work = work with { Size = info.Length, ModifiedUtc = info.LastWriteTimeUtc };
         Directory.CreateDirectory(Folder);
-        var file = FileOf(video);
+        var file = FileOf(work.Video);
         var temporary = file + ".part";
         File.WriteAllBytes(temporary, JsonSerializer.SerializeToUtf8Bytes(work, Options));
         File.Move(temporary, file, overwrite: true);
@@ -128,4 +133,12 @@ public sealed class StudioWorkStore(string folder)
         var key = OperatingSystem.IsWindows() ? path.ToUpperInvariant() : path;
         return Path.Combine(Folder, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..32].ToLowerInvariant() + ".json");
     }
+}
+
+/// <summary>Saved work of Úprava titulkostopy.</summary>
+public sealed class StudioWorkStore(string folder) : VideoWorkStore<StudioWork>(folder)
+{
+    /// <summary>Saves the work (the video's size and time are taken now).</summary>
+    public StudioWork Save(string video, IReadOnlyList<StudioTrackState> tracks, DateTime nowUtc) =>
+        Save(new StudioWork { Video = video, SavedUtc = nowUtc, Tracks = [.. tracks] });
 }

@@ -1864,6 +1864,16 @@ internal static class SelfTest
             Check(false, "audio: the result in the library");
         }
 
+        // Uložiť prácu: the sounds come back with the video, the dub's file too
+        page.SaveWorkCommand.Execute(null);
+        Check(page.HasWork && services.AudioWork.Load(video) is { Sounds.Count: 3 }, "audio: the work saved – " + page.WorkNote);
+        page.ClearCommand.Execute(null);
+        await page.LoadAsync([video]);
+        var back = page.Rows.FirstOrDefault(r => r.IsExternal);
+        Check(page.HasWork && page.Rows.Count == 3 && back is { DelayText: "-300", Stereo: true, Name: "Vymyslený dabing CZ", Codec.Codec: Core.Audio.AudioCodec.Aac } && back.Language.Tag.Primary == "cs",
+            $"audio: the work comes back with the video – {page.WorkNote} | {back?.Summary}");
+        page.DiscardWorkCommand.Execute(null);
+        Check(!page.HasWork && services.AudioWork.Load(video) is null, "audio: the work discarded");
         page.ClearCommand.Execute(null);
     }
 
@@ -2254,6 +2264,25 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == batch && studied.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500) &&
               batch.RunState.Contains("úprava titulkostopy v úlohe", StringComparison.Ordinal),
             $"batch: Upraviť v štúdiu → Uložiť do úlohy – the new times in the task ({studied.Target.For(studioTrack).Timing?.MkvMergeValue}) – {batch.RunState}");
+        // owner, 30. 10. 2026: Zvuk v štúdiu – the file's sound shifted, back with Uložiť do úlohy; the subtitles' edits stay
+        batch.SelectedGroup = batch.Groups.First(g => g.Group == studioItem.Group);
+        batch.SelectedFile = batch.FileRows.First(f => f.Item.File.Path == studioItem.File.Path);
+        batch.EditSoundInStudioCommand.Execute(null);
+        await WaitFor(() => model.Audio.IsTask && model.SelectedTool.Page == model.Audio && model.Audio.Rows.Count > 0);
+        var studioSound = model.Audio.Rows.FirstOrDefault(r => !r.IsExternal);
+        Check(studioSound is not null, "batch: Zvuk v štúdiu opens the file's sounds – " + model.Audio.Summary);
+        if (studioSound is not null)
+        {
+            studioSound.DelayText = "250";
+            studioSound.Name = "Vymyslený zvuk v úlohe";
+            await Screenshot(window, "studio-audio-task.png");
+            model.Audio.SaveToTaskCommand.Execute(null);
+            var both = batch.Items.First(i => i.File.Path == studioItem.File.Path);
+            Check(model.SelectedTool.Page == batch && both.Target.For(studioSound.Track.Id) is { Timing.DelayMilliseconds: 250, Name: "Vymyslený zvuk v úlohe" } &&
+                  both.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500),
+                $"batch: Zvuk v štúdiu → Uložiť do úlohy – the sound's shift and name in the task, the subtitles' times stay – {both.Target.For(studioSound.Track.Id).Timing?.MkvMergeValue} {both.Target.For(studioSound.Track.Id).Name}");
+        }
+
         batch.SaveStudio(studioItem.File.Path, new Core.Batch.StudioEdits());
         Check(batch.Items.First(i => i.File.Path == studioItem.File.Path).Target.For(studioTrack).Timing is null, "batch: the edits of the studio forgotten again");
 

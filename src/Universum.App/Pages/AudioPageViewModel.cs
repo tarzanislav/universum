@@ -47,6 +47,12 @@ public sealed class AudioPageViewModel : ObservableObject
     private double _progress;
     private CancellationTokenSource? _work;
     private (AudioRow Row, AudioSyncResult Result)? _proposal;
+    private (string Path, Func<StudioEdits, string?> Save, Action Leave)? _task;
+    private Dictionary<int, string> _batchNames = [];
+    private int _taskLoad;
+    private bool _openingTask;
+    private bool _hasWork;
+    private string _workNote = "";
 
     public AudioPageViewModel(AppServices services)
     {
@@ -78,6 +84,24 @@ public sealed class AudioPageViewModel : ObservableObject
             Summary = "Otvorte video – jeho zvukové stopy a zvuky odinakiaľ (dabing, iné vydanie) sa prehrajú s obrazom.";
             RefreshCommands();
         }, () => !_busy && _file is not null);
+        SaveToTaskCommand = new RelayCommand(SaveToTask, () => !_busy && _task is not null);
+        LeaveTaskCommand = new RelayCommand(() =>
+        {
+            var leave = _task?.Leave;
+            EndTask();
+            leave?.Invoke();
+        }, () => _task is not null);
+        SaveWorkCommand = new RelayCommand(SaveWork, () => !_busy && _file is not null && _task is null);
+        DiscardWorkCommand = new RelayCommand(() =>
+        {
+            if (_file is not null)
+            {
+                _services.AudioWork.Delete(_file.Path);
+                HasWork = false;
+                WorkNote = "Uložená práca je zahodená – hodnoty na stránke ostali.";
+                RefreshCommands();
+            }
+        }, () => _hasWork && _task is null);
         Player.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(Player.IsOpen))
@@ -118,6 +142,29 @@ public sealed class AudioPageViewModel : ObservableObject
     public RelayCommand ClearCommand { get; }
 
     public bool HasProposal => _proposal is not null;
+
+    /// <summary>Uložiť do úlohy: the sounds' edits go back to Hromadné spracovanie (a file opened with Zvuk v štúdiu).</summary>
+    public RelayCommand SaveToTaskCommand { get; }
+
+    /// <summary>Back to Hromadné spracovanie without saving.</summary>
+    public RelayCommand LeaveTaskCommand { get; }
+
+    /// <summary>Uložiť prácu: the values of every sound of the video come back when it is opened again.</summary>
+    public RelayCommand SaveWorkCommand { get; }
+
+    public RelayCommand DiscardWorkCommand { get; }
+
+    /// <summary>A file of Hromadné spracovanie is edited (its changes go back into the task).</summary>
+    public bool IsTask => _task is not null;
+
+    public string TaskText => _task is { } task
+        ? $"Úloha Hromadného spracovania: {Path.GetFileName(task.Path)}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia do úlohy – zapíšu sa pri jej behu."
+        : "";
+
+    /// <summary>Work is saved for the video.</summary>
+    public bool HasWork { get => _hasWork; private set => SetProperty(ref _hasWork, value); }
+
+    public string WorkNote { get => _workNote; private set => SetProperty(ref _workNote, value); }
 
     /// <summary>The sound played with the film and edited.</summary>
     public AudioRow? SelectedRow
@@ -265,6 +312,234 @@ public sealed class AudioPageViewModel : ObservableObject
             _busy = false;
             Changed();
         }
+
+        if (!_openingTask)
+        {
+            await RestoreWorkAsync();
+        }
+    }
+
+    /// <summary>
+    /// Zvuk v štúdiu: a file of Hromadné spracovanie (as analysed) with its edits so far; <paramref name="save"/> takes the
+    /// edits (null when taken, else why not), <paramref name="leave"/> goes back. False when it could not be opened.
+    /// </summary>
+    /// <param name="batchNames">The names the batch gives the video's own tracks (by track ID): shown until the user writes his own.</param>
+    public async Task<bool> EditForBatchAsync(MediaFile analysed, StudioEdits? edits, Func<StudioEdits, string?> save, Action leave, IReadOnlyDictionary<int, string>? batchNames = null)
+    {
+        if (_busy)
+        {
+            SyncStatus = "Štúdio práve pracuje (napasováva alebo zapisuje) – skúste Zvuk v štúdiu o chvíľu.";
+            return false;
+        }
+
+        var load = ++_taskLoad;
+        _openingTask = true;
+        try
+        {
+            await LoadVideoAsync(analysed.Path);
+        }
+        finally
+        {
+            if (load == _taskLoad)
+            {
+                _openingTask = false;
+            }
+        }
+
+        if (load != _taskLoad || _file is null || !Core.IO.Paths.Same(_file.Path, analysed.Path))
+        {
+            return false;
+        }
+
+        _batchNames = batchNames?.ToDictionary() ?? [];
+        if (edits is not null)
+        {
+            await RestoreAsync(edits.SoundStates, edits);
+            if (load != _taskLoad)
+            {
+                return false;
+            }
+        }
+
+        _task = (analysed.Path, save, leave);
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        Changed();
+        return true;
+    }
+
+    // the sounds as they were left: the files they were added from again (when they are still there), then the values
+    // of each row; a task without the values as typed gets its decisions
+    private async Task RestoreAsync(IReadOnlyList<AudioTrackState> states, StudioEdits? edits)
+    {
+        var files = states.Select(s => s.ExternalFile).Concat(edits?.AddedSounds.Select(s => s.Path) ?? []).OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists).Where(p => !Rows.Any(r => r.ExternalPath is { } known && Core.IO.Paths.Same(known, p))).ToList();
+        if (files.Count > 0)
+        {
+            await AddFilesAsync(files);
+        }
+
+        foreach (var row in Rows)
+        {
+            if (states.FirstOrDefault(row.Is) is { } state)
+            {
+                row.Restore(state);
+            }
+            else if (edits is not null && states.Count == 0)
+            {
+                if (!row.IsExternal)
+                {
+                    row.Include = !edits.RemovedSounds.Contains(row.Track.Id);
+                    if (edits.SoundLanguages.TryGetValue(row.Track.Id, out var language))
+                    {
+                        row.Language = row.LanguageChoices.FirstOrDefault(c => c.Same(language)) ?? row.Language;
+                    }
+
+                    if (edits.SoundNames.TryGetValue(row.Track.Id, out var name))
+                    {
+                        row.WriteName(name);
+                    }
+
+                    if (edits.SoundRecipes.TryGetValue(row.Track.Id, out var recipe))
+                    {
+                        row.SetRecipe(recipe);
+                    }
+                }
+                else if (edits.AddedSounds.FirstOrDefault(s => s.Is(row.Track)) is { } sound)
+                {
+                    row.Language = row.LanguageChoices.FirstOrDefault(c => c.Same(sound.Language)) ?? row.Language;
+                    if (sound.Name is not null)
+                    {
+                        row.WriteName(sound.Name);
+                    }
+
+                    row.SetRecipe(sound.Recipe);
+                }
+                else
+                {
+                    row.Include = false;
+                }
+            }
+            else if (row.IsExternal && files.Any(f => Core.IO.Paths.Same(f, row.ExternalPath!)))
+            {
+                // another sound of a file added for one of its sounds
+                row.Include = false;
+            }
+        }
+
+        SelectedRow = Rows.LastOrDefault(r => r is { IsExternal: true, Include: true }) ?? SelectedRow;
+        Changed();
+    }
+
+    private async Task RestoreWorkAsync()
+    {
+        HasWork = false;
+        WorkNote = "";
+        if (_file is null || _services.AudioWork.Load(_file.Path) is not { } work)
+        {
+            return;
+        }
+
+        await RestoreAsync(work.Sounds, null);
+        HasWork = true;
+        WorkNote = $"Obnovená uložená práca z {work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}.";
+        RefreshCommands();
+    }
+
+    private void SaveWork()
+    {
+        if (_file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var work = _services.AudioWork.Save(new AudioWork { Video = _file.Path, SavedUtc = DateTime.UtcNow, Sounds = [.. Rows.Select(r => r.State())] });
+            HasWork = true;
+            WorkNote = $"Práca je uložená ({work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            WorkNote = "Prácu sa nepodarilo uložiť: " + ex.Message;
+        }
+
+        RefreshCommands();
+    }
+
+    private void SaveToTask()
+    {
+        if (_task is not { } task || _file is null)
+        {
+            return;
+        }
+
+        if (!Core.IO.Paths.Same(_file.Path, task.Path))
+        {
+            SyncStatus = "V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Zvuk v štúdiu.";
+            EndTask();
+            return;
+        }
+
+        if (Rows.FirstOrDefault(r => r.Include && r.Problem is not null) is { } wrong)
+        {
+            SyncStatus = $"{wrong.Source}: {wrong.Problem}";
+            return;
+        }
+
+        var edits = new StudioEdits { SoundStates = [.. Rows.Select(r => r.State())] };
+        foreach (var row in Rows)
+        {
+            var recipe = row.Recipe;
+            if (row.IsExternal)
+            {
+                if (row.Include)
+                {
+                    edits.AddedSounds.Add(new StudioSound(row.ExternalPath!, row.Ordinal, row.Track, row.Language.Tag, row.WrittenName, recipe));
+                }
+
+                continue;
+            }
+
+            if (!row.Include)
+            {
+                edits.RemovedSounds.Add(row.Track.Id);
+                continue;
+            }
+
+            if (!row.Language.Same(row.Track.Language))
+            {
+                edits.SoundLanguages[row.Track.Id] = row.Language.Tag;
+            }
+
+            if (row.WrittenName is { } name)
+            {
+                edits.SoundNames[row.Track.Id] = name;
+            }
+
+            if (!recipe.Timing.IsNone || recipe.NeedsEncoding)
+            {
+                edits.SoundRecipes[row.Track.Id] = recipe;
+            }
+        }
+
+        // the task stays open when Hromadné spracovanie cannot take them now (the subtitles' part is kept by the batch)
+        if (task.Save(edits) is { } refused)
+        {
+            SyncStatus = refused;
+            return;
+        }
+
+        EndTask();
+    }
+
+    private void EndTask()
+    {
+        _task = null;
+        _batchNames = [];
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        Changed();
     }
 
     // the sounds of other files: every audio track of each as a row (Include: the user decides)
@@ -280,7 +555,8 @@ public sealed class AudioPageViewModel : ObservableObject
         var problems = new List<string>();
         try
         {
-            foreach (var path in paths)
+            // a file whose sounds are here already (a saved work restored with the video dropped with it) once
+            foreach (var path in paths.Where(p => !Rows.Any(r => r.ExternalPath is { } known && Core.IO.Paths.Same(known, p))))
             {
                 try
                 {
@@ -337,7 +613,18 @@ public sealed class AudioPageViewModel : ObservableObject
     private void Clear()
     {
         _work?.Cancel();
+        if (_task is not null)
+        {
+            // another video: the task of Hromadné spracovanie is left (its file is not here any more)
+            _task = null;
+                OnPropertyChanged(nameof(IsTask));
+            OnPropertyChanged(nameof(TaskText));
+        }
+
         _file = null;
+        _batchNames = [];
+        HasWork = false;
+        WorkNote = "";
         _proposal = null;
         _envelopes.Clear();
         Rows.Clear();
@@ -363,13 +650,15 @@ public sealed class AudioPageViewModel : ObservableObject
         RefreshCommands();
     }
 
-    // the names the tracks get (the rules' until the user writes his own) shown in their rows
+    // the names the tracks would get without the user's (the rules' or, in a task, the batch's) shown in their rows
     private void ShowNames()
     {
-        if (Target() is not { } target)
+        if (_file is null)
         {
             return;
         }
+
+        var target = Build(_file, Rows.ToDictionary(r => r, r => r.Track), [.. Rows], names: false);
 
         foreach (var row in Rows)
         {
@@ -394,7 +683,8 @@ public sealed class AudioPageViewModel : ObservableObject
     }
 
     // the target state of the video: its tracks, a sound written anew in place of its track, the sounds added
-    private TargetState Build(MediaFile file, IReadOnlyDictionary<AudioRow, MediaTrack> written, IReadOnlyList<AudioRow> rows)
+    // names: with the names the user wrote (false: what the tracks would be called without them)
+    private TargetState Build(MediaFile file, IReadOnlyDictionary<AudioRow, MediaTrack> written, IReadOnlyList<AudioRow> rows, bool names = true)
     {
         var tracks = new List<MediaTrack>();
         var replaced = new HashSet<int>();
@@ -431,16 +721,32 @@ public sealed class AudioPageViewModel : ObservableObject
             {
                 Languages = rowOf.Where(r => r.Value.Include).ToDictionary(r => r.Key, r => r.Value.Language.Tag),
                 Removed = removed,
-                Names = rowOf.Where(r => r.Value is { Include: true, WrittenName: not null }).ToDictionary(r => r.Key, r => r.Value.WrittenName!),
+                Names = NamesOf(rowOf, names),
                 Timings = shifts,
             });
         }
 
         var edits = tracks.Where(t => !removed.Contains(t.Id)).Select(t => rowOf.TryGetValue(t.Id, out var row)
-            ? new TrackEdit(t.Id, row.WrittenName ?? row.InitialName, row.Language.Tag, t.Flags)
+            ? new TrackEdit(t.Id, (names ? row.WrittenName : null) ?? row.InitialName, row.Language.Tag, row.IsExternal ? t.Flags : row.Track.Flags)
             : new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList();
         var target = ManualTarget.Create(augmented, edits, removed, title: "");
         return target with { Tracks = target.Tracks.Select(t => shifts.TryGetValue(t.TrackId, out var shift) ? t with { Timing = shift } : t).ToList() };
+    }
+
+    // the names of the result: the batch's for the video's own tracks (a task), the ones the user wrote over them
+    private Dictionary<int, string> NamesOf(Dictionary<int, AudioRow> rowOf, bool written)
+    {
+        var names = rowOf.Where(r => r.Value is { Include: true, IsExternal: false } && _batchNames.ContainsKey(r.Value.Track.Id))
+            .ToDictionary(r => r.Key, r => _batchNames[r.Value.Track.Id]);
+        if (written)
+        {
+            foreach (var (id, row) in rowOf.Where(r => r.Value is { Include: true, WrittenName: not null }))
+            {
+                names[id] = row.WrittenName!;
+            }
+        }
+
+        return names;
     }
 
     private bool CanSave() =>
@@ -457,43 +763,17 @@ public sealed class AudioPageViewModel : ObservableObject
         _busy = true;
         using var work = _work = new CancellationTokenSource();
         RefreshCommands();
-        var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "zvuk-" + Guid.NewGuid().ToString("N"));
         try
         {
-            Directory.CreateDirectory(folder);
-            // the sounds as they are now (the page cannot change them while it writes)
+            // the sounds as they are now (the page cannot change them while it writes); a sound written anew is written by
+            // the processor right before mkvmerge (as in Hromadné spracovanie)
             var rows = Rows.ToList();
-            var written = rows.ToDictionary(r => r, r => r.Track);
-            var encoded = rows.Where(r => r is { Include: true, Recipe.NeedsEncoding: true }).ToList();
-            var ffmpeg = encoded.Count == 0 ? "" : (await _services.SpeechAsync()).Ffmpeg;
-            for (var i = 0; i < encoded.Count; i++)
-            {
-                var row = encoded[i];
-                var output = Path.Combine(folder, $"{i + 1:00}.mka");
-                var at = i;
-                Result = $"Zapisujem zvuk {row.Source} ({i + 1} z {encoded.Count})…";
-                var progress = new Progress<double>(share => Progress = (at + share) / (encoded.Count + 1));
-                var problem = await AudioEncoder.EncodeAsync(_services.Runner, ffmpeg, row.ExternalPath ?? file.Path, row.Ordinal, row.Track, row.Recipe, output,
-                    file.Duration, progress, work.Token);
-                if (problem is not null)
-                {
-                    Result = $"Zvuk {row.Source} sa nepodarilo zapísať – nič sa nezapísalo. {problem}";
-                    return;
-                }
-
-                var (codec, _) = row.Recipe.Encoder(row.Track);
-                written[row] = row.Track with
-                {
-                    Id = row.IsExternal ? row.Track.Id : _nextId++, ExternalFile = output, ExternalTrack = 0, Codec = codec ?? row.Track.Codec,
-                    CodecId = row.Recipe.WrittenCodecId(row.Track),
-                    AudioChannels = row.Stereo ? 2 : row.Track.AudioChannels, Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null,
-                };
-            }
-
-            Result = "Zapisujem nový súbor…";
-            Progress = encoded.Count / (encoded.Count + 1.0);
+            var written = rows.ToDictionary(r => r, r => r.Include && r.Recipe.NeedsEncoding
+                ? new SoundEncoding(r.ExternalPath ?? file.Path, r.Ordinal, r.Track, r.Recipe).ToTrack(r.IsExternal ? r.Track.Id : _nextId++)
+                : r.Track);
+            Result = rows.Any(r => r is { Include: true, Recipe.NeedsEncoding: true }) ? "Zapisujem zvuk znova a potom nový súbor…" : "Zapisujem nový súbor…";
             var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file, written, rows)), placement, new OutputOptions(OriginalHandling.Keep),
-                cancellationToken: work.Token);
+                new Progress<double>(share => Progress = share), work.Token);
             Progress = 1;
             Result = result.Status switch
             {
@@ -512,15 +792,6 @@ public sealed class AudioPageViewModel : ObservableObject
         }
         finally
         {
-            try
-            {
-                Directory.Delete(folder, recursive: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // a temporary folder left behind is harmless
-            }
-
             _work = null;
             _busy = false;
             RefreshCommands();
@@ -621,5 +892,9 @@ public sealed class AudioPageViewModel : ObservableObject
         StopCommand?.NotifyCanExecuteChanged();
         ApplyProposalCommand?.NotifyCanExecuteChanged();
         ClearCommand?.NotifyCanExecuteChanged();
+        SaveToTaskCommand?.NotifyCanExecuteChanged();
+        LeaveTaskCommand?.NotifyCanExecuteChanged();
+        SaveWorkCommand?.NotifyCanExecuteChanged();
+        DiscardWorkCommand?.NotifyCanExecuteChanged();
     }
 }

@@ -68,8 +68,10 @@ public static class MkvToolNixArguments
     /// <summary>mkvmerge arguments that write the target state to a new file (track order may change).</summary>
     /// <param name="chaptersXml">Chapter file written from <see cref="TargetState.NewChapters"/> (null = none).</param>
     /// <param name="externalInputs">The files mkvmerge reads for added tracks (external subtitles converted to SRT in UTF-8), by their original path.</param>
+    /// <param name="encoded">The sounds written anew for tracks with <see cref="MediaTrack.Encode"/>, by track ID (one track each).</param>
     public static IReadOnlyList<string> Remux(
-        TargetState target, string sourcePath, string outputPath, string? chaptersXml = null, IReadOnlyDictionary<string, string>? externalInputs = null)
+        TargetState target, string sourcePath, string outputPath, string? chaptersXml = null, IReadOnlyDictionary<string, string>? externalInputs = null,
+        IReadOnlyDictionary<int, string>? encoded = null)
     {
         var arguments = new List<string> { "--gui-mode", "--output", outputPath };
         if (target.TitleChanged)
@@ -111,7 +113,7 @@ public static class MkvToolNixArguments
         foreach (var added in target.Tracks.Where(t => t.IsAdded))
         {
             inputs[added.TrackId] = inputs.Count + 1;
-            var input = externalInputs?.GetValueOrDefault(added.Source.ExternalFile!) ?? added.Source.ExternalFile!;
+            var input = encoded?.GetValueOrDefault(added.TrackId) ?? externalInputs?.GetValueOrDefault(added.Source.ExternalFile!) ?? added.Source.ExternalFile!;
             var inner = added.Source.ExternalTrack.ToString(CultureInfo.InvariantCulture);
             if (added.Source.IsTextSubtitles)
             {

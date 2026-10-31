@@ -381,7 +381,7 @@ public sealed partial class SubtitlesPageViewModel
             }
         }
 
-        // the task stays open when Hromadné spracovanie cannot take the edits now (it runs, it ran)
+        // the task stays open when Hromadné spracovanie cannot take the edits now (it runs, it ran); the sounds' edits stay
         if (task.Save(edits) is { } refused)
         {
             LiveStatus = refused;

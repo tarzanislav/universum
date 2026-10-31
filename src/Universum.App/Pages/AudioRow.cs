@@ -34,6 +34,7 @@ public sealed class AudioRow : ObservableObject
     private LanguageChoice _language;
     private string _name;
     private bool _nameWritten;
+    private string _defaultName;
     private FrameRate? _fpsFrom;
     private FrameRate? _fpsTo;
     private (long Numerator, long Denominator)? _measured;
@@ -56,6 +57,7 @@ public sealed class AudioRow : ObservableObject
         _language = LanguageChoices.First(c => c.Same(track.Language));
         _name = track.Name ?? "";
         _initialName = _name;
+        _defaultName = _name;
         Codecs = [new(AudioCodec.Keep, $"Ponechať ({track.Codec})"), new(AudioCodec.Ac3, "AC-3"), new(AudioCodec.Eac3, "E-AC-3"), new(AudioCodec.Aac, "AAC"),
             new(AudioCodec.Opus, "Opus"), new(AudioCodec.Flac, "FLAC (bezstratovo)")];
         _codec = Codecs[0];
@@ -115,10 +117,19 @@ public sealed class AudioRow : ObservableObject
         {
             if (value != _name)
             {
-                _nameWritten = true;
+                // the name the result would have anyway again: no name of the user's
+                _nameWritten = value.Trim() != _defaultName;
                 Set(ref _name, value);
             }
         }
+    }
+
+    /// <summary>A name the user wrote before (a saved work, a task): it counts as written, also when it is the default one.</summary>
+    public void WriteName(string name)
+    {
+        _nameWritten = true;
+        SetProperty(ref _name, name, nameof(Name));
+        Changed();
     }
 
     /// <summary>The name the user wrote (trimmed), or null.</summary>
@@ -126,12 +137,13 @@ public sealed class AudioRow : ObservableObject
 
     public string InitialName => _initialName;
 
-    /// <summary>Shows the name the result gets while the user has not written his own.</summary>
+    /// <summary>The name the result would get without the user's (the rules' or the batch's); shown while he has written none.</summary>
     public void ShowName(string? name)
     {
-        if (!_nameWritten && _name != (name ?? ""))
+        _defaultName = name ?? "";
+        if (!_nameWritten && _name != _defaultName)
         {
-            _name = name ?? "";
+            _name = _defaultName;
             OnPropertyChanged(nameof(Name));
         }
     }
@@ -232,6 +244,78 @@ public sealed class AudioRow : ObservableObject
                    (recipe.NeedsEncoding ? " – zvuk sa zapíše znova" : "");
         }
     }
+
+    /// <summary>The values of the row (Uložiť prácu, Uložiť do úlohy).</summary>
+    public AudioTrackState State() => new()
+    {
+        TrackId = IsExternal ? null : Track.Id,
+        ExternalFile = ExternalPath,
+        ExternalTrack = Track.ExternalTrack,
+        Include = Include,
+        Language = Language.Tag.Ietf ?? Language.Tag.Legacy,
+        Name = WrittenName,
+        FpsFrom = FpsFrom?.Label,
+        FpsTo = FpsTo?.Label,
+        MeasuredNumerator = _measured?.Numerator,
+        MeasuredDenominator = _measured?.Denominator,
+        Delay = DelayText,
+        KeepPitch = KeepPitch,
+        Codec = Codec.Codec,
+        Bitrate = Bitrate.Kbps,
+        Stereo = Stereo,
+        Normalize = Normalize,
+        Gain = GainText,
+    };
+
+    /// <summary>The values saved before.</summary>
+    public void Restore(AudioTrackState state)
+    {
+        Include = state.Include;
+        if (state.Language is { Length: > 0 } code && LanguageChoices.FirstOrDefault(c => c.Same(LanguageTag.FromCode(code))) is { } language)
+        {
+            Language = language;
+        }
+
+        if (state.Name is { } name)
+        {
+            WriteName(name);
+        }
+
+        FpsFrom = FrameRate.All.FirstOrDefault(r => r.Label == state.FpsFrom);
+        FpsTo = FrameRate.All.FirstOrDefault(r => r.Label == state.FpsTo);
+        _measured = state.MeasuredNumerator is { } numerator && state.MeasuredDenominator is { } denominator && denominator > 0 ? (numerator, denominator) : null;
+        DelayText = state.Delay;
+        KeepPitch = state.KeepPitch;
+        Codec = Codecs.FirstOrDefault(c => c.Codec == state.Codec) ?? Codecs[0];
+        Bitrate = Bitrates.FirstOrDefault(b => b.Kbps == state.Bitrate) ?? Bitrates[0];
+        Stereo = state.Stereo;
+        Normalize = state.Normalize;
+        GainText = state.Gain;
+        Changed();
+    }
+
+    /// <summary>What becomes of the sound as a task of Hromadné spracovanie has it (without the values as typed).</summary>
+    public void SetRecipe(AudioRecipe recipe)
+    {
+        SetTiming(recipe.Timing, null);
+        if (FrameRate.All.SelectMany(from => FrameRate.All.Where(to => to != from).Select(to => (from, to)))
+                .FirstOrDefault(p => SubtitleTiming.Fps(p.from, p.to) is var fps && fps.Numerator == recipe.Timing.Numerator && fps.Denominator == recipe.Timing.Denominator) is { from: not null } rates)
+        {
+            SetTiming(recipe.Timing, rates);
+        }
+
+        KeepPitch = recipe.KeepPitch;
+        Codec = Codecs.FirstOrDefault(c => c.Codec == recipe.Codec) ?? Codecs[0];
+        Bitrate = Bitrates.FirstOrDefault(b => b.Kbps == recipe.Bitrate) ?? Bitrates[0];
+        Stereo = recipe.Stereo;
+        Normalize = recipe.Normalize;
+        GainText = recipe.Gain.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The row is the sound saved as <paramref name="state"/>.</summary>
+    public bool Is(AudioTrackState state) => state.ExternalFile is { } file
+        ? ExternalPath is { } path && Core.IO.Paths.Same(path, file) && Track.ExternalTrack == state.ExternalTrack
+        : !IsExternal && state.TrackId == Track.Id;
 
     /// <summary>The times found by Napasovať: a change of frame rate, or the speed measured, and the shift.</summary>
     public void SetTiming(SubtitleTiming timing, (FrameRate From, FrameRate To)? rates)

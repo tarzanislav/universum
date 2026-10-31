@@ -785,6 +785,54 @@ public sealed class ProcessorTests
             "four sounds, the dub with its name, no tags – " + string.Join(" | ", after.TracksOf(TrackType.Audio).Select(t => $"{t.CodecId} {t.Name} {t.TagEntries}")));
     }
 
+    [Test]
+    public async Task SoundWrittenAnewByTheProcessor()
+    {
+        // a sound of the video written anew (PAL → film, stereo AAC) in place of its track: FFmpeg right before mkvmerge
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(System.IO.Path.PathSeparator)
+            .Select(d => System.IO.Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
+        if (ffmpeg is null)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+        }
+
+        using var work = new WorkFolder();
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var processor = new FileProcessor(installation, new ProcessRunner(), new FolderRecycleBin(System.IO.Path.Combine(work.Path, "bin")), System.IO.Path.Combine(work.Path, "journal"),
+            new LibraryIndex(System.IO.Path.Combine(work.Path, "library-index.json"))) { FindFfmpeg = _ => Task.FromResult(ffmpeg!) };
+        var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+        var original = work.Copy("en-und-cz-forced.mkv");
+        var file = await inspector.InspectAsync(original);
+        var english = file.TracksOf(TrackType.Audio).First();
+        var recipe = new Universum.Core.Audio.AudioRecipe(Universum.Core.Subtitles.SubtitleTiming.Fps(Universum.Core.Subtitles.FrameRate.All[2], Universum.Core.Subtitles.FrameRate.All[0])
+            with { DelayMilliseconds = 100 }, Codec: Universum.Core.Audio.AudioCodec.Aac, Stereo: true);
+        var anew = new Universum.Core.Audio.SoundEncoding(original, 0, english, recipe).ToTrack(1000);
+        var withSound = file with { Tracks = [.. file.Tracks, anew] };
+        var languages = withSound.Tracks.Where(t => t.Type != TrackType.Video).ToDictionary(t => t.Id, t => t.Language.IsUndetermined ? LanguageTag.FromCode("cs") : t.Language);
+        var target = UniversumRules.Apply(withSound, RuleProfile.Default, new TrackDecisions
+        {
+            Languages = languages,
+            Kept = withSound.TracksOf(TrackType.Subtitles).Select(t => t.Id).ToHashSet(),
+            Removed = new HashSet<int> { english.Id },
+            Timings = new Dictionary<int, Universum.Core.Subtitles.SubtitleTiming> { [1000] = recipe.Shift },
+        });
+        var plan = EditPlan.For(target);
+        var shares = new List<double>();
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep, new Progress<double>(shares.Add));
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var after = await inspector.InspectAsync(result.OutputPath!);
+        var audio = after.TracksOf(TrackType.Audio).ToList();
+        Assert.True(audio.Count == 2 && audio.Any(t => t is { CodecId: "A_AAC", AudioChannels: 2 }) && !after.HasTags,
+            "the English sound replaced by stereo AAC – " + string.Join(" | ", audio.Select(t => $"{t.CodecId} {t.AudioChannels} {t.Language.Primary}")));
+        Assert.True(File.Exists(original), "the original stays");
+
+        // the same again: the same result is known without reading the video whole
+        Assert.Equal(ProcessingStatus.AlreadyInLibrary, (await processor.ProcessAsync(plan, work.Movie(plan), Keep)).Status, "already in the library");
+        var none = new FileProcessor(installation, new ProcessRunner(), new FolderRecycleBin(System.IO.Path.Combine(work.Path, "bin")), System.IO.Path.Combine(work.Path, "journal2"));
+        var refused = await none.ProcessAsync(plan, new LibraryLayout(System.IO.Path.Combine(work.Path, "INY")).Place(target, new Universum.Core.Library.TitleInfo(Universum.Core.Library.MediaKind.Movie, "Iný", 2026), null, RuleProfile.Default), Keep);
+        Assert.True(refused.Status == ProcessingStatus.Failed && refused.Messages.Any(m => m.Contains("FFmpeg", StringComparison.Ordinal)), "without FFmpeg: said, nothing written");
+    }
+
     private static async Task<(FileProcessor Processor, MkvMergeInspector Inspector)> CreateAsync(WorkFolder work, IRecycleBin? bin = null, IProcessRunner? runner = null)
     {
         var installation = await TestData.RequireMkvToolNixAsync();

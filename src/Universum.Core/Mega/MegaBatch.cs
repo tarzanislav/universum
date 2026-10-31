@@ -172,15 +172,19 @@ public sealed class MegaFile
     }
 }
 
-/// <summary>An external subtitle file of a MEGA file: its track (ID, codec, language, name, flags, count) and the file's size and time.</summary>
+/// <summary>
+/// A track of a MEGA file that comes from another file – an external subtitle file, a sound added or written anew (owner,
+/// 30. 10. 2026): its track and the file's size and time. <paramref name="Track"/> is the whole track (older batches: none).
+/// </summary>
 public sealed record MegaExternal(
-    int Id, string Path, long Size, DateTime ModifiedUtc, string CodecId, string Codec, bool IsText, LanguageTag Language, string? Name, bool HearingImpaired, long? Frames)
+    int Id, string Path, long Size, DateTime ModifiedUtc, string CodecId, string Codec, bool IsText, LanguageTag Language, string? Name, bool HearingImpaired, long? Frames,
+    MediaTrack? Track = null)
 {
     public static MegaExternal Of(MediaTrack track)
     {
         var info = new FileInfo(track.ExternalFile!);
         return new MegaExternal(track.Id, track.ExternalFile!, info.Exists ? info.Length : -1, info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue,
-            track.CodecId ?? "", track.Codec, track.IsTextSubtitles, track.Language, track.Name, track.Flags.HearingImpaired, track.StatisticsFrames);
+            track.CodecId ?? "", track.Codec, track.IsTextSubtitles, track.Language, track.Name, track.Flags.HearingImpaired, track.StatisticsFrames, track);
     }
 
     /// <summary>The file is as it was when the batch was made.</summary>
@@ -193,7 +197,7 @@ public sealed record MegaExternal(
         }
     }
 
-    public MediaTrack ToTrack() => new()
+    public MediaTrack ToTrack() => Track is { } track ? track with { Id = Id } : new()
     {
         Id = Id, Type = TrackType.Subtitles, CodecId = CodecId, Codec = Codec, IsTextSubtitles = IsText, Language = Language, Name = Name,
         Flags = new TrackFlags(Default: false, Forced: false, HearingImpaired: HearingImpaired), StatisticsFrames = Frames, ExternalFile = Path,

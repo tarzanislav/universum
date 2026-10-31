@@ -573,6 +573,61 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task SoundEditsGoIntoTheBatchAndMega()
+    {
+        // owner, 30. 10. 2026: Úprava audiostopy → Uložiť do úlohy – a sound of the video written anew, a dub added and moved
+        if (Ffmpeg() is not { } ffmpeg)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+            return;
+        }
+
+        using var work = new Work();
+        var film = Path.Combine(work.Path, "Vymysleny Zvukovy Film (2026).mkv");
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), film);
+        var dub = Path.Combine(work.Path, "dabing k filmu.mka");
+        var made = await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg, ["-nostdin", "-v", "error", "-i", film, "-map", "0:a:0", "-c:a", "flac", dub]));
+        Assert.True(made.ExitCode == 0, made.StandardError);
+        var analysis = await AnalyzeAsync(work.Path);
+        var group = analysis.Groups.Single(g => g.Files.Any(f => f.Path == film));
+        var dubTrack = (await (await InspectorAsync()).InspectAsync(dub)).TracksOf(TrackType.Audio).Single();
+        group.Decisions.Studio[film] = new StudioEdits
+        {
+            SoundRecipes = { [1] = new Universum.Core.Audio.AudioRecipe(SubtitleTiming.Delay(100), Codec: Universum.Core.Audio.AudioCodec.Aac, Stereo: true) },
+            SoundNames = { [1] = "Originál" },
+            SoundLanguages = { [2] = LanguageTag.FromCode("en") },
+            AddedSounds = [new StudioSound(dub, 0, dubTrack with { Id = 1000, ExternalFile = dub, ExternalTrack = dubTrack.Id }, LanguageTag.FromCode("cs"), "Dabing",
+                new Universum.Core.Audio.AudioRecipe(SubtitleTiming.Delay(-200)))],
+        };
+        group.Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = Library(work.Path, analysis);
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single(i => i.File.Path == film);
+        var anew = item.File.Tracks.SingleOrDefault(t => t.Encode is not null);
+        var added = item.File.Tracks.SingleOrDefault(t => t.ExternalFile == dub);
+        Assert.True(anew is { CodecId: "A_AAC", AudioChannels: 2 } && added is not null && item.Target.Removed.Any(t => t.Id == 1) &&
+                    item.Target.For(anew.Id) is { Name: "Originál", Timing.DelayMilliseconds: 100 } && item.Target.For(added.Id) is { Name: "Dabing", Timing.DelayMilliseconds: -200 } &&
+                    item.Target.For(added.Id).Language.Primary == "cs" && item.Target.For(2).Language.Primary == "en",
+            "the plan: the English sound written anew in its place, the dub added – " + string.Join(" | ", item.Target.Tracks.Select(t => $"{t.TrackId}:{t.Name}:{t.Timing?.MkvMergeValue}")));
+        var audioOrder = item.Target.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.TrackId).ToList();
+        Assert.True(audioOrder.IndexOf(anew!.Id) < audioOrder.IndexOf(2) && item.Target.For(added!.Id).Flags.Default,
+            "the Czech dub first (the rules), then the sound written anew in its original's place before the other English one – " + string.Join(",", audioOrder));
+
+        // MEGA keeps the tracks whole, the sound written anew too
+        var store = Path.Combine(work.Path, "mega", "mega.json");
+        new Universum.Core.Mega.MegaStore(store).Add("Zvuk", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [item]);
+        var stored = new Universum.Core.Mega.MegaStore(store).Batches.Single().Files.Single();
+        Assert.True(stored.Externals.Any(e => e.ToTrack().Encode is { Recipe.Stereo: true }) && stored.Externals.Any(e => e.ToTrack() is { Type: TrackType.Audio, ExternalTrack: 0 } t && t.ExternalFile == dub) &&
+                    stored.Studio is { AddedSounds.Count: 1, SoundRecipes.Count: 1 }, "the MEGA batch keeps the sounds");
+
+        var result = (await RunAsync(work.Path, [item])).Single();
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var written = await (await InspectorAsync()).InspectAsync(result.OutputPath!);
+        Assert.True(written.TracksOf(TrackType.Audio).Count() == 3 && written.TracksOf(TrackType.Audio).Any(t => t is { CodecId: "A_AAC", AudioChannels: 2, Name: "Originál" }) &&
+                    written.TracksOf(TrackType.Audio).Any(t => t is { CodecId: "A_FLAC", Name: "Dabing" } && t.Language.Primary == "cs"),
+            "written: the sound anew, the other one, the dub – " + string.Join(" | ", written.TracksOf(TrackType.Audio).Select(t => $"{t.CodecId} {t.AudioChannels} {t.Name} {t.Language.Primary}")));
+    }
+
+    [Test]
     public async Task MegaBatchKeepsItsFilesAndDecisions()
     {
         // owner, 29. 10. 2026: a MEGA batch is the exact list of prepared files with every decision; its files are
@@ -1116,9 +1171,15 @@ public sealed class BatchTests
 
     private static async Task<IReadOnlyList<ProcessingResult>> RunAsync(string root, IReadOnlyList<BatchItem> items, IProgress<BatchProgress>? progress, BatchControl? control)
     {
-        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"));
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), new NoRecycleBin(), Path.Combine(root, "_journal"))
+        {
+            FindFfmpeg = _ => Task.FromResult(Ffmpeg() ?? "ffmpeg"),
+        };
         return await BatchRunner.RunAsync(items, processor, new OutputOptions(OriginalHandling.Keep), progress, control);
     }
+
+    private static string? Ffmpeg() => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+        .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
 
     private static async Task PropEditAsync(string file, params string[] arguments) =>
         await new ProcessRunner().RunAsync(new ProcessRequest((await TestData.RequireMkvToolNixAsync()).ToolPath(MkvToolNixTool.MkvPropEdit), [file, .. arguments]));

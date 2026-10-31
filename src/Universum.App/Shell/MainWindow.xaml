@@ -1608,6 +1608,15 @@
                 </Grid>
                 <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
+                        <!-- Zvuk v štúdiu: a file of Hromadné spracovanie – the changes go back into the task -->
+                        <DockPanel Visibility="{Binding IsTask, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Content="Späť bez uloženia" Command="{Binding LeaveTaskCommand}" Padding="12,6" Margin="0,0,8,0" />
+                                <Button Content="Uložiť do úlohy" Command="{Binding SaveToTaskCommand}" Padding="16,6" FontWeight="SemiBold" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding TaskText}" TextWrapping="Wrap" Margin="0,0,16,0" />
+                        </DockPanel>
+                        <StackPanel Visibility="{Binding IsTask, Converter={StaticResource InverseBoolToVisibility}}">
                         <WrapPanel DataContext="{Binding Library}">
                             <RadioButton Content="film" IsChecked="{Binding IsMovie}" GroupName="audioKind" VerticalAlignment="Center" Margin="0,0,12,0" MinWidth="0" />
                             <RadioButton Content="seriál" IsChecked="{Binding IsSeries}" GroupName="audioKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
@@ -1634,8 +1643,17 @@
                         <DockPanel>
                             <Button DockPanel.Dock="Right" Content="Uložiť" Command="{Binding SaveCommand}" Padding="16,6" VerticalAlignment="Top" />
                             <Button DockPanel.Dock="Right" Content="Zastaviť" Command="{Binding StopCommand}" Padding="12,6" Margin="0,0,8,0" VerticalAlignment="Top" />
-                            <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Margin="0,0,16,0" />
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <Button Content="Uložiť prácu" Command="{Binding SaveWorkCommand}" Padding="10,2" Margin="0,0,6,0"
+                                            ToolTip="Hodnoty všetkých zvukov tohto videa (aj pridané súbory) sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)" />
+                                    <Button Content="Zahodiť prácu" Command="{Binding DiscardWorkCommand}" Padding="10,2" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding WorkNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </StackPanel>
                         </DockPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -1998,7 +2016,9 @@
                         <DockPanel Margin="0,0,0,6">
                             <Button DockPanel.Dock="Right" Content="Informácie" Command="{Binding ShowInfoCommand}" Padding="10,3"
                                     ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
-                            <Button DockPanel.Dock="Right" Content="Upraviť v štúdiu" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                            <Button DockPanel.Dock="Right" Content="Zvuk v štúdiu" Command="{Binding EditSoundInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                                    ToolTip="Úprava audiostopy: dabing, posun, PAL 25 ↔ 23,976, kodek, hlasitosť – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
+                            <Button DockPanel.Dock="Right" Content="Titulky v štúdiu" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
                                     ToolTip="Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
                             <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
@@ -2009,6 +2029,7 @@
                                     <MenuItem Header="Rozpoznať jazyk audiostôp vybraných súborov" Command="{Binding DetectAudioSelectedCommand}" />
                                     <MenuItem Header="Informácie o súbore" Command="{Binding ShowInfoCommand}" />
                                     <MenuItem Header="Upraviť v štúdiu (titulky)" Command="{Binding EditInStudioCommand}" />
+                                    <MenuItem Header="Upraviť v štúdiu (zvuk)" Command="{Binding EditSoundInStudioCommand}" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>

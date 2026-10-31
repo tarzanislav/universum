@@ -29,7 +29,7 @@ public static class UniversumRules
             issues.Add(new RuleIssue(RuleIssueKind.MultipleVideoTracks));
         }
 
-        var audio = Order(file.TracksOf(TrackType.Audio).Where(kept), t => AudioRole(t, profile), language, profile.Priority, decisions);
+        var audio = Order(file, file.TracksOf(TrackType.Audio).Where(kept), t => AudioRole(t, profile), language, profile.Priority, decisions);
 
         // owner, 29. 10. 2026: subtitles in the profile's languages (CZ, SK, EN, PL, HU, RU) in that order, then those in
         // the language of an audio track; the others are left out unless the user keeps them (an undetermined one waits)
@@ -41,7 +41,7 @@ public static class UniversumRules
             .Where(t => !empty.Contains(t.Id) && language(t) is { IsUndetermined: false } tag && !profile.KeepsSubtitles(tag.Primary, audioLanguages) &&
                         !decisions.Kept.Contains(t.Id))
             .Select(t => t.Id).ToHashSet();
-        var subtitles = Order(file.TracksOf(TrackType.Subtitles).Where(t => kept(t) && !outOfList.Contains(t.Id) && !empty.Contains(t.Id)),
+        var subtitles = Order(file, file.TracksOf(TrackType.Subtitles).Where(t => kept(t) && !outOfList.Contains(t.Id) && !empty.Contains(t.Id)),
             t => SubtitleRole(file, t, profile, decisions), language, l => RuleProfile.PositionIn(subtitleOrder, l), decisions);
         if (audio.Count == 0)
         {
@@ -155,11 +155,11 @@ public static class UniversumRules
     /// user gave wins (the tracks it does not name follow in the rules' order).
     /// </summary>
     private static List<Classified> Order(
-        IEnumerable<MediaTrack> tracks, Func<MediaTrack, TrackRole> role, Func<MediaTrack, LanguageTag> language,
+        MediaFile file, IEnumerable<MediaTrack> tracks, Func<MediaTrack, TrackRole> role, Func<MediaTrack, LanguageTag> language,
         Func<string, int> priority, TrackDecisions decisions)
     {
         var ordered = tracks
-            .Select((t, index) => new Classified(t, language(t), role(t), index))
+            .Select(t => new Classified(t, language(t), role(t), Position(file, t)))
             .OrderBy(c => c.Role == TrackRole.Commentary ? 1 : 0)
             .ThenBy(c => priority(c.Language.Primary))
             .ThenBy(c => c.Role switch { TrackRole.Forced => 0, TrackRole.Main => 1, _ => 2 })
@@ -216,4 +216,19 @@ public static class UniversumRules
     }
 
     private sealed record Classified(MediaTrack Track, LanguageTag Language, TrackRole Role, int Index);
+
+    // a track's place in the file; a sound of the video written anew (Úprava audiostopy) takes its original's place
+    private static int Position(MediaFile file, MediaTrack track)
+    {
+        var id = track.Encode is { } encode && IO.Paths.Same(encode.Path, file.Path) ? encode.Source.Id : track.Id;
+        for (var i = 0; i < file.Tracks.Count; i++)
+        {
+            if (file.Tracks[i].Id == id)
+            {
+                return i;
+            }
+        }
+
+        return int.MaxValue;
+    }
 }

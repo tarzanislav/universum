@@ -188,6 +188,21 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
 }
 
 /// <summary>
+/// A sound to be written anew: the audio track <paramref name="Ordinal"/> (FFmpeg's "0:a:N") of <paramref name="Path"/>,
+/// as it is (<paramref name="Source"/>: its codec and channels), by <paramref name="Recipe"/> (its shift is mkvmerge's).
+/// </summary>
+public sealed record SoundEncoding(string Path, int Ordinal, MediaTrack Source, AudioRecipe Recipe)
+{
+    /// <summary>The track that comes of it (UNIVERSUM's <paramref name="id"/>): the codec written, the language and name kept.</summary>
+    public MediaTrack ToTrack(int id) => Source with
+    {
+        Id = id, ExternalFile = Path, ExternalTrack = 0, Encode = this, Codec = Recipe.Encoder(Source).Name ?? Source.Codec, CodecId = Recipe.WrittenCodecId(Source),
+        AudioChannels = Recipe.Stereo ? 2 : Source.AudioChannels, AudioSamplingFrequency = AudioRecipe.SampleRate, Flags = Source.Flags with { Default = false },
+        Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null, StatisticsBitsPerSecond = null, TagEntries = 0,
+    };
+}
+
+/// <summary>
 /// Writes a sound anew by its <see cref="AudioRecipe"/> (FFmpeg as a separate tool): the speed (atempo keeps the pitch,
 /// asetrate changes it), stereo, the loudness (normalizing measures the whole sound first), the codec – into a new
 /// Matroska audio file. The shift is not in it (mkvmerge writes it), nor anything but the sound.

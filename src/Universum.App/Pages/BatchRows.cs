@@ -38,6 +38,14 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
 
     public string State { get => _state; set => SetProperty(ref _state, value); }
 
+    /// <summary>
+    /// Holds files the analysis before did not have (owner, 31. 10. 2026: new folders and files put into the input folder –
+    /// at the end of the list, on a pastel background); until the group is processed or analysed again with nothing new.
+    /// </summary>
+    public bool IsNew { get => _isNew; set => SetProperty(ref _isNew, value); }
+
+    private bool _isNew;
+
     /// <summary>A file was added while the folder is read.</summary>
     public void Refresh() => OnPropertyChanged(nameof(Count));
 }

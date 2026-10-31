@@ -2650,6 +2650,26 @@ internal static class SelfTest
             $"batch: originals to the Recycle Bin ({removedOriginals.Count}; kept {keptOriginals.Count}: {string.Join("; ", keptOriginals)}), the library intact – {batch.RunState}");
         batch.KeepOriginal = true;
         Check(services.Settings.BatchOriginals == Core.Execution.OriginalsMode.Keep && !batch.CanDeleteOriginals, "batch: back to keeping the originals");
+
+        // owner, 31. 10. 2026: files put into the input folder since the analysis before – their group at the end, on a pastel background
+        var growing = Path.Combine(_outputDirectory, "pribudajuce");
+        Directory.CreateDirectory(growing);
+        var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media");
+        File.Copy(Path.Combine(media, "cz-only.mkv"), Path.Combine(growing, "Prvý.Vymyslený.Film.2026.mkv"), overwrite: true);
+        File.Copy(Path.Combine(media, "en-cz.mp4"), Path.Combine(growing, "Druhý.Vymyslený.Film.2026.mp4"), overwrite: true);
+        batch.Folder = growing;
+        await batch.AnalyzeAsync();
+        var firstOrder = batch.Groups.Select(g => g.Signature).ToList();
+        Check(firstOrder.Count == 2 && batch.Groups.All(g => !g.IsNew), "batch: the first analysis of a folder – nothing marked new");
+        var added = Path.Combine(growing, "Tretí.Vymyslený.Film.2027.mkv");
+        File.Copy(Path.Combine(media, "sk-cz-mixed.mkv"), added, overwrite: true);
+        await batch.AnalyzeAsync();
+        Check(batch.Groups.Count == 3 && batch.Groups.Take(2).Select(g => g.Signature).SequenceEqual(firstOrder) && !batch.Groups[0].IsNew && !batch.Groups[1].IsNew &&
+              batch.Groups[2].IsNew && batch.Groups[2].Group.Files.Any(f => f.Path == added),
+            "batch: the new file's group at the end, marked new – " + string.Join(" | ", batch.Groups.Select(g => $"{g.Title} {(g.IsNew ? "NEW" : "")}")));
+        await Screenshot(window, "batch-new-groups.png");
+        await batch.AnalyzeAsync();
+        Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");
     }
 
     private static async Task Screenshot(Window window, string fileName)

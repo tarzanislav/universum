@@ -45,6 +45,14 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         return new Placement(System.IO.Path.GetDirectoryName(full)!, prefix, "", new SizeClasses(), extension) { FixedName = prefix + extension };
     }
 
+    /// <summary>
+    /// The placement with Doplnok k názvu (owner, 31. 10. 2026) after the stream's description, before the size class:
+    /// "Creep (2004) - CZ EN FHD H264 Directors Cut BIG.mkv" – another version of the title (Jellyfin shows the part after
+    /// " - " as the version's name). A text that cannot be used (<see cref="LibraryNames.Addition"/>) is left out.
+    /// </summary>
+    public Placement WithAddition(string? text) =>
+        FixedName is null && LibraryNames.Addition(text).Addition is { } addition ? this with { Stem = Stem.Length > 0 ? Stem + " " + addition : addition } : this;
+
     public string FileName(long size, int number = 1) =>
         FixedName is not null
             ? number <= 1 ? FixedName : $"{Prefix} ({number.ToString(CultureInfo.InvariantCulture)}){Extension}"

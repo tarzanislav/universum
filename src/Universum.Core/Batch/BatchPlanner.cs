@@ -293,7 +293,7 @@ public static class BatchPlanner
             }
         }
 
-        var placement = library.Layout.Place(item.Target, title, episode, profile);
+        var placement = library.Layout.Place(item.Target, title, episode, profile).WithAddition(item.Group.Decisions.Additions.GetValueOrDefault(path));
         if (placement.EstimatedPathLength(new FileInfo(path).Length) > LibraryNames.MaxPathLength)
         {
             reasons.Add(new ReviewReason(ReviewReasonKind.PathTooLong));

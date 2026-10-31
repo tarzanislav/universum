@@ -580,7 +580,7 @@ public sealed class MuxSettingsViewModel : ObservableObject
             return null;
         }
 
-        return new LibraryLayout(folder).Place(target, title, Library.Episode, _services.Profile) with { Directory = folder };
+        return new LibraryLayout(folder).Place(target, title, Library.Episode, _services.Profile).WithAddition(Library.Addition) with { Directory = folder };
     }
 
     /// <summary>As MKVToolNix: the first source's name with " (1)" (or the next free number) beside it.</summary>

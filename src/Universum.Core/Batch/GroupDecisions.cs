@@ -59,6 +59,9 @@ public sealed class GroupDecisions
     /// </summary>
     public Dictionary<string, StudioEdits> Studio { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
+    /// <summary>Doplnok k názvu of single files (full path → the text put into the name before the size class; owner, 31. 10. 2026).</summary>
+    public Dictionary<string, string> Additions { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
     /// <summary>Files (full paths) to process even though required template slots are missing.</summary>
     public HashSet<string> ProcessAnyway { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 }

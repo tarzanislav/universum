@@ -113,6 +113,9 @@ public sealed class MegaFile
     /// <summary>The user chose to write it although it waited for a check (Aj tak) – kept when the batch is edited.</summary>
     public bool ProcessAnyway { get; init; }
 
+    /// <summary>Doplnok k názvu of the file (null: none).</summary>
+    public string? Addition { get; init; }
+
     /// <summary>Where the result was planned when the batch was made (shown on the page).</summary>
     public string PlannedPath { get; init; } = "";
 
@@ -166,6 +169,7 @@ public sealed class MegaFile
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
+            Addition = item.Group.Decisions.Additions.GetValueOrDefault(item.File.Path),
             Profile = profile,
             Externals = item.File.Tracks.Where(t => t.ExternalFile is not null).Select(MegaExternal.Of).ToList(),
         };

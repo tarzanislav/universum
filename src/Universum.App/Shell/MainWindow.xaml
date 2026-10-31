@@ -514,6 +514,11 @@
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                     Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -909,6 +914,11 @@
                                   IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                         <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                 Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                            <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                      ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,12,4">
                             <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04 (špeciály S00E01)" />
@@ -1021,6 +1031,11 @@
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                 <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                         Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                    <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                              ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                </StackPanel>
                                 <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                     <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                     <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -1404,6 +1419,11 @@
                                               IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                     <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                             Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                        <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                                  ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                    </StackPanel>
                                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                         <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                         <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -1646,6 +1666,11 @@
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                     Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -1790,6 +1815,11 @@
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                     Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -1943,6 +1973,11 @@
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="Potvrdiť titul" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
                                     Visibility="{Binding Tmdb.NeedsConfirmation, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding Tmdb.Warning}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
+                                <TextBlock Text="Doplnok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
+                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                            </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="Epizóda:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
@@ -2246,6 +2281,15 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
+                                <DataGridTemplateColumn Header="Doplnok k názvu" MinWidth="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" MinWidth="100"
+                                                      VerticalAlignment="Top"
+                                                      ToolTip="Doplnok do názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Výsledok" Binding="{Binding Outcome}" Width="*" MinWidth="90">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">

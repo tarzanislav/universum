@@ -25,6 +25,7 @@ public sealed class LibraryTargetPicker : ObservableObject
     private string _episodeNote = "";
     private TmdbTitle? _tmdbTitle;
     private Placement? _placement;
+    private string _addition = "";
 
     // the title was typed or chosen by the user (not only guessed from a file's name)
     private bool _titleByUser;
@@ -107,6 +108,30 @@ public sealed class LibraryTargetPicker : ObservableObject
 
     public string TitleNote { get => _titleNote; private set => SetProperty(ref _titleNote, value); }
 
+    /// <summary>Doplnok k názvu (owner, 31. 10. 2026): written or chosen, put into the name before the size class.</summary>
+    public string Addition
+    {
+        get => _addition;
+        set
+        {
+            var (addition, problem) = LibraryNames.Addition(value);
+            if (problem is not null)
+            {
+                TitleNote = problem;
+                OnPropertyChanged();
+                return;
+            }
+
+            if (SetProperty(ref _addition, addition ?? ""))
+            {
+                Update();
+            }
+        }
+    }
+
+    /// <summary>The additions offered to choose.</summary>
+    public IReadOnlyList<string> AdditionChoices => LibraryNames.AdditionChoices;
+
     /// <summary>Where the result goes, relative to the library, or what is still missing.</summary>
     public string Description { get => _description; private set => SetProperty(ref _description, value); }
 
@@ -132,6 +157,8 @@ public sealed class LibraryTargetPicker : ObservableObject
         _episodeNote = EpisodeNote(guess.Episode);
         _tmdbTitle = null;
         _titleByUser = false;
+        _addition = "";
+        OnPropertyChanged(nameof(Addition));
         TitleNote = remembered is null ? "" : "Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).";
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
@@ -202,7 +229,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         }
         else
         {
-            _placement = layout.Place(target, title, episode, _services.Profile);
+            _placement = layout.Place(target, title, episode, _services.Profile).WithAddition(_addition);
             var size = File.Exists(target.Source.Path) ? new FileInfo(target.Source.Path).Length : 0;
             Description = Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
                           (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +

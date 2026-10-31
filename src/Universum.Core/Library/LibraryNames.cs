@@ -23,6 +23,40 @@ public static class LibraryNames
         ["CON", "PRN", "AUX", "NUL", .. Enumerable.Range(1, 9).SelectMany(i => new[] { "COM" + i, "LPT" + i })],
         StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Doplnok k názvu offered to choose (owner, 31. 10. 2026); any other short text can be written.</summary>
+    public static IReadOnlyList<string> AdditionChoices { get; } = ["Directors Cut", "Remaster"];
+
+    /// <summary>The longest Doplnok k názvu.</summary>
+    public const int MaxAdditionLength = 30;
+
+    /// <summary>
+    /// Doplnok k názvu as it goes into the name (owner, 31. 10. 2026: "Directors Cut", "2"): letters, digits, spaces and
+    /// hyphens – never a path or a sign Windows does not allow; white space joined. Null when empty; a problem in words
+    /// when the text cannot be used (the size class is UNIVERSUM's own).
+    /// </summary>
+    public static (string? Addition, string? Problem) Addition(string? text)
+    {
+        var addition = string.Join(' ', (text ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (addition.Length == 0)
+        {
+            return (null, null);
+        }
+
+        if (!addition.All(c => char.IsLetterOrDigit(c) || c is ' ' or '-'))
+        {
+            return (null, "Doplnok k názvu môže mať len písmená, číslice, medzery a pomlčky.");
+        }
+
+        if (addition.Length > MaxAdditionLength)
+        {
+            return (null, $"Doplnok k názvu môže mať najviac {MaxAdditionLength} znakov.");
+        }
+
+        return SizeClasses.AllLabels.Any(label => addition.Split(' ').Contains(label, StringComparer.OrdinalIgnoreCase) || label.Equals(addition, StringComparison.OrdinalIgnoreCase))
+            ? (null, "Veľkostnú triedu (BIG, SMALL, BluRay …) dáva UNIVERSUM na koniec názvu samo – do doplnku nepatrí.")
+            : (addition.Normalize(NormalizationForm.FormC), null);
+    }
+
     /// <summary>
     /// Removes characters Windows does not allow in names (<c>&lt; &gt; : " / \ | ? *</c> and control characters)
     /// without replacement, joins white space into single spaces and drops dots and spaces at the end.

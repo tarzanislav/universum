@@ -3757,6 +3757,33 @@
                     <CheckBox Content="Pripnúť (hore v Poznámkach)" IsChecked="{Binding Pinned}" Margin="0,0,0,4" />
                     <CheckBox Content="Ukázať v kalendári v tento deň" IsChecked="{Binding OnDay}" Margin="0,0,0,6" />
                 </StackPanel>
+                <!-- the checklist of a task -->
+                <StackPanel Visibility="{Binding HasChecklist, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                    <TextBlock Text="Kontrolný zoznam" Style="{StaticResource Hint}" />
+                    <ItemsControl ItemsSource="{Binding Checklist}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,2,0,0">
+                                    <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Done}" MinWidth="0" VerticalAlignment="Center" />
+                                    <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" Padding="6,2" Margin="4,0,0,0" ToolTip="Odstrániť riadok">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="10" />
+                                    </Button>
+                                    <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <DockPanel Margin="0,4,0,0">
+                        <Button DockPanel.Dock="Right" Command="{Binding AddCheckCommand}" Padding="8,2" Margin="4,0,0,0" ToolTip="Pridať riadok (Enter)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="11" />
+                        </Button>
+                        <TextBox Text="{Binding NewCheckText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový riadok kontrolného zoznamu – Enter ho pridá">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCheckCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </DockPanel>
+                </StackPanel>
                 <TextBlock Text="Text" Style="{StaticResource Hint}" />
                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="220"
                          VerticalScrollBarVisibility="Auto" Margin="0,2,0,8" />
@@ -4238,6 +4265,199 @@
                             </ItemsControl>
                         </StackPanel>
                     </ScrollViewer>
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
+        <!-- POZNÁMKY – Plánované úlohy (owner, 31. 10. 2026, stage P2) -->
+        <DataTemplate x:Key="TaskCard">
+            <Border Margin="0,0,0,6" Padding="8,6" CornerRadius="6" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="1">
+                <DockPanel>
+                    <Border DockPanel.Dock="Left" Width="4" CornerRadius="2" Background="{Binding PriorityColor}" Margin="0,0,8,0" />
+                    <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsDone}" MinWidth="0" VerticalAlignment="Top" Margin="0,1,6,0" ToolTip="Hotovo" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Command="{Binding LeftCommand}" Padding="5,2" Margin="2,0,0,0" ToolTip="Späť (Na urobenie ← Rozpracované ← Hotové)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE76B;" FontSize="10" />
+                        </Button>
+                        <Button Command="{Binding RightCommand}" Padding="5,2" Margin="2,0,0,0" ToolTip="Ďalej (Na urobenie → Rozpracované → Hotové)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10" />
+                        </Button>
+                        <Button Command="{Binding EditCommand}" Padding="5,2" Margin="2,0,0,0" ToolTip="Upraviť">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE70F;" FontSize="10" />
+                        </Button>
+                        <Button Command="{Binding DeleteCommand}" Padding="5,2" Margin="2,0,0,0" ToolTip="Do koša">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="10" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding PriorityText}" FontWeight="Bold" Foreground="{Binding PriorityColor}" Margin="0,0,4,0" />
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                <Setter Property="Opacity" Value="0.6" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding DueText}" FontSize="11.5" Margin="0,0,10,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                <Setter Property="Foreground" Value="#D94F4F" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding Progress}" FontSize="11.5" Style="{StaticResource Hint}" Margin="0,0,10,0" />
+                            <TextBlock Text="{Binding Tags}" FontSize="11.5" Foreground="#D46A8C" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding Text}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" MaxHeight="48" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:TasksPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Plánované úlohy'}" />
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
+                               Text="Úlohy napíšte jedným riadkom, ako by ste ich povedali – deň, čas, #štítky a ! (vysoká priorita) UNIVERSUM pochopí. Úloha s termínom je aj v Kalendári. Hore sú úlohy, ktoré navrhuje UNIVERSUM." />
+                    <!-- one line -->
+                    <DockPanel Margin="0,0,0,2">
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="14,5" Margin="8,0,0,0" FontWeight="SemiBold" />
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Nová úloha…'}" Command="{Binding NewCommand}" Padding="12,5" Margin="8,0,0,0" />
+                        <TextBox Text="{Binding QuickText, UpdateSourceTrigger=PropertyChanged}" FontSize="14" Padding="8,5"
+                                 ToolTip="Napríklad: zajtra o 20:00 spracovať film #kino !  ·  do piatku zavolať  ·  za 3 dni …  – Enter pridá">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </DockPanel>
+                    <TextBlock Text="{Binding QuickHint}" FontSize="12" Margin="2,0,0,8">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding QuickText}" Value="">
+                                        <Setter Property="Opacity" Value="0.8" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <!-- the suggestions of UNIVERSUM -->
+                    <Border Style="{StaticResource Card}" Padding="12,8" Margin="0,0,0,8" Background="#14D46A8C"
+                            Visibility="{Binding HasSuggestions, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="{loc:T 'Obnoviť'}" Command="{Binding RefreshCommand}" Padding="10,3" />
+                                <TextBlock Text="UNIVERSUM navrhuje" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding Suggestions}" Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,2,0,2">
+                                            <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                       Foreground="#D46A8C" />
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Content="{Binding ActionText}" Command="{Binding ActionCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"
+                                                        Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}" />
+                                                <Button Content="{loc:T 'Prevziať'}" Command="{Binding TakeCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="Urobí z návrhu úlohu" />
+                                                <Button Content="{loc:T 'Skryť'}" Command="{Binding HideCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="Tento návrh sa už neukáže" />
+                                            </StackPanel>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Hint}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <!-- the view and the filters -->
+                    <DockPanel Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <TextBlock Text="Štítok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding TagChoices}" SelectedItem="{Binding Tag}" Width="130" Margin="0,0,12,0" />
+                            <TextBlock Text="Hľadať:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" Width="200" />
+                        </StackPanel>
+                        <WrapPanel VerticalAlignment="Center">
+                            <RadioButton Content="Zoznam" IsChecked="{Binding IsList}" GroupName="TasksView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Tabuľa" IsChecked="{Binding IsBoard}" GroupName="TasksView" MinWidth="0" Margin="0,0,20,0" />
+                            <CheckBox Content="Ukázať hotové" IsChecked="{Binding ShowDone}" MinWidth="0" Margin="0,0,12,0" />
+                            <Button Content="{loc:T 'Hotové do koša'}" Command="{Binding EmptyDoneCommand}" Padding="10,3" Margin="0,0,16,0" />
+                            <TextBlock Text="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                        </WrapPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
+                </StackPanel>
+                <!-- the editor on the right -->
+                <Border DockPanel.Dock="Right" Width="340" Margin="14,0,0,0" Style="{StaticResource Card}" Padding="0"
+                        Visibility="{Binding HasEditor, Converter={StaticResource BoolToVisibility}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ContentControl Content="{Binding Editor}" Margin="16,12,16,16" />
+                    </ScrollViewer>
+                </Border>
+                <Grid>
+                    <TextBlock Text="Zatiaľ tu nie sú žiadne úlohy – napíšte prvú do riadku hore." Style="{StaticResource Hint}" Margin="0,10,0,0"
+                               Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    <!-- the list by due day -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsList, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl ItemsSource="{Binding Groups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,10">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <Border Width="10" Height="10" CornerRadius="5" Background="{Binding Color}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" Foreground="{Binding Color}" />
+                                            <TextBlock Text="{Binding Count}" Style="{StaticResource Hint}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource TaskCard}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <!-- the board -->
+                    <Grid Visibility="{Binding IsBoard, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Na urobenie" FontWeight="SemiBold" FontSize="14" Foreground="#E09A3E" Margin="0,0,0,6" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource TaskCard}" />
+                            </ScrollViewer>
+                        </DockPanel>
+                        <DockPanel Grid.Column="2">
+                            <TextBlock DockPanel.Dock="Top" Text="Rozpracované" FontWeight="SemiBold" FontSize="14" Foreground="#5B8FD9" Margin="0,0,0,6" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding InProgress}" ItemTemplate="{StaticResource TaskCard}" />
+                            </ScrollViewer>
+                        </DockPanel>
+                        <DockPanel Grid.Column="4">
+                            <TextBlock DockPanel.Dock="Top" Text="Hotové" FontWeight="SemiBold" FontSize="14" Foreground="#63C48F" Margin="0,0,0,6" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Done}" ItemTemplate="{StaticResource TaskCard}" />
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Grid>
                 </Grid>
             </DockPanel>
         </DataTemplate>

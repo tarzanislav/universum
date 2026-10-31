@@ -1,9 +1,30 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Agenda;
 
 namespace Universum.App.Pages;
+
+/// <summary>A line of a task's checklist in the editor.</summary>
+public sealed class CheckRow : ObservableObject
+{
+    private string _text;
+    private bool _done;
+
+    public CheckRow(string text, bool done, Action<CheckRow> remove)
+    {
+        _text = text;
+        _done = done;
+        RemoveCommand = new RelayCommand(() => remove(this));
+    }
+
+    public string Text { get => _text; set => SetProperty(ref _text, value); }
+
+    public bool Done { get => _done; set => SetProperty(ref _done, value); }
+
+    public RelayCommand RemoveCommand { get; }
+}
 
 /// <summary>What a new record of the agenda is.</summary>
 public enum AgendaKind
@@ -45,6 +66,7 @@ public sealed class AgendaEditor : ObservableObject
     private bool _onDay;
     private VideoChoice<string?> _color;
     private string _problem = "";
+    private string _newCheck = "";
 
     public AgendaEditor(AgendaStore store, AgendaItem? item, DateOnly day, AgendaKind kind, Action closed)
     {
@@ -74,6 +96,19 @@ public sealed class AgendaEditor : ObservableObject
         _onDay = item is null || item.Links.Any(l => l.Kind == LinkKind.Day);
         _color = Colors.FirstOrDefault(c => c.Value == item?.Color) ?? Colors[0];
         Day = day;
+        foreach (var line in item?.Task?.Checklist ?? [])
+        {
+            Checklist.Add(new CheckRow(line.Text, line.Done, r => Checklist.Remove(r)));
+        }
+
+        AddCheckCommand = new RelayCommand(() =>
+        {
+            if (NewCheckText.Trim().Length > 0)
+            {
+                Checklist.Add(new CheckRow(NewCheckText.Trim(), false, r => Checklist.Remove(r)));
+                NewCheckText = "";
+            }
+        });
         SaveCommand = new RelayCommand(Save);
         CancelCommand = new RelayCommand(closed);
         DeleteCommand = new RelayCommand(Delete, () => _item is not null);
@@ -97,6 +132,15 @@ public sealed class AgendaEditor : ObservableObject
     public string Heading => (_item is null ? "Nový záznam" : "Upraviť záznam") + " – " + Day.ToString("d. M. yyyy", CultureInfo.InvariantCulture);
 
     public bool IsEvent { get => _kind == AgendaKind.Event; set => SetKind(value, AgendaKind.Event); }
+
+    /// <summary>The checklist of a task (also of an event that is a task).</summary>
+    public ObservableCollection<CheckRow> Checklist { get; } = [];
+
+    public string NewCheckText { get => _newCheck; set => SetProperty(ref _newCheck, value); }
+
+    public RelayCommand AddCheckCommand { get; }
+
+    public bool HasChecklist => IsTask || (IsEvent && AlsoTask);
 
     public bool IsTask { get => _kind == AgendaKind.Task; set => SetKind(value, AgendaKind.Task); }
 
@@ -152,7 +196,17 @@ public sealed class AgendaEditor : ObservableObject
     public VideoChoice<int?> Reminder { get => _reminder; set => SetProperty(ref _reminder, value); }
 
     /// <summary>An event that is also a task (it is then in Plánované úlohy too).</summary>
-    public bool AlsoTask { get => _alsoTask; set => SetProperty(ref _alsoTask, value); }
+    public bool AlsoTask
+    {
+        get => _alsoTask;
+        set
+        {
+            if (SetProperty(ref _alsoTask, value))
+            {
+                OnPropertyChanged(nameof(HasChecklist));
+            }
+        }
+    }
 
     public DateTime? DueDate { get => _due; set => SetProperty(ref _due, value); }
 
@@ -188,6 +242,7 @@ public sealed class AgendaEditor : ObservableObject
             OnPropertyChanged(nameof(IsEvent));
             OnPropertyChanged(nameof(IsTask));
             OnPropertyChanged(nameof(IsNote));
+            OnPropertyChanged(nameof(HasChecklist));
         }
     }
 
@@ -282,7 +337,7 @@ public sealed class AgendaEditor : ObservableObject
             Priority = Priority.Value,
             State = state,
             Finished = state == TaskState.Done ? old?.Finished ?? DateTimeOffset.Now : null,
-            Checklist = old?.Checklist ?? [],
+            Checklist = [.. Checklist.Where(c => c.Text.Trim().Length > 0).Select(c => new CheckItem { Text = c.Text.Trim(), Done = c.Done })],
         };
     }
 

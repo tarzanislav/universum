@@ -1034,6 +1034,15 @@ public sealed class AppSettings
     /// <summary>Kalendár: only the chosen titles (Vybrané) of Premiéry and Novinky.</summary>
     public bool CalendarOnlyChosen { get; set; }
 
+    /// <summary>Plánované úlohy: the done tasks shown in the list.</summary>
+    public bool TasksShowDone { get; set; }
+
+    /// <summary>Plánované úlohy: the board instead of the list.</summary>
+    public bool TasksBoard { get; set; }
+
+    /// <summary>Plánované úlohy: the suggestions hidden (their keys; the latest 500).</summary>
+    public List<string> HiddenSuggestions { get; set; } = [];
+
     /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
     public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }
 

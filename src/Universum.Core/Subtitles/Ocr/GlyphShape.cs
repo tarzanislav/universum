@@ -37,6 +37,9 @@ public readonly record struct GlyphShape(
         return body + (0.35f * proportions) + (0.8f * place) + MarkDistance(a, b);
     }
 
+    /// <summary>The height of capitals of its line in pixels (the scale it was drawn at); 0 when not known.</summary>
+    public float CapPixels() => Top - Bottom > 0.01f ? Pixels / (Top - Bottom) : 0;
+
     private static int Count(in GlyphShape s) =>
         BitOperations.PopCount(s.Body0) + BitOperations.PopCount(s.Body1) + BitOperations.PopCount(s.Body2) + BitOperations.PopCount(s.Body3);
 

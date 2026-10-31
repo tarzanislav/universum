@@ -12,6 +12,8 @@ public sealed record RenderedGlyph(string Text, bool Italic, InkBitmap Ink, floa
 /// <summary>
 /// The letters UNIVERSUM recognises – drawn from fonts subtitles use – and the nearest of them to a shape. The search goes
 /// through all of them (a few thousand shapes of 256 bits: microseconds); a film has a few hundred different letters.
+/// A shape is not compared with letters drawn much smaller than itself (a large blot is not a small bold "n" whose few
+/// pixels say little) – a small shape is, with the larger ones; only when there are none, with all.
 /// </summary>
 public sealed class OcrTemplates
 {
@@ -22,8 +24,13 @@ public sealed class OcrTemplates
         ".,:;!?'\"-–()/&%+*=„“”‘’«»…#@$€";
 
     private readonly OcrTemplate[] _templates;
+    private readonly float[] _caps;
 
-    public OcrTemplates(IEnumerable<OcrTemplate> templates) => _templates = templates.ToArray();
+    public OcrTemplates(IEnumerable<OcrTemplate> templates)
+    {
+        _templates = templates.ToArray();
+        _caps = _templates.Select(t => t.Shape.CapPixels()).ToArray();
+    }
 
     public int Count => _templates.Length;
 
@@ -73,12 +80,25 @@ public sealed class OcrTemplates
     /// <summary>The nearest template and the nearest one of another text, each with its distance.</summary>
     public (OcrTemplate Best, float Distance, (OcrTemplate Template, float Distance) Second, bool Found) NearestTwo(in GlyphShape shape)
     {
+        var cap = shape.CapPixels();
+        var near = cap > 0 ? NearestTwo(shape, cap / 1.7f) : default;
+        return near.Found ? near : NearestTwo(shape, 0);
+    }
+
+    // among the templates drawn with a height of capitals of at least `low` pixels
+    private (OcrTemplate Best, float Distance, (OcrTemplate Template, float Distance) Second, bool Found) NearestTwo(in GlyphShape shape, float low)
+    {
         var best = -1;
         var second = -1;
         var bestDistance = float.MaxValue;
         var secondDistance = float.MaxValue;
         for (var i = 0; i < _templates.Length; i++)
         {
+            if (_caps[i] > 0 && _caps[i] < low)
+            {
+                continue;
+            }
+
             var distance = GlyphShape.Distance(shape, _templates[i].Shape);
             if (distance < bestDistance)
             {

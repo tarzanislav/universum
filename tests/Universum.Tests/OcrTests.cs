@@ -257,6 +257,12 @@ public sealed class OcrTests
             var read = run.Document().Cues.Select(c => c.Text).ToList();
             Assert.True(read.SequenceEqual(lines), $"another font read back: {string.Join(" | ", read)}");
 
+            // a shape no font of the templates has (a black square) is asked, not taken for a letter
+            var square = new SubtitleOcr(templates, null, "sk").Read(
+                [new OcrPicture(TimeSpan.Zero, TimeSpan.FromSeconds(1), await DrawSubtitleAsync(ffmpeg, fonts + "dejavu/DejaVuSans.ttf", folder, "■ Ľudia ■", 44))]);
+            var squareRead = string.Join(" | ", square.Document().Cues.Select(c => c.Text));
+            Assert.True(square.Unknown.Count == 1 && squareRead == "� Ľudia �", "the square is asked – " + squareRead);
+
             // italic and small (as DVD subtitles), the same font
             var small = new List<OcrPicture>();
             for (var i = 0; i < lines.Length; i++)

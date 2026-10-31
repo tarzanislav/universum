@@ -74,12 +74,13 @@ public sealed class NoteLinkItem(NamedLink link, MarkedRow row)
     public CommunityToolkit.Mvvm.Input.RelayCommand RemoveCommand => new(() => row.RemoveLink(link.Address));
 }
 
-/// <summary>What the tables of Premiéry and Novinky show: the last week, what is to come, or the history.</summary>
+/// <summary>What the tables of Premiéry and Novinky show: the last week, what is to come, the history, or everything.</summary>
 public enum NewsView
 {
     Recent,
     Upcoming,
     History,
+    All,
 }
 
 /// <summary>Texts shared by the tables of Premiéry, Novinky and the Dashboard.</summary>

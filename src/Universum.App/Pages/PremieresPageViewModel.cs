@@ -136,6 +136,13 @@ public sealed class PremieresPageViewModel : ObservableObject
         set => SetView(value, NewsView.History);
     }
 
+    /// <summary>Everything: the history, the last week and what is to come (owner, 31. 10. 2026; the latest first).</summary>
+    public bool ShowAll
+    {
+        get => _view == NewsView.All;
+        set => SetView(value, NewsView.All);
+    }
+
     private void SetView(bool chosen, NewsView view)
     {
         if (!chosen || _view == view)
@@ -147,6 +154,7 @@ public sealed class PremieresPageViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowRecent));
         OnPropertyChanged(nameof(ShowUpcoming));
         OnPropertyChanged(nameof(ShowHistory));
+        OnPropertyChanged(nameof(ShowAll));
         OnPropertyChanged(nameof(Note));
         Show();
     }
@@ -223,6 +231,7 @@ public sealed class PremieresPageViewModel : ObservableObject
     {
         NewsView.History => "História – premiéry, ktoré už boli (najnovšie hore). ",
         NewsView.Recent => "Premiéry posledného týždňa (najnovšie hore). ",
+        NewsView.All => "Všetko – história aj nadchádzajúce premiéry (najneskoršie hore). ",
         _ => "",
     } + SelectedTab.Tab switch
     {
@@ -239,6 +248,7 @@ public sealed class PremieresPageViewModel : ObservableObject
             : OnlyChosen ? "Žiadne vybrané tituly – výber zaškrtnete v stĺpci Vybrané."
             : Filter.Length > 0 ? "Nič nezodpovedá hľadaniu."
             : ShowHistory ? "História je zatiaľ prázdna – premiéra sem prejde deň po svojom dátume."
+            : ShowAll && !Busy ? "Žiadne premiéry ani história – skúste Obnoviť."
             : Busy ? "Načítavam…" : "Žiadne premiéry – skúste Obnoviť.";
 
     public bool IsEmpty => SelectedTab.Rows.Count == 0;
@@ -451,6 +461,7 @@ public sealed class PremieresPageViewModel : ObservableObject
                                           {
                                               NewsView.Recent => r.SortDate >= today.AddDays(-7) && r.SortDate <= today,
                                               NewsView.History => r.SortDate < today,
+                                              NewsView.All => true,
                                               _ => r.SortDate >= today,
                                           } &&
                                           (!OnlyChosen || r.IsChosen) &&

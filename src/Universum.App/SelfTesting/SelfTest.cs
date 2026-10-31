@@ -1556,13 +1556,22 @@ internal static class SelfTest
         await page.ProcessCommand.ExecuteAsync(null);
         Check(File.Exists(Path.Combine(folder, "folder-povodny.jpg")) && page.Result.Contains("folder-povodny.jpg", StringComparison.Ordinal), "posters: the older one renamed – " + page.Result);
 
-        // Ďalšie TMDB obrázky: off by default; then the background and the logo beside folder.jpg
-        Check(!page.Extras && !File.Exists(Path.Combine(folder, "fanart.jpg")), "posters: the other pictures are off by default");
+        // Ďalšie TMDB obrázky (owner, 31. 10. 2026): off by default, nothing offered; then a block of their own – the background
+        // and the logo chosen with the mouse, written by their own button (Spracovať poster writes only the poster)
+        Check(!page.Extras && !File.Exists(Path.Combine(folder, "fanart.jpg")) && page.Backdrops.Count == 0 && !page.ProcessExtrasCommand.CanExecute(null),
+            "posters: the other pictures are off by default, nothing offered");
         page.Extras = true;
+        Check(page.Backdrops.Count > 0 && page.Logos.Count > 0 && page.SelectedBackdrop is { IsRecommended: true, IsSelected: true } && page.SelectedLogo is not null,
+            $"posters: the backgrounds and logos offered, the best chosen ({page.Backdrops.Count}, {page.Logos.Count})");
         await page.ProcessCommand.ExecuteAsync(null);
-        Check(File.ReadAllBytes(Path.Combine(folder, "fanart.jpg")) is [0xFF, 0xD8, ..] && File.Exists(Path.Combine(folder, "clearlogo.png")) && page.ExtrasText.Contains("pozadie", StringComparison.Ordinal),
-            $"posters: fanart.jpg and clearlogo.png – {page.Result} | {page.ExtrasText}");
-        page.Extras = false;
+        Check(!File.Exists(Path.Combine(folder, "fanart.jpg")), "posters: Spracovať poster writes only the poster – " + page.Result);
+        page.Backdrops[^1].SelectCommand.Execute(null);
+        Check(page.SelectedBackdrop == page.Backdrops[^1] && page.Backdrops.Count(b => b.IsSelected) == 1, "posters: another background chosen with the mouse");
+        await Screenshot(window, "tmdb-poster-extras.png");
+        await page.ProcessExtrasCommand.ExecuteAsync(null);
+        Check(File.ReadAllBytes(Path.Combine(folder, "fanart.jpg")) is [0xFF, 0xD8, ..] && File.Exists(Path.Combine(folder, "clearlogo.png")) && page.ExtrasText.Contains("pozadie", StringComparison.Ordinal) &&
+              page.ExtrasSizeText.Contains("1920 × 1080", StringComparison.Ordinal),
+            $"posters: Spracovať ďalšie TMDB obrázky – fanart.jpg and clearlogo.png in POSTER – {page.ExtrasResult} | {page.ExtrasText} | {page.ExtrasSizeText}");
 
         await page.DraftCommand.ExecuteAsync(null);
         Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("api.cloudflare.com", StringComparison.Ordinal)),
@@ -1573,8 +1582,14 @@ internal static class SelfTest
         Directory.CreateDirectory(movie);
         page.Merge = true;
         await page.ProcessCommand.ExecuteAsync(null);
-        Check(File.Exists(Path.Combine(movie, "folder.jpg")), "posters: merged into the film's folder – " + page.Result);
+        Check(File.Exists(Path.Combine(movie, "folder.jpg")) && !File.Exists(Path.Combine(movie, "fanart.jpg")), "posters: merged into the film's folder – " + page.Result);
         page.Merge = false;
+        page.ExtrasMerge = true;
+        await page.ProcessExtrasCommand.ExecuteAsync(null);
+        Check(File.Exists(Path.Combine(movie, "fanart.jpg")) && File.Exists(Path.Combine(movie, "clearlogo.png")),
+            "posters: Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom – to the film processed – " + page.ExtrasResult);
+        page.ExtrasMerge = false;
+        page.Extras = false;
 
         services.PosterTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
@@ -1618,7 +1633,8 @@ internal static class SelfTest
                     "/3/movie/777001/images" => """
                         { "posters": [ { "file_path": "/en-plagat.png", "iso_639_1": "en", "width": 2000, "height": 3000, "vote_average": 6, "vote_count": 3 },
                                        { "file_path": "/cz-plagat.png", "iso_639_1": "cs", "width": 1000, "height": 1500, "vote_average": 5.3, "vote_count": 1 } ],
-                          "backdrops": [ { "file_path": "/pozadie.png", "iso_639_1": null, "width": 1920, "height": 1080, "vote_average": 5, "vote_count": 1 } ],
+                          "backdrops": [ { "file_path": "/pozadie.png", "iso_639_1": null, "width": 1920, "height": 1080, "vote_average": 5, "vote_count": 1 },
+                                         { "file_path": "/pozadie-en.png", "iso_639_1": "en", "width": 1920, "height": 1080, "vote_average": 6, "vote_count": 2 } ],
                           "logos": [ { "file_path": "/logo-cz.png", "iso_639_1": "cs", "width": 400, "height": 150 } ] }
                         """,
                     "/3/collection/777" => """

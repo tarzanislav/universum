@@ -175,6 +175,25 @@ public sealed class PosterTests
             var done = waiting.Deliver(Path.Combine(main, "Season 01"));
             Assert.True(done!.Contains("clearlogo.png", StringComparison.Ordinal) && File.ReadAllBytes(Path.Combine(main, "fanart.jpg")).Length == 2 &&
                         File.Exists(Path.Combine(main, "fanart-povodny.jpg")) && File.Exists(Path.Combine(main, "clearlogo.png")), "the other pictures with the poster, an older one renamed – " + done);
+
+            // the poster and the other pictures by their own buttons (owner, 31. 10. 2026): they wait together, neither replaces the other
+            var film = new TitleInfo(MediaKind.Movie, "Vymyslený film", 2026);
+            waiting.Add(film, 9, null, new Dictionary<string, byte[]> { ["fanart.jpg"] = [5] });
+            waiting.Add(film, 9, [6, 6]);
+            waiting.Add(film, 9, null, new Dictionary<string, byte[]> { ["clearlogo.png"] = [7] });
+            Assert.True(waiting.All is [{ File: not null, Extras.Count: 2 }], "one entry: the poster and both pictures");
+            var filmFolder = library.TitleDirectory(film);
+            Directory.CreateDirectory(filmFolder);
+            var both = waiting.Deliver(filmFolder);
+            Assert.True(File.ReadAllBytes(Path.Combine(filmFolder, "folder.jpg")).Length == 2 && File.Exists(Path.Combine(filmFolder, "fanart.jpg")) &&
+                        File.Exists(Path.Combine(filmFolder, "clearlogo.png")) && waiting.All.Count == 0, "all delivered – " + both);
+            var other = new TitleInfo(MediaKind.Movie, "Iný vymyslený film", 2024);
+            waiting.Add(other, 10, null, new Dictionary<string, byte[]> { ["fanart.jpg"] = [8] });
+            var otherFolder = library.TitleDirectory(other);
+            Directory.CreateDirectory(otherFolder);
+            var only = waiting.Deliver(otherFolder);
+            Assert.True(only is not null && only.StartsWith("ďalšie obrázky: fanart.jpg", StringComparison.Ordinal) && !File.Exists(Path.Combine(otherFolder, "folder.jpg")) &&
+                        File.Exists(Path.Combine(otherFolder, "fanart.jpg")), "only the pictures, no poster – " + only);
         }
         finally
         {

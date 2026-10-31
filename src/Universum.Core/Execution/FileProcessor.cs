@@ -40,7 +40,7 @@ public sealed class FileProcessor(
     /// <summary>Replaces the encoders of Windows for pictures (tests on other systems: "libx264"); null in UNIVERSUM.</summary>
     public string? VideoEncoder { get; init; }
 
-    /// <summary>Posters waiting for their titles (TMDB poster, Zlúčiť poster s filmom): one goes into the title's folder once a result is written there.</summary>
+    /// <summary>Posters waiting for their titles (TMDB poster, Zlúčiť poster s filmom/seriálom): one goes into the title's folder once a result is written there.</summary>
     public Posters.PendingPosters? WaitingPosters { get; init; }
 
     /// <summary>

@@ -9,7 +9,7 @@ namespace Universum.Core.Posters;
 /// <summary>
 /// Where a poster goes (owner, 31. 10. 2026): "folder.jpg" always in the main folder of the title (never in a season
 /// folder) – in POSTER, named exactly as UNIVERSUM names the folder in MOVIES or TVSHOWS, so finding a poster alone never
-/// mixes with the films processed; with "Zlúčiť poster s filmom" in the folder of the title in MOVIES or TVSHOWS, or –
+/// mixes with the films processed; with "Zlúčiť poster s filmom/seriálom" in the folder of the title in MOVIES or TVSHOWS, or –
 /// when the title is only in the input folder – once UNIVERSUM has processed it. An existing folder.jpg is kept under
 /// another name (owner, 31. 10. 2026: "folder-povodny.jpg") and said; nothing is deleted.
 /// </summary>
@@ -177,14 +177,15 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
 }
 
 /// <summary>A poster waiting for its title to be processed (the title is only in the input folder).</summary>
+/// <param name="File">The poster (folder.jpg) kept meanwhile; null or empty when only the other pictures wait.</param>
 /// <param name="Extras">Other pictures of the main folder waiting with it (fanart.jpg, clearlogo.png, season posters): name → file.</param>
-public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName, string File, DateTimeOffset Since)
+public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName, string? File, DateTimeOffset Since)
 {
     public Dictionary<string, string> Extras { get; init; } = [];
 }
 
 /// <summary>
-/// Posters waiting for their titles (Zlúčiť poster s filmom, the title only in the input folder): kept in UNIVERSUM's
+/// Posters waiting for their titles (Zlúčiť poster s filmom/seriálom, the title only in the input folder): kept in UNIVERSUM's
 /// own folder; when UNIVERSUM writes a result into the title's folder in MOVIES or TVSHOWS, the poster goes into the main
 /// folder of the title as folder.jpg (an existing one renamed to folder-povodny.jpg) and stops waiting.
 /// </summary>
@@ -207,25 +208,41 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
         }
     }
 
-    /// <summary>A poster (and other pictures of the main folder) waits for the title (one per title: a newer one replaces the older).</summary>
-    public void Add(TitleInfo title, int tmdbId, byte[] jpeg, IReadOnlyDictionary<string, byte[]>? extras = null)
+    /// <summary>
+    /// A poster and/or other pictures of the main folder wait for the title (owner, 31. 10. 2026: the poster and the other
+    /// pictures are processed by their own buttons): one entry per title – a newer poster replaces the older one, the
+    /// other pictures are added to those already waiting (a newer one of the same name replaces the older).
+    /// </summary>
+    public void Add(TitleInfo title, int tmdbId, byte[]? jpeg, IReadOnlyDictionary<string, byte[]>? extras = null)
     {
         lock (Gate)
         {
             Directory.CreateDirectory(folder);
             var prefix = $"{(title.Kind == MediaKind.Movie ? "film" : "serial")}-{tmdbId}";
-            var file = Path.Combine(folder, prefix + ".jpg");
-            File.WriteAllBytes(file, jpeg);
-            var kept = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var all = Load();
+            var old = all.FirstOrDefault(w => w.Kind == title.Kind && w.TmdbId == tmdbId);
+            var file = old?.File is { Length: > 0 } kept && System.IO.File.Exists(kept) ? kept : null;
+            if (jpeg is not null)
+            {
+                file = Path.Combine(folder, prefix + ".jpg");
+                System.IO.File.WriteAllBytes(file, jpeg);
+            }
+
+            var pictures = new Dictionary<string, string>(old?.Extras.Where(e => System.IO.File.Exists(e.Value)) ?? [], StringComparer.OrdinalIgnoreCase);
             foreach (var (name, bytes) in extras ?? new Dictionary<string, byte[]>())
             {
                 var extra = Path.Combine(folder, $"{prefix}-{Path.GetFileName(name)}");
-                File.WriteAllBytes(extra, bytes);
-                kept[Path.GetFileName(name)] = extra;
+                System.IO.File.WriteAllBytes(extra, bytes);
+                pictures[Path.GetFileName(name)] = extra;
             }
 
-            var all = Load().Where(w => !(w.Kind == title.Kind && w.TmdbId == tmdbId)).ToList();
-            all.Add(new WaitingPoster(title.Kind, tmdbId, title.FolderName, file, DateTimeOffset.Now) { Extras = kept });
+            if (file is null && pictures.Count == 0)
+            {
+                return;
+            }
+
+            all.RemoveAll(w => w.Kind == title.Kind && w.TmdbId == tmdbId);
+            all.Add(new WaitingPoster(title.Kind, tmdbId, title.FolderName, file, DateTimeOffset.Now) { Extras = pictures });
             Save(all);
         }
     }
@@ -281,10 +298,15 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
 
             // the list first, then the files: a poster is never given twice, and a list that cannot be written changes nothing
             Save(all.Where(w => w != waiting).ToList());
-            var target = Path.Combine(main, PosterPlaces.FileName);
-            var kept = PosterPlaces.KeepOld(main);
-            File.Copy(waiting.File, target, overwrite: false);
-            File.Delete(waiting.File);
+            string? kept = null;
+            var poster = waiting.File is { Length: > 0 } waitingFile && File.Exists(waitingFile);
+            if (poster)
+            {
+                kept = PosterPlaces.KeepOld(main);
+                File.Copy(waiting.File!, Path.Combine(main, PosterPlaces.FileName), overwrite: false);
+                File.Delete(waiting.File!);
+            }
+
             var others = new List<string>();
             foreach (var (extraName, file) in waiting.Extras)
             {
@@ -297,8 +319,10 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
                 }
             }
 
-            return $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})") +
-                   (others.Count > 0 ? "; ďalšie obrázky: " + string.Join(", ", others) : "");
+            var pictures = others.Count > 0 ? "ďalšie obrázky: " + string.Join(", ", others) : "";
+            return !poster ? $"{pictures} pridané do {main}"
+                : $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})") +
+                  (pictures.Length > 0 ? "; " + pictures : "");
         }
     }
 

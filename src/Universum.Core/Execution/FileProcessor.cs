@@ -634,7 +634,12 @@ public sealed class FileProcessor(
 
             var encoding = tracks[i].Source.Encode!;
             var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
-            var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, encoding.Ordinal, encoding.Source, encoding.Recipe, output,
+            // FFmpeg's number of the sound (another container than Matroska may count its streams otherwise)
+            var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+            var ordinal = File.Exists(ffprobe)
+                ? await Media.AudioStreamOrder.OrdinalAsync(runner, ffprobe, encoding.Path, encoding.Source, encoding.Ordinal, cancellationToken).ConfigureAwait(false)
+                : encoding.Ordinal;
+            var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, ordinal, encoding.Source, encoding.Recipe, output,
                 target.Source.Duration, part, cancellationToken).ConfigureAwait(false);
             if (problem is not null)
             {
@@ -801,6 +806,13 @@ public sealed class FileProcessor(
             // the original says it is longer than its data are (a wrong header): everything it has was written
             problems = [];
         }
+        else if (problems.Count == 0 && plan.Target.Source.Duration is null && !written.IsCut && inspected.Duration is { } length &&
+                 await RealEndAsync(source, cancellationToken, videoOnly: written.RemovedFromFile.Any()) is { } dataEnd && length < dataEnd - TimeSpan.FromSeconds(1))
+        {
+            // a container whose length MKVToolNix does not tell (MPEG TS, AVI …): the end of its data (of the picture when a
+            // track is left out) – the new file is never shorter
+            problems = [$"duration {length}, expected {dataEnd}"];
+        }
 
         if (problems.Count > 0)
         {
@@ -812,7 +824,7 @@ public sealed class FileProcessor(
     }
 
     // where the data of the original really end (ffprobe beside FFmpeg); null without FFmpeg or when it cannot tell
-    private async Task<TimeSpan?> RealEndAsync(string path, CancellationToken cancellationToken)
+    private async Task<TimeSpan?> RealEndAsync(string path, CancellationToken cancellationToken, bool videoOnly = false)
     {
         if (FindFfmpeg is null)
         {
@@ -823,7 +835,7 @@ public sealed class FileProcessor(
         {
             var ffmpeg = await FindFfmpeg(cancellationToken).ConfigureAwait(false);
             var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
-            return File.Exists(ffprobe) ? await Media.MediaEnd.LastAsync(runner, ffprobe, path, cancellationToken).ConfigureAwait(false) : null;
+            return File.Exists(ffprobe) ? await Media.MediaEnd.LastAsync(runner, ffprobe, path, cancellationToken, videoOnly).ConfigureAwait(false) : null;
         }
         catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or Speech.SpeechException or InvalidOperationException)
         {

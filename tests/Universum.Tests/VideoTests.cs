@@ -121,6 +121,49 @@ public sealed class VideoTests
     private static bool Near((double Start, double End, string Text) cue, double start, double end, string text) =>
         Math.Abs(cue.Start - start) < 0.06 && Math.Abs(cue.End - end) < 0.06 && cue.Text.Contains(text, StringComparison.Ordinal);
 
+    [Test]
+    public async Task TransportStreamSoundsAndLength()
+    {
+        if (Ffmpeg() is not { } ffmpeg)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+            return;
+        }
+
+        var folder = Directory.CreateTempSubdirectory("universum-ts-").FullName;
+        try
+        {
+            // two sounds whose stream IDs (PIDs) are not in the order of the streams
+            var ts = Path.Combine(folder, "vymysleny.ts");
+            var made = await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg,
+            [
+                "-nostdin", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=160x120:d=3", "-f", "lavfi", "-i", "sine=f=440:d=3", "-f", "lavfi", "-i", "sine=f=880:d=3",
+                "-map", "0", "-map", "1", "-map", "2", "-c:v", "libx264", "-c:a", "mp2", "-streamid", "0:0x100", "-streamid", "1:0x120", "-streamid", "2:0x110", "-f", "mpegts", ts,
+            ]));
+            Assert.True(made.ExitCode == 0, made.StandardError);
+            var ffprobe = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+                .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe")).First(File.Exists);
+            var installation = await TestData.RequireMkvToolNixAsync();
+            var file = await new MkvMergeInspector(installation, new ProcessRunner()).InspectAsync(ts);
+            var sounds = file.TracksOf(TrackType.Audio).ToList();
+            var ordinals = new List<int>();
+            for (var i = 0; i < sounds.Count; i++)
+            {
+                ordinals.Add(await Universum.Core.Media.AudioStreamOrder.OrdinalAsync(new ProcessRunner(), ffprobe, ts, sounds[i], i));
+            }
+
+            var ids = await Universum.Core.Media.AudioStreamOrder.StreamIdsAsync(new ProcessRunner(), ffprobe, ts);
+            Assert.True(sounds.Count == 2 && ordinals.Select(o => ids[o]).SequenceEqual(sounds.Select(s => (long?)s.Number)),
+                $"each sound found by its PID – {string.Join(",", sounds.Select(s => s.Number))} → {string.Join(",", ordinals)}");
+            var end = await Universum.Core.Media.MediaEnd.LastAsync(new ProcessRunner(), ffprobe, ts);
+            Assert.True(end is { } e && Math.Abs(e.TotalSeconds - 3) < 0.2, $"the length counted from the first timestamp – {end}");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private static string? Ffmpeg() => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
         .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
 

@@ -229,6 +229,29 @@ public sealed class AppServices
     /// The tools of the recognition of the spoken language, installed with the program in "speech" (UNIVERSUM_SPEECH_DIR
     /// for tests), checked against their manifest once per run; <see cref="SpeechException"/> when missing or changed.
     /// </summary>
+    /// <summary>
+    /// FFmpeg's number of an audio track (<paramref name="ordinal"/>: its number as MKVToolNix lists the audio tracks): the
+    /// same in Matroska; in another container (MPEG TS) found by the stream's ID – MKVToolNix's order when FFmpeg is not there.
+    /// </summary>
+    public async Task<int> AudioOrdinalAsync(string path, MediaTrack track, int ordinal, CancellationToken cancellationToken = default)
+    {
+        if (AudioStreamOrder.IsMatroska(path))
+        {
+            return ordinal;
+        }
+
+        try
+        {
+            var ffmpeg = (await SpeechAsync(cancellationToken)).Ffmpeg;
+            var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+            return File.Exists(ffprobe) ? await AudioStreamOrder.OrdinalAsync(Runner, ffprobe, path, track, ordinal, cancellationToken) : ordinal;
+        }
+        catch (Exception ex) when (ex is SpeechException or IOException or ProcessStartException or TimeoutException)
+        {
+            return ordinal;
+        }
+    }
+
     public async Task<SpeechTools> SpeechAsync(CancellationToken cancellationToken = default)
     {
         if (_speech is { } verified)
@@ -756,6 +779,9 @@ public sealed class AppSettings
 
     /// <summary>The job queue starts as soon as a job is added.</summary>
     public bool AutoStartQueue { get; set; } = true;
+
+    /// <summary>Hromadné spracovanie: the panels below the tables hidden (more room in a small window).</summary>
+    public bool BatchPanelsHidden { get; set; }
 
     /// <summary>A sound when the queue (Hromadné spracovanie too) has done all its jobs (owner, 29. 10. 2026).</summary>
     public bool FinishSound { get; set; } = true;

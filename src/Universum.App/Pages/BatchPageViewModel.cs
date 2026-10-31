@@ -406,11 +406,38 @@ public sealed class BatchPageViewModel : ObservableObject
             if (SetProperty(ref _finish, value))
             {
                 OnPropertyChanged(nameof(HasFinish));
+                if (value is not null)
+                {
+                    // the end of a run is always seen
+                    ShowPanels = true;
+                }
             }
         }
     }
 
     public bool HasFinish => _finish is not null;
+
+    /// <summary>
+    /// The template, the originals and the title shown below the tables; hidden, the tables of a small window get the room
+    /// (a note of 29. 10. 2026: in a window of 1024 × 700 the tables had too little of it). Remembered.
+    /// </summary>
+    public bool ShowPanels
+    {
+        get => !_services.Settings.BatchPanelsHidden;
+        set
+        {
+            if (value == _services.Settings.BatchPanelsHidden)
+            {
+                _services.Settings.BatchPanelsHidden = !value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PanelsText));
+            }
+        }
+    }
+
+    /// <summary>"Skryť nastavenia ▴" / "Zobraziť nastavenia ▾".</summary>
+    public string PanelsText => ShowPanels ? "Skryť nastavenia ▴" : "Zobraziť nastavenia ▾";
 
     private BatchFinish? _finish;
 
@@ -2275,7 +2302,8 @@ public sealed class BatchPageViewModel : ObservableObject
                     RunState = where + "…";
                     Progress = (double)done / targets.Count;
                     var pieces = new Progress<int>(n => RunState = $"{where} (úsekov: {n})…");
-                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, target.Key.Ordinal, target.File.Duration, pieces, cancellation.Token);
+                    var ordinal = await _services.AudioOrdinalAsync(target.File.Path, target.Track, target.Key.Ordinal, cancellation.Token);
+                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, ordinal, target.File.Duration, pieces, cancellation.Token);
                     if (result.Language is { } code)
                     {
                         SpeechTargets.Keep(target, new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)

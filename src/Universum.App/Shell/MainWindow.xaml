@@ -2108,6 +2108,8 @@
                     </StackPanel>
                 </DockPanel>
                 <DockPanel Grid.Row="1" Margin="0,6,0,8">
+                    <ToggleButton DockPanel.Dock="Right" Content="{Binding PanelsText}" IsChecked="{Binding ShowPanels}" Padding="10,3" Margin="8,0,0,0"
+                                  ToolTip="Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)" />
                     <Button DockPanel.Dock="Right" Content="Upratať zvyšky" Command="{Binding CleanupCommand}" Padding="10,3"
                             ToolTip="Dočasné súbory po prerušenom spracovaní presunie do Koša" />
                     <Button DockPanel.Dock="Right" Content="Zastaviť analýzu" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
@@ -2178,7 +2180,7 @@
                                     ToolTip="Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
                             <TextBlock Text="Súbory skupiny – výsledok simulácie" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
-                        <DataGrid Grid.Row="1" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
+                        <DataGrid Grid.Row="1" MinHeight="110" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionChanged="OnBatchFilesSelected">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
@@ -2284,7 +2286,7 @@
                             </WrapPanel>
                         </DockPanel>
                         <!-- owner, 29. 10. 2026: the tracks in the order of the result; dragged by the grip (or the arrows) within their type -->
-                        <DataGrid Grid.Row="3" Margin="0,6,0,0" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
+                        <DataGrid Grid.Row="3" Margin="0,6,0,0" MinHeight="110" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False"
                                   AllowDrop="True" DragOver="OnSlotDragOver" Drop="OnSlotDrop">
                             <DataGrid.RowStyle>
@@ -2368,7 +2370,8 @@
                     </Grid>
                 </Grid>
 
-                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="12,8">
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="12,8"
+                        Visibility="{Binding ShowPanels, Converter={StaticResource BoolToVisibility}}">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                             <Button Content="Bez šablóny" Command="{Binding RulesOnlyCommand}" Margin="0,0,6,0" Padding="10,3" />
@@ -2386,7 +2389,8 @@
                     </DockPanel>
                 </Border>
 
-                <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,8,0,0" Padding="12,8">
+                <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,8,0,0" Padding="12,8"
+                        Visibility="{Binding ShowPanels, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <WrapPanel>
                             <TextBlock Text="Originál:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />

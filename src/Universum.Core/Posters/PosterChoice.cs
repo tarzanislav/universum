@@ -153,23 +153,27 @@ public static class PosterChoice
     /// The background of a title (fanart.jpg): without text first (backgrounds are meant to be), 16:9, at least 1280 px
     /// wide, then the rating of the community and the size; null when TMDB has none.
     /// </summary>
-    public static TmdbPicture? BestBackdrop(IReadOnlyList<TmdbPicture> backdrops) =>
+    public static TmdbPicture? BestBackdrop(IReadOnlyList<TmdbPicture> backdrops) => Backdrops(backdrops).FirstOrDefault();
+
+    /// <summary>The backgrounds to choose from, the best first (as <see cref="BestBackdrop"/> judges them).</summary>
+    public static IEnumerable<TmdbPicture> Backdrops(IReadOnlyList<TmdbPicture> backdrops) =>
         backdrops.Where(b => PosterCache.IsValidPath(b.Path))
             .OrderByDescending(b => b.Language is null or "" or "xx")
             .ThenByDescending(b => b.Width >= 1280 && Math.Abs(b.Aspect - (16 / 9.0)) <= 0.05)
-            .ThenByDescending(b => Score(b, null, PosterMood.Neutral))
-            .FirstOrDefault();
+            .ThenByDescending(b => Score(b, null, PosterMood.Neutral));
 
     /// <summary>
     /// The logo of the title (clearlogo.png, a transparent PNG): in Czech, English, the original language, then without
     /// language; the best rated; null when TMDB has none (or only vector ones).
     /// </summary>
-    public static TmdbPicture? BestLogo(IReadOnlyList<TmdbPicture> logos, string? originalLanguage) =>
+    public static TmdbPicture? BestLogo(IReadOnlyList<TmdbPicture> logos, string? originalLanguage) => Logos(logos, originalLanguage).FirstOrDefault();
+
+    /// <summary>The logos to choose from (PNG only), the best first (as <see cref="BestLogo"/> judges them).</summary>
+    public static IEnumerable<TmdbPicture> Logos(IReadOnlyList<TmdbPicture> logos, string? originalLanguage) =>
         logos.Where(l => PosterCache.IsValidPath(l.Path) && l.Path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
             .OrderBy(l => Tier(l.Language, originalLanguage) switch { 3 => 3, 4 => 4, var tier => tier })
             .ThenByDescending(l => ((l.VoteAverage * l.VoteCount) + 10) / (l.VoteCount + 2))
-            .ThenByDescending(l => l.Width)
-            .FirstOrDefault();
+            .ThenByDescending(l => l.Width);
 
     // UNIVERSUM's own opinion of its choice in words
     private static string Opinion(PosterCandidate? chosen, PictureLook? look, IReadOnlyList<PosterCandidate> all, PosterMood mood, IReadOnlyList<int> genres, string? originalLanguage)

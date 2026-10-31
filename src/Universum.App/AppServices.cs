@@ -466,7 +466,7 @@ public sealed class AppServices
 
     private Universum.Core.Posters.PendingPosters? _waitingPosters;
 
-    /// <summary>Posters waiting for their titles to be processed (Zlúčiť poster s filmom).</summary>
+    /// <summary>Posters waiting for their titles to be processed (Zlúčiť poster s filmom/seriálom).</summary>
     public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory, () => Settings.OutputDirectory);
 
     // drawing takes up to a minute or two
@@ -945,7 +945,7 @@ public sealed class AppSettings
 
     public string? OmdbKeyProtected { get; set; }
 
-    /// <summary>TMDB poster: the JPEG quality (50–100), the height of folder.jpg (750–3000) and Zlúčiť poster s filmom.</summary>
+    /// <summary>TMDB poster: the JPEG quality (50–100), the height of folder.jpg (750–3000) and Zlúčiť poster s filmom/seriálom.</summary>
     public int PosterQuality { get; set; } = 90;
 
     public int PosterHeight { get; set; } = 1500;
@@ -962,6 +962,9 @@ public sealed class AppSettings
     public bool PosterSeasons { get; set; } = true;
 
     public bool PosterEpisodes { get; set; } = true;
+
+    /// <summary>TMDB poster: Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom (owner, 31. 10. 2026; apart from the poster's).</summary>
+    public bool PosterExtrasMerge { get; set; }
 
     /// <summary>OpenSubtitles.com: the API key (protected), the user name, the password (protected).</summary>
     public string? OpenSubtitlesKeyProtected { get; set; }
@@ -1050,7 +1053,7 @@ public sealed class AppSettings
     /// <summary>Napovedkyňa: the series processed before and their titles.</summary>
     public static string SeriesMemoryFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "napovedkyna.json");
 
-    /// <summary>Posters waiting for their titles to be processed (TMDB poster, Zlúčiť poster s filmom).</summary>
+    /// <summary>Posters waiting for their titles to be processed (TMDB poster, Zlúčiť poster s filmom/seriálom).</summary>
     public static string WaitingPosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "posters-waiting");
 
     /// <summary>OMDb's ratings kept 7 days.</summary>

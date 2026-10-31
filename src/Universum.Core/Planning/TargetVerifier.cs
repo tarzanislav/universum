@@ -55,9 +55,9 @@ public static class TargetVerifier
         Check(problems, !target.TitleChanged || (result.Title ?? "") == (target.ResultTitle ?? ""), $"title '{result.Title}', expected '{target.ResultTitle}'");
         if (target.Cut is { Count: > 0 } parts && result.Duration is { } cut)
         {
-            // the parts kept (moved to key frames by at most a few seconds each)
+            // the parts kept as written (at key frames, or exactly): never shorter – a shorter film means a broken timeline
             var kept = parts.Aggregate(TimeSpan.Zero, (sum, p) => sum + p.Length);
-            Check(problems, cut > TimeSpan.Zero && Math.Abs((cut - kept).TotalSeconds) <= 1 + (10 * parts.Count), $"duration {cut}, expected about {kept}");
+            Check(problems, cut >= kept - TimeSpan.FromSeconds(0.5) && cut <= kept + TimeSpan.FromSeconds(1 + parts.Count), $"duration {cut}, expected {kept}");
         }
         else if (source.Duration is { } before && result.Duration is { } after)
         {

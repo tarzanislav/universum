@@ -49,7 +49,8 @@ public sealed class VideoPageViewModel : ObservableObject
     private const int FirstAddedId = 1000;
     private readonly AppServices _services;
     private MediaFile? _file;
-    private IReadOnlyList<TimeSpan>? _keyframes;
+    private FilmKeyframes? _frames;
+    private string? _framesProblem;
     private TimeSpan? _pendingStart;
     private bool _busy;
     private bool _useRules = true;
@@ -220,12 +221,12 @@ public sealed class VideoPageViewModel : ObservableObject
             if (_parts.Count > 0)
             {
                 var kept = WrittenParts().Aggregate(TimeSpan.Zero, (sum, p) => sum + p.Length);
-                parts.Add($"strih: {_parts.Count} {(_parts.Count == 1 ? "úsek" : _parts.Count < 5 ? "úseky" : "úsekov")}, ostane {CutRow.Clock(kept)}{(ExactCut ? " (presne)" : " (na kľúčových snímkach)")}");
+                parts.Add($"strih: {_parts.Count} {(_parts.Count == 1 ? "úsek" : _parts.Count < 5 ? "úseky" : "úsekov")}, ostane {CutRow.Clock(kept)}{(WritesPicture ? " (presne)" : " (na kľúčových snímkach)")}");
             }
 
             if (Aspect.Value is not null)
             {
-                parts.Add($"pomer strán {Aspect.Label}");
+                parts.Add($"pomer strán {Aspect.Label}" + (Turned ? " (obraz otočený na výšku)" : ""));
             }
 
             if (WritesPicture)
@@ -237,7 +238,42 @@ public sealed class VideoPageViewModel : ObservableObject
         }
     }
 
-    public string? Problem => Recipe.Problem;
+    public string? Problem => Recipe.Problem ?? CutProblem();
+
+    // turned by 90°: the proportions chosen for the film are those of its picture turned
+    private bool Turned => Rotation.Value % 180 == 90;
+
+    // where the film ends on its time (key frames read by ffprobe; else MKVToolNix's duration)
+    private TimeSpan? FilmEnd => _frames?.End ?? (_file?.Duration is { } length ? TimeSpan.FromSeconds(Player.Start) + length : null);
+
+    // a cut without writing the picture: possible only with the key frames, and no part may be lost between two of them
+    private string? CutProblem()
+    {
+        if (_parts.Count == 0 || WritesPicture)
+        {
+            return null;
+        }
+
+        if (_frames is null)
+        {
+            return _framesProblem is { } failed
+                ? $"Kľúčové snímky sa nedajú prečítať ({failed}) – strih bez prekódovania nevie, kde úseky začnú; zapnite Presný strih."
+                : "Kľúčové snímky sa ešte čítajú – strih bez prekódovania počká na ne (alebo zapnite Presný strih).";
+        }
+
+        var keyframes = _frames.Times;
+        if (keyframes.Count == 0 || FilmEnd is not { } end)
+        {
+            return "Video nemá označené kľúčové snímky – strih bez prekódovania nie je možný; zapnite Presný strih.";
+        }
+
+        var lost = _parts.FindIndex(p => Cut.Snap([p], keyframes, end).Count == 0);
+        return lost < 0 ? null
+            : $"Úsek {lost + 1} je kratší ako vzdialenosť kľúčových snímok – nezostalo by z neho nič; predĺžte ho alebo zapnite Presný strih.";
+    }
+
+    /// <summary>Something of the picture changes (a cut, the proportions, the picture) – the rules alone are not saved here.</summary>
+    public bool HasOwnChange => _parts.Count > 0 || Aspect.Value is not null || WritesPicture;
 
     /// <summary>Why the video cannot be written by the rules; empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
@@ -275,7 +311,7 @@ public sealed class VideoPageViewModel : ObservableObject
         var normalized = Cut.Normalized(_parts);
         _parts.Clear();
         _parts.AddRange(normalized);
-        Status = _keyframes is null && !ExactCut ? "Úsek pridaný (kľúčové snímky sa ešte čítajú – úseky sa posunú na ne pri zápise)." : "Úsek pridaný.";
+        Status = _frames is null && !WritesPicture ? "Úsek pridaný (kľúčové snímky sa ešte čítajú – potom sa ukáže, kam sa úsek posunie)." : "Úsek pridaný.";
         Changed();
     }
 
@@ -345,12 +381,12 @@ public sealed class VideoPageViewModel : ObservableObject
             Status = "Čítam kľúčové snímky videa…";
             var ffmpeg = (await _services.SpeechAsync(cancellationToken)).Ffmpeg;
             var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
-            var keyframes = await Cut.KeyframesAsync(_services.Runner, ffprobe, file.Path, cancellationToken);
+            var frames = await Cut.KeyframesAsync(_services.Runner, ffprobe, file.Path, file.IsMatroska, cancellationToken);
             if (ReferenceEquals(_file, file))
             {
-                _keyframes = keyframes;
-                Status = keyframes.Count == 0 ? "Video nemá označené kľúčové snímky – strih bez straty nemusí sedieť; použite presný strih."
-                    : $"Kľúčové snímky: {keyframes.Count} (strih bez prekódovania sa posunie na najbližšiu nasledujúcu).";
+                _frames = frames;
+                Status = frames.Times.Count == 0 ? "Video nemá označené kľúčové snímky – strihať sa dá len presne (obraz sa zapíše znova)."
+                    : $"Kľúčové snímky: {frames.Times.Count} (strih bez prekódovania sa posunie na najbližšiu nasledujúcu).";
                 Changed();
             }
         }
@@ -362,7 +398,9 @@ public sealed class VideoPageViewModel : ObservableObject
         {
             if (ReferenceEquals(_file, file))
             {
-                Status = "Kľúčové snímky sa nedajú prečítať (" + ex.Message + ") – úseky sa posunú na ne až pri zápise.";
+                _framesProblem = ex.Message;
+                Status = "Kľúčové snímky sa nedajú prečítať (" + ex.Message + ") – strihať sa dá len presne.";
+                Changed();
             }
         }
     }
@@ -374,7 +412,8 @@ public sealed class VideoPageViewModel : ObservableObject
         _reading.Dispose();
         _reading = new CancellationTokenSource();
         _file = null;
-        _keyframes = null;
+        _frames = null;
+        _framesProblem = null;
         _pendingStart = null;
         _parts.Clear();
         Result = "";
@@ -386,11 +425,14 @@ public sealed class VideoPageViewModel : ObservableObject
 
     private void Changed()
     {
+        // each part as it will be written: exactly, or moved to key frames on its own (two parts may meet there)
         Parts.Clear();
-        var written = WrittenParts();
-        for (var i = 0; i < _parts.Count; i++)
+        foreach (var part in _parts)
         {
-            Parts.Add(new CutRow(_parts[i], ExactCut || WritesPicture ? "presne" : i < written.Count ? $"{CutRow.Clock(written[i].Start)} – {CutRow.Clock(written[i].End)}" : ""));
+            Parts.Add(new CutRow(part, WritesPicture ? "presne"
+                : _frames is not { Times.Count: > 0 } frames || FilmEnd is not { } end ? ""
+                : Cut.Snap([part], frames.Times, end) is [var moved] ? $"{CutRow.Clock(moved.Start)} – {CutRow.Clock(moved.End)}"
+                : "nič – kratší ako vzdialenosť kľúčových snímok"));
         }
 
         OnPropertyChanged(nameof(Changes));
@@ -406,10 +448,11 @@ public sealed class VideoPageViewModel : ObservableObject
     private IReadOnlyList<CutPart> WrittenParts()
     {
         var parts = Cut.Normalized(_parts);
-        return WritesPicture || _keyframes is not { Count: > 0 } keyframes || _file?.Duration is not { } duration ? parts : Cut.Snap(parts, keyframes, duration);
+        return WritesPicture || _frames is not { Times.Count: > 0 } frames || FilmEnd is not { } end ? parts : Cut.Snap(parts, frames.Times, end);
     }
 
-    // the target of the video: its picture written anew in a track of its own (key frames where the parts begin and end)
+    // the target of the video: its picture written anew in a track of its own in the place of the old one (key frames
+    // wherever a part begins and ends – the cut is then exact)
     private TargetState Build(MediaFile file)
     {
         var video = file.TracksOf(TrackType.Video).First();
@@ -418,9 +461,9 @@ public sealed class VideoPageViewModel : ObservableObject
         var picture = video.Id;
         if (WritesPicture)
         {
-            var marks = ExactCut ? _parts.SelectMany(p => new[] { p.Start, p.End }).Distinct().Order().ToList() : [];
-            var anew = new VideoEncoding(file.Path, video, Recipe, marks).ToTrack(FirstAddedId);
-            tracks.Add(anew);
+            var marks = Cut.Normalized(_parts).SelectMany(p => new[] { p.Start, p.End }).Distinct().Order().ToList();
+            var anew = new VideoEncoding(file.Path, video, Recipe, marks, file.IsMatroska).ToTrack(FirstAddedId);
+            tracks.Insert(tracks.IndexOf(video) + 1, anew);
             removed.Add(video.Id);
             picture = anew.Id;
         }
@@ -439,13 +482,16 @@ public sealed class VideoPageViewModel : ObservableObject
 
         return target with
         {
-            Cut = _parts.Count == 0 ? null : WrittenParts(),
-            Tracks = target.Tracks.Select(t => t.TrackId == picture && Aspect.Value is { } aspect ? t with { AspectRatio = aspect } : t).ToList(),
+            Cut = _parts.Count > 0 && WrittenParts() is { Count: > 0 } kept ? kept : null,
+            Tracks = target.Tracks.Select(t => t.TrackId == picture && Aspect.Value is { } aspect ? t with { AspectRatio = Turned ? Upright(aspect) : aspect } : t).ToList(),
         };
     }
 
+    // "16/9" of a picture turned by 90°: "9/16"
+    private static string Upright(string aspect) => aspect.Split('/') is [var width, var height] ? $"{height}/{width}" : aspect;
+
     private bool CanSave() =>
-        !_busy && _file is not null && Library.Placement is not null && Problem is null && Blocked.Length == 0 && Target() is { HasChanges: true };
+        !_busy && _file is not null && HasOwnChange && Library.Placement is not null && Problem is null && Blocked.Length == 0 && Target() is { HasChanges: true };
 
     private async Task SaveAsync()
     {

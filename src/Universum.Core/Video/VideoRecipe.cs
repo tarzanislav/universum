@@ -67,6 +67,30 @@ public sealed record VideoRecipe(int Rotation = 0, VideoCodec Codec = VideoCodec
         return parts.Count == 0 ? "bez zmeny" : string.Join(", ", parts);
     }
 
+    /// <summary>The size of the picture written ("1280x720") from the size it has; null when that is not known.</summary>
+    public string? Dimensions(string? pixels)
+    {
+        if (pixels?.Split('x') is not [var w, var h] || !int.TryParse(w, CultureInfo.InvariantCulture, out var width) || !int.TryParse(h, CultureInfo.InvariantCulture, out var height) ||
+            width <= 0 || height <= 0)
+        {
+            return null;
+        }
+
+        if (Rotation % 180 == 90)
+        {
+            (width, height) = (height, width);
+        }
+
+        if (Height is { } lines)
+        {
+            // as FFmpeg's "scale=-2:height" (rounded to the nearest even width)
+            width = (int)Math.Round(width * (double)lines / height / 2, MidpointRounding.AwayFromZero) * 2;
+            height = lines;
+        }
+
+        return string.Create(CultureInfo.InvariantCulture, $"{width}x{height}");
+    }
+
     /// <summary>FFmpeg's filters: turned, then of the height, in the encoders' pixel format.</summary>
     public IReadOnlyList<string> Filters()
     {
@@ -96,15 +120,16 @@ public sealed record VideoRecipe(int Rotation = 0, VideoCodec Codec = VideoCodec
 
 /// <summary>
 /// The picture of <paramref name="Path"/> (<paramref name="Source"/>: its video track) to be written anew by
-/// <paramref name="Recipe"/>, with key frames at <paramref name="Keyframes"/> (a cut there is exact).
+/// <paramref name="Recipe"/>, with key frames at <paramref name="Keyframes"/> (a cut there is exact). <paramref name="Matroska"/>:
+/// the film's own timestamps are kept (mkvmerge keeps those of a Matroska file; another one it counts from its first one).
 /// </summary>
-public sealed record VideoEncoding(string Path, MediaTrack Source, VideoRecipe Recipe, IReadOnlyList<TimeSpan> Keyframes)
+public sealed record VideoEncoding(string Path, MediaTrack Source, VideoRecipe Recipe, IReadOnlyList<TimeSpan> Keyframes, bool Matroska = true)
 {
     /// <summary>The track that comes of it (UNIVERSUM's <paramref name="id"/>).</summary>
     public MediaTrack ToTrack(int id) => Source with
     {
         Id = id, ExternalFile = Path, ExternalTrack = 0, VideoEncode = this, Codec = Recipe.Encoder(Source).Name, CodecId = Recipe.WrittenCodecId(Source),
-        PixelDimensions = null, DisplayDimensions = null, Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null,
+        PixelDimensions = Recipe.Dimensions(Source.PixelDimensions), DisplayDimensions = null, Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null,
         StatisticsBitsPerSecond = null, TagEntries = 0, IndexEntries = null,
     };
 }
@@ -126,14 +151,24 @@ public static partial class VideoEncoder
 
         var invariant = CultureInfo.InvariantCulture;
         var chosen = encoder ?? encoding.Recipe.Encoder(encoding.Source).Encoder;
-        var arguments = new List<string>
+        // on the time mkvmerge gives the film's sound: a Matroska file's own timestamps (-copyts, also when it does not start
+        // at 0), another file's from its first one (FFmpeg's own way) – the picture stays with the sound, the key frames forced
+        // land on the marks
+        var arguments = new List<string> { "-nostdin", "-hide_banner", "-loglevel", "error" };
+        if (encoding.Matroska)
         {
-            "-nostdin", "-hide_banner", "-loglevel", "error", "-i", encoding.Path, "-map", "0:v:0", "-an", "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
-            "-vf", string.Join(",", encoding.Recipe.Filters()), "-c:v", chosen,
-        };
-        arguments.AddRange(chosen.EndsWith("_mf", StringComparison.Ordinal)
-            ? ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant)]
-            : ["-crf", Math.Clamp(51 - (encoding.Recipe.Quality / 2), 0, 51).ToString(invariant)]);
+            arguments.Add("-copyts");
+        }
+
+        arguments.AddRange(["-i", encoding.Path, "-map", "0:v:0", "-an", "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
+            "-vf", string.Join(",", encoding.Recipe.Filters()), "-c:v", chosen]);
+        arguments.AddRange(chosen switch
+        {
+            // H.264 High (Media Foundation starts from Baseline); the HEVC encoder of Windows is a hardware one
+            "h264_mf" => ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant), "-profile:v", "high"],
+            "hevc_mf" => ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant), "-hw_encoding", "1"],
+            _ => ["-crf", Math.Clamp(51 - (encoding.Recipe.Quality / 2), 0, 51).ToString(invariant)],
+        });
         if (encoding.Keyframes.Count > 0)
         {
             arguments.AddRange(["-force_key_frames", string.Join(",", encoding.Keyframes.Select(k => k.TotalSeconds.ToString("0.###", invariant)))]);

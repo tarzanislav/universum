@@ -1837,7 +1837,11 @@ internal static class SelfTest
         }
 
         // an exact cut of a turned picture: the encoders of Windows (Media Foundation) – a computer without them is said
+        var original = (await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(video)).TracksOf(TrackType.Video).Single();
+        page.Aspect = page.Aspects[0];
         page.AddPart(TimeSpan.FromSeconds(0.3), TimeSpan.FromSeconds(1.5));
+        Check(page.Parts is [{ Written.Length: > 0 } row] && row.Written.StartsWith("nič", StringComparison.Ordinal) == (page.Problem is { Length: > 0 }),
+            $"video: the part moved to key frames (lost between two of them: said) – {page.Parts.FirstOrDefault()?.Written} | {page.Problem}");
         page.ExactCut = true;
         page.Rotation = page.Rotations.First(r => r.Value == 90);
         page.Library.TitleText = "Obrazový test strih (2026)";
@@ -1849,8 +1853,12 @@ internal static class SelfTest
         if (page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal) && cut is not null)
         {
             var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(cut);
-            Check(written.TracksOf(TrackType.Video).Single().CodecId == "V_MPEG4/ISO/AVC" && written.Duration is { } length && Math.Abs(length.TotalSeconds - 1.2) < 0.35,
-                $"video: written anew by the encoders of Windows, cut exactly – {written.TracksOf(TrackType.Video).Single().PixelDimensions} {written.Duration}");
+            var picture = written.TracksOf(TrackType.Video).Single();
+            Check(picture.CodecId == "V_MPEG4/ISO/AVC" && written.Duration is { } length && Math.Abs(length.TotalSeconds - 1.2) < 0.35,
+                $"video: written anew by the encoders of Windows, cut exactly – {picture.PixelDimensions} {written.Duration}");
+            Check(original.PixelDimensions?.Split('x') is [var w, var h] && picture.PixelDimensions == $"{h}x{w}" &&
+                  (original.DisplayAspect is not { } before || picture.DisplayAspect is { } after && Math.Abs(after - (1 / before)) < 0.05),
+                $"video: turned on its side – {original.PixelDimensions} {original.DisplayAspect:0.###} → {picture.PixelDimensions} {picture.DisplayAspect:0.###}");
         }
         else
         {

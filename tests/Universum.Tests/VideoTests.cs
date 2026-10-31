@@ -27,6 +27,8 @@ public sealed class VideoTests
         var turned = new VideoRecipe(Rotation: 90, Height: 720);
         Assert.True(turned.NeedsEncoding && string.Join(",", turned.Filters()) == "transpose=clock,scale=-2:720:flags=lanczos,format=nv12" &&
                     new VideoRecipe(Rotation: 45).Problem is { Length: > 0 } && !VideoRecipe.None.NeedsEncoding, "the filters of a picture turned and smaller");
+        Assert.True(turned.Dimensions("1920x1080") == "406x720" && new VideoRecipe(Rotation: 180).Dimensions("720x576") == "720x576" && turned.Dimensions(null) is null,
+            "the size written: turned, then of the height (an even width, as FFmpeg)");
     }
 
     [Test]
@@ -41,13 +43,15 @@ public sealed class VideoTests
         var folder = Directory.CreateTempSubdirectory("universum-video-").FullName;
         try
         {
-            var (installation, inspector, film) = await FilmAsync(ffmpeg, folder);
+            var (installation, inspector, film) = await FilmAsync(ffmpeg, folder, subtitles: true);
             var ffprobe = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
                 .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe")).First(File.Exists);
-            var keyframes = await Cut.KeyframesAsync(new ProcessRunner(), ffprobe, film);
-            Assert.True(keyframes.Count == 10 && Math.Abs(keyframes[1].TotalSeconds - 2) < 0.1, "a key frame every two seconds – " + string.Join(" ", keyframes.Select(k => k.TotalSeconds)));
+            var frames = await Cut.KeyframesAsync(new ProcessRunner(), ffprobe, film, matroska: true);
+            var keyframes = frames.Times;
+            Assert.True(keyframes.Count == 10 && Math.Abs(keyframes[1].TotalSeconds - 2) < 0.1 && frames.End is { } end && Math.Abs(end.TotalSeconds - 20) < 0.2,
+                $"a key frame every two seconds, twenty seconds – {string.Join(" ", keyframes.Select(k => k.TotalSeconds))} | {frames.End}");
             var file = await inspector.InspectAsync(film);
-            var parts = Cut.Snap([new CutPart(T(3), T(6.5)), new CutPart(T(12), T(14))], keyframes, file.Duration!.Value);
+            var parts = Cut.Snap([new CutPart(T(3), T(6.5)), new CutPart(T(12), T(14))], keyframes, frames.End!.Value);
             var rules = UniversumRules.Apply(file, RuleProfile.Default, new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [1] = LanguageTag.FromCode("cs") } });
             var target = rules with
             {
@@ -59,6 +63,12 @@ public sealed class VideoTests
             var written = await inspector.InspectAsync(result.OutputPath!);
             Assert.True(written.Duration is { } length && Math.Abs(length.TotalSeconds - 6) < 0.3 && written.TracksOf(TrackType.Video).Single().DisplayAspect is { } aspect &&
                         Math.Abs(aspect - (4 / 3.0)) < 0.02, $"4 + 2 s kept (key frames), shown 4:3 – {written.Duration} {written.TracksOf(TrackType.Video).Single().DisplayDimensions}");
+
+            // the subtitles within the parts kept, moved with them (one shown across the cut: in both parts, shortened)
+            var subtitles = await SubtitleText.ExtractDocumentAsync(installation, new ProcessRunner(), written, written.TracksOf(TrackType.Subtitles).Single());
+            var cues = subtitles!.Cues.Select(c => (c.Start.TotalSeconds, c.End.TotalSeconds, c.Text)).ToList();
+            Assert.True(cues.Count == 3 && Near(cues[0], 0, 1, "Prvý") && Near(cues[1], 3, 4, "Druhý") && Near(cues[2], 4, 5, "Druhý"),
+                "subtitles cut with the film – " + string.Join(" | ", cues));
         }
         finally
         {
@@ -84,6 +94,7 @@ public sealed class VideoTests
             // turned by 90° and smaller; key frames where the parts begin and end, so the cut is exact
             var parts = new List<CutPart> { new(T(3), T(6.5)), new(T(12.5), T(14)) };
             var anew = new VideoEncoding(film, video, new VideoRecipe(Rotation: 90, Codec: VideoCodec.H264, Height: 160), parts.SelectMany(p => new[] { p.Start, p.End }).ToList()).ToTrack(1000);
+            Assert.Equal("120x160", anew.PixelDimensions, "the size the picture will have");
             var augmented = file with { Tracks = [.. file.Tracks, anew] };
             var rules = UniversumRules.Apply(augmented, RuleProfile.Default, new TrackDecisions
             {
@@ -105,11 +116,15 @@ public sealed class VideoTests
         }
     }
 
+    private static bool Near((double Start, double End, string Text) cue, double start, double end, string text) =>
+        Math.Abs(cue.Start - start) < 0.06 && Math.Abs(cue.End - end) < 0.06 && cue.Text.Contains(text, StringComparison.Ordinal);
+
     private static string? Ffmpeg() => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
         .Select(d => Path.Combine(d, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(File.Exists);
 
-    // twenty seconds, 4:3 320 × 240, a key frame every two seconds, a tone
-    private static async Task<(MkvToolNixInstallation, MkvMergeInspector, string)> FilmAsync(string ffmpeg, string folder)
+    // twenty seconds, 4:3 320 × 240, a key frame every two seconds, a tone (and invented Czech subtitles: one across the
+    // start of the first part kept, one from it into the second, two in what is cut out)
+    private static async Task<(MkvToolNixInstallation, MkvMergeInspector, string)> FilmAsync(string ffmpeg, string folder, bool subtitles = false)
     {
         var installation = await TestData.RequireMkvToolNixAsync();
         var mp4 = Path.Combine(folder, "film.mp4");
@@ -120,7 +135,27 @@ public sealed class VideoTests
         ]));
         Assert.True(made.ExitCode == 0, made.StandardError);
         var film = Path.Combine(folder, "Vymyslený strihaný film.mkv");
-        await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge), ["-q", "-o", film, mp4]));
+        var srt = Path.Combine(folder, "titulky.srt");
+        await File.WriteAllTextAsync(srt, """
+            1
+            00:00:03,000 --> 00:00:05,000
+            Prvý vymyslený titulok
+
+            2
+            00:00:07,000 --> 00:00:13,000
+            Druhý vymyslený titulok
+
+            3
+            00:00:09,000 --> 00:00:10,000
+            Vystrihnutý
+
+            4
+            00:00:15,000 --> 00:00:16,000
+            Tiež vystrihnutý
+
+            """);
+        await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge),
+            subtitles ? ["-q", "-o", film, mp4, "--language", "0:cs", srt] : ["-q", "-o", film, mp4]));
         return (installation, new MkvMergeInspector(installation, new ProcessRunner()), film);
     }
 

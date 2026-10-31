@@ -793,7 +793,15 @@ public sealed class FileProcessor(
         }
 
         FlushToDisk(temporary);
-        var problems = TargetVerifier.Compare(written, await _inspector.InspectAsync(temporary, cancellationToken));
+        var inspected = await _inspector.InspectAsync(temporary, cancellationToken);
+        var problems = TargetVerifier.Compare(written, inspected);
+        if (problems is [var only] && only.StartsWith("duration", StringComparison.Ordinal) && inspected.Duration is { } after &&
+            await RealEndAsync(source, cancellationToken) is { } end && (after - end).Duration() <= TimeSpan.FromSeconds(1))
+        {
+            // the original says it is longer than its data are (a wrong header): everything it has was written
+            problems = [];
+        }
+
         if (problems.Count > 0)
         {
             TryDelete(temporary);
@@ -801,6 +809,26 @@ public sealed class FileProcessor(
         }
 
         return [];
+    }
+
+    // where the data of the original really end (ffprobe beside FFmpeg); null without FFmpeg or when it cannot tell
+    private async Task<TimeSpan?> RealEndAsync(string path, CancellationToken cancellationToken)
+    {
+        if (FindFfmpeg is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var ffmpeg = await FindFfmpeg(cancellationToken).ConfigureAwait(false);
+            var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+            return File.Exists(ffprobe) ? await Media.MediaEnd.LastAsync(runner, ffprobe, path, cancellationToken).ConfigureAwait(false) : null;
+        }
+        catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or Speech.SpeechException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Edits a header in place (never interrupted) and verifies it; throws <see cref="EditFailedException"/>.</summary>

@@ -51,6 +51,8 @@ public sealed class VideoTests
             Assert.True(keyframes.Count == 10 && Math.Abs(keyframes[1].TotalSeconds - 2) < 0.1 && frames.End is { } end && Math.Abs(end.TotalSeconds - 20) < 0.2,
                 $"a key frame every two seconds, twenty seconds – {string.Join(" ", keyframes.Select(k => k.TotalSeconds))} | {frames.End}");
             var file = await inspector.InspectAsync(film);
+            var dataEnd = await Universum.Core.Media.MediaEnd.LastAsync(new ProcessRunner(), ffprobe, film);
+            Assert.True(dataEnd is { } last && Math.Abs(last.TotalSeconds - 20) < 0.2, $"the real end of the data – {dataEnd}");
             var parts = Cut.Snap([new CutPart(T(3), T(6.5)), new CutPart(T(12), T(14))], keyframes, frames.End!.Value);
             var rules = UniversumRules.Apply(file, RuleProfile.Default, new TrackDecisions { Languages = new Dictionary<int, LanguageTag> { [1] = LanguageTag.FromCode("cs") } });
             var target = rules with

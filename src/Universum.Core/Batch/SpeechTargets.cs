@@ -53,7 +53,8 @@ public static class SpeechTargets
 
     // the audio tracks without a language in the file
     private static IEnumerable<SpeechTarget> Tracks(BatchGroup group, MediaFile file, bool forGroup) =>
-        SlotKey.Of(file).Where(x => x.Key.Type == TrackType.Audio && x.Track.Language.IsUndetermined)
+        // the file's own sounds (a sound added or written anew in the studio has its language from there)
+        SlotKey.Of(file).Where(x => x.Key.Type == TrackType.Audio && x.Track.ExternalFile is null && x.Track.Language.IsUndetermined)
             .Select(x => new SpeechTarget(group, file, x.Key, x.Track, forGroup));
 
     private static (IReadOnlyList<SpeechTarget>, int) Split(IEnumerable<SpeechTarget> candidates)

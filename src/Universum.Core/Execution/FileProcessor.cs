@@ -609,7 +609,7 @@ public sealed class FileProcessor(
             var encoding = tracks[i].Source.Encode!;
             var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
             var at = i;
-            var part = progress is null ? null : new Progress<double>(p => progress.Report((at + p) / tracks.Count * 0.5));
+            var part = progress is null ? null : new ScaledProgress(progress, (double)at / tracks.Count * 0.5, 0.5 / tracks.Count);
             var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, encoding.Ordinal, encoding.Source, encoding.Recipe, output,
                 target.Source.Duration, part, cancellationToken).ConfigureAwait(false);
             if (problem is not null)
@@ -621,6 +621,12 @@ public sealed class FileProcessor(
         }
 
         return (encoded, null);
+    }
+
+    // a part of the work reported as a share of the whole, at once (in order – no posting to another thread)
+    private sealed class ScaledProgress(IProgress<double> whole, double from, double share) : IProgress<double>
+    {
+        public void Report(double value) => whole.Report(from + (share * Math.Clamp(value, 0, 1)));
     }
 
     /// <summary>Writes and verifies the result as <paramref name="temporary"/>; returns the problems (empty = success).</summary>
@@ -651,7 +657,7 @@ public sealed class FileProcessor(
 
                 var share = encoded.Count == 0 ? 0 : 0.5;
                 result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs, encoded),
-                    progress is null || share == 0 ? progress : new Progress<double>(p => progress.Report(share + ((1 - share) * p))), cancellationToken);
+                    progress is null || share == 0 ? progress : new ScaledProgress(progress, share, 1 - share), cancellationToken);
             }
             finally
             {

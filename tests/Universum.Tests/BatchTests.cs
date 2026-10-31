@@ -608,6 +608,9 @@ public sealed class BatchTests
                     item.Target.For(anew.Id) is { Name: "Originál", Timing.DelayMilliseconds: 100 } && item.Target.For(added.Id) is { Name: "Dabing", Timing.DelayMilliseconds: -200 } &&
                     item.Target.For(added.Id).Language.Primary == "cs" && item.Target.For(2).Language.Primary == "en",
             "the plan: the English sound written anew in its place, the dub added – " + string.Join(" | ", item.Target.Tracks.Select(t => $"{t.TrackId}:{t.Name}:{t.Timing?.MkvMergeValue}")));
+        var audioOrder = item.Target.Tracks.Where(t => t.Type == TrackType.Audio).Select(t => t.TrackId).ToList();
+        Assert.True(audioOrder.IndexOf(anew!.Id) < audioOrder.IndexOf(2) && item.Target.For(added!.Id).Flags.Default,
+            "the Czech dub first (the rules), then the sound written anew in its original's place before the other English one – " + string.Join(",", audioOrder));
 
         // MEGA keeps the tracks whole, the sound written anew too
         var store = Path.Combine(work.Path, "mega", "mega.json");

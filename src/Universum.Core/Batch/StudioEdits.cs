@@ -305,7 +305,12 @@ public sealed record StudioEdits
             }
             else if (AddedSounds.FirstOrDefault(s => s.Is(track)) is { } sound)
             {
-                languages[track.Id] = sound.Language;
+                // an undetermined one is left to the batch (its language can be chosen there)
+                if (!sound.Language.IsUndetermined)
+                {
+                    languages[track.Id] = sound.Language;
+                }
+
                 if (sound.Name is not null)
                 {
                     names[track.Id] = sound.Name;

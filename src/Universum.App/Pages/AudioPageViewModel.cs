@@ -48,7 +48,6 @@ public sealed class AudioPageViewModel : ObservableObject
     private CancellationTokenSource? _work;
     private (AudioRow Row, AudioSyncResult Result)? _proposal;
     private (string Path, Func<StudioEdits, string?> Save, Action Leave)? _task;
-    private StudioEdits? _taskEdits;
     private Dictionary<int, string> _batchNames = [];
     private int _taskLoad;
     private bool _openingTask;
@@ -353,7 +352,6 @@ public sealed class AudioPageViewModel : ObservableObject
         }
 
         _batchNames = batchNames?.ToDictionary() ?? [];
-        _taskEdits = edits;
         if (edits is not null)
         {
             await RestoreAsync(edits.SoundStates, edits);
@@ -476,6 +474,13 @@ public sealed class AudioPageViewModel : ObservableObject
             return;
         }
 
+        if (!Core.IO.Paths.Same(_file.Path, task.Path))
+        {
+            SyncStatus = "V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Zvuk v štúdiu.";
+            EndTask();
+            return;
+        }
+
         if (Rows.FirstOrDefault(r => r.Include && r.Problem is not null) is { } wrong)
         {
             SyncStatus = $"{wrong.Source}: {wrong.Problem}";
@@ -518,8 +523,8 @@ public sealed class AudioPageViewModel : ObservableObject
             }
         }
 
-        // the subtitles' edits of the task stay; the task stays open when Hromadné spracovanie cannot take them now
-        if (task.Save(edits.WithSubtitlesOf(_taskEdits)) is { } refused)
+        // the task stays open when Hromadné spracovanie cannot take them now (the subtitles' part is kept by the batch)
+        if (task.Save(edits) is { } refused)
         {
             SyncStatus = refused;
             return;
@@ -531,7 +536,6 @@ public sealed class AudioPageViewModel : ObservableObject
     private void EndTask()
     {
         _task = null;
-        _taskEdits = null;
         _batchNames = [];
         OnPropertyChanged(nameof(IsTask));
         OnPropertyChanged(nameof(TaskText));
@@ -551,7 +555,8 @@ public sealed class AudioPageViewModel : ObservableObject
         var problems = new List<string>();
         try
         {
-            foreach (var path in paths)
+            // a file whose sounds are here already (a saved work restored with the video dropped with it) once
+            foreach (var path in paths.Where(p => !Rows.Any(r => r.ExternalPath is { } known && Core.IO.Paths.Same(known, p))))
             {
                 try
                 {
@@ -608,6 +613,14 @@ public sealed class AudioPageViewModel : ObservableObject
     private void Clear()
     {
         _work?.Cancel();
+        if (_task is not null)
+        {
+            // another video: the task of Hromadné spracovanie is left (its file is not here any more)
+            _task = null;
+                OnPropertyChanged(nameof(IsTask));
+            OnPropertyChanged(nameof(TaskText));
+        }
+
         _file = null;
         _batchNames = [];
         HasWork = false;
@@ -714,7 +727,7 @@ public sealed class AudioPageViewModel : ObservableObject
         }
 
         var edits = tracks.Where(t => !removed.Contains(t.Id)).Select(t => rowOf.TryGetValue(t.Id, out var row)
-            ? new TrackEdit(t.Id, (names ? row.WrittenName : null) ?? row.InitialName, row.Language.Tag, t.Flags)
+            ? new TrackEdit(t.Id, (names ? row.WrittenName : null) ?? row.InitialName, row.Language.Tag, row.IsExternal ? t.Flags : row.Track.Flags)
             : new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList();
         var target = ManualTarget.Create(augmented, edits, removed, title: "");
         return target with { Tracks = target.Tracks.Select(t => shifts.TryGetValue(t.TrackId, out var shift) ? t with { Timing = shift } : t).ToList() };

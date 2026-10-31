@@ -105,7 +105,8 @@ public sealed class MainViewModel : ObservableObject
         SelectedTool = Tools.First(t => t.Page == Subtitles);
         await Subtitles.EditForBatchAsync(file, edits, saved =>
         {
-            var refused = Batch.SaveStudio(file.Path, saved);
+            // the subtitles' part over the task as it is now (the sounds' part may have been saved meanwhile)
+            var refused = Batch.SaveStudio(file.Path, saved.WithSoundsOf(Batch.StudioOf(file.Path)));
             if (refused is null)
             {
                 SelectedTool = batch;
@@ -122,7 +123,8 @@ public sealed class MainViewModel : ObservableObject
         SelectedTool = Tools.First(t => t.Page == Audio);
         await Audio.EditForBatchAsync(file, edits, saved =>
         {
-            var refused = Batch.SaveStudio(file.Path, saved);
+            // the sounds' part over the task as it is now (the subtitles' part may have been saved meanwhile)
+            var refused = Batch.SaveStudio(file.Path, saved.WithSubtitlesOf(Batch.StudioOf(file.Path)));
             if (refused is null)
             {
                 SelectedTool = batch;

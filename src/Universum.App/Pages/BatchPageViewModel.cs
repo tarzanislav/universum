@@ -333,6 +333,10 @@ public sealed class BatchPageViewModel : ObservableObject
         (sound ? SoundStudioRequested : StudioRequested)?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path), names);
     }
 
+    /// <summary>The studios' edits of a file of the batch now (each studio saves its part over them).</summary>
+    public StudioEdits? StudioOf(string path) =>
+        _analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path)))?.Decisions.Studio.GetValueOrDefault(path);
+
     /// <summary>
     /// Uložiť do úlohy: the studio's edits of a file of the batch (none: forgotten); the plan is computed again. They
     /// stay with the file's path, also when the folder is analysed again. Null when taken, else why not.
@@ -1501,11 +1505,20 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
+        // a sound of the file written anew (Zvuk v štúdiu) stands in its original's slot
+        foreach (var anew in item.File.Tracks.Where(t => t.Encode is { } encode && Paths.Same(encode.Path, item.File.Path)))
+        {
+            if (keyOf.TryGetValue(anew.Encode!.Source.Id, out var original))
+            {
+                keyOf[anew.Id] = original;
+            }
+        }
+
         var removed = item.Target.RemovedByLanguage.Where(t => keyOf.ContainsKey(t.Id)).Select(t => keyOf[t.Id]).ToHashSet();
         var order = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).Select(t => keyOf[t.TrackId]).ToList();
         // the names the rules give (no name written – by the group or in the studio): what a written name is compared with
         var rules = UniversumRules.Apply(item.File, _services.Profile, item.Decisions with { Names = new Dictionary<int, string>() });
-        var names = rules.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).ToDictionary(t => keyOf[t.TrackId], t => t.Name);
+        var names = rules.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).GroupBy(t => keyOf[t.TrackId]).ToDictionary(g => g.Key, g => g.Last().Name);
         foreach (var slot in SlotRows)
         {
             slot.SetRemovedByLanguage(removed.Contains(slot.Key));
@@ -2609,7 +2622,9 @@ public sealed class BatchPageViewModel : ObservableObject
                 var path = media.Path;
                 // decisions by track ID only for the file's own tracks the studio does not decide (the IDs of external
                 // files are given by each analysis; the studio's edits come back by path)
-                var studied = file.Studio is { } studioOfFile ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).ToHashSet() : new HashSet<int>();
+                var studied = file.Studio is { } studioOfFile
+                    ? studioOfFile.Languages.Keys.Concat(studioOfFile.Forced.Keys).Concat(studioOfFile.SoundLanguages.Keys).ToHashSet()
+                    : new HashSet<int>();
                 var slots = SlotKey.Of(media).Where(x => x.Track.ExternalFile is null && !studied.Contains(x.Track.Id)).ToDictionary(x => x.Track.Id, x => x.Key);
                 kinds.Add(file.Title.Kind);
                 _library.KindOfFile[path] = file.Title.Kind;
@@ -2642,7 +2657,8 @@ public sealed class BatchPageViewModel : ObservableObject
                 // analysis'); the ones the studio wrote come back with the studio's edits
                 foreach (var (id, name) in file.Names)
                 {
-                    if (file.Studio?.Names.ContainsKey(id) == true ||
+                    if (file.Studio?.Names.ContainsKey(id) == true || file.Studio?.SoundNames.ContainsKey(id) == true ||
+                        file.Externals.Any(e => e.Id == id && e.Track?.Encode is not null) ||
                         (file.Externals.FirstOrDefault(e => e.Id == id) is { } external && file.Studio?.FileNames.Keys.Any(p => Paths.Same(p, external.Path)) == true))
                     {
                         continue;
@@ -2660,7 +2676,9 @@ public sealed class BatchPageViewModel : ObservableObject
                 group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));
                 if (file.Order.Count > 0 && group.Decisions.Order.Count == 0)
                 {
-                    group.Decisions.Order.AddRange(file.Order.Where(slots.ContainsKey).Select(id => slots[id]));
+                    // a sound written anew in the order stands for its original
+                    var originals = file.Externals.Where(e => e.Track?.Encode is { } encode && Paths.Same(encode.Path, path)).ToDictionary(e => e.Id, e => e.Track!.Encode!.Source.Id);
+                    group.Decisions.Order.AddRange(file.Order.Select(id => originals.GetValueOrDefault(id, id)).Where(slots.ContainsKey).Select(id => slots[id]));
                 }
 
                 if (file.ProcessAnyway)

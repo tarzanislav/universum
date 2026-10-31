@@ -15,6 +15,9 @@ v súboroch MKV podľa jasných pravidiel, jednotlivo aj hromadne pre celý prie
 - **Rozpoznanie jazyka** stôp bez jazyka – z názvu stopy, z textu titulkov a **z reči audiostopy**
   ([whisper.cpp](https://github.com/ggml-org/whisper.cpp) a [FFmpeg](https://ffmpeg.org) sú súčasťou inštalácie,
   všetko beží len v počítači); výsledok je vždy návrh na potvrdenie.
+- **Text z obrázkových titulkov (OCR)** – titulky PGS z Blu-ray prečíta vlastné rozpoznávanie UNIVERSUM (žiadna
+  knižnica OCR): písmená porovná s písmami Windows, neznáme tvary sa opýta raz za film a zapamätá si ich;
+  výsledok je nový súbor SRT vedľa videa.
 - **Knižnica pre Jellyfin** – výsledky idú do výstupného priečinka: `MOVIES\Creep (2004)\Creep (2004) - CZ EN FHD H264 BIG.mkv`
   a `TVSHOWS\Nine Puzzles (2025) [tmdbid-227191]\Season 01\Nine Puzzles S01E04 - CZ titulky FHD H264 SMALL.mkv`.
   Názvy vie vyhľadať na [TMDB](https://www.themoviedb.org/) s vlastným bezplatným kľúčom používateľa.

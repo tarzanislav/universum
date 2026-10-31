@@ -289,6 +289,11 @@ public sealed class AppServices
     /// <summary>The saved work of Úprava titulkostopy (Uložiť prácu; owner, 30. 10. 2026).</summary>
     public StudioWorkStore StudioWork => _studioWork ??= new(AppSettings.StudioWorkDirectory);
 
+    /// <summary>Saved work of Úprava audiostopy (a folder of its own beside the subtitles').</summary>
+    public Core.Audio.AudioWorkStore AudioWork => _audioWork ??= new(Path.Combine(AppSettings.StudioWorkDirectory, "zvuk"));
+
+    private Core.Audio.AudioWorkStore? _audioWork;
+
     private StudioWorkStore? _studioWork;
 
     /// <summary>Napovedkyňa for one file (Single spracovanie, the tools): the remembered series its names point to, or null.</summary>

@@ -22,8 +22,9 @@ public sealed partial class SubtitlesPageViewModel
     private string _liveStatus = "";
     private readonly HashSet<SubtitleRow> _reading = [];
 
-    // a task of Hromadné spracovanie: the names the batch gives the video's own tracks
+    // a task of Hromadné spracovanie: the names the batch gives the video's own tracks, its edits so far
     private Dictionary<int, string> _batchNames = [];
+    private StudioEdits? _taskEdits;
 
     // ends the reading of picture subtitles of a video closed
     private CancellationTokenSource _readingStop = new();
@@ -193,6 +194,7 @@ public sealed partial class SubtitlesPageViewModel
         }
 
         _batchNames = batchNames?.ToDictionary() ?? [];
+        _taskEdits = edits;
         _quiet++;
         try
         {
@@ -381,8 +383,8 @@ public sealed partial class SubtitlesPageViewModel
             }
         }
 
-        // the task stays open when Hromadné spracovanie cannot take the edits now (it runs, it ran)
-        if (task.Save(edits) is { } refused)
+        // the task stays open when Hromadné spracovanie cannot take the edits now (it runs, it ran); the sounds' edits stay
+        if (task.Save(edits.WithSoundsOf(_taskEdits)) is { } refused)
         {
             LiveStatus = refused;
             return;
@@ -395,6 +397,7 @@ public sealed partial class SubtitlesPageViewModel
     {
         _task = null;
         _batchNames = [];
+        _taskEdits = null;
         OnPropertyChanged(nameof(IsTask));
         OnPropertyChanged(nameof(TaskText));
         RefreshCommands();

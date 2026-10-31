@@ -94,6 +94,7 @@ public sealed class MainViewModel : ObservableObject
         Batch.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
         Batch.StudioRequested += (file, edits, names) => _ = EditInStudioAsync(file, edits, names);
+        Batch.SoundStudioRequested += (file, edits, names) => _ = EditSoundInStudioAsync(file, edits, names);
         Mega.EditRequested += batch => _ = EditMegaBatchAsync(batch);
     }
 
@@ -103,6 +104,23 @@ public sealed class MainViewModel : ObservableObject
         var batch = Tools.First(t => t.Page == Batch);
         SelectedTool = Tools.First(t => t.Page == Subtitles);
         await Subtitles.EditForBatchAsync(file, edits, saved =>
+        {
+            var refused = Batch.SaveStudio(file.Path, saved);
+            if (refused is null)
+            {
+                SelectedTool = batch;
+            }
+
+            return refused;
+        }, () => SelectedTool = batch, names);
+    }
+
+    // Upraviť zvuk v štúdiu – a file of Hromadné spracovanie in Úprava audiostopy, back with Uložiť do úlohy
+    private async Task EditSoundInStudioAsync(Core.Media.MediaFile file, Core.Batch.StudioEdits? edits, IReadOnlyDictionary<int, string> names)
+    {
+        var batch = Tools.First(t => t.Page == Batch);
+        SelectedTool = Tools.First(t => t.Page == Audio);
+        await Audio.EditForBatchAsync(file, edits, saved =>
         {
             var refused = Batch.SaveStudio(file.Path, saved);
             if (refused is null)

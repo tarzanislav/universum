@@ -69,9 +69,18 @@ public static class BatchReport
         foreach (var item in items)
         {
             byPath.TryGetValue(item.File.Path, out var result);
-            var notes = result?.Messages.Count > 0
-                ? string.Join(" | ", result.Messages)
-                : string.Join(" | ", item.Reasons.Select(r => r.Kind + (r.Slot is { } s ? " " + s : "")));
+
+            // in words (owner, 31. 10. 2026: the tools' messages said nothing): the problems with what to do, then what was done
+            string notes;
+            if (result is not null)
+            {
+                var words = ProcessingWords.Describe(item.File.Path, item.Plan, result);
+                notes = string.Join(" | ", words.Problems.Select(p => $"{p.What} Čo s tým: {p.Advice}").Concat(words.Done));
+            }
+            else
+            {
+                notes = string.Join(" | ", item.Reasons.Select(r => r.Kind + (r.Slot is { } s ? " " + s : "")));
+            }
             yield return [item.File.Path, item.Group.Label, Describe(item, result), result?.OutputPath ?? item.PlannedPath ?? "", notes];
         }
     }

@@ -772,8 +772,11 @@ public sealed class AudioPageViewModel : ObservableObject
                 ? new SoundEncoding(r.ExternalPath ?? file.Path, r.Ordinal, r.Track, r.Recipe).ToTrack(r.IsExternal ? r.Track.Id : _nextId++)
                 : r.Track);
             Result = rows.Any(r => r is { Include: true, Recipe.NeedsEncoding: true }) ? "Zapisujem zvuk znova a potom nový súbor…" : "Zapisujem nový súbor…";
-            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file, written, rows)), placement, new OutputOptions(OriginalHandling.Keep),
+            var plan = EditPlan.For(Build(file, written, rows));
+            var started = DateTime.UtcNow;
+            var result = await _services.Processor(installation).ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep),
                 new Progress<double>(share => Progress = share), work.Token);
+            _services.LogProcessing("Úprava audiostopy", plan, result, started);
             Progress = 1;
             Result = result.Status switch
             {

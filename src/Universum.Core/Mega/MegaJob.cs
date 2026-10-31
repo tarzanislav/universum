@@ -18,9 +18,32 @@ namespace Universum.Core.Mega;
 /// <param name="changed">Called after a file's state changed (the page saves the list).</param>
 public sealed class MegaJob(
     MegaBatch batch, FileProcessor processor, Func<string, CancellationToken, Task<MediaFile>> inspect, Action<MegaBatch>? changed = null)
-    : Job($"MEGA {batch.Label}: {batch.Name}")
+    : Job($"MEGA {batch.Label}: {batch.Name}"), ILoggedJob
 {
+    private readonly List<LoggedFile> _logged = [];
+
     public MegaBatch Batch { get; } = batch;
+
+    public string LogKind => $"MEGA spracovanie – {Batch.Label}";
+
+    public IReadOnlyList<LoggedFile> LoggedFiles
+    {
+        get
+        {
+            lock (_logged)
+            {
+                return [.. _logged];
+            }
+        }
+    }
+
+    private void Log(LoggedFile file)
+    {
+        lock (_logged)
+        {
+            _logged.Add(file);
+        }
+    }
 
     /// <summary>The file and its prepared item, or why it cannot be written now (null item).</summary>
     /// <param name="index">The library index: a result made from this original after the batch was prepared is never replaced.</param>
@@ -116,6 +139,7 @@ public sealed class MegaJob(
                 skipped++;
                 file.State = problem == AlreadyInLibrary ? MegaFileState.AlreadyInLibrary : MegaFileState.Skipped;
                 file.Note = problem;
+                Log(ProcessingWords.Skipped(file.Path, problem, file.State == MegaFileState.AlreadyInLibrary));
                 context.Log(file.State == MegaFileState.AlreadyInLibrary ? JobSeverity.Info : JobSeverity.Warning,
                     $"{(file.State == MegaFileState.AlreadyInLibrary ? "Už v knižnici" : "PRESKOČENÝ")}: {Path.GetFileName(file.Path)} – {problem}");
                 changed?.Invoke(Batch);
@@ -146,6 +170,7 @@ public sealed class MegaJob(
                     file.Note = result.OutputPath ?? string.Join(" | ", result.Messages);
                     file.ResultPath = result.Status is ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary ? result.OutputPath : null;
                     file.OriginalRemoved = result.Messages.Contains(FileProcessor.OriginalRecycledMessage);
+                    Log(ProcessingWords.Describe(item.File.Path, item.Plan, result));
                     changed?.Invoke(Batch);
                 }),
                 null, cancellationToken).ConfigureAwait(false);

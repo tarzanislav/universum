@@ -11,9 +11,23 @@ namespace Universum.Core.Jobs;
 /// </summary>
 public sealed class BatchJob(
     string description, IReadOnlyList<BatchItem> items, FileProcessor processor, OutputOptions output, IProgress<BatchProgress>? progress = null)
-    : Job(description)
+    : Job(description), ILoggedJob
 {
+    private readonly List<LoggedFile> _logged = [];
     private IReadOnlyList<ProcessingResult> _results = [];
+
+    public string LogKind => "Hromadné spracovanie";
+
+    public IReadOnlyList<LoggedFile> LoggedFiles
+    {
+        get
+        {
+            lock (_logged)
+            {
+                return [.. _logged];
+            }
+        }
+    }
 
     /// <summary>Pause, resume and stop after the current file (the batch page's buttons).</summary>
     public BatchControl Control { get; } = new();
@@ -30,7 +44,7 @@ public sealed class BatchJob(
     protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
     {
         context.Log(JobSeverity.Info, $"Hromadné spracovanie: {FileCount} súborov do knižnice.");
-        _results = await BatchRunner.RunAsync(items, processor, output, new Reporter(context, progress), Control, cancellationToken).ConfigureAwait(false);
+        _results = await BatchRunner.RunAsync(items, processor, output, new Reporter(context, progress, Log), Control, cancellationToken).ConfigureAwait(false);
 
         var done = _results.Count(r => r.Status == ProcessingStatus.Done);
         var present = _results.Count(r => r.Status == ProcessingStatus.AlreadyInLibrary);
@@ -66,8 +80,18 @@ public sealed class BatchJob(
         };
     }
 
-    // job progress and output, and the batch page's own progress
-    private sealed class Reporter(IJobContext context, IProgress<BatchProgress>? page) : IProgress<BatchProgress>
+    // a finished file into the log of processing (files on different drives finish in parallel)
+    private void Log(BatchItem item, ProcessingResult result)
+    {
+        var file = ProcessingWords.Describe(item.File.Path, item.Plan, result);
+        lock (_logged)
+        {
+            _logged.Add(file);
+        }
+    }
+
+    // job progress and output, the batch page's own progress and the log
+    private sealed class Reporter(IJobContext context, IProgress<BatchProgress>? page, Action<BatchItem, ProcessingResult> log) : IProgress<BatchProgress>
     {
         public void Report(BatchProgress value)
         {
@@ -76,6 +100,7 @@ public sealed class BatchJob(
             {
                 var (severity, text) = Line(value.Item, result);
                 context.Log(severity, $"{value.Finished} / {value.Total} · {text}");
+                log(value.Item, result);
             }
 
             page?.Report(value);

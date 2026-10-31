@@ -740,7 +740,9 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             var processor = _services.Processor(_services.CurrentMkvToolNix);
             var series = SeriesToRemember();
+            var started = DateTime.UtcNow;
             var result = await processor.ProcessAsync(_plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
+            _services.LogProcessing("Single spracovanie", _plan, result, started);
             _undoRecord = result.UndoRecordPath;
             if (result.Status is ProcessingStatus.Done or ProcessingStatus.Unchanged or ProcessingStatus.AlreadyInLibrary)
             {

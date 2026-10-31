@@ -506,8 +506,11 @@ public sealed class VideoPageViewModel : ObservableObject
         try
         {
             Result = WritesPicture ? "Zapisujem obraz znova a potom nový súbor (môže to trvať dlho)…" : "Zapisujem nový súbor…";
-            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file)), placement,
+            var plan = EditPlan.For(Build(file));
+            var started = DateTime.UtcNow;
+            var result = await _services.Processor(installation).ProcessAsync(plan, placement,
                 new OutputOptions(OriginalHandling.Keep), new Progress<double>(share => Progress = share), work.Token);
+            _services.LogProcessing("Úprava videostopy", plan, result, started);
             Progress = 1;
             Result = result.Status switch
             {

@@ -36,6 +36,7 @@ public sealed class MainViewModel : ObservableObject
         Video = new VideoPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
+        Logs = new Jobs.ProcessingLogsPageViewModel(_services.ProcessingLogs);
         Dashboard = new DashboardPageViewModel(services, this);
         HistraLists = new HistraListsPageViewModel(services);
         Posters = new PosterPageViewModel(services);
@@ -85,6 +86,7 @@ public sealed class MainViewModel : ObservableObject
             new("MEGA spracovanie", "\uE945", Mega, templates),
             new("Fronta úloh", "\uE823", Queue, statistics),
             new("Výstup úloh", "\uE7C3", Output, statistics),
+            new("Záznamy spracovania", "\uE81C", Logs, statistics),
             new("Nastavenia", "\uE713", Settings, statistics),
         ];
         var view = new ListCollectionView(Tools.ToList());
@@ -325,6 +327,9 @@ public sealed class MainViewModel : ObservableObject
     public Jobs.JobQueuePageViewModel Queue { get; }
 
     public Jobs.JobOutputPageViewModel Output { get; }
+
+    /// <summary>Záznamy spracovania (owner, 31. 10. 2026).</summary>
+    public Jobs.ProcessingLogsPageViewModel Logs { get; }
 
     public ToolItem SelectedTool
     {

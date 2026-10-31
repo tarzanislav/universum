@@ -9,9 +9,17 @@ namespace Universum.Core.Jobs;
 /// runs directly – verification, undo record, Recycle Bin – with progress and the tools' warnings in the job output.
 /// </summary>
 public sealed class FileJob(string description, FileProcessor processor, EditPlan plan, Placement placement, OutputOptions output)
-    : Job(description)
+    : Job(description), ILoggedJob
 {
     public EditPlan Plan { get; } = plan;
+
+    /// <summary>The page that added it: "Single spracovanie", "Úprava hlavičky" (the description up to the colon).</summary>
+    public string LogKind => Description.Split(':')[0].Trim();
+
+    public IReadOnlyList<LoggedFile> LoggedFiles => Result is { } result ? [ProcessingWords.Describe(Plan.Target.Source.Path, Plan, result)]
+        : Status == JobStatus.Failed ? [new LoggedFile(Plan.Target.Source.Path, null, LoggedOutcome.Failed, "Chyba – originál ostal nezmenený", [],
+            [.. Messages.Where(m => m.Severity == JobSeverity.Error).Select(m => new LoggedProblem(m.Text, "Skúste súbor spracovať znova."))], [])]
+        : [];
 
     /// <summary>The result of the last run.</summary>
     public ProcessingResult? Result { get; private set; }

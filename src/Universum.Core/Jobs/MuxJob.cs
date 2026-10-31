@@ -3,9 +3,39 @@ using Universum.Core.Muxing;
 namespace Universum.Core.Jobs;
 
 /// <summary>The multiplexer as a job: mkvmerge's progress, warnings and errors go to the job output.</summary>
-public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec spec) : Job(description)
+public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec spec) : Job(description), ILoggedJob
 {
     public MuxSpec Spec { get; } = spec;
+
+    public string LogKind => "Zlučovanie";
+
+    public IReadOnlyList<LoggedFile> LoggedFiles
+    {
+        get
+        {
+            if (Result is not { } result)
+            {
+                return [];
+            }
+
+            var failed = result.Status != MuxStatus.Done;
+            var explained = result.Messages.Select(m => (Message: m, Words: Execution.ProcessingWords.Explain(m, failed))).ToList();
+            var problems = explained.Where(e => e.Words is (_, { } problem)).Select(e => e.Words!.Value.Problem!).ToList();
+            if (result.Status == MuxStatus.Failed && problems.Count == 0)
+            {
+                problems.Add(new LoggedProblem("Zlučovanie sa nepodarilo (podrobnosti sú v technických riadkoch).", "Skontrolujte vstupné súbory a voľné miesto na disku a skúste znova."));
+            }
+
+            return
+            [
+                new LoggedFile(Spec.Sources.FirstOrDefault()?.File.Path ?? "", result.OutputPath,
+                    result.Status switch { MuxStatus.Done => LoggedOutcome.Done, MuxStatus.Cancelled => LoggedOutcome.Cancelled, _ => LoggedOutcome.Failed },
+                    result.Status switch { MuxStatus.Done => "Hotovo – nový súbor", MuxStatus.Cancelled => "Zrušené – nič sa nezapísalo", _ => "Chyba – nič sa nezapísalo" },
+                    [$"Zlúčené: {Spec.Sources.Count} vstup(y), {Spec.Tracks.Count} stôp.", .. explained.Where(e => e.Words is ({ } step, null)).Select(e => e.Words!.Value.Step!)],
+                    problems, [.. explained.Where(e => e.Words is null or (_, not null)).Select(e => e.Message)]),
+            ];
+        }
+    }
 
     public MuxResult? Result { get; private set; }
 

@@ -332,7 +332,10 @@ public sealed class ChaptersPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(target), placement, new OutputOptions(OriginalHandling.Keep));
+            var plan = EditPlan.For(target);
+            var started = DateTime.UtcNow;
+            var result = await _services.Processor(installation).ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep));
+            _services.LogProcessing("Kapitoly", plan, result, started);
             _services.Inspector(installation).Invalidate(target.Source.Path);
             var count = Count(target.NewChapters!.Count);
             switch (result.Status)

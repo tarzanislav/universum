@@ -150,7 +150,7 @@ internal static class SelfTest
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
               "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
               "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Nastavenia",
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia",
             "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
@@ -291,6 +291,7 @@ internal static class SelfTest
         await TestBatchPageAsync(model, window, services);
         await WaitFor(() => sounds.Count > 0);
         Check(sounds.Count > 0 && services.Settings.FinishSound, "queue: the sound of the end after Hromadné spracovanie");
+        await TestProcessingLogsAsync(model, window, services);
 
         // updates: the real MKVToolNix feed and change log, the GitHub releases of UNIVERSUM
         var updates = await services.Updates.CheckAsync();
@@ -1928,6 +1929,31 @@ internal static class SelfTest
             Segment(1.6, 0x80, []);
             return [.. data];
         }
+    }
+
+    // owner, 31. 10. 2026: Záznamy spracovania – the runs of this self-test (Hromadné and Single spracovanie, the studios …)
+    // in words; ticked logs and all deleted (the films are never touched)
+    private static async Task TestProcessingLogsAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var page = model.Logs;
+        model.SelectedTool = model.Tools.First(t => t.Page == page);
+        await WaitFor(() => page.Logs.Count > 0);
+        var kinds = page.Logs.Select(l => l.Kind).Distinct().ToList();
+        Check(kinds.Contains("Hromadné spracovanie") && kinds.Contains("Úprava hlavičky"), "logs: the runs of the self-test – " + string.Join(", ", kinds));
+        page.Selected = page.Logs.First(l => l.Kind == "Hromadné spracovanie");
+        Check(page.Files.Count > 0 && page.Files.All(f => f.Headline.Length > 0 && (f.HasDone || f.HasProblems)), "logs: the files of a batch run in words – " +
+              string.Join(" | ", page.Files.Take(3).Select(f => f.Headline)));
+        await Screenshot(window, "logs.png");
+
+        page.Confirm = _ => true;
+        var count = page.Logs.Count;
+        page.Logs[0].IsChecked = true;
+        page.DeleteCommand.Execute(null);
+        await WaitFor(() => page.Logs.Count == count - 1);
+        Check(page.Logs.Count == count - 1 && services.ProcessingLogs.All().Count == count - 1, "logs: a ticked log deleted");
+        page.DeleteAllCommand.Execute(null);
+        await WaitFor(() => page.Logs.Count == 0);
+        Check(page.Logs.Count == 0 && services.ProcessingLogs.All().Count == 0, "logs: all deleted");
     }
 
     // owner, 30. 10. 2026: Úprava videostopy – the proportions (without writing the picture), an exact cut of a turned picture

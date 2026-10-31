@@ -2120,6 +2120,117 @@
                 </DataGrid>
             </Grid>
         </DataTemplate>
+
+        <!-- Záznamy spracovania (owner, 31. 10. 2026): every run in words; ticked ones or all can be deleted -->
+        <DataTemplate DataType="{x:Type jobs:ProcessingLogsPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top">
+                        <Button Content="Zmazať označené" Command="{Binding DeleteCommand}" Padding="12,4" Margin="0,0,8,0"
+                                ToolTip="Zmaže zaškrtnuté záznamy (alebo vybraný, keď nie je nič zaškrtnuté) – filmy sa nemenia" />
+                        <Button Content="Zmazať všetky" Command="{Binding DeleteAllCommand}" Padding="12,4" Margin="0,0,8,0" />
+                        <Button Content="Priečinok záznamov" Command="{Binding OpenFolderCommand}" Padding="12,4" />
+                    </WrapPanel>
+                    <TextBlock Style="{StaticResource PageTitle}" Text="Záznamy spracovania" />
+                </DockPanel>
+                <TextBlock Grid.Row="1" Style="{StaticResource Hint}" Text="{Binding Status}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="360" MinWidth="220" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ListBox ItemsSource="{Binding Logs}" SelectedItem="{Binding Selected}" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,3">
+                                    <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsChecked}" VerticalAlignment="Top" Margin="0,2,8,0" ToolTip="Označiť na zmazanie" />
+                                    <StackPanel>
+                                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding When, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="   " /><Run Text="{Binding Kind, Mode=OneWay}" /></TextBlock>
+                                        <TextBlock x:Name="summary" Text="{Binding Summary}" TextWrapping="Wrap" Opacity="0.85" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding HasProblems}" Value="True">
+                                        <Setter TargetName="summary" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                        <Setter TargetName="summary" Property="Opacity" Value="1" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <DockPanel Grid.Column="2">
+                        <StackPanel DockPanel.Dock="Top">
+                            <DockPanel>
+                                <CheckBox DockPanel.Dock="Right" Content="len súbory s problémom" IsChecked="{Binding OnlyProblems}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding Outcome}" TextWrapping="Wrap" Margin="0,2,0,8" />
+                        </StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Files}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}" Margin="0,0,8,8">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock x:Name="headline" Text="{Binding Headline}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,4" />
+                                                <ItemsControl ItemsSource="{Binding Problems}" Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,4">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Margin="0,2">
+                                                                <TextBlock TextWrapping="Wrap"><Run Text="Čo sa stalo: " FontWeight="SemiBold" /><Run Text="{Binding What, Mode=OneWay}" /></TextBlock>
+                                                                <TextBlock TextWrapping="Wrap"><Run Text="Čo s tým: " FontWeight="SemiBold" /><Run Text="{Binding Advice, Mode=OneWay}" /></TextBlock>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <StackPanel Visibility="{Binding HasDone, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBlock Text="Čo sa urobilo:" FontWeight="SemiBold" />
+                                                    <ItemsControl ItemsSource="{Binding Done}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" Margin="8,1,0,0" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                                <DockPanel Margin="0,6,0,0">
+                                                    <Button DockPanel.Dock="Right" Content="Ukázať" Command="{Binding OpenCommand}" CommandParameter="{Binding File.Source}" Padding="8,1" Margin="8,0,0,0"
+                                                            ToolTip="Otvorí priečinok s originálom v Prieskumníkovi" />
+                                                    <TextBlock Text="{Binding Source}" Style="{StaticResource Hint}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                                <DockPanel Margin="0,2,0,0" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                                                    <Button DockPanel.Dock="Right" Content="Ukázať" Command="{Binding OpenCommand}" CommandParameter="{Binding File.Result}" Padding="8,1" Margin="8,0,0,0"
+                                                            ToolTip="Otvorí priečinok s výsledkom v Prieskumníkovi" />
+                                                    <TextBlock Text="{Binding Result}" Style="{StaticResource Hint}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                                <Expander Header="Technické podrobnosti (výstup nástrojov)" Margin="0,4,0,0" Visibility="{Binding HasTechnical, Converter={StaticResource BoolToVisibility}}">
+                                                    <TextBox Text="{Binding Technical, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" BorderThickness="0" Margin="0,4,0,0" />
+                                                </Expander>
+                                            </StackPanel>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                <Setter TargetName="headline" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsProblem}" Value="True">
+                                                <Setter TargetName="headline" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Grid>
+            </Grid>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:BatchPageViewModel}">
             <Grid Margin="24,20,24,12">
                 <Grid.RowDefinitions>

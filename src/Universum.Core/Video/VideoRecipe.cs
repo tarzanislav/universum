@@ -164,8 +164,9 @@ public static partial class VideoEncoder
             "-vf", string.Join(",", encoding.Recipe.Filters()), "-c:v", chosen]);
         arguments.AddRange(chosen switch
         {
-            // H.264 High (Media Foundation starts from Baseline); the HEVC encoder of Windows is a hardware one
-            "h264_mf" => ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant), "-profile:v", "high"],
+            // H.264 High (Media Foundation starts from Baseline; FFmpeg's generic option takes the number only: 100); the
+            // HEVC encoder of Windows is a hardware one
+            "h264_mf" => ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant), "-profile:v", "100"],
             "hevc_mf" => ["-rate_control", "quality", "-quality", encoding.Recipe.Quality.ToString(invariant), "-hw_encoding", "1"],
             _ => ["-crf", Math.Clamp(51 - (encoding.Recipe.Quality / 2), 0, 51).ToString(invariant)],
         });

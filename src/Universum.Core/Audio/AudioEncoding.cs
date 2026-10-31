@@ -103,8 +103,8 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         }
 
         var (name, encoder) = Encoder(track);
-        var most = encoder switch { "ac3" => 640, "eac3" => 6144, "libopus" => 512, "libmp3lame" => 320, _ => int.MaxValue };
-        return encoder is null ? $"Kodek {track.Codec} FFmpeg nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, Opus, FLAC)."
+        var most = encoder switch { "ac3" => 640, "eac3" => 6144, _ => int.MaxValue };
+        return encoder is null ? $"Kodek {name ?? track.Codec} FFmpeg UNIVERSUM nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, FLAC)."
             : BitrateFor(track) > most ? $"{name} najviac {most} kbit/s."
             : null;
     }
@@ -131,30 +131,27 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         "ac3" => "A_AC3",
         "eac3" => "A_EAC3",
         "aac" => "A_AAC",
-        "libopus" => "A_OPUS",
         "flac" => "A_FLAC",
-        "libmp3lame" => "A_MPEG/L3",
-        "libvorbis" => "A_VORBIS",
         _ => null,
     };
 
-    /// <summary>FFmpeg's encoder and the codec's name; the encoder null when FFmpeg cannot write the codec kept.</summary>
+    /// <summary>
+    /// FFmpeg's encoder and the codec's name; the encoder null when the FFmpeg of UNIVERSUM cannot write the codec (it is
+    /// an LGPL build with FFmpeg's own encoders only: AC-3, E-AC-3, AAC, FLAC – no Opus, MP3 or Vorbis).
+    /// </summary>
     public (string? Name, string? Encoder) Encoder(MediaTrack track) => Codec switch
     {
         AudioCodec.Ac3 => ("AC-3", "ac3"),
         AudioCodec.Eac3 => ("E-AC-3", "eac3"),
         AudioCodec.Aac => ("AAC", "aac"),
-        AudioCodec.Opus => ("Opus", "libopus"),
+        AudioCodec.Opus => ("Opus", null),
         AudioCodec.Flac => ("FLAC", "flac"),
         _ => CodecIdOf(track) switch
         {
             "A_AC3" => ("AC-3", "ac3"),
             "A_EAC3" => ("E-AC-3", "eac3"),
             { } id when id.StartsWith("A_AAC", StringComparison.Ordinal) => ("AAC", "aac"),
-            "A_OPUS" => ("Opus", "libopus"),
             "A_FLAC" => ("FLAC", "flac"),
-            "A_MPEG/L3" => ("MP3", "libmp3lame"),
-            "A_VORBIS" => ("Vorbis", "libvorbis"),
             { } id when id.StartsWith("A_PCM", StringComparison.Ordinal) => ("FLAC", "flac"),
             _ => (null, null),
         },
@@ -180,8 +177,6 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
             "ac3" => surround ? 640 : 224,
             "eac3" => surround ? 768 : 256,
             "aac" => surround ? 448 : 192,
-            "libopus" => surround ? 384 : 160,
-            "libmp3lame" => 192,
             _ => surround ? 448 : 192,
         };
     }
@@ -254,12 +249,6 @@ public static partial class AudioEncoder
         }
 
         var (_, encoder) = recipe.Encoder(track);
-        if (encoder == "libopus" && !recipe.Stereo)
-        {
-            // libopus takes 5.1 only as its own layout (AC-3, DTS decode as 5.1(side))
-            filters.Add("aformat=channel_layouts=7.1|5.1|stereo|mono");
-        }
-
         var arguments = new List<string>(input) { "-map_metadata", "-1", "-map_chapters", "-1" };
         if (filters.Count > 0)
         {

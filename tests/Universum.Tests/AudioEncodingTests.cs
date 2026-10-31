@@ -22,10 +22,11 @@ public sealed class AudioEncodingTests
         Assert.True(pal.NeedsEncoding && pal.Shift == SubtitleTiming.Delay(-120 + AudioRecipe.TempoLeadMilliseconds) && (pal with { KeepPitch = false }).Shift == SubtitleTiming.Delay(-120) &&
                     pal.BitrateFor(ac3) == 640 && pal.Problem(ac3) is null, "PAL → film: AC-3 again, 640 kbit/s; atempo's lead made up for");
         var raw = new MediaTrack { Id = 0, Type = TrackType.Audio, Codec = "AC-3", AudioChannels = 6 };
-        Assert.True(AudioRecipe.CodecIdOf(raw) == "A_AC3" && pal.Problem(raw) is null && pal.WrittenCodecId(raw) == "A_AC3" &&
-                    (pal with { Codec = AudioCodec.Opus }).WrittenCodecId(raw) == "A_OPUS", "a raw .ac3 file: its codec by name");
-        Assert.True((pal with { Codec = AudioCodec.Opus, Bitrate = 640 }).Problem(ac3) is { Length: > 0 } && (pal with { Bitrate = 768 }).Problem(ac3) is { Length: > 0 },
-            "bitrates the codecs do not take");
+        Assert.True(AudioRecipe.CodecIdOf(raw) == "A_AC3" && pal.Problem(raw) is null && pal.WrittenCodecId(raw) == "A_AC3", "a raw .ac3 file: its codec by name");
+        Assert.True((pal with { Bitrate = 768 }).Problem(ac3) is { Length: > 0 }, "bitrates the codecs do not take");
+        var opus = ac3 with { CodecId = "A_OPUS", Codec = "Opus" };
+        Assert.True((pal with { Codec = AudioCodec.Opus }).Problem(ac3)!.Contains("Opus", StringComparison.Ordinal) && pal.Problem(opus) is { Length: > 0 } &&
+                    (pal with { Codec = AudioCodec.Aac }).Problem(opus) is null, "the FFmpeg of UNIVERSUM writes no Opus (LGPL): another codec is chosen");
         Assert.True(pal.Problem(dts) is { Length: > 0 } && (pal with { Codec = AudioCodec.Flac }).Problem(dts) is null, "DTS cannot be written: a codec is chosen");
         Assert.Equal("atempo=0.959040959", string.Join(";", AudioEncoder.SpeedFilters(pal, 48000)), "the tempo keeps the pitch");
         Assert.Equal("asetrate=46033.96603,aresample=48000", string.Join(";", AudioEncoder.SpeedFilters(pal with { KeepPitch = false }, 48000)), "the pitch changes with the speed");

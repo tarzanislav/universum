@@ -57,8 +57,17 @@ public sealed class MainViewModel : ObservableObject
         };
         Interests = new InterestsPageViewModel(services);
         Calendar = new CalendarPageViewModel(services) { OpenNews = OpenInNews };
-        AgendaTasks = new PlaceholderPageViewModel(Loc.T("Plánované úlohy"),
-            "Moje úlohy, úlohy navrhnuté programom (napr. vybraný titul je vo vstupnom priečinku) a neskôr úlohy, ktoré UNIVERSUM vykoná sám. Úlohy s termínom už teraz vidno v Kalendári.", "etapa P2");
+        AgendaTasks = new TasksPageViewModel(services)
+        {
+            ProcessFound = ProcessFoundAsync,
+            OpenNews = OpenInNews,
+            OpenLog = id =>
+            {
+                Open(Logs);
+                Logs.Refresh();
+                Logs.Selected = Logs.Logs.FirstOrDefault(l => l.Log.Id == id);
+            },
+        };
         AgendaNotes = new PlaceholderPageViewModel(Loc.T("Poznámky"),
             "Poznámky (aj hlasom), poznámky k titulom z Premiér a Noviniek, k dňom, úlohám a spracovaniu. Poznámky k dňu sa už teraz dajú písať v Kalendári.", "etapa P2");
         NotesGuide = new PlaceholderPageViewModel(Loc.T("Návod"), "Stručný návod ku skupine POZNÁMKY – s obrázkami, zvýrazneniami a postupmi krok za krokom.", "etapa N");
@@ -365,7 +374,8 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Kalendár (the group POZNÁMKY).</summary>
     public CalendarPageViewModel Calendar { get; }
 
-    public PlaceholderPageViewModel AgendaTasks { get; }
+    /// <summary>Plánované úlohy (the group POZNÁMKY).</summary>
+    public TasksPageViewModel AgendaTasks { get; }
 
     public PlaceholderPageViewModel AgendaNotes { get; }
 
@@ -455,6 +465,11 @@ public sealed class MainViewModel : ObservableObject
             if (value?.Page == Calendar)
             {
                 Calendar.Shown();
+            }
+
+            if (value?.Page == AgendaTasks)
+            {
+                AgendaTasks.Shown();
             }
         }
     }

@@ -1279,12 +1279,95 @@ internal static class SelfTest
         Check(news.Requests.Count == asked && again.Tabs[0].Rows.Count == 2, "novinky: the kept days are shown at once at the next start, without asking the sources");
 
         await TestCalendarAsync(model, window, services);
+        await TestTasksAsync(model, window, services);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SeriesNewsForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
         model.Open(model.Dashboard);
+    }
+
+    /// <summary>
+    /// Plánované úlohy (owner, 31. 10. 2026, stage P2): tasks written in one line and understood, the groups by due day,
+    /// done, the board, the checklist in the editor, the filters, the suggestions of UNIVERSUM (a chosen title in the input
+    /// folder), and the task in Kalendár; invented titles only.
+    /// </summary>
+    private static async Task TestTasksAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var tasks = model.AgendaTasks;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        model.Open(tasks);
+        await tasks.Ready;
+        tasks.IsList = true;
+        tasks.QuickText = "zajtra o 20:00 vymyslená úloha #test !";
+        Check(tasks.QuickHint.Contains("vymyslená úloha", StringComparison.Ordinal) && tasks.QuickHint.Contains("20:00", StringComparison.Ordinal), "tasks: the line understood before it is added – " + tasks.QuickHint);
+        tasks.AddCommand.Execute(null);
+        var made = services.Agenda.Items.Single(i => i.Title == "vymyslená úloha");
+        Check(made.Task is { Priority: 2, DueTime.Hour: 20 } && made.Task.Due == today.AddDays(1) && made.Tags.SequenceEqual(["test"]) && tasks.QuickText.Length == 0 &&
+              tasks.Groups.Any(g => g.Title == "Zajtra" && g.Rows.Any(r => r.Item == made)), "tasks: a task of tomorrow 20:00, high priority, tagged – " + tasks.Status);
+        tasks.QuickText = "skontrolovať vymyslené titulky";
+        tasks.AddCommand.Execute(null);
+        services.Agenda.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená úloha po termíne", Task = new Core.Agenda.AgendaTask { Due = today.AddDays(-2) } });
+        Check(tasks.Groups.Select(g => g.Title).SequenceEqual(["Po termíne", "Zajtra", "Bez termínu"]) && tasks.Groups[0].Rows[0].IsOverdue,
+            "tasks: the groups by due day, the overdue one first – " + string.Join(", ", tasks.Groups.Select(g => g.Title)));
+        await Screenshot(window, "tasks-list.png");
+
+        tasks.Groups.First(g => g.Title == "Po termíne").Rows[0].IsDone = true;
+        Check(!tasks.Groups.Any(g => g.Title == "Po termíne") && services.Agenda.Items.Single(i => i.Title == "Vymyslená úloha po termíne").Task!.State == Core.Agenda.TaskState.Done,
+            "tasks: a task done leaves the open groups");
+        tasks.ShowDone = true;
+        Check(tasks.Groups.Any(g => g.Title == "Hotové"), "tasks: the done tasks shown on demand");
+        tasks.ShowDone = false;
+
+        tasks.Edit(made);
+        var editor = tasks.Editor!;
+        editor.NewCheckText = "vymyslený krok 1";
+        editor.AddCheckCommand.Execute(null);
+        editor.NewCheckText = "vymyslený krok 2";
+        editor.AddCheckCommand.Execute(null);
+        editor.Checklist[0].Done = true;
+        await Screenshot(window, "tasks-editor.png");
+        editor.SaveCommand.Execute(null);
+        Check(!tasks.HasEditor && made.Task!.Checklist.Count == 2 && made.Task.Checklist.Count(c => c.Done) == 1 &&
+              tasks.Groups.SelectMany(g => g.Rows).First(r => r.Item == made).Progress == "☑ 1/2", "tasks: the checklist of the task – 1 of 2 done");
+
+        tasks.Filter = "titulky";
+        Check(tasks.Groups.SelectMany(g => g.Rows).Select(r => r.Title).SequenceEqual(["skontrolovať vymyslené titulky"]), "tasks: looked for without diacritics");
+        tasks.Filter = "";
+        tasks.Tag = "test";
+        Check(tasks.Groups.SelectMany(g => g.Rows).All(r => r.Item == made), "tasks: by the tag");
+        tasks.Tag = TasksPageViewModel.AllTags;
+
+        tasks.IsBoard = true;
+        var plain = tasks.ToDo.First(r => r.Title == "skontrolovať vymyslené titulky");
+        plain.RightCommand.Execute(null);
+        Check(tasks.InProgress.Any(r => r.Title == "skontrolovať vymyslené titulky"), "tasks: on the board to In progress");
+        await Screenshot(window, "tasks-board.png");
+        tasks.InProgress.First(r => r.Title == "skontrolovať vymyslené titulky").RightCommand.Execute(null);
+        Check(tasks.Done.Any(r => r.Title == "skontrolovať vymyslené titulky"), "tasks: on the board to Done");
+        tasks.IsBoard = false;
+
+        if (services.InputWatch.Found.Count > 0)
+        {
+            var suggestion = tasks.Suggestions.FirstOrDefault(s => s.Key.StartsWith("vstup|", StringComparison.Ordinal));
+            Check(suggestion is { HasAction: true }, "tasks: UNIVERSUM suggests to process a chosen title found in the input folder – " + string.Join(", ", tasks.Suggestions.Select(s => s.Title)));
+            suggestion!.TakeCommand.Execute(null);
+            Check(services.Agenda.Items.Any(i => i.Title == suggestion.Title && i.Task?.Due == today) && !tasks.Suggestions.Contains(suggestion) &&
+                  services.Settings.HiddenSuggestions.Contains(suggestion.Key), "tasks: a suggestion taken as a task of today, then hidden");
+        }
+
+        model.Calendar.Select(today.AddDays(1));
+        Check(model.Calendar.DetailSections.Any(s => s.Entries.Any(e => e.Record == made && e.TimeText == "20:00")), "tasks: the task of tomorrow is in Kalendár");
+
+        foreach (var record in services.Agenda.Items.ToList())
+        {
+            services.Agenda.Delete(record.Id);
+        }
+
+        services.Agenda.EmptyBin();
+        services.Settings.HiddenSuggestions.Clear();
+        services.Settings.Save();
     }
 
     /// <summary>

@@ -34,8 +34,11 @@ public sealed class FileProcessor(
     /// <summary>The library index the processor records its results in (null without one).</summary>
     public LibraryIndex? Index => index;
 
-    /// <summary>Finds FFmpeg when a sound is to be written anew (<see cref="MediaTrack.Encode"/>); null: such a plan fails.</summary>
+    /// <summary>Finds FFmpeg when a sound or a picture is to be written anew (<see cref="MediaTrack.Encode"/>, <see cref="MediaTrack.VideoEncode"/>); null: such a plan fails.</summary>
     public Func<CancellationToken, Task<string>>? FindFfmpeg { get; init; }
+
+    /// <summary>Replaces the encoders of Windows for pictures (tests on other systems: "libx264"); null in UNIVERSUM.</summary>
+    public string? VideoEncoder { get; init; }
 
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
@@ -587,10 +590,10 @@ public sealed class FileProcessor(
         return Result(plan, ProcessingStatus.Done, final, null, messages);
     }
 
-    // the sounds of the target written anew by FFmpeg (the first half of the work), by track ID
+    // the sounds and pictures of the target written anew by FFmpeg (the first half of the work), by track ID
     private async Task<(IReadOnlyDictionary<int, string> Encoded, string? Problem)> EncodeAsync(TargetState target, string folder, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var tracks = target.Tracks.Where(t => t.IsAdded && t.Source.Encode is not null).ToList();
+        var tracks = target.Tracks.Where(t => t.IsAdded && (t.Source.Encode is not null || t.Source.VideoEncode is not null)).ToList();
         var encoded = new Dictionary<int, string>();
         if (tracks.Count == 0)
         {
@@ -606,10 +609,23 @@ public sealed class FileProcessor(
         Directory.CreateDirectory(folder);
         for (var i = 0; i < tracks.Count; i++)
         {
-            var encoding = tracks[i].Source.Encode!;
-            var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
             var at = i;
             var part = progress is null ? null : new ScaledProgress(progress, (double)at / tracks.Count * 0.5, 0.5 / tracks.Count);
+            if (tracks[i].Source.VideoEncode is { } picture)
+            {
+                var video = Path.Combine(folder, $"obraz-{i + 1:00}.mkv");
+                var failed = await Video.VideoEncoder.EncodeAsync(runner, ffmpeg, picture, video, target.Source.Duration, part, cancellationToken, VideoEncoder).ConfigureAwait(false);
+                if (failed is not null)
+                {
+                    return (encoded, $"the picture of {Path.GetFileName(picture.Path)} cannot be written anew: {failed}");
+                }
+
+                encoded[tracks[i].TrackId] = video;
+                continue;
+            }
+
+            var encoding = tracks[i].Source.Encode!;
+            var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
             var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, encoding.Ordinal, encoding.Source, encoding.Recipe, output,
                 target.Source.Duration, part, cancellationToken).ConfigureAwait(false);
             if (problem is not null)

@@ -69,7 +69,18 @@ public sealed class LibraryIndex
                 text.Append("|sync:").Append(timing.MkvMergeValue);
             }
 
-            if (track.Source.Encode is { } encode)
+            if (track.AspectRatio is { } aspect)
+            {
+                text.Append("|aspect:").Append(aspect);
+            }
+
+            if (track.Source.VideoEncode is { } picture)
+            {
+                var source = new FileInfo(picture.Path);
+                text.Append(CultureInfo.InvariantCulture, $"|video:{Path.GetFullPath(picture.Path)}/{(source.Exists ? source.Length : -1)}/{(source.Exists ? source.LastWriteTimeUtc.Ticks : 0)}/")
+                    .Append(System.Text.Json.JsonSerializer.Serialize(picture.Recipe)).Append('/').AppendJoin(',', picture.Keyframes.Select(k => k.Ticks));
+            }
+            else if (track.Source.Encode is { } encode)
             {
                 // a sound written anew: by its source (the file as it is now) and how it is written – not read whole
                 var info = new FileInfo(encode.Path);
@@ -82,6 +93,11 @@ public sealed class LibraryIndex
             }
 
             text.Append('\n');
+        }
+
+        if (target.Cut is { } cut)
+        {
+            text.Append("cut:").AppendJoin(',', cut.Select(p => $"{p.Start.Ticks}-{p.End.Ticks}")).Append(';');
         }
 
         text.Append("removed:").AppendJoin(',', target.RemovedFromFile.Select(t => t.Id)).Append(";tags:").Append(target.RemoveTags).Append(";index:").Append(target.RepairIndex);

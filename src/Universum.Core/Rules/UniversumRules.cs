@@ -21,9 +21,12 @@ public static class UniversumRules
         decisions ??= TrackDecisions.None;
         var issues = new List<RuleIssue>();
         var language = (MediaTrack t) => decisions.Languages.TryGetValue(t.Id, out var chosen) ? chosen : t.Language;
-        var kept = (MediaTrack t) => t.Type is TrackType.Video or TrackType.Other || !decisions.Removed.Contains(t.Id);
+        // a video track is left out only when its picture is written anew in a track of its own (Úprava videostopy)
+        var replaced = (MediaTrack t) => t.Type == TrackType.Video && decisions.Removed.Contains(t.Id) &&
+                                         file.Tracks.Any(r => r.VideoEncode is { } encode && encode.Source.Id == t.Id && IO.Paths.Same(encode.Path, file.Path));
+        var kept = (MediaTrack t) => t.Type == TrackType.Other || (t.Type == TrackType.Video ? !replaced(t) : !decisions.Removed.Contains(t.Id));
 
-        var videos = file.TracksOf(TrackType.Video).ToList();
+        var videos = file.TracksOf(TrackType.Video).Where(kept).ToList();
         if (videos.Count > 1)
         {
             issues.Add(new RuleIssue(RuleIssueKind.MultipleVideoTracks));

@@ -84,8 +84,15 @@ public static class MkvToolNixArguments
             arguments.AddRange(["--no-global-tags", "--no-track-tags", "--disable-track-statistics-tags"]);
         }
 
+        if (target.IsCut)
+        {
+            // Úprava videostopy: the parts kept, one after another in one file
+            arguments.AddRange(["--split", Video.Cut.MkvMergeValue(target.Cut!)]);
+        }
+
         if (target.RemovedFromFile.Any() || target.Tracks.Any(t => t.IsAdded))
         {
+            AddSelection(arguments, target, TrackType.Video, "--video-tracks", "--no-video");
             AddSelection(arguments, target, TrackType.Audio, "--audio-tracks", "--no-audio");
             AddSelection(arguments, target, TrackType.Subtitles, "--subtitle-tracks", "--no-subtitles");
         }
@@ -128,9 +135,12 @@ public static class MkvToolNixArguments
             }
 
             // one track of each added file (a VobSub .idx may hold several languages, a film several sounds)
-            arguments.AddRange(added.Type == TrackType.Audio
-                ? ["--audio-tracks", inner, "--no-video", "--no-subtitles", "--no-buttons", "--no-attachments", "--no-global-tags", "--no-chapters", input]
-                : ["--subtitle-tracks", inner, "--no-global-tags", "--no-chapters", input]);
+            arguments.AddRange(added.Type switch
+            {
+                TrackType.Audio => ["--audio-tracks", inner, "--no-video", "--no-subtitles", "--no-buttons", "--no-attachments", "--no-global-tags", "--no-chapters", input],
+                TrackType.Video => ["--video-tracks", inner, "--no-audio", "--no-subtitles", "--no-buttons", "--no-attachments", "--no-global-tags", "--no-chapters", input],
+                _ => ["--subtitle-tracks", inner, "--no-global-tags", "--no-chapters", input],
+            });
         }
 
         arguments.AddRange(["--track-order", string.Join(",", target.Tracks.Select(t => t.IsAdded
@@ -166,6 +176,12 @@ public static class MkvToolNixArguments
         if (track.Timing is { IsNone: false } timing)
         {
             arguments.AddRange(["--sync", $"{id}:{timing.MkvMergeValue}"]);
+        }
+
+        // Úprava videostopy: the proportions the picture is shown at
+        if (track.AspectRatio is { } aspect)
+        {
+            arguments.AddRange(["--aspect-ratio", $"{id}:{aspect}"]);
         }
     }
 

@@ -48,11 +48,18 @@ public static class TargetVerifier
         }
 
         Check(problems, !target.RepairIndex || result.TracksOf(TrackType.Video).All(v => v.IndexEntries is null or > 0), "video index still missing");
-        Check(problems, result.ChapterEntries == target.ResultChapterEntries, $"chapters {result.ChapterEntries}, expected {target.ResultChapterEntries}");
+        // a film cut keeps the chapters of its parts only
+        Check(problems, target.IsCut || result.ChapterEntries == target.ResultChapterEntries, $"chapters {result.ChapterEntries}, expected {target.ResultChapterEntries}");
         Check(problems, result.AttachmentCount == source.AttachmentCount, $"attachments {result.AttachmentCount}, expected {source.AttachmentCount}");
         Check(problems, !target.RemoveTags || !result.HasTags, "tags are still present");
         Check(problems, !target.TitleChanged || (result.Title ?? "") == (target.ResultTitle ?? ""), $"title '{result.Title}', expected '{target.ResultTitle}'");
-        if (source.Duration is { } before && result.Duration is { } after)
+        if (target.Cut is { Count: > 0 } parts && result.Duration is { } cut)
+        {
+            // the parts kept (moved to key frames by at most a few seconds each)
+            var kept = parts.Aggregate(TimeSpan.Zero, (sum, p) => sum + p.Length);
+            Check(problems, cut > TimeSpan.Zero && Math.Abs((cut - kept).TotalSeconds) <= 1 + (10 * parts.Count), $"duration {cut}, expected about {kept}");
+        }
+        else if (source.Duration is { } before && result.Duration is { } after)
         {
             // added subtitles and new times may end after the video: the file is then longer, never shorter
             Check(problems, target.AddsFiles || target.TimingChanged ? (before - after).TotalSeconds <= 1 : Math.Abs((after - before).TotalSeconds) <= 1,

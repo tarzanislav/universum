@@ -30,5 +30,8 @@ public sealed record TrackTarget(MediaTrack Source, string? Name, LanguageTag La
     /// <summary>The track is added from an external file (subtitles lying with the video).</summary>
     public bool IsAdded => Source.ExternalFile is not null;
 
-    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged || TimingChanged || IsAdded;
+    /// <summary>The proportions the picture is shown at ("16/9"; Úprava videostopy – owner, 30. 10. 2026); null keeps them.</summary>
+    public string? AspectRatio { get; init; }
+
+    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged || TimingChanged || IsAdded || AspectRatio is not null;
 }

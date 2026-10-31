@@ -83,4 +83,7 @@ public sealed record MediaTrack
     /// <see cref="ExternalFile"/> – the video itself or another file; it is written right before mkvmerge reads it.
     /// </summary>
     public Audio.SoundEncoding? Encode { get; init; }
+
+    /// <summary>The picture written anew (Úprava videostopy: turned, of another height or codec, cut exactly) from a video track of <see cref="ExternalFile"/>.</summary>
+    public Video.VideoEncoding? VideoEncode { get; init; }
 }

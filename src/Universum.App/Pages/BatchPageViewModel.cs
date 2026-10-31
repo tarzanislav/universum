@@ -205,6 +205,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         _studioEdits.Clear();
         _additions.Clear();
+        _revisions.Clear();
 
         _subtitleReading?.Cancel();
         _analysis = null;
@@ -379,6 +380,41 @@ public sealed class BatchPageViewModel : ObservableObject
     // Doplnok k názvu by the files' paths: given again to the groups of every new analysis of the folder
     private readonly Dictionary<string, string> _additions = new(Paths.Comparer);
 
+    // Revízia by the files' paths, kept as Doplnok k názvu
+    private readonly HashSet<string> _revisions = new(Paths.Comparer);
+
+    /// <summary>
+    /// Revízia of one file (owner, 31. 10. 2026): written again although its result is in the library; the new version is
+    /// verified, then the earlier one goes to the Recycle Bin.
+    /// </summary>
+    public void SetRevision(string path, bool revision)
+    {
+        if (_analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path))) is not { } group || IsRunning)
+        {
+            return;
+        }
+
+        var key = group.Files.First(f => Paths.Same(f.Path, path)).Path;
+        if (revision ? !group.Decisions.Revisions.Add(key) : !group.Decisions.Revisions.Remove(key))
+        {
+            return;
+        }
+
+        if (revision)
+        {
+            _revisions.Add(key);
+        }
+        else
+        {
+            _revisions.Remove(key);
+        }
+
+        Replan();
+        RunState = revision
+            ? $"{Path.GetFileName(path)}: revízia – spracuje sa znova; nová verzia sa zapíše a overí, až potom ide doterajší výsledok do Koša."
+            : $"{Path.GetFileName(path)}: bez revízie.";
+    }
+
     private void ApplyStudioEdits()
     {
         foreach (var group in _analysis?.Groups ?? [])
@@ -393,6 +429,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 if (_additions.TryGetValue(file.Path, out var addition))
                 {
                     group.Decisions.Additions[file.Path] = addition;
+                }
+
+                if (_revisions.Contains(file.Path))
+                {
+                    group.Decisions.Revisions.Add(file.Path);
                 }
             }
         }
@@ -2781,6 +2822,12 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     group.Decisions.Additions[path] = addition;
                     _additions[path] = addition;
+                }
+
+                if (file.Revision)
+                {
+                    group.Decisions.Revisions.Add(path);
+                    _revisions.Add(path);
                 }
 
                 if (file.Studio is { } studio)

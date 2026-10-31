@@ -139,12 +139,13 @@ public sealed class FileProcessor(
             string? previous = null;
             if (fingerprint is not null && index!.FindPrevious(placement, fingerprint, signature) is { } found)
             {
-                if (found.Target == signature)
+                if (found.Target == signature && !plan.Revision)
                 {
                     return Result(plan, ProcessingStatus.AlreadyInLibrary, found.Path, null, []);
                 }
 
-                // made from this original earlier, with other decisions: replaced once the new result is in place
+                // made from this original earlier, with other decisions (or written again as a revision): replaced once the
+                // new result is in place and verified
                 previous = found.Path;
             }
 

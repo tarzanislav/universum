@@ -871,6 +871,14 @@ public sealed class BatchTests
         Assert.True(again is { Status: BatchStatus.Unchanged, NeedsWork: false, AlreadyInLibraryAt: not null }, "already in the library: " + again.Status);
         Assert.True(marked.Where(i => i.File.Path != written.File.Path).All(i => i.AlreadyInLibraryAt is null), "the others are not");
 
+        // owner, 31. 10. 2026: Revízia – the file is written again as a new version (the earlier one goes once it is verified)
+        analysis.Groups[0].Decisions.Revisions.Add(written.File.Path);
+        var revised = BatchPlanner.MarkAlreadyInLibrary(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library), index, fingerprints)
+            .Single(i => i.File.Path == written.File.Path);
+        Assert.True(revised is { NeedsWork: true, AlreadyInLibraryAt: null, Plan.Revision: true }, "a revision is written again: " + revised.Status);
+        Assert.True(Universum.Core.Mega.MegaFile.From(revised).Revision, "a MEGA batch keeps the revision");
+        analysis.Groups[0].Decisions.Revisions.Clear();
+
         // other decisions: another result, not the same – it is written
         analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("sk");
         var changed = BatchPlanner.MarkAlreadyInLibrary(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library), index, fingerprints);

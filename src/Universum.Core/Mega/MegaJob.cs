@@ -95,7 +95,7 @@ public sealed class MegaJob(
         var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile).WithAddition(file.Addition);
         var group = new BatchGroup("MEGA", 0);
         group.Files.Add(media);
-        var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target), new TemplateMatch([], [], []),
+        var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target) with { Revision = file.Revision }, new TemplateMatch([], [], []),
             new Dictionary<SlotKey, LanguageEvidence>(), [])
         {
             Placement = placement,

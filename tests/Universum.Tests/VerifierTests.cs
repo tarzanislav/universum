@@ -28,6 +28,8 @@ public sealed class VerifierTests
 
         var kept = ManualTarget.Create(file with { Tracks = [video, audio] }, edits);
         Assert.True(TargetVerifier.Compare(kept, Written("00:22:00.386")).Any(p => p.StartsWith("duration", StringComparison.Ordinal)), "nothing removed: still a fault");
+        var noIndex = kept with { RepairIndex = true };
+        Assert.True(TargetVerifier.Compare(noIndex, Written("00:22:00.386")).Any(p => p.Contains("neúplný", StringComparison.Ordinal)), "without an index and shorter: an incomplete original said");
         var unknown = ManualTarget.Create(file with { Tracks = [video with { StatisticsFrames = null }, audio, subtitles] }, edits, new HashSet<int> { 2 });
         Assert.True(TargetVerifier.Compare(unknown, Written("00:22:00.386")).Any(p => p.StartsWith("duration", StringComparison.Ordinal)), "the picture's length unknown: still a fault");
     }

@@ -61,13 +61,28 @@ public static class TargetVerifier
         }
         else if (source.Duration is { } before && result.Duration is { } after)
         {
-            // added subtitles and new times may end after the video: the file is then longer, never shorter
-            Check(problems, target.AddsFiles || target.TimingChanged ? (before - after).TotalSeconds <= 1 : Math.Abs((after - before).TotalSeconds) <= 1,
-                $"duration {after}, expected {before}");
+            // added subtitles and new times may end after the video: the file is then longer, never shorter. A track
+            // removed may have reached further than the rest (owner's report, 31. 10. 2026: subtitles or a sound longer
+            // than the picture): then the file ends with the picture kept – never shorter than the picture itself
+            var shortest = before;
+            if (target.RemovedFromFile.Any() && VideoLength(target) is { } picture && picture < before)
+            {
+                shortest = picture;
+            }
+
+            var longer = target.AddsFiles || target.TimingChanged;
+            Check(problems, after >= shortest - TimeSpan.FromSeconds(1) && (longer || after <= before + TimeSpan.FromSeconds(1)),
+                $"duration {after}, expected {before}" + (shortest < before ? $" (the picture kept {shortest})" : ""));
         }
 
         return problems;
     }
+
+    // the length of the video kept, from its frames and frame duration (mkvmerge's statistics); null when not known
+    private static TimeSpan? VideoLength(TargetState target) =>
+        target.Tracks.FirstOrDefault(t => t.Type == TrackType.Video && !t.IsAdded)?.Source is { StatisticsFrames: > 0 and var frames, DefaultDurationNanoseconds: > 0 and var duration }
+            ? TimeSpan.FromTicks(frames * duration / 100)
+            : null;
 
     private static string CodecFamily(string? codecId) => (codecId ?? "").Split('/')[0];
 

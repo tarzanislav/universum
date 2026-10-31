@@ -75,7 +75,7 @@ public static class TargetVerifier
                 $"duration {after}, expected {before}" + (shortest < before ? $" (the picture kept {shortest})" : "") +
                 // a file without an index that ends earlier than it says: mostly a download that stopped (owner's report, 31. 10. 2026)
                 (target.RepairIndex && after < shortest - TimeSpan.FromSeconds(1)
-                    ? $" – originál nemá index a jeho údaje končia o {(shortest - after).TotalSeconds:0} s skôr, ako hlási: pravdepodobne je neúplný (chýba koniec), stiahnite ho znova"
+                    ? $" – originál nemá index a hlási o {(shortest - after).TotalSeconds:0} s viac, ako zapísal mkvmerge (chybný údaj v hlavičke alebo neúplný súbor)"
                     : ""));
         }
 

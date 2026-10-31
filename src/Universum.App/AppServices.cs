@@ -689,6 +689,11 @@ public sealed class AppServices
     /// </summary>
     public Universum.Core.Jobs.ProcessingLogStore ProcessingLogs => _processingLogs ??= new(Path.Combine(AppSettings.Directory, "zaznamy"));
 
+    /// <summary>The records of POZNÁMKY – Kalendár, Plánované úlohy, Poznámky (owner, 31. 10. 2026): one store in the folder of the settings.</summary>
+    public Universum.Core.Agenda.AgendaStore Agenda => _agenda ??= new(Path.Combine(AppSettings.Directory, "planovac", "zaznamy.json"));
+
+    private Universum.Core.Agenda.AgendaStore? _agenda;
+
     private Universum.Core.Jobs.ProcessingLogStore? _processingLogs;
 
     // jobs already in the logs: the job and the end of its run (a job run again is logged again)
@@ -1001,6 +1006,33 @@ public sealed class AppSettings
 
     /// <summary>The size of the posters of Novinky – Seriály, 1× to 2×.</summary>
     public double NewsPosterScale { get; set; } = 1;
+
+    /// <summary>Kalendár (owner, 31. 10. 2026): the regions of the holidays; null: by the language of the interface.</summary>
+    public List<string>? CalendarRegions { get; set; }
+
+    /// <summary>Kalendár: the Slovak names shown.</summary>
+    public bool CalendarNamesSk { get; set; } = true;
+
+    /// <summary>Kalendár: the Czech names shown.</summary>
+    public bool CalendarNamesCs { get; set; } = true;
+
+    /// <summary>Kalendár: the English equivalents shown; null: only in the English interface.</summary>
+    public bool? CalendarNamesEn { get; set; }
+
+    /// <summary>Kalendár: the Slovak region of the school holidays (kraj code); null: all.</summary>
+    public string? CalendarSchoolRegion { get; set; }
+
+    /// <summary>Kalendár: the Czech district of the school holidays; null: all.</summary>
+    public string? CalendarSchoolDistrict { get; set; }
+
+    /// <summary>Kalendár: the layers switched off.</summary>
+    public List<string> CalendarHiddenLayers { get; set; } = [];
+
+    /// <summary>Kalendár: the view last chosen.</summary>
+    public string CalendarView { get; set; } = "Month";
+
+    /// <summary>Kalendár: only the chosen titles (Vybrané) of Premiéry and Novinky.</summary>
+    public bool CalendarOnlyChosen { get; set; }
 
     /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
     public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }

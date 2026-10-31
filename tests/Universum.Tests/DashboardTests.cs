@@ -5,25 +5,36 @@ using Universum.Core.Weather;
 
 namespace Universum.Tests;
 
-/// <summary>Dashboard: the Slovak calendar of names and the weather from Open-Meteo (invented answers).</summary>
+/// <summary>Dashboard: the calendar of names (SK, CZ, English equivalents) and the weather from Open-Meteo (invented answers).</summary>
 public sealed class DashboardTests
 {
     [Test]
-    public void NameDaysFollowTheSlovakCalendar()
+    public void NameDaysOfTheOwnCalendar()
     {
-        Assert.Equal("Meniny má Sabína", SlovakCalendar.NameDayText(new DateOnly(2026, 10, 27)));
-        Assert.Equal("Meniny majú Adam, Eva", SlovakCalendar.NameDayText(new DateOnly(2026, 12, 24)));
-        Assert.Equal("Meniny majú Alexandra, Sandra, Karina", SlovakCalendar.NameDayText(new DateOnly(2027, 1, 2)));
-        Assert.Equal("Pamiatka zosnulých", SlovakCalendar.NameDayText(new DateOnly(2026, 11, 2)));
-        Assert.Equal("Nový rok – Deň vzniku Slovenskej republiky", SlovakCalendar.NameDayText(new DateOnly(2027, 1, 1)));
-        Assert.Equal("Radomír", SlovakCalendar.NameDay(new DateOnly(2028, 2, 29)).Single());
-        Assert.Equal("Silvester", SlovakCalendar.NameDay(new DateOnly(2026, 12, 31)).Single());
+        Assert.Equal("Meniny má Sabína", NameDays.Text(new DateOnly(2026, 10, 27), "sk"));
+        Assert.Equal("Meniny majú Adam, Eva", NameDays.Text(new DateOnly(2026, 12, 24), "sk"));
+        Assert.Equal("Meniny majú Alexandra, Sandra, Karina", NameDays.Text(new DateOnly(2027, 1, 2), "sk"));
+        Assert.Equal("Pamiatka zosnulých", NameDays.Text(new DateOnly(2026, 11, 2), "sk"));
+        Assert.Equal("Nový rok – Deň vzniku Slovenskej republiky", NameDays.Text(new DateOnly(2027, 1, 1), "sk"));
+        Assert.Equal("Radomír", NameDays.Slovak(new DateOnly(2028, 2, 29)).Single());
+        Assert.Equal("Silvester", NameDays.Slovak(new DateOnly(2026, 12, 31)).Single());
+        Assert.Equal("Svátek má Sabina", NameDays.Text(new DateOnly(2026, 10, 22), "cs"));
+        Assert.Equal("Svátek mají Kašpar, Melichar, Baltazar", NameDays.Text(new DateOnly(2027, 1, 6), "cs"));
+        Assert.Equal("Památka zesnulých", NameDays.Text(new DateOnly(2026, 11, 2), "cs"));
+        Assert.Equal("Horymír", NameDays.Czech(new DateOnly(2028, 2, 29)).Single());
+        Assert.True(NameDays.EnglishOf(new DateOnly(2026, 6, 24)).SequenceEqual(["John"]), "Ján / Jan → John");
+        Assert.True(NameDays.EnglishOf(new DateOnly(2026, 6, 29)).SequenceEqual(["Peter", "Paul", "Petra"]), "Peter, Pavol, Petra / Petr, Pavel");
+        Assert.Equal("Name day: Stephen", NameDays.Text(new DateOnly(2026, 12, 26), "en"));
+        Assert.Equal("", NameDays.Text(new DateOnly(2026, 1, 17), "en"));
         for (var day = new DateOnly(2028, 1, 1); day.Year == 2028; day = day.AddDays(1))
         {
-            Assert.True(SlovakCalendar.NameDayText(day).Length > 0, "every day says something: " + day);
+            Assert.True(NameDays.Text(day, "sk").Length > 0 && NameDays.Text(day, "cs").Length > 0, "every day says something: " + day);
         }
 
-        Assert.Equal("utorok 27. októbra 2026", SlovakCalendar.LongDate(new DateOnly(2026, 10, 27)));
+        Assert.Equal("utorok 27. októbra 2026", CalendarTexts.LongDate(new DateOnly(2026, 10, 27), "sk"));
+        Assert.Equal("úterý 27. října 2026", CalendarTexts.LongDate(new DateOnly(2026, 10, 27), "cs"));
+        Assert.Equal("Tuesday 27 October 2026", CalendarTexts.LongDate(new DateOnly(2026, 10, 27), "en"));
+        Assert.Equal(44, CalendarTexts.Week(new DateOnly(2026, 10, 27)));
     }
 
     [Test]

@@ -1,0 +1,129 @@
+# UNIVERSUM – sviatky, dni pracovného pokoja a pamätné dni (vlastný zoznam, overený 31. 10. 2026 podľa zákonov).
+# Stĺpce: krajina | druh | dátum | od roku | do roku | voľno | slovensky | česky | anglicky | zdroj
+#   krajina: SK, CZ, GB-ENG (Anglicko a Wales), GB-SCT (Škótsko), GB-NIR (Severné Írsko), US
+#   druh:    state = štátny sviatok · other = iný deň pracovného pokoja (ostatní svátek) · memorial = pamätný (významný) deň
+#            bank = bank holiday (UK) · federal = federálny sviatok (USA)
+#   dátum:   MM-DD · easter+N / easter-N (dní od Veľkonočnej nedele) · nth:MM:N:D (N-tý deň D v mesiaci MM; N = -1 posledný;
+#            D = 1 pondelok … 7 nedeľa)
+#   voľno:   off = deň voľna · work = pracovný deň · off!2026 = voľno okrem uvedených rokov (čiarkou) ·
+#            off+sub = pri víkende náhradné voľno v najbližší voľný pracovný deň (UK) · off+obs = sobota → piatok, nedeľa → pondelok (USA)
+
+SK|state|01-01|1993||off|Deň vzniku Slovenskej republiky|Den vzniku Slovenské republiky|Day of the Establishment of the Slovak Republic|241/1993 Z. z. § 1
+SK|state|07-05|1993||off|Sviatok svätého Cyrila a Metoda|Svátek svatého Cyrila a Metoděje|Saints Cyril and Methodius Day|241/1993 Z. z. § 1
+SK|state|08-29|1993||off|Výročie Slovenského národného povstania|Výročí Slovenského národního povstání|Slovak National Uprising Anniversary|241/1993 Z. z. § 1
+SK|state|09-01|1993|2023|off|Deň Ústavy Slovenskej republiky|Den Ústavy Slovenské republiky|Constitution Day|241/1993 Z. z. § 1
+SK|state|09-01|2024||work|Deň Ústavy Slovenskej republiky|Den Ústavy Slovenské republiky|Constitution Day|241/1993 Z. z. § 1, § 2 ods. 3
+SK|state|10-28|2021||work|Deň vzniku samostatného česko-slovenského štátu|Den vzniku samostatného československého státu|Independent Czechoslovak State Day|241/1993 Z. z. § 1, § 2 ods. 3
+SK|state|11-17|2001|2024|off|Deň boja za slobodu a demokraciu|Den boje za svobodu a demokracii|Struggle for Freedom and Democracy Day|241/1993 Z. z. § 1
+SK|state|11-17|2025||work|Deň boja za slobodu a demokraciu|Den boje za svobodu a demokracii|Struggle for Freedom and Democracy Day|241/1993 Z. z. § 1, § 2 ods. 3
+SK|other|01-06|1993||off|Zjavenie Pána (Traja králi)|Zjevení Páně (Tři králové)|Epiphany|241/1993 Z. z. § 2
+SK|other|easter-2|1993||off|Veľký piatok|Velký pátek|Good Friday|241/1993 Z. z. § 2
+SK|other|easter+1|1993||off|Veľkonočný pondelok|Velikonoční pondělí|Easter Monday|241/1993 Z. z. § 2
+SK|other|05-01|1993||off|Sviatok práce|Svátek práce|Labour Day|241/1993 Z. z. § 2
+SK|other|05-08|1997||off!2026|Deň víťazstva nad fašizmom|Den vítězství nad fašismem|Victory over Fascism Day|241/1993 Z. z. § 2, § 4b
+SK|other|09-15|1993||off!2026|Sedembolestná Panna Mária|Panna Maria Sedmibolestná|Our Lady of Sorrows|241/1993 Z. z. § 2, § 4b
+SK|other|11-01|1993||off|Sviatok Všetkých svätých|Svátek Všech svatých|All Saints' Day|241/1993 Z. z. § 2
+SK|other|12-24|1993||off|Štedrý deň|Štědrý den|Christmas Eve|241/1993 Z. z. § 2
+SK|other|12-25|1993||off|Prvý sviatok vianočný|První svátek vánoční|Christmas Day|241/1993 Z. z. § 2
+SK|other|12-26|1993||off|Druhý sviatok vianočný|Druhý svátek vánoční|St Stephen's Day|241/1993 Z. z. § 2
+SK|memorial|03-06|||work|Deň obetí pandémie COVID-19|Den obětí pandemie covidu-19|Day of the Victims of the COVID-19 Pandemic|241/1993 Z. z. § 3
+SK|memorial|03-25|||work|Deň zápasu za ľudské práva|Den zápasu za lidská práva|Day of the Struggle for Human Rights|241/1993 Z. z. § 3
+SK|memorial|04-13|||work|Deň nespravodlivo stíhaných|Den nespravedlivě stíhaných|Day of the Unjustly Prosecuted|241/1993 Z. z. § 3
+SK|memorial|05-01|||work|Výročie vstupu Slovenskej republiky do Európskej únie|Výročí vstupu Slovenské republiky do Evropské unie|Anniversary of Slovakia's Accession to the EU|241/1993 Z. z. § 3
+SK|memorial|05-04|||work|Výročie úmrtia M. R. Štefánika|Výročí úmrtí M. R. Štefánika|Anniversary of the Death of M. R. Štefánik|241/1993 Z. z. § 3
+SK|memorial|06-07|||work|Výročie Memoranda národa slovenského|Výročí Memoranda národa slovenského|Anniversary of the Memorandum of the Slovak Nation|241/1993 Z. z. § 3
+SK|memorial|06-21|||work|Deň odchodu sovietskych okupačných vojsk z Československa (1991)|Den odchodu sovětských okupačních vojsk z Československa (1991)|Departure of Soviet Occupation Troops from Czechoslovakia (1991)|241/1993 Z. z. § 3
+SK|memorial|06-24|||work|Deň pamiatky obetí komunizmu|Den památky obětí komunismu|Day of Remembrance of the Victims of Communism|241/1993 Z. z. § 3
+SK|memorial|07-05|||work|Deň Slovákov žijúcich v zahraničí|Den Slováků žijících v zahraničí|Day of Slovaks Living Abroad|241/1993 Z. z. § 3
+SK|memorial|07-17|||work|Výročie Deklarácie o zvrchovanosti Slovenskej republiky|Výročí Deklarace o svrchovanosti Slovenské republiky|Anniversary of the Declaration of Sovereignty of the Slovak Republic|241/1993 Z. z. § 3
+SK|memorial|08-04|||work|Deň Matice slovenskej|Den Matice slovenské|Matica slovenská Day|241/1993 Z. z. § 3
+SK|memorial|08-10|||work|Deň obetí banských nešťastí|Den obětí důlních neštěstí|Day of the Victims of Mining Disasters|241/1993 Z. z. § 3
+SK|memorial|08-21|||work|Deň obetí okupácie Československa v roku 1968|Den obětí okupace Československa v roce 1968|Day of the Victims of the 1968 Occupation of Czechoslovakia|241/1993 Z. z. § 3
+SK|memorial|09-09|||work|Deň obetí holokaustu a rasového násilia|Den obětí holokaustu a rasového násilí|Day of the Victims of the Holocaust and Racial Violence|241/1993 Z. z. § 3
+SK|memorial|09-18|||work|Deň slovenskej štátnej vlajky|Den slovenské státní vlajky|Slovak State Flag Day|241/1993 Z. z. § 3
+SK|memorial|09-19|||work|Deň vzniku Slovenskej národnej rady|Den vzniku Slovenské národní rady|Day of the Establishment of the Slovak National Council|241/1993 Z. z. § 3
+SK|memorial|09-22|||work|Deň proti nenávistným prejavom voči deťom|Den proti nenávistným projevům vůči dětem|Day against Hate Speech towards Children|241/1993 Z. z. § 3
+SK|memorial|10-06|||work|Deň hrdinov karpatsko-duklianskej operácie|Den hrdinů karpatsko-dukelské operace|Day of the Heroes of the Carpathian-Dukla Operation|241/1993 Z. z. § 3
+SK|memorial|10-12|||work|Deň samizdatu|Den samizdatu|Samizdat Day|241/1993 Z. z. § 3
+SK|memorial|10-27|||work|Deň černovskej tragédie|Den černovské tragédie|Day of the Černová Tragedy|241/1993 Z. z. § 3
+SK|memorial|10-29|||work|Deň narodenia Ľudovíta Štúra|Den narození Ľudovíta Štúra|Birthday of Ľudovít Štúr|241/1993 Z. z. § 3
+SK|memorial|10-30|||work|Výročie Deklarácie slovenského národa|Výročí Deklarace slovenského národa|Anniversary of the Declaration of the Slovak Nation|241/1993 Z. z. § 3
+SK|memorial|10-31|||work|Deň reformácie|Den reformace|Reformation Day|241/1993 Z. z. § 3
+SK|memorial|12-30|||work|Deň vyhlásenia Slovenska za samostatnú cirkevnú provinciu|Den vyhlášení Slovenska samostatnou církevní provincií|Day of Slovakia's Proclamation as an Independent Church Province|241/1993 Z. z. § 3
+
+CZ|state|01-01|2000||off|Deň obnovy samostatného českého štátu|Den obnovy samostatného českého státu|Restoration Day of the Independent Czech State|245/2000 Sb. § 1
+CZ|state|05-08|2000||off|Deň víťazstva|Den vítězství|Victory Day|245/2000 Sb. § 1
+CZ|state|07-05|2000||off|Deň slovanských vierozvestcov Cyrila a Metoda|Den slovanských věrozvěstů Cyrila a Metoděje|Saints Cyril and Methodius Day|245/2000 Sb. § 1
+CZ|state|07-06|2000||off|Deň upálenia majstra Jána Husa|Den upálení mistra Jana Husa|Jan Hus Day|245/2000 Sb. § 1
+CZ|state|09-28|2000||off|Deň českej štátnosti|Den české státnosti|Czech Statehood Day|245/2000 Sb. § 1
+CZ|state|10-28|2000||off|Deň vzniku samostatného československého štátu|Den vzniku samostatného československého státu|Independent Czechoslovak State Day|245/2000 Sb. § 1
+CZ|state|11-17|2000||off|Deň boja za slobodu a demokraciu a Medzinárodný deň študentstva|Den boje za svobodu a demokracii a Mezinárodní den studentstva|Struggle for Freedom and Democracy Day and International Students' Day|245/2000 Sb. § 1
+CZ|other|01-01|2000||off|Nový rok|Nový rok|New Year's Day|245/2000 Sb. § 2
+CZ|other|easter-2|2016||off|Veľký piatok|Velký pátek|Good Friday|245/2000 Sb. § 2
+CZ|other|easter+1|2000||off|Veľkonočný pondelok|Velikonoční pondělí|Easter Monday|245/2000 Sb. § 2
+CZ|other|05-01|2000||off|Sviatok práce|Svátek práce|Labour Day|245/2000 Sb. § 2
+CZ|other|12-24|2000||off|Štedrý deň|Štědrý den|Christmas Eve|245/2000 Sb. § 2
+CZ|other|12-25|2000||off|1. sviatok vianočný|1. svátek vánoční|Christmas Day|245/2000 Sb. § 2
+CZ|other|12-26|2000||off|2. sviatok vianočný|2. svátek vánoční|St Stephen's Day|245/2000 Sb. § 2
+CZ|memorial|01-16|||work|Deň pamiatky Jana Palacha|Den památky Jana Palacha|Jan Palach Remembrance Day|245/2000 Sb. § 4
+CZ|memorial|01-27|||work|Deň pamiatky obetí holokaustu a predchádzania zločinom proti ľudskosti|Den památky obětí holocaustu a předcházení zločinům proti lidskosti|Holocaust Remembrance Day|245/2000 Sb. § 4
+CZ|memorial|03-08|||work|Medzinárodný deň žien|Mezinárodní den žen|International Women's Day|245/2000 Sb. § 4
+CZ|memorial|03-09|||work|Deň pamiatky obetí vyhladenia terezínskeho rodinného tábora v Osvienčime-Brezinke|Den památky obětí vyhlazení terezínského rodinného tábora v Osvětimi-Březince|Remembrance of the Victims of the Theresienstadt Family Camp in Auschwitz-Birkenau|245/2000 Sb. § 4
+CZ|memorial|03-12|||work|Deň prístupu Českej republiky k NATO|Den přístupu České republiky k Severoatlantické alianci (NATO)|Czech Accession to NATO Day|245/2000 Sb. § 4
+CZ|memorial|03-28|||work|Deň narodenia Jana Amosa Komenského|Den narození Jana Amose Komenského|Birthday of John Amos Comenius|245/2000 Sb. § 4
+CZ|memorial|03-30|2026||work|Deň českej vlajky|Den české vlajky|Czech Flag Day|245/2000 Sb. § 4 (59/2026 Sb.)
+CZ|memorial|04-07|||work|Deň vzdelanosti|Den vzdělanosti|Day of Education|245/2000 Sb. § 4
+CZ|memorial|05-01|||work|Deň pristúpenia Českej republiky k Európskej únii|Den přistoupení České republiky k Evropské unii|Czech Accession to the EU Day|245/2000 Sb. § 4
+CZ|memorial|05-05|||work|Májové povstanie českého ľudu|Květnové povstání českého lidu|Prague Uprising Day|245/2000 Sb. § 4
+CZ|memorial|05-15|||work|Deň rodín|Den rodin|Day of Families|245/2000 Sb. § 4
+CZ|memorial|05-27|||work|Deň národného vzdoru|Den národního vzdoru|Day of National Resistance|245/2000 Sb. § 4
+CZ|memorial|06-10|||work|Deň pamiatky obetí vyhladenia obce Lidice|Den památky obětí vyhlazení obce Lidice|Lidice Remembrance Day|245/2000 Sb. § 4
+CZ|memorial|06-18|||work|Deň hrdinov druhého odboja|Den hrdinů druhého odboje|Day of the Heroes of the Second Resistance|245/2000 Sb. § 4
+CZ|memorial|06-25|||work|Deň odchodu okupačných vojsk|Den odchodu okupačních vojsk|Day of the Departure of the Occupation Troops|245/2000 Sb. § 4
+CZ|memorial|06-27|||work|Deň pamiatky obetí komunistického režimu|Den památky obětí komunistického režimu|Remembrance Day of the Victims of the Communist Regime|245/2000 Sb. § 4
+CZ|memorial|08-21|||work|Deň pamiatky obetí invázie a následnej okupácie vojskami Varšavskej zmluvy|Den památky obětí invaze a následné okupace vojsky Varšavské smlouvy|Remembrance of the Victims of the 1968 Invasion|245/2000 Sb. § 4
+CZ|memorial|10-08|||work|Pamätný deň sokolstva|Památný den sokolstva|Sokol Remembrance Day|245/2000 Sb. § 4
+CZ|memorial|10-12|||work|Deň samizdatu|Den samizdatu|Samizdat Day|245/2000 Sb. § 4
+CZ|memorial|11-11|||work|Deň vojnových veteránov|Den válečných veteránů|Veterans Day|245/2000 Sb. § 4
+
+GB-ENG|bank|01-01|||off+sub|Nový rok|Nový rok|New Year's Day|Banking and Financial Dealings Act 1971
+GB-ENG|bank|easter-2|||off|Veľký piatok|Velký pátek|Good Friday|Banking and Financial Dealings Act 1971
+GB-ENG|bank|easter+1|||off|Veľkonočný pondelok|Velikonoční pondělí|Easter Monday|Banking and Financial Dealings Act 1971
+GB-ENG|bank|nth:05:1:1|||off|Prvomájový sviatok|Prvomájový svátek|Early May Bank Holiday|Banking and Financial Dealings Act 1971
+GB-ENG|bank|nth:05:-1:1|||off|Jarný sviatok|Jarní svátek|Spring Bank Holiday|Banking and Financial Dealings Act 1971
+GB-ENG|bank|nth:08:-1:1|||off|Letný sviatok|Letní svátek|Summer Bank Holiday|Banking and Financial Dealings Act 1971
+GB-ENG|bank|12-25|||off+sub|Prvý sviatok vianočný|1. svátek vánoční|Christmas Day|Banking and Financial Dealings Act 1971
+GB-ENG|bank|12-26|||off+sub|Druhý sviatok vianočný (Boxing Day)|2. svátek vánoční (Boxing Day)|Boxing Day|Banking and Financial Dealings Act 1971
+
+GB-SCT|bank|01-01|||off+sub|Nový rok|Nový rok|New Year's Day|Banking and Financial Dealings Act 1971
+GB-SCT|bank|01-02|||off+sub|2. január|2. leden|2nd January|Banking and Financial Dealings Act 1971
+GB-SCT|bank|easter-2|||off|Veľký piatok|Velký pátek|Good Friday|Banking and Financial Dealings Act 1971
+GB-SCT|bank|nth:05:1:1|||off|Prvomájový sviatok|Prvomájový svátek|Early May Bank Holiday|Banking and Financial Dealings Act 1971
+GB-SCT|bank|nth:05:-1:1|||off|Jarný sviatok|Jarní svátek|Spring Bank Holiday|Banking and Financial Dealings Act 1971
+GB-SCT|bank|nth:08:1:1|||off|Letný sviatok|Letní svátek|Summer Bank Holiday|Banking and Financial Dealings Act 1971
+GB-SCT|bank|11-30|||off+sub|Deň svätého Ondreja|Den svatého Ondřeje|St Andrew's Day|St Andrew's Day Bank Holiday (Scotland) Act 2007
+GB-SCT|bank|12-25|||off+sub|Prvý sviatok vianočný|1. svátek vánoční|Christmas Day|Banking and Financial Dealings Act 1971
+GB-SCT|bank|12-26|||off+sub|Druhý sviatok vianočný (Boxing Day)|2. svátek vánoční (Boxing Day)|Boxing Day|Banking and Financial Dealings Act 1971
+
+GB-NIR|bank|01-01|||off+sub|Nový rok|Nový rok|New Year's Day|Banking and Financial Dealings Act 1971
+GB-NIR|bank|03-17|||off+sub|Deň svätého Patrika|Den svatého Patrika|St Patrick's Day|Banking and Financial Dealings Act 1971
+GB-NIR|bank|easter-2|||off|Veľký piatok|Velký pátek|Good Friday|Banking and Financial Dealings Act 1971
+GB-NIR|bank|easter+1|||off|Veľkonočný pondelok|Velikonoční pondělí|Easter Monday|Banking and Financial Dealings Act 1971
+GB-NIR|bank|nth:05:1:1|||off|Prvomájový sviatok|Prvomájový svátek|Early May Bank Holiday|Banking and Financial Dealings Act 1971
+GB-NIR|bank|nth:05:-1:1|||off|Jarný sviatok|Jarní svátek|Spring Bank Holiday|Banking and Financial Dealings Act 1971
+GB-NIR|bank|07-12|||off+sub|Výročie bitky na rieke Boyne|Výročí bitvy na řece Boyne|Battle of the Boyne (Orangemen's Day)|Banking and Financial Dealings Act 1971
+GB-NIR|bank|nth:08:-1:1|||off|Letný sviatok|Letní svátek|Summer Bank Holiday|Banking and Financial Dealings Act 1971
+GB-NIR|bank|12-25|||off+sub|Prvý sviatok vianočný|1. svátek vánoční|Christmas Day|Banking and Financial Dealings Act 1971
+GB-NIR|bank|12-26|||off+sub|Druhý sviatok vianočný (Boxing Day)|2. svátek vánoční (Boxing Day)|Boxing Day|Banking and Financial Dealings Act 1971
+
+US|federal|01-01|||off+obs|Nový rok|Nový rok|New Year's Day|5 U.S.C. 6103
+US|federal|nth:01:3:1|1986||off|Deň Martina Luthera Kinga|Den Martina Luthera Kinga|Birthday of Martin Luther King, Jr.|5 U.S.C. 6103
+US|federal|nth:02:3:1|1971||off|Deň prezidentov (narodeniny Washingtona)|Den prezidentů (Washingtonovy narozeniny)|Washington's Birthday|5 U.S.C. 6103
+US|federal|nth:05:-1:1|1971||off|Deň pamäti padlých|Den obětí válek|Memorial Day|5 U.S.C. 6103
+US|federal|06-19|2021||off+obs|Juneteenth – Deň nezávislosti černošského obyvateľstva|Juneteenth – Den nezávislosti černošského obyvatelstva|Juneteenth National Independence Day|5 U.S.C. 6103
+US|federal|07-04|||off+obs|Deň nezávislosti|Den nezávislosti|Independence Day|5 U.S.C. 6103
+US|federal|nth:09:1:1|||off|Sviatok práce|Svátek práce|Labor Day|5 U.S.C. 6103
+US|federal|nth:10:2:1|1971||off|Deň Kolumba|Kolumbův den|Columbus Day|5 U.S.C. 6103
+US|federal|11-11|||off+obs|Deň veteránov|Den veteránů|Veterans Day|5 U.S.C. 6103
+US|federal|nth:11:4:4|||off|Deň vďakyvzdania|Den díkůvzdání|Thanksgiving Day|5 U.S.C. 6103
+US|federal|12-25|||off+obs|Vianoce|Vánoce|Christmas Day|5 U.S.C. 6103

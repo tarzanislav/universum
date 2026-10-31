@@ -808,6 +808,17 @@ public sealed class AppSettings
 
     public bool PosterMerge { get; set; }
 
+    /// <summary>TMDB poster: Ďalšie TMDB obrázky (off by default) and which of them – background, logo, season posters, episode stills.</summary>
+    public bool PosterExtras { get; set; }
+
+    public bool PosterBackdrop { get; set; } = true;
+
+    public bool PosterLogo { get; set; } = true;
+
+    public bool PosterSeasons { get; set; } = true;
+
+    public bool PosterEpisodes { get; set; } = true;
+
     /// <summary>OpenSubtitles.com: the API key (protected), the user name, the password (protected).</summary>
     public string? OpenSubtitlesKeyProtected { get; set; }
 

@@ -146,6 +146,18 @@ internal static class SelfTest
         Check(model.Info.Tracks.Count == 6, $"information page shows 6 tracks ({model.Info.Tracks.Count})");
         Check(model.Info.Error.Length == 0, "information page shows no error: " + model.Info.Error);
         Check(model.SelectedTool.Page == model.Dashboard && model.Tools[0].Title == "Dashboard", "the program starts with the Dashboard");
+
+        // owner, 31. 10. 2026: Rozhranie CZ/EN – Slovak by default; Czech and English after a restart (the texts by their Slovak key)
+        Localization.Loc.Init("en");
+        var englishTexts = (Localization.Loc.T("Uložiť"), Localization.Loc.T("Hromadné spracovanie"), Localization.Loc.T("Vymyslený text bez prekladu"));
+        Localization.Loc.Init("cs");
+        var czechText = Localization.Loc.T("Hromadné spracovanie");
+        Localization.Loc.Init(services.Settings.UiLanguage);
+        Check(englishTexts == ("Save", "Batch processing", "Vymyslený text bez prekladu") && czechText == "Hromadné zpracování" && Localization.Loc.Language == "sk",
+            $"languages: English and Czech texts, Slovak by default – {englishTexts} {czechText}");
+        model.Settings.UiLanguage = "en";
+        Check(services.Settings.UiLanguage == "en" && AppSettings.Load().UiLanguage == "en", "languages: the choice kept for the next start");
+        model.Settings.UiLanguage = "sk";
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
               "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +

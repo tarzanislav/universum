@@ -81,6 +81,26 @@ public sealed class SettingsPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>The languages of the window to choose from.</summary>
+    public IReadOnlyList<LanguageOption> UiLanguages { get; } = [.. Localization.Loc.Languages.Select(l => new LanguageOption(l.Code, l.Name))];
+
+    /// <summary>The language of the window (owner, 31. 10. 2026: Slovak, Czech, English); applied after a restart.</summary>
+    public string UiLanguage
+    {
+        get => _services.Settings.UiLanguage;
+        set
+        {
+            if (value is not ("sk" or "cs" or "en") || value == _services.Settings.UiLanguage)
+            {
+                return;
+            }
+
+            _services.Settings.UiLanguage = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>A sound when all the jobs are done (owner, 29. 10. 2026; also on Fronta úloh).</summary>
     public bool FinishSound
     {
@@ -627,3 +647,6 @@ public sealed class SettingsPageViewModel : ObservableObject
     private static List<string> ListOfNumbers(string text) =>
         text.Split([';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 }
+
+/// <summary>A language of the window in the list: its code and its name in that language.</summary>
+public sealed record LanguageOption(string Code, string Name);

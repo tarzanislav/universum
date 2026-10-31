@@ -21,6 +21,7 @@ public partial class App : Application
         DispatcherUnhandledException += OnUnhandledException;
         Universum.Platform.Windows.WindowsVolumes.Register();
         var services = new AppServices();
+        Localization.Loc.Init(services.Settings.UiLanguage);
 
         if (e.Args.Contains(SelfTestSwitch, StringComparer.OrdinalIgnoreCase))
         {

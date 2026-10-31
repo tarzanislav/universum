@@ -23,6 +23,9 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
 
     private static readonly HashSet<string> Videos = new([".mkv", ".mp4", ".m4v", ".avi", ".ts", ".m2ts", ".mov", ".webm", ".wmv", ".mpg", ".iso"], StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The file is a video (by its extension) – as the input folder is searched.</summary>
+    public static bool IsVideo(string file) => Videos.Contains(Path.GetExtension(file));
+
     public LibraryLayout Library { get; } = library;
 
     /// <summary>POSTER\Názov (rok) – the folder of a poster found alone.</summary>

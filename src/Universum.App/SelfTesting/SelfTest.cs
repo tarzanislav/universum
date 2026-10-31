@@ -865,6 +865,21 @@ internal static class SelfTest
         film.Links[0].OpenCommand.Execute(null);
         Check(opened.Count == 1 && opened[0].AbsoluteUri == "https://histra.net/movie/1001", "lists: the HISTRA link opens the title's page");
         Browser.Open = browser;
+
+        // the title shown goes on (owner, 31. 10. 2026): to TMDB poster by its TMDB ID, to processing by its names and year
+        var toPoster = page.OpenInPoster;
+        var toSingle = page.SendToSingle;
+        (MediaKind Kind, int Id)? posterAsked = null;
+        (IReadOnlyList<string> Names, int? Year, string Caption)? singleAsked = null;
+        page.OpenInPoster = (kind, id) => { posterAsked = (kind, id); return Task.CompletedTask; };
+        page.SendToSingle = (kind, names, year, caption) => { singleAsked = (names, year, caption); return Task.FromResult<string?>("vymyslené: nenašiel sa"); };
+        await page.ToPosterCommand.ExecuteAsync(null);
+        await page.ToSingleCommand.ExecuteAsync(null);
+        Check(posterAsked == (MediaKind.Movie, 9001) && singleAsked is { } asked && asked.Names.Contains("Invented Story 1") && asked.Year == 1991 &&
+              page.Status == "vymyslené: nenašiel sa",
+            $"lists: Otvoriť v TMDB Poster and Do Single spracovania – {posterAsked} | {(singleAsked is { } a ? string.Join("/", a.Names) + " " + a.Year + " " + a.Caption : "")} | {page.Status}");
+        page.OpenInPoster = toPoster;
+        page.SendToSingle = toSingle;
         await WaitFor(() => page.Lists.SelectMany(l => l.Visible).All(r => r.SmallPoster.Image is not null) && film.LargePoster.Image is not null);
         await Screenshot(window, "histra-lists.png");
 

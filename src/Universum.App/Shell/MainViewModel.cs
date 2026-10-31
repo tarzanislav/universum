@@ -39,8 +39,16 @@ public sealed class MainViewModel : ObservableObject
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Logs = new Jobs.ProcessingLogsPageViewModel(_services.ProcessingLogs);
         Dashboard = new DashboardPageViewModel(services, this);
-        HistraLists = new HistraListsPageViewModel(services);
         Posters = new PosterPageViewModel(services);
+        HistraLists = new HistraListsPageViewModel(services)
+        {
+            OpenInPoster = async (kind, id) =>
+            {
+                Open(Posters);
+                await Posters.OpenAsync(kind, id);
+            },
+            SendToSingle = SendTitleToProcessingAsync,
+        };
         Premieres = new PremieresPageViewModel(services);
         SeriesNews = new SeriesNewsPageViewModel(services)
         {
@@ -415,6 +423,50 @@ public sealed class MainViewModel : ObservableObject
         {
             System.Windows.MessageBox.Show("Hromadné spracovanie práve pracuje (alebo dávka nemá čakajúce súbory) – skúste to po jeho skončení.", "UNIVERSUM");
         }
+    }
+
+    /// <summary>
+    /// A title from Listy z HISTRA to processing (owner, 31. 10. 2026): looked for in the input folder (a file or a folder
+    /// named as it); a film or one episode into Single spracovanie, more episodes of a series into Hromadné spracovanie
+    /// (a film folder: its largest video). What happened in words when nothing was sent; null when it was.
+    /// </summary>
+    private async Task<string?> SendTitleToProcessingAsync(Universum.Core.Library.MediaKind kind, IReadOnlyList<string> names, int? year, string caption)
+    {
+        if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
+        {
+            return "Nastavte vstupný priečinok (Nastavenia) – titul sa hľadá v ňom.";
+        }
+
+        var found = await Task.Run(() => new Universum.Core.Posters.PosterPlaces(_services.Library ?? new Universum.Core.Library.LibraryLayout(input), input).InInput(kind, names, year));
+        if (found is null)
+        {
+            return $"{caption} sa vo vstupnom priečinku nenašiel – v Single spracovaní otvorte súbor sami.";
+        }
+
+        List<string> files = System.IO.File.Exists(found) ? [found]
+            : await Task.Run(() => System.IO.Directory.EnumerateFiles(found, "*", new System.IO.EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+                .Where(f => Universum.Core.Posters.PosterPlaces.IsVideo(f)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList());
+        if (files.Count == 0)
+        {
+            return $"V priečinku {System.IO.Path.GetFileName(found)} nie je žiadne video.";
+        }
+
+        bool sent;
+        if (kind == Universum.Core.Library.MediaKind.Movie)
+        {
+            sent = await SendFilmToSingleAsync(files.MaxBy(f => new System.IO.FileInfo(f).Length)!, caption);
+        }
+        else if (files.Count > 1)
+        {
+            sent = await SendEpisodesToBatchAsync([(caption, files)]);
+        }
+        else
+        {
+            var number = Universum.Core.Library.EpisodeNumber.TryParse(System.IO.Path.GetFileName(files[0]));
+            sent = await SendEpisodeToSingleAsync(files[0], caption, number is { } n ? $"S{n.Season:00}E{n.Episode:00}" : "");
+        }
+
+        return sent ? null : "Spracovanie práve pracuje – pošlite titul znova po jeho skončení.";
     }
 
     /// <summary>A chosen film from the input folder into Single spracovanie with its title; false while it is busy.</summary>

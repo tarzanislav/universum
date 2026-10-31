@@ -171,7 +171,7 @@ public sealed class FileProcessor(
             }
 
             result = Finish(result, fingerprint, signature, output.PreserveModifiedTime ? originalTime : null);
-            if (WaitingPosters?.Deliver(placement.Directory) is { } delivered)
+            if (placement.FixedName is null && WaitingPosters?.Deliver(placement.Directory) is { } delivered)
             {
                 result = result with { Messages = [.. result.Messages, delivered] };
             }

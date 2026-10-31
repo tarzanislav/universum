@@ -404,7 +404,7 @@ public sealed class AppServices
     private Universum.Core.Posters.PendingPosters? _waitingPosters;
 
     /// <summary>Posters waiting for their titles to be processed (Zlúčiť poster s filmom).</summary>
-    public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory);
+    public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory, () => Settings.OutputDirectory);
 
     // drawing takes up to a minute or two
     private static readonly HttpClient DraftHttp = new() { Timeout = TimeSpan.FromMinutes(3) };

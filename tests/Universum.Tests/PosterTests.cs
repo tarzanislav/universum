@@ -37,6 +37,8 @@ public sealed class PosterTests
         var latin = PosterChoice.Offer([new("/fr.jpg", "fr", 1000, 1500, 6, 2), new("/en2.jpg", "en", 1000, 1500, 6, 2)], new Dictionary<string, PictureLook>(), [], "fr", latinOriginal: true);
         Assert.Sequence(["Originál (fr)", "EN"], latin.Groups.Select(g => g.Name), "an original in Latin script is offered first");
         Assert.True(PosterChoice.Offer([], new Dictionary<string, PictureLook>(), [], "en", true) is { Recommended: null, Groups.Count: 0 }, "no poster at all");
+        var slovak = PosterChoice.Offer([new("/sk2.jpg", "sk", 1000, 1500, 6, 2)], new Dictionary<string, PictureLook>(), [], "en", true);
+        Assert.True(slovak.Recommended?.Picture.Path == "/sk2.jpg" && slovak.Opinion.Contains("(sk)", StringComparison.Ordinal), "only a Slovak one: recommended – " + slovak.Opinion);
     }
 
     [Test]
@@ -78,6 +80,9 @@ public sealed class PosterTests
         var film = await finder.FindAsync("Invented Carp (2021)", null);
         Assert.True(film is [{ Kind: MediaKind.Movie, Id: 101, Year: 2021 }], "the year chooses – " + string.Join(", ", film.Select(f => f.Caption)));
         Assert.True(await finder.FindAsync("tmdbid-303", MediaKind.Movie) is [{ Id: 303 }], "by TMDB ID");
+        await finder.FindAsync("Vymyslený kapor 2049", MediaKind.Movie);
+        Assert.True(server.Requests.Any(r => Uri.UnescapeDataString(r).Contains("query=Vymyslený kapor 2049", StringComparison.Ordinal)),
+            "a number at the end that is not the year: the whole name searched too");
         Assert.True(await finder.FindAsync("https://www.imdb.com/title/tt0000303/", null) is [{ Id: 303, Kind: MediaKind.Movie }], "by IMDb ID");
 
         // a typo: nothing for the name as written, found by the beginning of the word and the similarity of the names
@@ -90,8 +95,8 @@ public sealed class PosterTests
             : uri.AbsolutePath.StartsWith("/3/search/", StringComparison.Ordinal) ? """{ "results": [] }""" : null;
         var typo = await finder.FindAsync("Invetned", null);
         Assert.True(typo.Count > 0 && typo[0].Id == 101, "a swapped pair of letters – " + string.Join(", ", typo.Select(f => f.Caption)));
-        Assert.True(TitleFinder.Similarity("matirx", "The Matrix") < TitleFinder.Similarity("matirx", "Matrix") && TitleFinder.Similarity("Pelíšky", "pelisky") == 1, "similarity");
-        Assert.True(TitleFinder.NameAndYear("Vymyslený kapor (2021)") == ("Vymyslený kapor", 2021) && TitleFinder.NameAndYear("1917") == ("1917", null), "name and year");
+        Assert.True(TitleFinder.Similarity("vymsyleny", "Ten Vymyslený") < TitleFinder.Similarity("vymsyleny", "Vymyslený") && TitleFinder.Similarity("Vymyslený", "vymysleny") == 1, "similarity");
+        Assert.True(TitleFinder.NameAndYear("Vymyslený kapor (2021)") == ("Vymyslený kapor", 2021) && TitleFinder.NameAndYear("2077") == ("2077", null), "name and year");
     }
 
     [Test]
@@ -174,11 +179,14 @@ public sealed class PosterTests
             Assert.True(places.InInput(MediaKind.Movie, ["Iný"], null) is null, "a longer name is another title");
 
             // waiting until the film is processed: then in its main folder, an older one renamed
-            var waiting = new PendingPosters(Path.Combine(root, "waiting"));
+            var waiting = new PendingPosters(Path.Combine(root, "waiting"), () => library.Root);
             waiting.Add(film, 7, [9, 9]);
             waiting.Add(series, 55, [8]);
             Assert.True(waiting.All.Count == 2, "two posters wait");
             Assert.True(waiting.Deliver(Path.Combine(library.Movies, "Iný (2020)")) is null, "another film: nothing");
+            var originals = Path.Combine(root, "INPUT", "MOVIES", "Vymyslený film (2026)");
+            Directory.CreateDirectory(originals);
+            Assert.True(waiting.Deliver(originals) is null && !File.Exists(Path.Combine(originals, "folder.jpg")), "never into a folder of originals named like the library");
             var filmFolder = library.TitleDirectory(film);
             Directory.CreateDirectory(filmFolder);
             File.WriteAllBytes(Path.Combine(filmFolder, "folder.jpg"), [1]);

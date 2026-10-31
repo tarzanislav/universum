@@ -98,12 +98,17 @@ public sealed partial class PosterCache
             return Task.FromResult<string?>(null);
         }
 
-        // one download per poster, however many rows ask for it
-        return _running.GetOrAdd(file, _ => DownloadAsync(Address(path, size), file, size == PosterSize.Original ? MaxOriginalBytes : MaxBytes, cancellationToken));
+        // one download per poster, however many rows ask for it – not cancelled with the first one who asked (the others
+        // still wait for it); each caller stops waiting with its own token
+        return _running.GetOrAdd(file, _ => DownloadAsync(Address(path, size), file, size == PosterSize.Original ? MaxOriginalBytes : MaxBytes, size != PosterSize.Original))
+            .WaitAsync(cancellationToken);
     }
 
-    private async Task<string?> DownloadAsync(Uri address, string file, long limit, CancellationToken cancellationToken)
+    // remember: a poster that cannot be had is not asked for again in this run (an original is – a passing network error
+    // must not keep folder.jpg from being written)
+    private async Task<string?> DownloadAsync(Uri address, string file, long limit, bool remember)
     {
+        var cancellationToken = CancellationToken.None;
         await _parallel.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -111,7 +116,7 @@ public sealed partial class PosterCache
             if (!response.IsSuccessStatusCode || response.RequestMessage?.RequestUri?.Host != Server.Host ||
                 response.Content.Headers.ContentLength > limit)
             {
-                _failed[file] = true;
+                Fail(file, remember);
                 return null;
             }
 
@@ -123,7 +128,7 @@ public sealed partial class PosterCache
             {
                 if (buffer.Length + read > limit)
                 {
-                    _failed[file] = true;
+                    Fail(file, remember);
                     return null;
                 }
 
@@ -133,7 +138,7 @@ public sealed partial class PosterCache
             var bytes = buffer.ToArray();
             if (!IsPicture(bytes))
             {
-                _failed[file] = true;
+                Fail(file, remember);
                 return null;
             }
 
@@ -147,7 +152,7 @@ public sealed partial class PosterCache
         {
             if (!cancellationToken.IsCancellationRequested)
             {
-                _failed[file] = true;
+                Fail(file, remember);
             }
 
             return null;
@@ -156,6 +161,14 @@ public sealed partial class PosterCache
         {
             _parallel.Release();
             _running.TryRemove(file, out _);
+        }
+    }
+
+    private void Fail(string file, bool remember)
+    {
+        if (remember)
+        {
+            _failed[file] = true;
         }
     }
 

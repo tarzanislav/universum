@@ -38,14 +38,14 @@ public sealed partial class TitleFinder(TmdbClient tmdb)
             return [];
         }
 
-        // an IMDb ID ("tt0133093", also in an address)
+        // an IMDb ID ("tt" and digits, also in an address)
         if (ImdbId().Match(typed) is { Success: true } imdb)
         {
             return Ranked(await GetListAsync($"find/{imdb.Value}?external_source=imdb_id&language=cs-CZ", null, cancellationToken).ConfigureAwait(false), kind, "", null);
         }
 
         // a TMDB ID or address: the film and the series of that number, unless the address says which; a bare number may
-        // also be a name ("1917"), so it is searched as well
+        // also be a name (a film named by a year), so it is searched as well
         if (TitleGuess.ParseTmdb(typed) is { } reference)
         {
             var found = new List<FoundTitle>();
@@ -67,6 +67,14 @@ public sealed partial class TitleFinder(TmdbClient tmdb)
         var (name, year) = NameAndYear(typed);
         var results = await SearchAsync(name, year, kind, cancellationToken).ConfigureAwait(false);
         var ranked = Ranked(results, kind, name, year);
+        if (ranked.Count == 0 && year is not null)
+        {
+            // a number at the end that is part of the name, not the year ("Vymyslený príbeh 2049" of another year)
+            (name, year) = (typed, null);
+            results = await SearchAsync(name, null, kind, cancellationToken).ConfigureAwait(false);
+            ranked = Ranked(results, kind, name, null);
+        }
+
         if (ranked.Any(r => Similarity(name, r) >= 0.5))
         {
             return ranked;
@@ -115,7 +123,7 @@ public sealed partial class TitleFinder(TmdbClient tmdb)
             return 1;
         }
 
-        // the whole name, and its beginning as long as what was typed ("matirx" ~ "matrix reloaded")
+        // the whole name, and its beginning as long as what was typed ("vymsylený" ~ "vymyslený kapor 2")
         var whole = 1 - (Distance(a, b) / (double)Math.Max(a.Length, b.Length));
         var start = b.Length > a.Length ? 1 - (Distance(a, b[..a.Length]) / (double)a.Length) - 0.1 : 0;
         return Math.Max(whole, start);

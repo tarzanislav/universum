@@ -27,6 +27,9 @@ public sealed class GenreCell(AppServices services, SeriesEpisode episode) : Obs
         }
     }
 
+    /// <summary>The genre known so far, without asking TMDB (sorting reads every row).</summary>
+    public string Sorted => _text;
+
     public override string ToString() => _text;
 
     private async Task LoadAsync()

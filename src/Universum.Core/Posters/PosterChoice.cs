@@ -115,7 +115,9 @@ public static class PosterChoice
         var recommended = candidates.FirstOrDefault(c => c.Acceptable && c.Tier <= 2)
                           ?? candidates.FirstOrDefault(c => c.Tier <= 2)
                           ?? candidates.FirstOrDefault(c => c.Tier == 3 && c.Acceptable)
-                          ?? candidates.FirstOrDefault(c => c.Tier == 3);
+                          ?? candidates.FirstOrDefault(c => c.Tier == 3)
+                          ?? candidates.FirstOrDefault(c => c.Acceptable)
+                          ?? candidates.FirstOrDefault();
 
         var groups = new List<PosterGroup>();
         void Add(string name, Func<PosterCandidate, bool> belongs)
@@ -164,7 +166,8 @@ public static class PosterChoice
                 0 => "Odporúčam český plagát – názov je na ňom po česky",
                 1 => all.Any(c => c.Tier == 0) ? "Odporúčam anglický plagát – české plagáty sú príliš malé alebo nevhodné" : "Odporúčam anglický plagát – český TMDB nemá",
                 2 => $"Odporúčam plagát v pôvodnom jazyku ({originalLanguage}) – český ani anglický TMDB nemá",
-                _ => "Odporúčam plagát bez textu – plagát s názvom TMDB nemá",
+                3 => "Odporúčam plagát bez textu – plagát s názvom TMDB nemá",
+                _ => $"Odporúčam plagát v jazyku ({picture.Language}) – v češtine, angličtine ani v pôvodnom jazyku TMDB nemá žiadny",
             },
         };
 

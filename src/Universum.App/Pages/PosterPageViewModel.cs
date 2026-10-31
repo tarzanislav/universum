@@ -536,10 +536,17 @@ public sealed class PosterPageViewModel : ObservableObject
 
         _drawing = true;
         Refresh();
+        var card = Card;
         try
         {
             DraftStatus = "AI kreslí návrh plagátu (môže to trvať do minúty)…";
             var draft = await _services.Drafts.CreateAsync(details, _services.DraftKeys, _title.Token);
+            if (!ReferenceEquals(card, Card))
+            {
+                // another title opened meanwhile: this draft is not its poster
+                return;
+            }
+
             if (draft.Picture is not { } picture)
             {
                 DraftStatus = draft.Problem ?? "Návrh sa nepodaril.";

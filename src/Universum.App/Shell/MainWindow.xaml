@@ -2662,7 +2662,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
-                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Text" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Sorted" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.1*" MinWidth="90" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Spracovať" Width="88" MinWidth="88" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -2867,7 +2867,7 @@
                               Visibility="{Binding IsSeriesTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
-                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Text" ElementStyle="{StaticResource NewsCell}" />
+                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Sorted" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Premiéra" Binding="{Binding Date}" Width="100" MinWidth="100" SortMemberPath="SortDate" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Kedy" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
@@ -3032,7 +3032,7 @@
                         </Button>
                         <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" Width="150" Margin="8,0" />
                         <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"
-                                 ToolTip="Napr. Pelíšky 1999, The Matrix, 千と千尋の神隠し, 603, tt0133093 alebo adresa z themoviedb.org">
+                                 ToolTip="Názov (aj s rokom, napr. „Názov 2024“), TMDB ID (číslo alebo adresa z themoviedb.org) alebo IMDb ID (tt a číslice)">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
                             </TextBox.InputBindings>

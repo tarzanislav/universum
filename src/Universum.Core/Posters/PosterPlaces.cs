@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Text;
 
@@ -24,7 +25,7 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
 
     public LibraryLayout Library { get; } = library;
 
-    /// <summary>POSTER\Creep (2004) – the folder of a poster found alone.</summary>
+    /// <summary>POSTER\Názov (rok) – the folder of a poster found alone.</summary>
     public string PosterFolder(TitleInfo title) => Path.Combine(Library.Posters, title.FolderName);
 
     /// <summary>
@@ -180,7 +181,8 @@ public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName
 /// own folder; when UNIVERSUM writes a result into the title's folder in MOVIES or TVSHOWS, the poster goes into the main
 /// folder of the title as folder.jpg (an existing one renamed to folder-povodny.jpg) and stops waiting.
 /// </summary>
-public sealed partial class PendingPosters(string folder)
+/// <param name="libraryRoot">The output folder now (null: none) – a poster goes only into its MOVIES or TVSHOWS, never next to originals.</param>
+public sealed partial class PendingPosters(string folder, Func<string?> libraryRoot)
 {
     private static readonly object Gate = new();
 
@@ -215,10 +217,23 @@ public sealed partial class PendingPosters(string folder)
     /// <summary>
     /// After a result was written into <paramref name="resultDirectory"/> (a title folder, or its season folder): the poster
     /// waiting for that title as folder.jpg in its main folder. What was done in words; null when no poster waits for it.
+    /// Never throws – the result is written either way.
     /// </summary>
     public string? Deliver(string resultDirectory)
     {
-        var main = Path.TrimEndingDirectorySeparator(resultDirectory);
+        try
+        {
+            return DeliverOrThrow(resultDirectory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException)
+        {
+            return "čakajúci plagát sa nedal pridať: " + ex.Message;
+        }
+    }
+
+    private string? DeliverOrThrow(string resultDirectory)
+    {
+        var main = Path.TrimEndingDirectorySeparator(Path.GetFullPath(resultDirectory));
         if (SeasonFolder().IsMatch(Path.GetFileName(main)))
         {
             main = Path.GetDirectoryName(main) ?? main;
@@ -230,7 +245,9 @@ public sealed partial class PendingPosters(string folder)
             LibraryNames.ShowsFolder => MediaKind.Series,
             _ => (MediaKind?)null,
         };
-        if (kind is null)
+        // only into the library of the output folder (MOVIES, TVSHOWS), never into a folder of originals named so
+        var root = libraryRoot();
+        if (kind is null || root is null || !Paths.Same(Path.GetDirectoryName(Path.GetDirectoryName(main)) ?? "", Path.GetFullPath(root)))
         {
             return null;
         }
@@ -246,23 +263,13 @@ public sealed partial class PendingPosters(string folder)
                 return null;
             }
 
-            var target = Path.Combine(main, PosterPlaces.FileName);
-            string message;
-            try
-            {
-                var kept = PosterPlaces.KeepOld(main);
-                File.Copy(waiting.File, target, overwrite: false);
-                message = $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})");
-
-                File.Delete(waiting.File);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                return $"plagát pre {name} sa nedal pridať: {ex.Message}";
-            }
-
+            // the list first, then the files: a poster is never given twice, and a list that cannot be written changes nothing
             Save(all.Where(w => w != waiting).ToList());
-            return message;
+            var target = Path.Combine(main, PosterPlaces.FileName);
+            var kept = PosterPlaces.KeepOld(main);
+            File.Copy(waiting.File, target, overwrite: false);
+            File.Delete(waiting.File);
+            return $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})");
         }
     }
 

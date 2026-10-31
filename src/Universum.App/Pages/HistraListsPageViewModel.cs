@@ -22,6 +22,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
     private string _status = "";
     private bool _busy;
     private HistraItemRow? _selected;
+    private TitleCardViewModel? _card;
     private CancellationTokenSource? _work;
 
     public HistraListsPageViewModel(AppServices services)
@@ -117,11 +118,34 @@ public sealed class HistraListsPageViewModel : ObservableObject
             if (SetProperty(ref _selected, value))
             {
                 OnPropertyChanged(nameof(HasSelected));
+                Card = value is null ? null : CardOf(value);
             }
         }
     }
 
     public bool HasSelected => Selected is not null;
+
+    /// <summary>
+    /// The card of the title chosen (owner, 31. 10. 2026: as in TMDB poster – HISTRA's data at once, TMDB's detail when it
+    /// comes); a film of its collection opens in it.
+    /// </summary>
+    public TitleCardViewModel? Card { get => _card; private set => SetProperty(ref _card, value); }
+
+    private TitleCardViewModel CardOf(HistraItemRow row)
+    {
+        var item = row.Item;
+        var card = new TitleCardViewModel(_services, item.Kind, item.Ids.Tmdb,
+            new TitleSeed(item.OriginalTitle, item.Title != item.OriginalTitle ? item.Title : "", item.Year, item.Overview, item.Rating, item.Runtime, item.PosterPath, item.Ids));
+        card.OpenRequested += Open;
+        return card;
+    }
+
+    private void Open(MediaKind kind, int id)
+    {
+        var card = new TitleCardViewModel(_services, kind, id);
+        card.OpenRequested += Open;
+        Card = card;
+    }
 
     /// <summary>
     /// The user's lists from HISTRA for the import window (imported ones ticked); null when HISTRA could not be asked

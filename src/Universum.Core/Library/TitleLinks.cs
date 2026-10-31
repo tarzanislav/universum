@@ -29,6 +29,10 @@ public static class TitleLinks
     /// <summary>The title on imdb.com.</summary>
     public static Uri? Imdb(string? id) => TitleIds.ValidImdb(id) is { } valid ? new Uri($"https://www.imdb.com/title/{valid}/") : null;
 
+    /// <summary>The title on trakt.tv, found by its TMDB ID (Trakt's own search by ID opens the title).</summary>
+    public static Uri? Trakt(MediaKind kind, int? tmdbId) =>
+        tmdbId is > 0 ? new Uri($"https://trakt.tv/search/tmdb/{tmdbId}?id_type={(kind == MediaKind.Movie ? "movie" : "show")}") : null;
+
     /// <summary>A search on csfd.cz for the title (ČSFD IDs are not in the data UNIVERSUM reads).</summary>
     public static Uri? CsfdSearch(string? title) =>
         string.IsNullOrWhiteSpace(title) ? null : new Uri("https://www.csfd.cz/hledat/?q=" + Uri.EscapeDataString(title.Trim()));

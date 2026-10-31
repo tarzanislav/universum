@@ -51,6 +51,13 @@ public sealed record FilmPremiere
 
     public double Popularity { get; init; }
 
+    /// <summary>TMDB's genre numbers (empty in premieres kept before 31. 10. 2026 until they are checked again).</summary>
+    public IReadOnlyList<int> Genres { get; init; } = [];
+
+    /// <summary>The genres in Slovak ("akčný, sci-fi").</summary>
+    [JsonIgnore]
+    public string Genre => TmdbGenres.Join(Genres);
+
     /// <summary>The library title by the specification (13.2).</summary>
     [JsonIgnore]
     public TitleInfo? Title => TitleInfo.FromTmdb(MediaKind.Movie, TmdbId, OriginalTitle, EnglishTitle, Year);
@@ -264,7 +271,8 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
     private async Task<Details?> DetailsAsync(int id, CancellationToken cancellationToken)
     {
         using var document = await tmdb.GetCompactAsync(
-            $"movie/{id.ToString(CultureInfo.InvariantCulture)}?language=cs-CZ&append_to_response=release_dates", DetailLifetime, CompactDetails, cancellationToken).ConfigureAwait(false);
+            // (the order of the parameters names the cache entry: details kept before 31. 10. 2026 had no genres)
+            $"movie/{id.ToString(CultureInfo.InvariantCulture)}?append_to_response=release_dates&language=cs-CZ", DetailLifetime, CompactDetails, cancellationToken).ConfigureAwait(false);
         return document is not null && Details.Parse(document.RootElement) is { } details ? details with { Id = id } : null;
     }
 
@@ -291,6 +299,7 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
         release_date = Text(root, "release_date"),
         original_language = Text(root, "original_language"),
         poster_path = Text(root, "poster_path"),
+        genres = Array(root, "genres").Select(g => g.TryGetProperty("id", out var id) && id.TryGetInt32(out var number) ? number : 0).Where(g => g > 0).ToList(),
         countries = Array(root, "production_countries").Select(c => Text(c, "iso_3166_1")).OfType<string>().ToList(),
         companies = Array(root, "production_companies").Select(c => Text(c, "name")).OfType<string>().Take(2).ToList(),
         dates = root.TryGetProperty("release_dates", out var releases)
@@ -328,6 +337,9 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
         /// <summary>The original language (ISO code), when TMDB tells it.</summary>
         public string Language { get; init; } = "";
 
+        /// <summary>TMDB's genre numbers.</summary>
+        public IReadOnlyList<int> Genres { get; init; } = [];
+
         public static Details? Parse(JsonElement root)
         {
             var original = WebText.Clean(Text(root, "original_title"), 300);
@@ -348,6 +360,9 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
                     ? new Release(country, type, day, WebText.Clean(Text(d, "n"), 60)) : null).OfType<Release>().ToList())
             {
                 Language = WebText.Clean(Text(root, "original_language"), 10),
+                Genres = root.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array
+                    ? genres.EnumerateArray().Where(g => g.ValueKind == JsonValueKind.Number && g.TryGetInt32(out _)).Select(g => g.GetInt32()).Take(8).ToList()
+                    : [],
             };
         }
 
@@ -368,6 +383,7 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
             Availability = Availability(),
             PosterPath = Poster,
             Popularity = popularity,
+            Genres = Genres,
         };
 
         // owner, 29. 10. 2026 – where it premieres: a festival or gala premiere (type 1, anywhere, with its place), the

@@ -15,6 +15,9 @@ public sealed record SeriesMatch(int TmdbId, string? PosterPath)
     /// <summary>The original language (ISO code).</summary>
     public string Language { get; init; } = "";
 
+    /// <summary>TMDB's genre numbers (empty in answers kept before 31. 10. 2026).</summary>
+    public IReadOnlyList<int> Genres { get; init; } = [];
+
     /// <summary>A Czech or Slovak series; null when TMDB tells neither the countries nor the language.</summary>
     public bool? IsHome => Countries.Count == 0 && Language.Length == 0 ? null
         : Countries.Any(HomeOrigin.IsHomeCountry) || HomeOrigin.IsHomeLanguage(Language);
@@ -39,7 +42,8 @@ public sealed class SeriesTmdb(TmdbClient tmdb)
 
         foreach (var withYear in year is null ? [false] : new[] { true, false })
         {
-            var path = "search/tv?language=en-US&include_adult=false&query=" + Uri.EscapeDataString(originalTitle.Trim()) +
+            // (the order of the parameters names the cache entry: answers kept before 31. 10. 2026 had no genres)
+            var path = "search/tv?include_adult=false&language=en-US&query=" + Uri.EscapeDataString(originalTitle.Trim()) +
                        (withYear ? "&first_air_date_year=" + year!.Value.ToString(CultureInfo.InvariantCulture) : "");
             using var document = await tmdb.GetCompactAsync(path, Lifetime, Compact, cancellationToken).ConfigureAwait(false);
             if (document is null || !document.RootElement.TryGetProperty("r", out var results) || results.ValueKind != JsonValueKind.Array)
@@ -52,14 +56,17 @@ public sealed class SeriesTmdb(TmdbClient tmdb)
             var match = named.FirstOrDefault() ?? (withYear && found.Count == 1 ? found[0] : null);
             if (match is not null)
             {
-                return new SeriesMatch(match.Id, match.Poster) { Countries = match.Countries, Language = match.Language };
+                return new SeriesMatch(match.Id, match.Poster) { Countries = match.Countries, Language = match.Language, Genres = match.Genres };
             }
         }
 
         return null;
     }
 
-    private sealed record Found(int Id, string Name, string Original, int? Year, string? Poster, IReadOnlyList<string> Countries, string Language);
+    private sealed record Found(int Id, string Name, string Original, int? Year, string? Poster, IReadOnlyList<string> Countries, string Language)
+    {
+        public IReadOnlyList<int> Genres { get; init; } = [];
+    }
 
     private static Found? Parse(JsonElement r) =>
         r.ValueKind == JsonValueKind.Object && r.TryGetProperty("id", out var id) && id.TryGetInt32(out var number) && number > 0
@@ -70,6 +77,11 @@ public sealed class SeriesTmdb(TmdbClient tmdb)
                     ? countries.EnumerateArray().Where(c => c.ValueKind == JsonValueKind.String).Select(c => c.GetString()!).Where(c => c.Length is > 0 and <= 3).Take(5).ToList()
                     : [],
                 WebText.Clean(Text(r, "l"), 10))
+            {
+                Genres = r.TryGetProperty("g", out var genres) && genres.ValueKind == JsonValueKind.Array
+                    ? genres.EnumerateArray().Where(g => g.ValueKind == JsonValueKind.Number && g.TryGetInt32(out _)).Select(g => g.GetInt32()).Take(8).ToList()
+                    : [],
+            }
             : null;
 
     // a search keeps only the IDs, names, years, posters and origins of its first ten results
@@ -87,6 +99,9 @@ public sealed class SeriesTmdb(TmdbClient tmdb)
                     ? origin.EnumerateArray().Where(c => c.ValueKind == JsonValueKind.String).Select(c => c.GetString()).ToList()
                     : [],
                 l = Text(e, "original_language"),
+                g = e.TryGetProperty("genre_ids", out var genres) && genres.ValueKind == JsonValueKind.Array
+                    ? genres.EnumerateArray().Where(g => g.ValueKind == JsonValueKind.Number).Select(g => g.GetInt32()).ToList()
+                    : [],
             }).ToList()
             : [],
     });

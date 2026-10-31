@@ -53,6 +53,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
         _weatherTownInput = services.Settings.WeatherPlace?.Name ?? "";
         NewsSources = new NewsSourcesViewModel(services);
+        PosterServices = new PosterServicesViewModel(services);
         InterestSources = new InterestSourcesViewModel(services);
         SubtitleAccounts = new SubtitleAccountsViewModel(services);
         SeriesMemory = new SeriesMemoryViewModel(services);
@@ -66,6 +67,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
+
+    /// <summary>TMDB poster: drawing by AI (Cloudflare, OpenAI) and the ratings of OMDb.</summary>
+    public PosterServicesViewModel PosterServices { get; }
 
     /// <summary>Nastavenia → Zaujímavosti.</summary>
     public InterestSourcesViewModel InterestSources { get; }

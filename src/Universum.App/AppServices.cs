@@ -124,6 +124,7 @@ public sealed class AppServices
         new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex)
         {
             DeleteOriginalsAllowed = deleteOriginals,
+            WaitingPosters = WaitingPosters,
             // a sound written anew (Úprava audiostopy, also in Hromadné spracovanie and MEGA): FFmpeg of the installation
             FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
         };
@@ -386,6 +387,72 @@ public sealed class AppServices
 
     /// <summary>Where the chosen titles can be watched legally (checked once a day).</summary>
     public Pages.Watchlist Watchlist => _watchlist ??= new Pages.Watchlist(this);
+
+    // TMDB poster (owner, 31. 10. 2026): finding titles, their detail and posters, drafts drawn by AI, other ratings
+
+    /// <summary>TMDB for the title card and TMDB poster (the self-test's stand-in answers there); null without TMDB.</summary>
+    public TmdbClient? PosterTmdb => PosterTmdbForSelfTest ?? Tmdb;
+
+    public TmdbClient? PosterTmdbForSelfTest { get; set; }
+
+    /// <summary>Finds films and series as the user writes them; null without TMDB.</summary>
+    public Universum.Core.Posters.TitleFinder? Finder => PosterTmdb is { } tmdb ? new Universum.Core.Posters.TitleFinder(tmdb) : null;
+
+    /// <summary>The detail, posters and collection of a title; null without TMDB.</summary>
+    public TmdbTitleDetails? TitleDetails => PosterTmdb is { } tmdb ? new TmdbTitleDetails(tmdb) : null;
+
+    private Universum.Core.Posters.PendingPosters? _waitingPosters;
+
+    /// <summary>Posters waiting for their titles to be processed (Zlúčiť poster s filmom).</summary>
+    public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory);
+
+    // drawing takes up to a minute or two
+    private static readonly HttpClient DraftHttp = new() { Timeout = TimeSpan.FromMinutes(3) };
+
+    /// <summary>Posters drawn by AI (OpenAI with the user's key, else Cloudflare with the user's account).</summary>
+    public Universum.Core.Posters.PosterDrafts Drafts => DraftsForSelfTest ?? new Universum.Core.Posters.PosterDrafts(DraftHttp);
+
+    public Universum.Core.Posters.PosterDrafts? DraftsForSelfTest { get; set; }
+
+    /// <summary>The keys of the services that draw posters (the token and the key protected for this Windows account).</summary>
+    public Universum.Core.Posters.DraftKeys DraftKeys => DraftKeysForSelfTest ?? new(Settings.CloudflareAccount,
+        Settings.CloudflareTokenProtected is { Length: > 0 } token ? UserSecret.Unprotect(token) : null,
+        Settings.OpenAiKeyProtected is { Length: > 0 } key ? UserSecret.Unprotect(key) : null);
+
+    public Universum.Core.Posters.DraftKeys? DraftKeysForSelfTest { get; set; }
+
+    /// <summary>Stores the Cloudflare account and token (null removes them).</summary>
+    public void SetCloudflare(string? account, string? token)
+    {
+        Settings.CloudflareAccount = string.IsNullOrWhiteSpace(account) ? null : account.Trim();
+        Settings.CloudflareTokenProtected = string.IsNullOrWhiteSpace(token) ? null : UserSecret.Protect(token.Trim());
+        Settings.Save();
+    }
+
+    /// <summary>Stores the OpenAI key (null removes it).</summary>
+    public void SetOpenAiKey(string? key)
+    {
+        Settings.OpenAiKeyProtected = string.IsNullOrWhiteSpace(key) ? null : UserSecret.Protect(key.Trim());
+        Settings.Save();
+    }
+
+    /// <summary>The user's OMDb key; null without one.</summary>
+    public string? OmdbKey => Settings.OmdbKeyProtected is { Length: > 0 } key ? UserSecret.Unprotect(key) : null;
+
+    private OmdbClient? _omdb;
+
+    /// <summary>The ratings of IMDb, Rotten Tomatoes and Metacritic (OMDb with the user's key); null without one.</summary>
+    public OmdbClient? Omdb => OmdbForSelfTest ?? (OmdbKey is { } key && OmdbClient.IsValidKey(key) ? _omdb ??= new OmdbClient(Http, key, AppSettings.OmdbCacheFile) : null);
+
+    public OmdbClient? OmdbForSelfTest { get; set; }
+
+    /// <summary>Stores the OMDb key (null removes it).</summary>
+    public void SetOmdbKey(string? key)
+    {
+        Settings.OmdbKeyProtected = string.IsNullOrWhiteSpace(key) ? null : UserSecret.Protect(key.Trim());
+        Settings.Save();
+        _omdb = null;
+    }
 
     private Pages.Watchlist? _watchlist;
 
@@ -725,6 +792,22 @@ public sealed class AppSettings
     /// <summary>The DeepL key, protected for the Windows account.</summary>
     public string? DeepLKeyProtected { get; set; }
 
+    /// <summary>TMDB poster: the Cloudflare account ID, its API token (protected), the OpenAI key (protected), the OMDb key (protected).</summary>
+    public string? CloudflareAccount { get; set; }
+
+    public string? CloudflareTokenProtected { get; set; }
+
+    public string? OpenAiKeyProtected { get; set; }
+
+    public string? OmdbKeyProtected { get; set; }
+
+    /// <summary>TMDB poster: the JPEG quality (50–100), the height of folder.jpg (750–3000) and Zlúčiť poster s filmom.</summary>
+    public int PosterQuality { get; set; } = 90;
+
+    public int PosterHeight { get; set; } = 1500;
+
+    public bool PosterMerge { get; set; }
+
     /// <summary>OpenSubtitles.com: the API key (protected), the user name, the password (protected).</summary>
     public string? OpenSubtitlesKeyProtected { get; set; }
 
@@ -811,6 +894,12 @@ public sealed class AppSettings
 
     /// <summary>Napovedkyňa: the series processed before and their titles.</summary>
     public static string SeriesMemoryFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "napovedkyna.json");
+
+    /// <summary>Posters waiting for their titles to be processed (TMDB poster, Zlúčiť poster s filmom).</summary>
+    public static string WaitingPosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "posters-waiting");
+
+    /// <summary>OMDb's ratings kept 7 days.</summary>
+    public static string OmdbCacheFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "omdb-cache.json");
 
     /// <summary>The HISTRA lists imported into UNIVERSUM.</summary>
     public static string HistraListsFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "histra-lists.json");

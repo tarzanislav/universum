@@ -244,6 +244,7 @@ internal static class SelfTest
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
         await TestVideoAsync(model, window, services, work);
+        await TestPostersAsync(model, window, services, library);
         TestSeriesMemory(model, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
@@ -835,6 +836,9 @@ internal static class SelfTest
         film.OpenCommand.Execute(null);
         Check(page.Selected == film && film.Caption == "Invented Story 1 (1991)" && film.LocalTitle == "Vymyslený príbeh 1",
             $"lists: the detail of a title – {film.Caption} / {film.LocalTitle}");
+        Check(page.Card is { MainName: "Invented Story 1 (1991)" } card && card.OtherNames.SequenceEqual(["Vymyslený príbeh 1 (1991)"]) &&
+              card.Links.Any(l => l.Text == "Trakt" && l.Address.AbsoluteUri == "https://trakt.tv/search/tmdb/9001?id_type=movie") && card.Ids.Count == film.Ids.Count,
+            $"lists: the card of the title (names, Trakt, IDs) – {page.Card?.MainName} | {string.Join(", ", page.Card?.Links.Select(l => l.Text) ?? [])}");
         Check(string.Join(", ", film.Links.Select(l => $"{l.Text} {l.Address.AbsoluteUri}")) ==
               "HISTRA https://histra.net/movie/1001, TMDB https://www.themoviedb.org/movie/9001, IMDb https://www.imdb.com/title/tt0009001/, " +
               "ČSFD (hľadať) https://www.csfd.cz/hledat/?q=Invented%20Story%201",
@@ -1481,6 +1485,107 @@ internal static class SelfTest
     /// HISTRA and its poster server with invented lists: three lists; the first has 30 titles, given at most 20 per page
     /// (as HISTRA cuts the limit), the second three; a deleted list answers 404. Posters are drawn pictures.
     /// </summary>
+    // owner, 31. 10. 2026: TMDB poster – an invented film found, its card, the poster recommended, folder.jpg in POSTER (an
+    // older one renamed), a draft by AI, merged into the film processed; invented answers, nothing goes to the internet
+    private static async Task TestPostersAsync(MainViewModel model, MainWindow window, AppServices services, string library)
+    {
+        var fake = new FakePosters();
+        var http = new System.Net.Http.HttpClient(fake);
+        services.PosterTmdbForSelfTest = new Core.Library.Tmdb.TmdbClient(http, "selftest-key", null, new RequestPacer(1000));
+        services.PostersForSelfTest = new PosterCache(http, Path.Combine(_outputDirectory, "posters-tmdb"), PosterCache.DefaultServer);
+        services.DraftsForSelfTest = new Core.Posters.PosterDrafts(http);
+        services.DraftKeysForSelfTest = new Core.Posters.DraftKeys(new string('a', 32), new string('t', 40), null);
+        var page = model.Posters;
+        model.SelectedTool = model.Tools.First(t => t.Page == page);
+        page.Merge = false;
+        page.Query = "Vymyslený plagát 2026";
+        await page.SearchCommand.ExecuteAsync(null);
+        await page.OfferReady;
+        Check(page.Results.Count == 1 && page.Card?.Details is { OriginalTitle: "Vymyslený plagát" }, "posters: the film found and opened – " + page.SearchStatus);
+        var card = page.Card!;
+        Check(card.MainName == "Vymyslený plagát (2026)" && card.OtherNames.SequenceEqual(["Invented Poster (2026)", "Vymyšlený plakát (2026)"]) && card.Genre == "komédia" &&
+              card.Facts == "Film · 1 h 40 min (100 min)" && card.Directors == "Vymyslená Režisérka" && card.HasCollection,
+            $"posters: the card – {card.MainName} | {string.Join(" / ", card.OtherNames)} | {card.Facts} | {card.Genre} | {card.Directors} | {card.Collection.Count}");
+        Check(page.Recommended?.Candidate?.Picture.Path == "/cz-plagat.png" && page.Selected == page.Recommended && page.Opinion.StartsWith("Odporúčam český plagát", StringComparison.Ordinal) &&
+              page.Groups.Select(g => g.Name).SequenceEqual(["EN", "CZ"]), $"posters: the Czech one recommended, the groups – {page.Opinion} | {string.Join(", ", page.Groups.Select(g => g.Name))}");
+        await Screenshot(window, "tmdb-poster.png");
+
+        await page.ProcessCommand.ExecuteAsync(null);
+        var folder = Path.Combine(library, "POSTER", "Vymyslený plagát (2026)");
+        var jpeg = Path.Combine(folder, "folder.jpg");
+        Check(File.Exists(jpeg) && File.ReadAllBytes(jpeg) is [0xFF, 0xD8, ..], "posters: folder.jpg (JPEG) in POSTER – " + page.Result);
+        page.Groups.Single(g => g.Name == "EN").Posters[0].SelectCommand.Execute(null);
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(File.Exists(Path.Combine(folder, "folder-povodny.jpg")) && page.Result.Contains("folder-povodny.jpg", StringComparison.Ordinal), "posters: the older one renamed – " + page.Result);
+
+        await page.DraftCommand.ExecuteAsync(null);
+        Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("api.cloudflare.com", StringComparison.Ordinal)),
+            "posters: a draft by AI (Cloudflare) – " + page.DraftStatus);
+
+        // merged: the film processed (its folder in MOVIES) gets the poster
+        var movie = Path.Combine(library, "MOVIES", "Vymyslený plagát (2026)");
+        Directory.CreateDirectory(movie);
+        page.Merge = true;
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(File.Exists(Path.Combine(movie, "folder.jpg")), "posters: merged into the film's folder – " + page.Result);
+        page.Merge = false;
+
+        services.PosterTmdbForSelfTest = null;
+        services.PostersForSelfTest = null;
+        services.DraftsForSelfTest = null;
+        services.DraftKeysForSelfTest = null;
+    }
+
+    private sealed class FakePosters : System.Net.Http.HttpMessageHandler
+    {
+        private readonly byte[] _poster = FakeHistra.DrawPoster(4);
+
+        public List<string> Requests { get; } = [];
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var uri = request.RequestUri!;
+            lock (Requests)
+            {
+                Requests.Add(uri.AbsoluteUri);
+            }
+
+            if (uri.Host == "image.tmdb.org")
+            {
+                return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.ByteArrayContent(_poster) });
+            }
+
+            var body = uri.Host switch
+            {
+                "api.cloudflare.com" => $$"""{ "result": { "image": "{{Convert.ToBase64String(_poster)}}" }, "success": true }""",
+                _ => uri.AbsolutePath switch
+                {
+                    "/3/search/multi" => """{ "results": [ { "media_type": "movie", "id": 777001, "title": "Vymyslený plagát", "original_title": "Vymyslený plagát", "release_date": "2026-03-01", "popularity": 3 } ] }""",
+                    "/3/movie/777001" => """
+                        { "id": 777001, "title": "Invented Poster", "original_title": "Vymyslený plagát", "original_language": "sk", "release_date": "2026-03-01", "runtime": 100,
+                          "vote_average": 7.1, "vote_count": 42, "genres": [ { "id": 35 } ], "overview": "An invented film.", "poster_path": "/cz-plagat.png",
+                          "belongs_to_collection": { "id": 777, "name": "Vymyslené plagáty" },
+                          "credits": { "cast": [ { "name": "Vymyslený Herec" } ], "crew": [ { "job": "Director", "name": "Vymyslená Režisérka" } ] },
+                          "external_ids": { "imdb_id": "tt7770010" },
+                          "translations": { "translations": [ { "iso_639_1": "cs", "iso_3166_1": "CZ", "data": { "title": "Vymyšlený plakát", "overview": "Vymyšlený film." } } ] } }
+                        """,
+                    "/3/movie/777001/images" => """
+                        { "posters": [ { "file_path": "/en-plagat.png", "iso_639_1": "en", "width": 2000, "height": 3000, "vote_average": 6, "vote_count": 3 },
+                                       { "file_path": "/cz-plagat.png", "iso_639_1": "cs", "width": 1000, "height": 1500, "vote_average": 5.3, "vote_count": 1 } ] }
+                        """,
+                    "/3/collection/777" => """
+                        { "name": "Vymyslené plagáty", "parts": [ { "id": 777001, "title": "Invented Poster", "original_title": "Vymyslený plagát", "release_date": "2026-03-01" },
+                                                                 { "id": 777002, "title": "Invented Poster 2", "original_title": "Vymyslený plagát 2", "release_date": "2028-03-01" } ] }
+                        """,
+                    _ => null,
+                },
+            };
+            return Task.FromResult(body is null
+                ? new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+                : new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(body, Encoding.UTF8, "application/json") });
+        }
+    }
+
     private sealed class FakeHistra : System.Net.Http.HttpMessageHandler
     {
         private readonly List<byte[]> _posters = Enumerable.Range(0, 6).Select(DrawPoster).ToList();

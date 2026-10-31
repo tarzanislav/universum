@@ -143,17 +143,21 @@ public sealed record LibraryLayout(string Root)
 
     public string Shows => Path.Combine(Root, LibraryNames.ShowsFolder);
 
+    /// <summary>POSTER: posters found alone, apart from the films and series processed (owner, 31. 10. 2026).</summary>
+    public string Posters => Path.Combine(Root, LibraryNames.PostersFolder);
+
     /// <summary>
     /// Where results are written (MOVIES and TVSHOWS): batch processing skips them. Other folders of the output folder
     /// may hold originals (owner's report, 27. 10. 2026: streams kept in the output folder were not found).
     /// </summary>
     public IReadOnlyList<string> ResultFolders => [Movies, Shows];
 
-    /// <summary>Creates MOVIES and TVSHOWS. UNIVERSUM never deletes folders in the output folder.</summary>
+    /// <summary>Creates MOVIES, TVSHOWS and POSTER. UNIVERSUM never deletes folders in the output folder.</summary>
     public void EnsureCreated()
     {
         System.IO.Directory.CreateDirectory(Movies);
         System.IO.Directory.CreateDirectory(Shows);
+        System.IO.Directory.CreateDirectory(Posters);
     }
 
     /// <summary>Folder of a title: MOVIES\Creep (2004) or TVSHOWS\Nine Puzzles (2025) [tmdbid-227191].</summary>

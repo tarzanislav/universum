@@ -38,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
         HistraLists = new HistraListsPageViewModel(services);
+        Posters = new PosterPageViewModel(services);
         Premieres = new PremieresPageViewModel(services);
         SeriesNews = new SeriesNewsPageViewModel(services)
         {
@@ -59,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
             new("Premiéry", "\uE8B2", Premieres, news),
             new("Novinky – Seriály", "\uE7F4", SeriesNews, news),
             new("Listy z HISTRA", "\uE8F1", HistraLists, news),
+            new("TMDB poster", "\uE8B9", Posters, news),
             new("Zaujímavosti", "\uE734", Interests, news),
             new("Zlučovanie", "\uE71D", Mux, multiplexing),
             new("Úprava hlavičky", "\uE70F", HeaderEditor, multiplexing),
@@ -230,6 +232,9 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>Listy z HISTRA – the user's HISTRA lists, read only.</summary>
     public HistraListsPageViewModel HistraLists { get; }
+
+    /// <summary>TMDB poster – a poster of a film or series found on TMDB, written as folder.jpg (owner, 31. 10. 2026).</summary>
+    public PosterPageViewModel Posters { get; }
 
     /// <summary>Premiéry – films and series, SK/CZ and the world.</summary>
     public PremieresPageViewModel Premieres { get; }

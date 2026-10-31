@@ -9,6 +9,9 @@ public enum PosterSize
 {
     Small,
     Large,
+
+    /// <summary>The poster as it was uploaded (TMDB: up to 2000 × 3000) – for folder.jpg.</summary>
+    Original,
 }
 
 /// <summary>
@@ -25,6 +28,9 @@ public sealed partial class PosterCache
 
     /// <summary>The largest poster accepted.</summary>
     public const int MaxBytes = 2 << 20;
+
+    /// <summary>The largest original poster accepted.</summary>
+    public const int MaxOriginalBytes = 40 << 20;
 
     private readonly HttpClient _http;
     private readonly string _folder;
@@ -93,17 +99,17 @@ public sealed partial class PosterCache
         }
 
         // one download per poster, however many rows ask for it
-        return _running.GetOrAdd(file, _ => DownloadAsync(Address(path, size), file, cancellationToken));
+        return _running.GetOrAdd(file, _ => DownloadAsync(Address(path, size), file, size == PosterSize.Original ? MaxOriginalBytes : MaxBytes, cancellationToken));
     }
 
-    private async Task<string?> DownloadAsync(Uri address, string file, CancellationToken cancellationToken)
+    private async Task<string?> DownloadAsync(Uri address, string file, long limit, CancellationToken cancellationToken)
     {
         await _parallel.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             using var response = await _http.GetAsync(address, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode || response.RequestMessage?.RequestUri?.Host != Server.Host ||
-                response.Content.Headers.ContentLength > MaxBytes)
+                response.Content.Headers.ContentLength > limit)
             {
                 _failed[file] = true;
                 return null;
@@ -115,7 +121,7 @@ public sealed partial class PosterCache
             int read;
             while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                if (buffer.Length + read > MaxBytes)
+                if (buffer.Length + read > limit)
                 {
                     _failed[file] = true;
                     return null;
@@ -158,7 +164,12 @@ public sealed partial class PosterCache
         bytes.Length > 8 && ((bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) ||
                              bytes[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }));
 
-    private static string SizeFolder(PosterSize size) => size == PosterSize.Large ? "w342" : "w154";
+    private static string SizeFolder(PosterSize size) => size switch
+    {
+        PosterSize.Large => "w342",
+        PosterSize.Original => "original",
+        _ => "w154",
+    };
 
     [GeneratedRegex("^/[A-Za-z0-9_-]{1,100}\\.(jpg|jpeg|png)$", RegexOptions.CultureInvariant)]
     private static partial Regex PosterPath();

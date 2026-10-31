@@ -48,6 +48,16 @@ public sealed class MainViewModel : ObservableObject
         Interests = new InterestsPageViewModel(services);
         Mega = new MegaPageViewModel(services);
 
+        // the input folder watched: new films and episodes are told, sent to Hromadné spracovanie on a click
+        ArrivalsToBatchCommand = new AsyncRelayCommand(ArrivalsToBatchAsync);
+        DismissArrivalsCommand = new RelayCommand(services.Arrivals.Clear);
+        services.Arrivals.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasArrivals));
+            OnPropertyChanged(nameof(ArrivalsText));
+        };
+        services.RestartWatch();
+
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup("NOVINKY A OBSAH", Color.FromRgb(0x9B, 0x6B, 0xD6));
         var multiplexing = new ToolGroup("MULTIPLEXING", Color.FromRgb(0x4A, 0x7B, 0xD9));
@@ -232,6 +242,39 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>Listy z HISTRA – the user's HISTRA lists, read only.</summary>
     public HistraListsPageViewModel HistraLists { get; }
+
+    /// <summary>New films and episodes came into the input folder.</summary>
+    public bool HasArrivals => _services.Arrivals.Count > 0;
+
+    /// <summary>"Na vstupe pribudli nové súbory (3): Vymyslený.Film.mkv, …".</summary>
+    public string ArrivalsText =>
+        $"Na vstupe pribudli nové súbory ({_services.Arrivals.Count}): " +
+        string.Join(", ", _services.Arrivals.Take(3).Select(System.IO.Path.GetFileName)) + (_services.Arrivals.Count > 3 ? " …" : "");
+
+    public AsyncRelayCommand ArrivalsToBatchCommand { get; }
+
+    public RelayCommand DismissArrivalsCommand { get; }
+
+    // the new files into Hromadné spracovanie (analysed there; nothing runs by itself)
+    private async Task ArrivalsToBatchAsync()
+    {
+        var files = _services.Arrivals.Where(System.IO.File.Exists).ToList();
+        if (files.Count == 0)
+        {
+            _services.Arrivals.Clear();
+            return;
+        }
+
+        Open(Batch);
+        if (await Batch.AnalyzeChosenAsync(files))
+        {
+            _services.Arrivals.Clear();
+        }
+        else
+        {
+            System.Windows.MessageBox.Show("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení.", "UNIVERSUM");
+        }
+    }
 
     /// <summary>TMDB poster – a poster of a film or series found on TMDB, written as folder.jpg (owner, 31. 10. 2026).</summary>
     public PosterPageViewModel Posters { get; }

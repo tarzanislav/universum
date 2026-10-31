@@ -3964,6 +3964,8 @@
                     </Border>
                     <StackPanel Margin="0,0,0,16">
                         <ContentControl Content="{Binding InputFolder}" />
+                        <CheckBox Content="Sledovať vstupný priečinok – upozorniť na nové filmy a epizódy" IsChecked="{Binding WatchInput}" Margin="4,8,0,0"
+                                  ToolTip="Keď sa do vstupného priečinka dokopíruje film alebo epizóda, hore sa ukáže upozornenie s tlačidlom Do Hromadného spracovania. Nič sa nespracuje samo." />
                         <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="4,4,0,0" TextWrapping="Wrap"
                                    Text="Sem prichádzajú nové filmy a epizódy. Novinky – Seriály v ňom (aj v podpriečinkoch) hľadajú epizódy, ktoré odošlete na spracovanie; Single a Hromadné spracovanie v ňom otvárajú výber súborov. Súbory v ňom UNIVERSUM len číta." />
                     </StackPanel>
@@ -4402,7 +4404,23 @@
             </ListBox>
         </DockPanel>
 
-        <ContentControl Grid.Column="1" Content="{Binding SelectedTool.Page}" />
+        <DockPanel Grid.Column="1">
+            <!-- owner, 31. 10. 2026: new films and episodes in the input folder – told, sent to Hromadné spracovanie on a click -->
+            <Border DockPanel.Dock="Top" Margin="16,10,16,0" CornerRadius="8" Padding="14,8" Background="#336FA8E8"
+                    Visibility="{Binding HasArrivals, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Do Hromadného spracovania" Command="{Binding ArrivalsToBatchCommand}" Padding="12,4" Margin="8,0,8,0" FontWeight="SemiBold" />
+                        <Button Command="{Binding DismissArrivalsCommand}" Padding="8,4" ToolTip="Skryť (súbory ostanú na vstupe)">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="12" />
+                        </Button>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE8B5;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ArrivalsText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ArrivalsText}" />
+                </DockPanel>
+            </Border>
+            <ContentControl Content="{Binding SelectedTool.Page}" />
+        </DockPanel>
 
         <Border Grid.Row="1" Grid.ColumnSpan="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" Padding="16,6">
             <DockPanel>

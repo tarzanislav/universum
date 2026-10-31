@@ -62,6 +62,12 @@ public sealed class GroupDecisions
     /// <summary>Doplnok k názvu of single files (full path → the text put into the name before the size class; owner, 31. 10. 2026).</summary>
     public Dictionary<string, string> Additions { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
+    /// <summary>
+    /// Revízia (owner, 31. 10. 2026): files (full paths) written again although the same result of them is in the library;
+    /// the earlier result goes to the Recycle Bin once the new one is verified.
+    /// </summary>
+    public HashSet<string> Revisions { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
     /// <summary>Files (full paths) to process even though required template slots are missing.</summary>
     public HashSet<string> ProcessAnyway { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 }

@@ -39,7 +39,7 @@ public static class BatchPlanner
     /// </summary>
     /// <param name="fingerprints">Fingerprints of the originals (full path → <see cref="LibraryIndex.FingerprintAsync"/>).</param>
     public static IReadOnlyList<BatchItem> MarkAlreadyInLibrary(IReadOnlyList<BatchItem> items, LibraryIndex index, IReadOnlyDictionary<string, string> fingerprints) =>
-        items.Select(i => i.NeedsWork && i.Placement is { } placement &&
+        items.Select(i => i.NeedsWork && !i.Plan.Revision && i.Placement is { } placement &&
                           fingerprints.TryGetValue(Path.GetFullPath(i.File.Path), out var fingerprint) &&
                           index.FindPrevious(placement, fingerprint, LibraryIndex.TargetSignature(i.Target)) is { } found &&
                           found.Target == LibraryIndex.TargetSignature(i.Target)
@@ -235,7 +235,7 @@ public static class BatchPlanner
             reasons.AddRange(match.MissingRequired.Select(s => new ReviewReason(ReviewReasonKind.MissingRequiredSlot, TemplateSlot: s)));
         }
 
-        var item = new BatchItem(file, group, decisions, target, EditPlan.For(target), match, evidence, reasons);
+        var item = new BatchItem(file, group, decisions, target, EditPlan.For(target) with { Revision = group.Decisions.Revisions.Contains(file.Path) }, match, evidence, reasons);
         return library is null ? item : Place(item, library, profile, reasons);
     }
 

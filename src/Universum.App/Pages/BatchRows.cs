@@ -573,8 +573,22 @@ public sealed class FileRow : ObservableObject
     /// <summary>Planned place in the library, relative to the output folder.</summary>
     public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
 
+    /// <summary>Revízia is offered for a file whose result is in the library (and stays while chosen).</summary>
+    public bool CanRevise => Item.AlreadyInLibraryAt is not null || Item.Plan.Revision;
+
+    /// <summary>
+    /// Revízia (owner, 31. 10. 2026): the file is written again although its result is in the library; the new version
+    /// is verified, then the earlier one goes to the Recycle Bin.
+    /// </summary>
+    public bool Revision
+    {
+        get => Item.Plan.Revision;
+        set => page.SetRevision(Item.File.Path, value);
+    }
+
     /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container.</summary>
-    public string Status => Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? "už v knižnici"
+    public string Status => Item.Plan.Revision && Item.Reasons.Count == 0 ? "revízia – nová verzia nahradí výsledok v knižnici"
+        : Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? "už v knižnici"
         : Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
         ? $"nový MKV z {Item.File.ContainerName}"
         : Texts.Status(Item.Status);

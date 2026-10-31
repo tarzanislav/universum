@@ -116,6 +116,9 @@ public sealed class MegaFile
     /// <summary>Doplnok k názvu of the file (null: none).</summary>
     public string? Addition { get; init; }
 
+    /// <summary>Revízia: written again although its result is in the library (the earlier one to the Recycle Bin).</summary>
+    public bool Revision { get; init; }
+
     /// <summary>Where the result was planned when the batch was made (shown on the page).</summary>
     public string PlannedPath { get; init; } = "";
 
@@ -170,6 +173,7 @@ public sealed class MegaFile
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
             Addition = item.Group.Decisions.Additions.GetValueOrDefault(item.File.Path),
+            Revision = item.Plan.Revision,
             Profile = profile,
             Externals = item.File.Tracks.Where(t => t.ExternalFile is not null).Select(MegaExternal.Of).ToList(),
         };

@@ -533,6 +533,9 @@
                         <DockPanel Margin="0,12,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="Vrátiť späť" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
+                                <Button Content="Revízia" Command="{Binding ReviseCommand}" Margin="0,0,8,0" Padding="16,6"
+                                        Visibility="{Binding CanRevise, Converter={StaticResource BoolToVisibility}}"
+                                        ToolTip="Výsledok už v knižnici je – spracovať znova ako novú verziu: nová sa zapíše a overí, až potom ide doterajšia do Koša" />
                                 <Button Content="Do fronty" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="Pridá súbor do fronty úloh namiesto okamžitého spracovania" />
                                 <Button Content="Použiť pravidlá" Command="{Binding ApplyCommand}" Padding="16,6" />
                             </StackPanel>
@@ -2414,6 +2417,15 @@
                                             <CheckBox IsChecked="{Binding ProcessAnyway, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
                                                       Visibility="{Binding CanProcessAnyway, Converter={StaticResource BoolToVisibility}}"
                                                       ToolTip="Spracovať aj bez povinnej stopy šablóny" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Revízia">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Revision, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"
+                                                      Visibility="{Binding CanRevise, Converter={StaticResource BoolToVisibility}}"
+                                                      ToolTip="Výsledok už v knižnici je – spracovať znova ako novú verziu: nová sa zapíše a overí, až potom ide doterajšia do Koša" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

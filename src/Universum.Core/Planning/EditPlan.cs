@@ -5,6 +5,12 @@ namespace Universum.Core.Planning;
 /// <summary>What will be done with one file: the target state, the write method and the list of changes.</summary>
 public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyList<PlannedChange> Changes)
 {
+    /// <summary>
+    /// Revízia (owner, 31. 10. 2026): the original is written again although the same result of it is in the library; the
+    /// new result is verified and only then the earlier one goes to the Recycle Bin.
+    /// </summary>
+    public bool Revision { get; init; }
+
     public static EditPlan For(TargetState target)
     {
         var method = !target.HasChanges ? WriteMethod.None : target.NeedsRewrite ? WriteMethod.Remux : WriteMethod.HeaderEdit;

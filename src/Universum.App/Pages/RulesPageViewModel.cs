@@ -58,7 +58,8 @@ public sealed class RulesPageViewModel : ObservableObject
         _services = services;
         OpenCommand = new AsyncRelayCommand(OpenAsync, () => !Busy);
         ClearCommand = new RelayCommand(Clear, () => !Busy);
-        ApplyCommand = new AsyncRelayCommand(ApplyAsync, CanApply);
+        ApplyCommand = new AsyncRelayCommand(() => ApplyAsync(), CanApply);
+        ReviseCommand = new AsyncRelayCommand(() => ApplyAsync(revision: true), () => CanRevise && CanApply());
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
         QueueCommand = new RelayCommand(Enqueue, CanApply);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
@@ -88,6 +89,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
+        CanRevise = false;
         Result = "";
         _undoRecord = null;
         _languages.Clear();
@@ -121,6 +123,27 @@ public sealed class RulesPageViewModel : ObservableObject
     }
 
     public AsyncRelayCommand ApplyCommand { get; }
+
+    /// <summary>
+    /// Revízia (owner, 31. 10. 2026): the same result is in the library – the file is written again as a new version; it is
+    /// verified, then the earlier one goes to the Recycle Bin.
+    /// </summary>
+    public AsyncRelayCommand ReviseCommand { get; }
+
+    /// <summary>The last processing found the same result in the library (Revízia is offered).</summary>
+    public bool CanRevise
+    {
+        get => _canRevise;
+        private set
+        {
+            if (SetProperty(ref _canRevise, value))
+            {
+                ReviseCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    private bool _canRevise;
 
     public AsyncRelayCommand UndoCommand { get; }
 
@@ -261,6 +284,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
         Result = "";
         _undoRecord = null;
+        CanRevise = false;
         _languages.Clear();
         _videoNames.Clear();
         _kept.Clear();
@@ -726,13 +750,15 @@ public sealed class RulesPageViewModel : ObservableObject
         UpdateTarget();
     }
 
-    private async Task ApplyAsync()
+    private async Task ApplyAsync(bool revision = false)
     {
         if (_plan is null || _placement is null || _services.CurrentMkvToolNix is null || _services.Settings.OriginalHandling is not { } handling)
         {
             return;
         }
 
+        var plan = revision ? _plan with { Revision = true } : _plan;
+        CanRevise = false;
         Busy = true;
         Result = "Pracujem…";
         Progress = 0;
@@ -741,8 +767,9 @@ public sealed class RulesPageViewModel : ObservableObject
             var processor = _services.Processor(_services.CurrentMkvToolNix);
             var series = SeriesToRemember();
             var started = DateTime.UtcNow;
-            var result = await processor.ProcessAsync(_plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
-            _services.LogProcessing("Single spracovanie", _plan, result, started);
+            var result = await processor.ProcessAsync(plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
+            _services.LogProcessing(revision ? "Single spracovanie – revízia" : "Single spracovanie", plan, result, started);
+            CanRevise = result.Status == ProcessingStatus.AlreadyInLibrary;
             _undoRecord = result.UndoRecordPath;
             if (result.Status is ProcessingStatus.Done or ProcessingStatus.Unchanged or ProcessingStatus.AlreadyInLibrary)
             {
@@ -757,9 +784,9 @@ public sealed class RulesPageViewModel : ObservableObject
             }
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Hotovo: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu je možné vrátiť späť."),
+                ProcessingStatus.Done => $"Hotovo{(revision ? " (revízia – doterajšia verzia je v Koši)" : "")}: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu je možné vrátiť späť."),
                 ProcessingStatus.Unchanged => "Súbor už spĺňa pravidlá a je v knižnici.",
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal.",
+                ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal. Ak ho chcete spracovať znova ako novú verziu, stlačte Revízia.",
                 ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať (pozri upozornenia).",
                 ProcessingStatus.Cancelled => "Zrušené.",
                 _ when FileProcessor.NeedsAttention(result) =>
@@ -871,6 +898,7 @@ public sealed class RulesPageViewModel : ObservableObject
         ApplyCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         QueueCommand?.NotifyCanExecuteChanged();
+        ReviseCommand?.NotifyCanExecuteChanged();
         ChooseOutputDirectoryCommand.NotifyCanExecuteChanged();
     }
 

@@ -290,6 +290,14 @@ public sealed class ProcessorTests
 
         var third = await processor.ProcessAsync(corrected, work.Movie(corrected), Keep);
         Assert.Equal(ProcessingStatus.AlreadyInLibrary, third.Status, "the same decisions again: nothing to do");
+
+        // owner, 31. 10. 2026: Revízia – written again all the same; the new result verified, then the earlier one to the Recycle Bin
+        var revision = await processor.ProcessAsync(corrected with { Revision = true }, work.Movie(corrected), Keep);
+        Assert.Equal(ProcessingStatus.Done, revision.Status, "a revision is written: " + string.Join("; ", revision.Messages));
+        Assert.Equal(second.OutputPath, revision.OutputPath, "the new version takes the place of the earlier one");
+        Assert.True(bin.Recycled.Count == 2 && revision.Messages.Any(m => m.StartsWith(FileProcessor.ReplacedPreviousPrefix, StringComparison.Ordinal)), "the earlier version in the Recycle Bin");
+        Assert.True(System.IO.File.Exists(original), "the original stays");
+        Assert.Equal(ProcessingStatus.AlreadyInLibrary, (await processor.ProcessAsync(corrected, work.Movie(corrected), Keep)).Status, "without revision the new version is found");
     }
 
     [Test]
@@ -876,8 +884,10 @@ public sealed class ProcessorTests
 
         public void MoveToRecycleBin(string path)
         {
+            // as the Recycle Bin of Windows: a file of the same name there before is kept
             Directory.CreateDirectory(folder);
-            System.IO.File.Move(path, System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path)));
+            var target = System.IO.Path.Combine(folder, System.IO.Path.GetFileName(path));
+            System.IO.File.Move(path, System.IO.File.Exists(target) ? System.IO.Path.Combine(folder, $"{Recycled.Count + 1} {System.IO.Path.GetFileName(path)}") : target);
             Recycled.Add(path);
         }
     }

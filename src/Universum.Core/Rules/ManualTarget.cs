@@ -27,7 +27,9 @@ public static class ManualTarget
             throw new ArgumentException("Every track of the file must be either kept (once) or removed.", nameof(tracks));
         }
 
-        if (removed.Any(id => byId[id].Type is not (TrackType.Audio or TrackType.Subtitles)))
+        // a video track only when its picture is written anew in a track of its own (Úprava videostopy)
+        if (removed.Any(id => byId[id].Type is not (TrackType.Audio or TrackType.Subtitles) &&
+                              !(byId[id].Type == TrackType.Video && file.Tracks.Any(t => t.VideoEncode?.Source.Id == id))))
         {
             throw new ArgumentException("Only audio and subtitle tracks can be left out.", nameof(removed));
         }

@@ -58,8 +58,9 @@ public sealed class AudioRow : ObservableObject
         _name = track.Name ?? "";
         _initialName = _name;
         _defaultName = _name;
+        // the encoders of the FFmpeg UNIVERSUM installs (LGPL, FFmpeg's own encoders)
         Codecs = [new(AudioCodec.Keep, $"Ponechať ({track.Codec})"), new(AudioCodec.Ac3, "AC-3"), new(AudioCodec.Eac3, "E-AC-3"), new(AudioCodec.Aac, "AAC"),
-            new(AudioCodec.Opus, "Opus"), new(AudioCodec.Flac, "FLAC (bezstratovo)")];
+            new(AudioCodec.Flac, "FLAC (bezstratovo)")];
         _codec = Codecs[0];
         _bitrate = Bitrates[0];
         DelayStepCommand = new RelayCommand<string>(step =>

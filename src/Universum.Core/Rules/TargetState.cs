@@ -27,6 +27,12 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>The chapters are replaced.</summary>
     public bool ChaptersChanged => NewChapters is not null;
 
+    /// <summary>The parts of the film kept (Úprava videostopy: strih – owner, 30. 10. 2026); null keeps it whole.</summary>
+    public IReadOnlyList<Video.CutPart>? Cut { get; init; }
+
+    /// <summary>The film is cut.</summary>
+    public bool IsCut => Cut is { Count: > 0 };
+
     /// <summary>Number of chapter entries the result has.</summary>
     public int ResultChapterEntries => NewChapters?.Count ?? Source.ChapterEntries;
 
@@ -57,13 +63,13 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     public IEnumerable<MediaTrack> RemovedFromFile => Removed.Where(t => t.ExternalFile is null);
 
     public bool HasChanges => ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || RemovedFromFile.Any() ||
-                              Tracks.Any(t => t.HasChanges);
+                              IsCut || Tracks.Any(t => t.HasChanges);
 
     /// <summary>
     /// A new file must be written (another container, order, removed tracks, index repair, added files, new times of
     /// subtitles); otherwise a header edit is enough.
     /// </summary>
-    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged;
+    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged || IsCut || Tracks.Any(t => t.AspectRatio is not null);
 
     public bool IsBlocked => Issues.Any(i => i.IsBlocking);
 

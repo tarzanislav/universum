@@ -34,8 +34,11 @@ public sealed class FileProcessor(
     /// <summary>The library index the processor records its results in (null without one).</summary>
     public LibraryIndex? Index => index;
 
-    /// <summary>Finds FFmpeg when a sound is to be written anew (<see cref="MediaTrack.Encode"/>); null: such a plan fails.</summary>
+    /// <summary>Finds FFmpeg when a sound or a picture is to be written anew (<see cref="MediaTrack.Encode"/>, <see cref="MediaTrack.VideoEncode"/>); null: such a plan fails.</summary>
     public Func<CancellationToken, Task<string>>? FindFfmpeg { get; init; }
+
+    /// <summary>Replaces the encoders of Windows for pictures (tests on other systems: "libx264"); null in UNIVERSUM.</summary>
+    public string? VideoEncoder { get; init; }
 
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
@@ -587,10 +590,10 @@ public sealed class FileProcessor(
         return Result(plan, ProcessingStatus.Done, final, null, messages);
     }
 
-    // the sounds of the target written anew by FFmpeg (the first half of the work), by track ID
+    // the sounds and pictures of the target written anew by FFmpeg (the first half of the work), by track ID
     private async Task<(IReadOnlyDictionary<int, string> Encoded, string? Problem)> EncodeAsync(TargetState target, string folder, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        var tracks = target.Tracks.Where(t => t.IsAdded && t.Source.Encode is not null).ToList();
+        var tracks = target.Tracks.Where(t => t.IsAdded && (t.Source.Encode is not null || t.Source.VideoEncode is not null)).ToList();
         var encoded = new Dictionary<int, string>();
         if (tracks.Count == 0)
         {
@@ -606,10 +609,23 @@ public sealed class FileProcessor(
         Directory.CreateDirectory(folder);
         for (var i = 0; i < tracks.Count; i++)
         {
-            var encoding = tracks[i].Source.Encode!;
-            var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
             var at = i;
             var part = progress is null ? null : new ScaledProgress(progress, (double)at / tracks.Count * 0.5, 0.5 / tracks.Count);
+            if (tracks[i].Source.VideoEncode is { } picture)
+            {
+                var video = Path.Combine(folder, $"obraz-{i + 1:00}.mkv");
+                var failed = await Video.VideoEncoder.EncodeAsync(runner, ffmpeg, picture, video, target.Source.Duration, part, cancellationToken, VideoEncoder).ConfigureAwait(false);
+                if (failed is not null)
+                {
+                    return (encoded, $"the picture of {Path.GetFileName(picture.Path)} cannot be written anew: {failed}");
+                }
+
+                encoded[tracks[i].TrackId] = video;
+                continue;
+            }
+
+            var encoding = tracks[i].Source.Encode!;
+            var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
             var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, encoding.Ordinal, encoding.Source, encoding.Recipe, output,
                 target.Source.Duration, part, cancellationToken).ConfigureAwait(false);
             if (problem is not null)
@@ -623,6 +639,68 @@ public sealed class FileProcessor(
         return (encoded, null);
     }
 
+    // the text subtitles of a film cut, each within the parts kept (UNIVERSUM's SRT in their place); one with nothing in
+    // the parts is left out – mkvmerge would measure the parts left out by the subtitles' durations too
+    private async Task<(TargetState Target, string? Problem)> CutSubtitlesAsync(TargetState target, string folder, CancellationToken cancellationToken)
+    {
+        var tracks = new List<TrackTarget>();
+        var removed = target.Removed.ToList();
+        var next = 3000 + target.Tracks.Max(t => t.TrackId);
+        var fps = target.Source.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond;
+        foreach (var track in target.Tracks)
+        {
+            if (track.Type != TrackType.Subtitles || !track.Source.IsTextSubtitles)
+            {
+                tracks.Add(track);
+                continue;
+            }
+
+            Subtitles.SubtitleDocument? document;
+            try
+            {
+                document = track.IsAdded
+                    ? await Subtitles.SubtitleReader.ReadFileAsync(track.Source.ExternalFile!, fps, cancellationToken).ConfigureAwait(false)
+                    : await SubtitleText.ExtractDocumentAsync(installation, runner, target.Source, track.Source, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or System.Xml.XmlException)
+            {
+                document = null;
+            }
+
+            if (document is null)
+            {
+                return (target, $"the subtitles of track {track.TrackId} cannot be read to cut them");
+            }
+
+            if (track.Timing is { IsNone: false } timing)
+            {
+                document = timing.Apply(document);
+            }
+
+            var clipped = Video.Cut.Clip(document, target.Cut!);
+            if (!track.IsAdded)
+            {
+                removed.Add(track.Source);
+            }
+
+            if (clipped.Cues.Count == 0)
+            {
+                continue;
+            }
+
+            Directory.CreateDirectory(folder);
+            var srt = Path.Combine(folder, $"strih-{tracks.Count + 1:00}.srt");
+            await Subtitles.SrtWriter.SaveAsync(clipped, srt, cancellationToken).ConfigureAwait(false);
+            tracks.Add(track with
+            {
+                Source = track.Source with { Id = next++, ExternalFile = srt, ExternalTrack = 0, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", Number = null, Uid = null },
+                Timing = null,
+            });
+        }
+
+        return (target with { Tracks = tracks, Removed = removed }, null);
+    }
+
     // a part of the work reported as a share of the whole, at once (in order – no posting to another thread)
     private sealed class ScaledProgress(IProgress<double> whole, double from, double share) : IProgress<double>
     {
@@ -633,8 +711,10 @@ public sealed class FileProcessor(
     private async Task<IReadOnlyList<string>> WriteTemporaryAsync(EditPlan plan, string temporary, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var source = plan.Target.Source.Path;
-        EnsureFreeSpace(source, temporary);
+        // a picture written anew lies beside the new file until mkvmerge has written it: about twice the film
+        EnsureFreeSpace(source, temporary, plan.Target.Tracks.Any(t => t.Source.VideoEncode is not null) ? 2 : 1);
         ProcessResult? result = null;
+        var written = plan.Target;
         if (plan.Method == WriteMethod.Remux)
         {
             using var chapters = ChaptersFile.For(plan.Target);
@@ -642,21 +722,33 @@ public sealed class FileProcessor(
             var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "external-" + Guid.NewGuid().ToString("N"));
             try
             {
-                var (inputs, problem) = await Subtitles.ExternalSubtitleTracks.ConvertAsync(plan.Target, folder, cancellationToken).ConfigureAwait(false);
+                // a film cut (Úprava videostopy): its text subtitles within the parts kept
+                if (plan.Target.IsCut)
+                {
+                    var (clipped, cutProblem) = await CutSubtitlesAsync(plan.Target, folder, cancellationToken).ConfigureAwait(false);
+                    if (cutProblem is not null)
+                    {
+                        return [cutProblem];
+                    }
+
+                    written = clipped;
+                }
+
+                var (inputs, problem) = await Subtitles.ExternalSubtitleTracks.ConvertAsync(written, folder, cancellationToken).ConfigureAwait(false);
                 if (problem is not null)
                 {
                     return [problem];
                 }
 
                 // sounds written anew (Úprava audiostopy) first, each into its own file; mkvmerge then takes them
-                var (encoded, encodingProblem) = await EncodeAsync(plan.Target, folder, progress, cancellationToken).ConfigureAwait(false);
+                var (encoded, encodingProblem) = await EncodeAsync(written, folder, progress, cancellationToken).ConfigureAwait(false);
                 if (encodingProblem is not null)
                 {
                     return [encodingProblem];
                 }
 
                 var share = encoded.Count == 0 ? 0 : 0.5;
-                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs, encoded),
+                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(written, source, temporary, chapters.Path, inputs, encoded),
                     progress is null || share == 0 ? progress : new ScaledProgress(progress, share, 1 - share), cancellationToken);
             }
             finally
@@ -693,7 +785,7 @@ public sealed class FileProcessor(
         }
 
         FlushToDisk(temporary);
-        var problems = TargetVerifier.Compare(plan.Target, await _inspector.InspectAsync(temporary, cancellationToken));
+        var problems = TargetVerifier.Compare(written, await _inspector.InspectAsync(temporary, cancellationToken));
         if (problems.Count > 0)
         {
             TryDelete(temporary);
@@ -1007,7 +1099,7 @@ public sealed class FileProcessor(
         stream.Flush(flushToDisk: true);
     }
 
-    private static void EnsureFreeSpace(string source, string target)
+    private static void EnsureFreeSpace(string source, string target, int times = 1)
     {
         try
         {
@@ -1017,7 +1109,7 @@ public sealed class FileProcessor(
                 return;
             }
 
-            var needed = new FileInfo(source).Length + (64L << 20);
+            var needed = (new FileInfo(source).Length * times) + (64L << 20);
             var free = new DriveInfo(root).AvailableFreeSpace;
             if (free < needed)
             {

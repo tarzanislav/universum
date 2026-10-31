@@ -345,7 +345,10 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     {
         Editor = null;
         Detail();
-    });
+    })
+    {
+        Voice = _services.Voice,
+    };
 
     private async Task LoadAsync()
     {

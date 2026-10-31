@@ -68,8 +68,7 @@ public sealed class MainViewModel : ObservableObject
                 Logs.Selected = Logs.Logs.FirstOrDefault(l => l.Log.Id == id);
             },
         };
-        AgendaNotes = new PlaceholderPageViewModel(Loc.T("Poznámky"),
-            "Poznámky (aj hlasom), poznámky k titulom z Premiér a Noviniek, k dňom, úlohám a spracovaniu. Poznámky k dňu sa už teraz dajú písať v Kalendári.", "etapa P2");
+        AgendaNotes = new NotesPageViewModel(services);
         NotesGuide = new PlaceholderPageViewModel(Loc.T("Návod"), "Stručný návod ku skupine POZNÁMKY – s obrázkami, zvýrazneniami a postupmi krok za krokom.", "etapa N");
         Mega = new MegaPageViewModel(services);
 
@@ -377,7 +376,8 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Plánované úlohy (the group POZNÁMKY).</summary>
     public TasksPageViewModel AgendaTasks { get; }
 
-    public PlaceholderPageViewModel AgendaNotes { get; }
+    /// <summary>Poznámky (the group POZNÁMKY).</summary>
+    public NotesPageViewModel AgendaNotes { get; }
 
     public PlaceholderPageViewModel NotesGuide { get; }
 
@@ -470,6 +470,11 @@ public sealed class MainViewModel : ObservableObject
             if (value?.Page == AgendaTasks)
             {
                 AgendaTasks.Shown();
+            }
+
+            if (value?.Page == AgendaNotes)
+            {
+                AgendaNotes.Shown();
             }
         }
     }

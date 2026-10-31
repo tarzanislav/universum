@@ -67,6 +67,10 @@ public sealed class AgendaEditor : ObservableObject
     private VideoChoice<string?> _color;
     private string _problem = "";
     private string _newCheck = "";
+    private string? _recording;
+    private bool _recordingNow;
+    private string _voiceStatus = "";
+    private VideoChoice<string> _voiceLanguage;
 
     public AgendaEditor(AgendaStore store, AgendaItem? item, DateOnly day, AgendaKind kind, Action closed)
     {
@@ -96,6 +100,16 @@ public sealed class AgendaEditor : ObservableObject
         _onDay = item is null || item.Links.Any(l => l.Kind == LinkKind.Day);
         _color = Colors.FirstOrDefault(c => c.Value == item?.Color) ?? Colors[0];
         Day = day;
+        _recording = item?.Note?.Recording;
+        _voiceLanguage = VoiceLanguages.FirstOrDefault(l => l.Value == Localization.Loc.Language) ?? VoiceLanguages[0];
+        RecordCommand = new AsyncRelayCommand(RecordAsync);
+        PlayCommand = new RelayCommand(() =>
+        {
+            if (RecordingPath is { } path && System.IO.File.Exists(path))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+            }
+        }, () => RecordingPath is not null);
         foreach (var line in item?.Task?.Checklist ?? [])
         {
             Checklist.Add(new CheckRow(line.Text, line.Done, r => Checklist.Remove(r)));
@@ -132,6 +146,80 @@ public sealed class AgendaEditor : ObservableObject
     public string Heading => (_item is null ? "Nový záznam" : "Upraviť záznam") + " – " + Day.ToString("d. M. yyyy", CultureInfo.InvariantCulture);
 
     public bool IsEvent { get => _kind == AgendaKind.Event; set => SetKind(value, AgendaKind.Event); }
+
+    /// <summary>The languages the voice is written down in.</summary>
+    public static IReadOnlyList<VideoChoice<string>> VoiceLanguages { get; } = [new("sk", "slovensky"), new("cs", "česky"), new("en", "anglicky")];
+
+    /// <summary>The recording and writing down of the voice (null: without it – the editor of the self-test's first steps).</summary>
+    public VoiceRecorder? Voice { get; init; }
+
+    public bool HasVoice => Voice is not null;
+
+    public VideoChoice<string> VoiceLanguage { get => _voiceLanguage; set => SetProperty(ref _voiceLanguage, value); }
+
+    /// <summary>Nahrať hlasom / Zastaviť a prepísať.</summary>
+    public AsyncRelayCommand RecordCommand { get; }
+
+    public RelayCommand PlayCommand { get; }
+
+    public bool IsRecording { get => _recordingNow; private set { if (SetProperty(ref _recordingNow, value)) { OnPropertyChanged(nameof(RecordText)); } } }
+
+    public string RecordText => IsRecording ? "Zastaviť a prepísať" : "Nahrať hlasom";
+
+    public string VoiceStatus { get => _voiceStatus; private set => SetProperty(ref _voiceStatus, value); }
+
+    /// <summary>The voice recording kept with the note.</summary>
+    public string? RecordingPath => _recording is { Length: > 0 } name ? System.IO.Path.Combine(VoiceRecorder.Folder, name) : null;
+
+    public bool HasRecording => RecordingPath is not null;
+
+    /// <summary>A text written down from a recording is added to the text (also the self-test).</summary>
+    public void AddSpoken(string text, string? recording)
+    {
+        if (text.Length > 0)
+        {
+            Text = Text.Trim().Length == 0 ? text : Text.TrimEnd() + "\n" + text;
+        }
+
+        if (recording is not null)
+        {
+            _recording = recording;
+            OnPropertyChanged(nameof(RecordingPath));
+            OnPropertyChanged(nameof(HasRecording));
+            PlayCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private async Task RecordAsync()
+    {
+        if (Voice is not { } voice)
+        {
+            return;
+        }
+
+        if (!IsRecording)
+        {
+            VoiceStatus = "Spúšťam mikrofón…";
+            var problem = await voice.StartAsync();
+            IsRecording = problem is null;
+            VoiceStatus = problem ?? "Nahrávam – hovorte. Keď skončíte, kliknite na Zastaviť a prepísať.";
+            return;
+        }
+
+        IsRecording = false;
+        VoiceStatus = "Prepisujem nahrávku (v počítači, bez internetu)…";
+        var (recording, text, trouble) = await voice.StopAsync(VoiceLanguage.Value);
+        if (text is not null)
+        {
+            AddSpoken(text, recording);
+        }
+        else if (recording is not null)
+        {
+            AddSpoken("", recording);
+        }
+
+        VoiceStatus = trouble ?? "Prepísané – skontrolujte text. Nahrávka ostáva pri poznámke.";
+    }
 
     /// <summary>The checklist of a task (also of an event that is a task).</summary>
     public ObservableCollection<CheckRow> Checklist { get; } = [];
@@ -314,7 +402,7 @@ public sealed class AgendaEditor : ObservableObject
             default:
                 item.Time = null;
                 item.Task = null;
-                item.Note = new AgendaNote { Pinned = Pinned, Recording = item.Note?.Recording };
+                item.Note = new AgendaNote { Pinned = Pinned, Recording = _recording };
                 if (OnDay)
                 {
                     item.Links.Add(new AgendaLink(LinkKind.Day, Day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Day.ToString("d. M. yyyy", CultureInfo.InvariantCulture)));

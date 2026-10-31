@@ -227,6 +227,8 @@ internal static class Translations
         ["Prevziať"] = "Převzít",
         ["Skryť"] = "Skrýt",
         ["Hotové do koša"] = "Hotové do koše",
+        ["Nová poznámka…"] = "Nová poznámka…",
+        ["Vysypať kôš"] = "Vysypat koš",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -450,5 +452,7 @@ internal static class Translations
         ["Prevziať"] = "Take",
         ["Skryť"] = "Hide",
         ["Hotové do koša"] = "Done to the bin",
+        ["Nová poznámka…"] = "New note…",
+        ["Vysypať kôš"] = "Empty the bin",
     };
 }

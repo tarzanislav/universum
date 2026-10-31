@@ -3785,8 +3785,37 @@
                     </DockPanel>
                 </StackPanel>
                 <TextBlock Text="Text" Style="{StaticResource Hint}" />
-                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="220"
-                         VerticalScrollBarVisibility="Auto" Margin="0,2,0,8" />
+                <TextBox x:Name="AgendaText" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="220"
+                         VerticalScrollBarVisibility="Auto" Margin="0,2,0,6" />
+                <!-- the voice: Windows' voice typing, or a recording written down in the computer -->
+                <Border Padding="8,6" CornerRadius="6" Margin="0,0,0,6" Background="#10D46A8C" Visibility="{Binding HasVoice, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <WrapPanel>
+                            <Button Click="OnDictateClick" Tag="{Binding ElementName=AgendaText}" Padding="8,3" Margin="0,0,6,4"
+                                    ToolTip="Hlasové písanie Windows (Win + H) – píše do textu poznámky; ide cez službu Microsoftu (internet)">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE720;" Margin="0,0,6,0" />
+                                    <TextBlock Text="Diktovať (Win+H)" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding RecordCommand}" Padding="8,3" Margin="0,0,6,4"
+                                    ToolTip="Nahrá hlas z mikrofónu a prepíše ho v počítači (whisper.cpp) – bez internetu, nahrávka ostane pri poznámke">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE7C8;" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding RecordText}" />
+                                </StackPanel>
+                            </Button>
+                            <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.VoiceLanguages}}" SelectedItem="{Binding VoiceLanguage}" Width="100" Margin="0,0,6,4"
+                                      ToolTip="Jazyk prepisu" />
+                            <Button Command="{Binding PlayCommand}" Padding="8,3" Margin="0,0,0,4" ToolTip="Prehrať nahrávku poznámky"
+                                    Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE768;" />
+                            </Button>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding VoiceStatus}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -4458,6 +4487,125 @@
                             </ScrollViewer>
                         </DockPanel>
                     </Grid>
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
+        <!-- POZNÁMKY – Poznámky (owner, 31. 10. 2026, stage P2) -->
+        <DataTemplate DataType="{x:Type pages:TitleNoteEditor}">
+            <StackPanel>
+                <TextBlock Text="Poznámka k titulu" Style="{StaticResource Hint}" />
+                <TextBlock Text="{Binding Caption}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
+                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,0,0,6" />
+                <TextBlock Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="Tá istá poznámka je pri titule v Premiérach a Novinkách – zmena platí všade. Prázdna poznámka sa odstráni." />
+                <WrapPanel>
+                    <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveCommand}" Padding="14,5" Margin="0,0,8,0" FontWeight="SemiBold" />
+                    <Button Content="{loc:T 'Zrušiť'}" Command="{Binding CancelCommand}" Padding="12,5" />
+                </WrapPanel>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type pages:NotesPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Poznámky'}" />
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
+                               Text="Vaše poznámky, poznámky k dňom z Kalendára a poznámky k titulom z Premiér a Noviniek na jednom mieste. Poznámku môžete napísať aj hlasom – cez hlasové písanie Windows alebo nahrávkou, ktorú UNIVERSUM prepíše v počítači." />
+                    <DockPanel Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="14,5" Margin="8,0,0,0" FontWeight="SemiBold" />
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Nová poznámka…'}" Command="{Binding NewCommand}" Padding="12,5" Margin="8,0,0,0" ToolTip="Poznámka s textom, štítkami, farbou a hlasom" />
+                        <TextBox Text="{Binding QuickText, UpdateSourceTrigger=PropertyChanged}" FontSize="14" Padding="8,5"
+                                 ToolTip="Rýchla poznámka – prvá veta je názov, #slová sú štítky; Enter ju pridá">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </DockPanel>
+                    <DockPanel Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <TextBlock Text="Štítok:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding TagChoices}" SelectedItem="{Binding Tag}" Width="120" Margin="0,0,10,0" />
+                            <ComboBox ItemsSource="{Binding Source={x:Static pages:NotesPageViewModel.Sorts}}" SelectedItem="{Binding Sort}" Width="140" Margin="0,0,10,0" />
+                            <TextBlock Text="Hľadať:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" Width="180" />
+                        </StackPanel>
+                        <WrapPanel VerticalAlignment="Center">
+                            <RadioButton Content="Všetky" IsChecked="{Binding ShowAll}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Moje" IsChecked="{Binding ShowMine}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="K dňom" IsChecked="{Binding ShowDays}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="K titulom" IsChecked="{Binding ShowTitles}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="{Binding BinText}" IsChecked="{Binding ShowBin}" GroupName="NotesSource" MinWidth="0" Margin="0,0,10,0" />
+                            <Button Content="{loc:T 'Vysypať kôš'}" Command="{Binding EmptyBinCommand}" Padding="10,3"
+                                    Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)" />
+                        </WrapPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
+                </StackPanel>
+                <Border DockPanel.Dock="Right" Width="340" Margin="14,0,0,0" Style="{StaticResource Card}" Padding="0"
+                        Visibility="{Binding HasEditor, Converter={StaticResource BoolToVisibility}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ContentControl Content="{Binding Editor}" Margin="16,12,16,16" />
+                    </ScrollViewer>
+                </Border>
+                <Grid>
+                    <TextBlock Text="Zatiaľ tu nie sú žiadne poznámky." Style="{StaticResource Hint}" Margin="0,10,0,0"
+                               Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Cards}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding OpenCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" Margin="0,0,10,10">
+                                        <Border Width="250" MinHeight="120" CornerRadius="8" Padding="12,10" Background="{Binding Background}" BorderBrush="{Binding Accent}" BorderThickness="0,4,0,0">
+                                            <DockPanel>
+                                                <DockPanel DockPanel.Dock="Top">
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE7C8;" FontSize="12" Margin="0,2,6,0" ToolTip="Má hlasovú nahrávku"
+                                                                   Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Button Command="{Binding PinCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="Pripnúť hore / odopnúť"
+                                                                Visibility="{Binding CanPin, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock FontSize="11">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                                                        <Setter Property="Text" Value="&#xE718;" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                                                                <Setter Property="Text" Value="&#xE840;" />
+                                                                                <Setter Property="Foreground" Value="#D46A8C" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Button>
+                                                        <Button Command="{Binding RestoreCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="Vrátiť z koša"
+                                                                Visibility="{Binding InBin, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE7A7;" FontSize="11" />
+                                                        </Button>
+                                                        <Button Command="{Binding DeleteCommand}" Padding="4,1" ToolTip="Do koša"
+                                                                Visibility="{Binding InBin, Converter={StaticResource InverseBoolToVisibility}}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="11" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
+                                                </DockPanel>
+                                                <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource Hint}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0">
+                                                    <Run Text="{Binding Where, Mode=OneWay}" />
+                                                    <Run Text="  " />
+                                                    <Run Text="{Binding When, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Tags}" FontSize="11.5" Foreground="#D46A8C" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="128" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                            </DockPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Grid>
             </DockPanel>
         </DataTemplate>

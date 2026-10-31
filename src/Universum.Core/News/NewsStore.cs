@@ -148,6 +148,9 @@ public sealed class MarkStore(string file)
     /// <summary>The keys of the chosen titles (Vybrané).</summary>
     public IReadOnlyList<string> Chosen => Marks.Where(m => m.Value.Chosen).Select(m => m.Key).ToList();
 
+    /// <summary>The titles with a note: their keys and notes (Poznámky shows them as notes of titles).</summary>
+    public IReadOnlyList<(string Key, string Note)> Notes => [.. Marks.Where(m => m.Value.Note.Length > 0).Select(m => (m.Key, m.Value.Note))];
+
     public void Set(string key, TitleMark mark)
     {
         mark = mark with { Note = mark.Note.Trim() };

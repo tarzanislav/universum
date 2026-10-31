@@ -259,15 +259,15 @@ public sealed partial class SubtitlesPageViewModel
             _ocrAsked = 0;
             _ocrTotal = _ocrUnknown.Count;
             var (all, known) = run.Coverage;
-            if (_ocrTotal == 0)
-            {
-                save = true;
-                return;
-            }
 
-            OcrStatus = $"Prečítaných {known} z {all} písmen ({run.Clusters.Count} rôznych tvarov). {_ocrTotal} tvarov UNIVERSUM nepozná – povedzte, čo sú: " +
-                        "pýta sa raz za film a zapamätá si ich aj pre ďalšie filmy.";
-            Ask();
+            // nothing to ask: saved once the reading is over (below, after the busy state ends)
+            save = _ocrTotal == 0;
+            if (!save)
+            {
+                OcrStatus = $"Prečítaných {known} z {all} písmen ({run.Clusters.Count} rôznych tvarov). {_ocrTotal} tvarov UNIVERSUM nepozná – povedzte, čo sú: " +
+                            "pýta sa raz za film a zapamätá si ich aj pre ďalšie filmy.";
+                Ask();
+            }
         }
         catch (OperationCanceledException)
         {

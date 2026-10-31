@@ -2024,7 +2024,7 @@ internal static class SelfTest
             // what the reading took the square for: the shapes of the third subtitle and their nearest letters
             var shapes = new Core.Subtitles.Ocr.SubtitleOcr(await OcrFonts.TemplatesAsync(), null, "sk")
                 .Read(Core.Subtitles.Ocr.OcrPicture.Of(Core.Subtitles.Pictures.PgsReader.Read(supBytes)));
-            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && c.Shape.Pixels > 20 && Math.Abs(c.Shape.Aspect - 1) < 0.25f).Take(3))
+            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && shapes.Context(c).X0 == 0).Take(2))
             {
                 Check(false, $"OCR diagnostics: shape {shape.Text} {shape.Distance:0.000} {shape.Sample.Width}x{shape.Sample.Height}: " +
                              string.Join(", ", shape.Candidates.Select(c => $"{c.Text} {c.Distance:0.000}")));

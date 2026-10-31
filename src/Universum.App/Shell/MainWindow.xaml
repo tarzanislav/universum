@@ -2866,7 +2866,9 @@
                             </StackPanel>
                             <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
-                            <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0" />
+                            <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Zobraziť všetko" IsChecked="{Binding ShowAll}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0"
+                                         ToolTip="História, posledný týždeň aj nadchádzajúce – všetky informácie" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
                             <CheckBox Content="Zobraziť vybrané" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,0,16,0" ToolTip="Len seriály zaškrtnuté v stĺpci Vybrané" />
                             <CheckBox Content="len z mojich listov HISTRA" IsChecked="{Binding OnlyMyLists}" MinWidth="0"
@@ -3094,7 +3096,9 @@
                             </StackPanel>
                             <RadioButton Content="Týždeň spätne" IsChecked="{Binding ShowRecent}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="Nadchádzajúce" IsChecked="{Binding ShowUpcoming}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
-                            <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0" />
+                            <RadioButton Content="História" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
+                            <RadioButton Content="Zobraziť všetko" IsChecked="{Binding ShowAll}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0"
+                                         ToolTip="História, posledný týždeň aj nadchádzajúce – všetky informácie" />
                             <CheckBox Content="Zobraziť aj postery" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
                             <CheckBox Content="Zobraziť vybrané" IsChecked="{Binding OnlyChosen}" MinWidth="0" ToolTip="Len tituly zaškrtnuté v stĺpci Vybrané" />
                         </WrapPanel>

@@ -990,6 +990,11 @@ internal static class SelfTest
         Check(page.SelectedTab.Rows.Count == 1 && page.SelectedTab.Rows[0] is PremiereFilmRow { Caption: var past } && past.StartsWith("World Invented Film", StringComparison.Ordinal),
             "premieres: the film that is over is in the history");
         await Screenshot(window, "premieres-history.png");
+        page.ShowAll = true;
+        var everything = page.SelectedTab.Rows;
+        Check(everything.Count == page.SelectedTab.All.Count && everything.Any(r => r.SortDate < DateOnly.FromDateTime(DateTime.Now)) &&
+              everything.Zip(everything.Skip(1)).All(p => p.First.SortDate >= p.Second.SortDate),
+            $"premieres: Zobraziť všetko shows the history and the coming premieres, the latest first ({everything.Count} of {page.SelectedTab.All.Count})");
         page.ShowUpcoming = true;
 
         int Days() => news.Requests.Count(r => r.Contains("rozpis.example/den/", StringComparison.Ordinal) || r.Contains("/schedule", StringComparison.Ordinal));
@@ -1221,6 +1226,10 @@ internal static class SelfTest
         Check(domestic.Rows.Count == 1 && domestic.Rows[0].Caption == "Starý seriál (2019)" && domestic.Rows[0].NearestCode == "S02E05",
             "novinky: older episodes are in the history – " + string.Join(", ", domestic.Rows.Select(r => r.Caption)));
         await Screenshot(window, "novinky-history.png");
+        page.ShowAll = true;
+        Check(new[] { "Domáci seriál (2020)", "Invented Show (2026)", "Starý seriál (2019)" }.All(c => domestic.Rows.Any(r => r.Caption == c)) &&
+              domestic.Rows.First(r => r.Caption == "Domáci seriál (2020)").Episodes.Count >= 45,
+            "novinky: Zobraziť všetko shows the history, the last week and the coming episodes – " + string.Join(", ", domestic.Rows.Select(r => $"{r.Caption} {r.Episodes.Count}")));
         page.ShowRecent = true;
 
         // Kde pozerať: the chosen series and film on services in Slovakia; the chosen titles in the input folder

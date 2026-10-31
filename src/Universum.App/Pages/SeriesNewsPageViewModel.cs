@@ -154,6 +154,13 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         set => SetView(value, NewsView.History);
     }
 
+    /// <summary>Everything: the history, the last week and what is to come (owner, 31. 10. 2026; the latest first).</summary>
+    public bool ShowAll
+    {
+        get => _view == NewsView.All;
+        set => SetView(value, NewsView.All);
+    }
+
     private void SetView(bool chosen, NewsView view)
     {
         if (!chosen || _view == view)
@@ -165,7 +172,8 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowRecent));
         OnPropertyChanged(nameof(ShowUpcoming));
         OnPropertyChanged(nameof(ShowHistory));
-        if (view == NewsView.History && _history is null)
+        OnPropertyChanged(nameof(ShowAll));
+        if (view is NewsView.History or NewsView.All && _history is null)
         {
             _ = LoadHistoryAsync();
         }
@@ -250,6 +258,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             : Filter.Length > 0 || OnlyMyLists ? "Nič nezodpovedá hľadaniu."
             : _view == NewsView.Upcoming ? "Žiadne nadchádzajúce epizódy – skúste Obnoviť."
             : ShowHistory ? (_history is null ? "Načítavam históriu…" : "História je zatiaľ prázdna – epizódy sem prechádzajú po týždni.")
+            : ShowAll && _history is null ? "Načítavam históriu…"
             : Busy ? "Načítavam…" : "Žiadne nové epizódy – skúste Obnoviť.";
 
     public bool IsEmpty => SelectedTab.Rows.Count == 0;
@@ -556,6 +565,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         {
             NewsView.History => (_history ?? []).Concat(_all.Where(e => e.AirDate < from)),
             NewsView.Upcoming => _all.Where(e => e.AirDate >= today),
+            NewsView.All => (_history ?? []).Concat(_all),
             _ => _all.Where(e => e.AirDate >= from && e.AirDate <= today),
         });
         var rhythms = (_history ?? []).Concat(_all).GroupBy(MarkStore.Series).ToDictionary(g => g.Key, g => Periodicity.Describe(g.SelectMany(e =>

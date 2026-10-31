@@ -2662,6 +2662,7 @@
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Sorted" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.1*" MinWidth="90" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Spracovať" Width="88" MinWidth="88" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -2833,6 +2834,7 @@
                               Visibility="{Binding IsFilmTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Názov filmu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre, Mode=OneWay}" Width="1*" MinWidth="90" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTemplateColumn Header="Premiéra" Width="100" MinWidth="100" SortMemberPath="SortDate">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -2865,6 +2867,7 @@
                               Visibility="{Binding IsSeriesTab, Converter={StaticResource BoolToVisibility}}">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Header="Názov seriálu" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                            <DataGridTextColumn Header="Žáner" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Sorted" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Produkcia" Binding="{Binding Production}" Width="1.2*" MinWidth="95" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Premiéra" Binding="{Binding Date}" Width="100" MinWidth="100" SortMemberPath="SortDate" ElementStyle="{StaticResource NewsCell}" />
                             <DataGridTextColumn Header="Kedy" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
@@ -2887,6 +2890,329 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" IsHitTestVisible="False"
                                Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
+            </DockPanel>
+        </DataTemplate>
+        <!-- owner, 31. 10. 2026: the card of a title (TMDB poster, Listy z HISTRA) – the poster at the top, links, identifiers in
+             two columns, the names with the year, kind, length, ratings, genre, directors, actors, plot, the collection -->
+        <DataTemplate DataType="{x:Type pages:TitleCardViewModel}">
+            <StackPanel>
+                <Grid Width="240" Height="360" HorizontalAlignment="Left">
+                    <Border CornerRadius="8" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <TextBlock Text="{Binding MainName}" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="12" Opacity="0.7" />
+                    </Border>
+                    <Border CornerRadius="8">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Poster.Image}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                    <Border CornerRadius="8">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding ChosenPoster}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                </Grid>
+                <ProgressBar IsIndeterminate="True" Height="3" Margin="0,8,0,0" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Links}" Margin="0,12,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding Text}" Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Padding="10,3" Margin="0,0,6,6" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Identifikátory" FontWeight="SemiBold" Margin="0,6,0,4" />
+                <ItemsControl ItemsSource="{Binding Ids}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="0,1,10,1">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Name}" Style="{StaticResource Hint}" Width="52" />
+                                <TextBox Text="{Binding Value, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" Padding="0" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding MainName}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,12,0,0" />
+                <ItemsControl ItemsSource="{Binding OtherNames}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontSize="15" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Facts}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Ratings}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" Visibility="{Binding HasGenre, Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="Žáner: " FontWeight="SemiBold" /><Run Text="{Binding Genre, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding HasDirectors, Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="{Binding DirectorsLabel, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=": " FontWeight="SemiBold" /><Run Text="{Binding Directors, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding HasCast, Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="Hrajú: " FontWeight="SemiBold" /><Run Text="{Binding Cast, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Text="{Binding Overview}" TextWrapping="Wrap" Margin="0,10,0,0" Visibility="{Binding HasOverview, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel Visibility="{Binding HasCollection, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+                    <TextBlock FontWeight="SemiBold" TextWrapping="Wrap">
+                        <Run Text="Kolekcia: " /><Run Text="{Binding CollectionName, Mode=OneWay}" />
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Collection}" Margin="0,6,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding OpenCommand}" ToolTip="{Binding Caption}" Margin="0,0,8,8" Cursor="Hand">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <StackPanel Width="72">
+                                                <Border x:Name="Frame" Width="72" Height="108" CornerRadius="5" BorderThickness="2" BorderBrush="Transparent"
+                                                        Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                                    <Border CornerRadius="3">
+                                                        <Border.Background>
+                                                            <ImageBrush ImageSource="{Binding Poster.Image}" Stretch="UniformToFill" />
+                                                        </Border.Background>
+                                                    </Border>
+                                                </Border>
+                                                <TextBlock Text="{Binding Caption}" FontSize="11" TextWrapping="Wrap" MaxHeight="30" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <ControlTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                    <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+        <!-- owner, 31. 10. 2026: TMDB poster – find a title, its card on the left, the posters offered on the right -->
+        <DataTemplate DataType="{x:Type pages:PosterPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="TMDB poster" />
+                    <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,10"
+                               Text="Nájdite film alebo seriál podľa názvu (pôvodný, český, slovenský aj anglický, v akomkoľvek písme, aj s preklepom), s rokom alebo podľa TMDB či IMDb ID. UNIVERSUM odporučí plagát s názvom (CZ → EN → pôvodný jazyk), vybraný uloží ako folder.jpg do priečinka POSTER vo výstupe – alebo k spracovanému filmu či seriálu." />
+                    <TextBlock Text="{Binding Requirement}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="0,0,0,8">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Requirement}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <DockPanel Margin="0,0,0,4">
+                        <Button DockPanel.Dock="Right" Command="{Binding SearchCommand}" Padding="14,5">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" Margin="0,0,8,0" />
+                                <TextBlock Text="Hľadať" />
+                            </StackPanel>
+                        </Button>
+                        <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" Width="150" Margin="8,0" />
+                        <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"
+                                 ToolTip="Názov (aj s rokom, napr. „Názov 2024“), TMDB ID (číslo alebo adresa z themoviedb.org) alebo IMDb ID (tt a číslice)">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </DockPanel>
+                    <TextBlock Text="{Binding SearchStatus}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                </StackPanel>
+                <!-- the card of the title -->
+                <Border DockPanel.Dock="Left" Width="460" Margin="0,0,16,0" Style="{StaticResource Card}" Padding="0"
+                        Visibility="{Binding HasCard, Converter={StaticResource BoolToVisibility}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="18">
+                            <ContentControl Content="{Binding Card}" />
+                            <DockPanel Margin="0,14,0,0">
+                                <Image DockPanel.Dock="Left" Source="/Assets/tmdb-logo.png" Height="10" Margin="0,0,8,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <TextBlock Style="{StaticResource Hint}" FontSize="11" TextWrapping="Wrap" Text="This product uses the TMDB API but is not endorsed or certified by TMDB." />
+                            </DockPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- results -->
+                        <ItemsControl ItemsSource="{Binding Results}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding OpenCommand}" ToolTip="{Binding Caption}" Margin="0,0,10,10" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <StackPanel Width="84">
+                                                    <Border x:Name="Frame" Width="84" Height="126" CornerRadius="6" BorderThickness="2" BorderBrush="Transparent"
+                                                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                                        <Grid>
+                                                            <TextBlock Text="{Binding Caption}" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="4" FontSize="11" />
+                                                            <Border CornerRadius="4">
+                                                                <Border.Background>
+                                                                    <ImageBrush ImageSource="{Binding Poster.Image}" Stretch="UniformToFill" />
+                                                                </Border.Background>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Caption}" FontSize="11.5" TextWrapping="Wrap" MaxHeight="32" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                                                    <TextBlock Text="{Binding KindText}" Style="{StaticResource Hint}" FontSize="11" />
+                                                </StackPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <!-- the posters of the title -->
+                        <StackPanel Visibility="{Binding HasCard, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Plagáty" FontSize="18" FontWeight="SemiBold" Margin="0,6,0,2" />
+                            <TextBlock Text="{Binding OfferStatus}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                            <Border Style="{StaticResource Card}" Margin="0,8,0,8" Padding="14,10">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE735;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Top"
+                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Opinion}" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </Border>
+                            <ItemsControl ItemsSource="{Binding Groups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,8">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                            <ItemsControl ItemsSource="{Binding Posters}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding SelectCommand}" ToolTip="{Binding ToolTip}" Margin="0,0,10,10" Cursor="Hand">
+                                                            <Button.Template>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <StackPanel Width="104">
+                                                                        <Grid>
+                                                                            <Border x:Name="Frame" Width="104" Height="156" CornerRadius="6" BorderThickness="3" BorderBrush="Transparent"
+                                                                                    Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                                                                <Grid>
+                                                                                    <Border CornerRadius="3">
+                                                                                        <Border.Background>
+                                                                                            <ImageBrush ImageSource="{Binding Thumb.Image}" Stretch="UniformToFill" />
+                                                                                        </Border.Background>
+                                                                                    </Border>
+                                                                                    <Border CornerRadius="3">
+                                                                                        <Border.Background>
+                                                                                            <ImageBrush ImageSource="{Binding DraftImage}" Stretch="UniformToFill" />
+                                                                                        </Border.Background>
+                                                                                    </Border>
+                                                                                </Grid>
+                                                                            </Border>
+                                                                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0" CornerRadius="9" Padding="5,1"
+                                                                                    Background="#E0F2B34E" ToolTip="Odporúčaný"
+                                                                                    Visibility="{Binding IsRecommended, Converter={StaticResource BoolToVisibility}}">
+                                                                                <TextBlock Text="★" FontSize="12" Foreground="#141414" />
+                                                                            </Border>
+                                                                        </Grid>
+                                                                        <TextBlock Text="{Binding Label}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                                    </StackPanel>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+                                                                        </Trigger>
+                                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                                        </DataTrigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Button.Template>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- a draft by AI -->
+                            <Border Style="{StaticResource Card}" Margin="0,4,0,10" Padding="14,10">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Command="{Binding DraftCommand}" Padding="12,5" VerticalAlignment="Top">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE790;" Margin="0,0,8,0" />
+                                                <TextBlock Text="Navrhnúť plagát cez AI" />
+                                            </StackPanel>
+                                        </Button>
+                                        <StackPanel Margin="0,0,12,0">
+                                            <TextBlock Text="Návrh plagátu cez AI" FontWeight="SemiBold" />
+                                            <TextBlock Text="Keď TMDB plagát nemá (alebo sa žiadny nehodí): podľa deja, žánru, roku a názvu, 2:3 (1024 × 1536), JPEG." Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding DraftHint}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                    <TextBlock Text="{Binding DraftStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <!-- processing -->
+                            <Border Style="{StaticResource Card}" Padding="14,12">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding SelectedText}" FontWeight="SemiBold" />
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <TextBlock Text="Veľkosť folder.jpg:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <ComboBox ItemsSource="{Binding Heights}" SelectedItem="{Binding Height}" Width="230" Margin="0,0,20,0" />
+                                        <TextBlock Text="Kvalita JPEG:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <Slider Minimum="50" Maximum="100" Value="{Binding Quality}" Width="140" VerticalAlignment="Center" IsSnapToTickEnabled="True" TickFrequency="5"
+                                                ToolTip="90 = takmer ako originál, niekoľko stoviek kB; menej = menší súbor" />
+                                        <TextBlock Text="{Binding Quality}" VerticalAlignment="Center" Margin="8,0,0,0" Width="28" />
+                                    </WrapPanel>
+                                    <CheckBox Content="Zlúčiť poster s filmom" IsChecked="{Binding Merge}" Margin="0,10,0,0"
+                                              ToolTip="folder.jpg pôjde do hlavného priečinka spracovaného filmu alebo seriálu (MOVIES, TVSHOWS); keď je zatiaľ len na vstupe, počká, kým ho UNIVERSUM spracuje" />
+                                    <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,0"
+                                               Text="Bez zaškrtnutia: POSTER\Názov (rok)\folder.jpg. So zaškrtnutím: MOVIES alebo TVSHOWS\Názov (rok)\folder.jpg – vždy do hlavného priečinka, nikdy do Season. Existujúci folder.jpg sa premenuje na folder-povodny.jpg." />
+                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Button Command="{Binding ProcessCommand}" Padding="14,6" Margin="0,0,8,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE74E;" Margin="0,0,8,0" />
+                                                <TextBlock Text="Spracovať poster" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Content="Otvoriť priečinok POSTER" Command="{Binding OpenPosterFolderCommand}" Padding="12,6" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:HistraListsPageViewModel}">
@@ -2929,58 +3255,19 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </StackPanel>
-                <!-- the detail of the chosen title -->
-                <Border DockPanel.Dock="Right" Width="380" Margin="16,0,0,0" Style="{StaticResource Card}" Padding="0"
+                <!-- the detail of the chosen title: on the left, the lists on the right (owner, 31. 10. 2026) -->
+                <Border DockPanel.Dock="Left" Width="460" Margin="0,0,16,0" Style="{StaticResource Card}" Padding="0"
                         Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
-                    <DockPanel DataContext="{Binding Selected}">
+                    <DockPanel>
                         <Button DockPanel.Dock="Top" HorizontalAlignment="Right" Margin="0,8,8,0" Padding="8,2" ToolTip="Zavrieť"
-                                Command="{Binding DataContext.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=DockPanel, AncestorLevel=2}}">
+                                Command="{Binding CloseDetailCommand}">
                             <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="12" />
                         </Button>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="18,0,18,18">
-                                <Border Width="200" Height="300" CornerRadius="8" HorizontalAlignment="Left" Background="{Binding List.Tint}">
-                                    <Border CornerRadius="8">
-                                        <Border.Background>
-                                            <ImageBrush ImageSource="{Binding LargePoster.Image}" Stretch="UniformToFill" />
-                                        </Border.Background>
-                                    </Border>
-                                </Border>
-                                <TextBlock Text="{Binding Caption}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,12,0,0" />
-                                <TextBlock Text="{Binding LocalTitle}" FontSize="15" TextWrapping="Wrap"
-                                           Visibility="{Binding HasLocalTitle, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="{Binding Facts}" Style="{StaticResource Hint}" Margin="0,4,0,0" />
-                                <TextBlock Text="{Binding Overview}" TextWrapping="Wrap" Margin="0,10,0,0" />
-                                <TextBlock Text="Odkazy" FontWeight="SemiBold" Margin="0,14,0,4" />
-                                <ItemsControl ItemsSource="{Binding Links}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Content="{Binding Text}" Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Padding="10,3" Margin="0,0,6,6" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <TextBlock Text="Identifikátory" FontWeight="SemiBold" Margin="0,10,0,4" />
-                                <ItemsControl ItemsSource="{Binding Ids}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,1">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="90" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" Style="{StaticResource Hint}" />
-                                                <TextBox Grid.Column="1" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" Padding="0" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <StackPanel Visibility="{Binding HasOther, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Ďalšie údaje z HISTRA" FontWeight="SemiBold" Margin="0,10,0,4" />
+                                <ContentControl Content="{Binding Card}" />
+                                <StackPanel DataContext="{Binding Selected}" Visibility="{Binding HasOther, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Ďalšie údaje z HISTRA" FontWeight="SemiBold" Margin="0,12,0,4" />
                                     <ItemsControl ItemsSource="{Binding Other}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -2996,8 +3283,8 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </StackPanel>
-                                <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Margin="0,14,0,0"
-                                           Text="Údaje a ID pochádzajú z HISTRA, plagáty zo servera plagátov v Nastaveniach. ČSFD ID HISTRA nemá – odkaz otvorí hľadanie na ČSFD." />
+                                <TextBlock Style="{StaticResource Hint}" FontSize="11.5" Margin="0,14,0,0" TextWrapping="Wrap"
+                                           Text="Údaje z HISTRA, detail (názvy, žáner, réžia, herci, kolekcia) z TMDB, ak je kľúč TMDB; hodnotenia IMDb, Rotten Tomatoes a Metacritic z OMDb, ak je jeho kľúč. ČSFD ID nie je v dátach – odkaz otvorí hľadanie." />
                             </StackPanel>
                         </ScrollViewer>
                     </DockPanel>
@@ -3686,6 +3973,41 @@
                                       ToolTip="Vypnutím sa na HISTRA nič neposiela; uložený token ostáva." />
                             <TextBlock Text="{Binding HistraStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding PosterServices}">
+                        <StackPanel>
+                            <TextBlock Text="TMDB poster – návrh plagátu cez AI a ďalšie hodnotenia" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8"
+                                       Text="Keď TMDB plagát nemá, nakreslí návrh AI: s kľúčom OpenAI platené (gpt-image-2, ~0,04 $ za návrh, kľúč z platform.openai.com), inak zadarmo Cloudflare Workers AI (FLUX.2, denný limit; účet na dash.cloudflare.com → Workers AI, Account ID a API token s povolením Workers AI). Posiela sa len názov, rok, žánre a dej. OMDb (bezplatný kľúč z omdbapi.com) pridá do karty titulu hodnotenia IMDb, Rotten Tomatoes a Metacritic – posiela sa len IMDb ID. Kľúče sú chránené pre vaše konto Windows." />
+                            <TextBlock Text="Cloudflare Workers AI (zadarmo)" Margin="0,2,0,2" />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Uložiť" Command="{Binding SaveCloudflareCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveCloudflareCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <UniformGrid Columns="2">
+                                    <TextBox Text="{Binding Account, UpdateSourceTrigger=PropertyChanged}" ToolTip="Account ID (32 znakov)" Margin="0,0,6,0" />
+                                    <TextBox Text="{Binding Token, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový API token" />
+                                </UniformGrid>
+                            </DockPanel>
+                            <TextBlock Text="OpenAI (platené)" Margin="0,8,0,2" />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Uložiť" Command="{Binding SaveOpenAiCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveOpenAiCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <TextBox Text="{Binding OpenAi, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč OpenAI (sk-…)" />
+                            </DockPanel>
+                            <TextBlock Text="OMDb (hodnotenia IMDb, Rotten Tomatoes, Metacritic)" Margin="0,8,0,2" />
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button Content="Uložiť" Command="{Binding SaveOmdbCommand}" Margin="8,0,8,0" Padding="12,5" />
+                                    <Button Content="Odstrániť" Command="{Binding RemoveOmdbCommand}" Padding="12,5" />
+                                </StackPanel>
+                                <TextBox Text="{Binding Omdb, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč OMDb" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16" DataContext="{Binding NewsSources}">

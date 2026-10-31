@@ -11,6 +11,9 @@ public static class LibraryNames
 
     public const string ShowsFolder = "TVSHOWS";
 
+    /// <summary>Posters found alone (TMDB poster, owner 31. 10. 2026): "folder.jpg" in a title folder named as in MOVIES and TVSHOWS.</summary>
+    public const string PostersFolder = "POSTER";
+
     /// <summary>Longest full path accepted for a result; longer paths are sent for review.</summary>
     public const int MaxPathLength = 250;
 

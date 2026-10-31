@@ -586,6 +586,9 @@ public sealed class PremiereFilmRow : PremiereRow
 
     public string Production => Film.Production;
 
+    /// <summary>Žáner (owner, 31. 10. 2026) – TMDB's genres in Slovak.</summary>
+    public string Genre => Film.Genre;
+
     public string Where => Film.PremiereNote;
 
     public string Availability => Film.Availability.Length > 0 ? Film.Availability : "–";
@@ -606,6 +609,7 @@ public sealed class PremiereSeriesRow : PremiereRow
         var first = premiere.First;
         Premiere = premiere;
         Poster = new PosterThumb(page.Services, () => page.Services.SeriesLookup.PosterAsync(first), PosterSize.Small);
+        Genre = new GenreCell(page.Services, premiere.First);
         _search = Words.Normalize($"{first.Caption} {first.Title} {first.Channel}");
         OpenTmdbCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesTmdbAsync(first)));
         OpenHistraCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesHistraAsync(first)));
@@ -635,6 +639,9 @@ public sealed class PremiereSeriesRow : PremiereRow
     public string Production => string.Join(" · ", new[] { Premiere.First.Channel, Premiere.First.Country.Length > 0 ? CountryNames.Name(Premiere.First.Country) : "" }.Where(p => p.Length > 0));
 
     public string Genres => Premiere.First.Genres;
+
+    /// <summary>Žáner (owner, 31. 10. 2026) – the source's genres in Slovak, else TMDB's.</summary>
+    public GenreCell Genre { get; }
 
     public string What => Premiere.First.Kind == EpisodeKind.SeriesPremiere ? $"nový seriál · {Premiere.First.Code}" : $"{Premiere.First.Season}. séria · {Premiere.First.Code}";
 

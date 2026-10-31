@@ -684,6 +684,7 @@ public sealed class NewsSeriesRow : MarkedRow
         var first = First;
         _search = Words.Normalize(string.Join(" ", episodes.Select(e => $"{e.Episode.Title} {e.Episode.OriginalTitle} {e.Episode.Channel}").Distinct()));
         Poster = new PosterThumb(page.Services, () => page.Services.SeriesLookup.PosterAsync(first), PosterSize.Small);
+        Genre = new GenreCell(page.Services, first);
         ToggleCommand = new RelayCommand(() => IsExpanded = !IsExpanded);
         OpenTmdbCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesTmdbAsync(first)));
         OpenHistraCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenSeriesHistraAsync(first)));
@@ -733,6 +734,9 @@ public sealed class NewsSeriesRow : MarkedRow
     public string LocalTitle => First.Title != First.OriginalTitle ? First.Title : "";
 
     public string Production => Nearest.Production;
+
+    /// <summary>Žáner (owner, 31. 10. 2026) – the source's genres in Slovak, else TMDB's.</summary>
+    public GenreCell Genre { get; }
 
     public string NearestCode => Nearest.Code;
 

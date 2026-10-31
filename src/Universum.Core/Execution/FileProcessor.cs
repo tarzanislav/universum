@@ -40,6 +40,9 @@ public sealed class FileProcessor(
     /// <summary>Replaces the encoders of Windows for pictures (tests on other systems: "libx264"); null in UNIVERSUM.</summary>
     public string? VideoEncoder { get; init; }
 
+    /// <summary>Posters waiting for their titles (TMDB poster, Zlúčiť poster s filmom): one goes into the title's folder once a result is written there.</summary>
+    public Posters.PendingPosters? WaitingPosters { get; init; }
+
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
     /// (MEGA spracovanie keeps it with a batch).
@@ -168,6 +171,11 @@ public sealed class FileProcessor(
             }
 
             result = Finish(result, fingerprint, signature, output.PreserveModifiedTime ? originalTime : null);
+            if (placement.FixedName is null && WaitingPosters?.Deliver(placement.Directory) is { } delivered)
+            {
+                result = result with { Messages = [.. result.Messages, delivered] };
+            }
+
             if (inLibrary)
             {
                 // the reworked library result keeps its origin in the index under its (possibly new) name and size

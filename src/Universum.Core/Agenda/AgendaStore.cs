@@ -224,6 +224,39 @@ public sealed class AgendaStore
         return [.. found.OrderBy(o => o.First).ThenBy(o => o.Item.Time?.StartTime ?? o.Item.Task?.DueTime ?? TimeOnly.MinValue)];
     }
 
+    /// <summary>The hour a reminder of a whole day comes at (8:00 of the day, minus the time asked before).</summary>
+    public static readonly TimeOnly WholeDayAt = new(8, 0);
+
+    /// <summary>
+    /// The reminders due after <paramref name="after"/> up to <paramref name="upTo"/>: each occurrence of a timed record
+    /// with a reminder whose moment (the start minus the minutes asked) falls in that span; the start is given.
+    /// </summary>
+    public IReadOnlyList<(AgendaItem Item, DateTime Start)> Reminders(DateTime after, DateTime upTo)
+    {
+        var found = new List<(AgendaItem, DateTime)>();
+        var from = DateOnly.FromDateTime(after);
+        var to = DateOnly.FromDateTime(upTo).AddDays(8);
+        foreach (var item in Items)
+        {
+            if (item.Time is not { ReminderMinutes: { } minutes } time || item.Task?.State is TaskState.Done or TaskState.Cancelled)
+            {
+                continue;
+            }
+
+            foreach (var start in Recurrences.Starts(time, from, to))
+            {
+                var moment = start.ToDateTime(time.StartTime ?? WholeDayAt);
+                var remind = moment.AddMinutes(-minutes);
+                if (remind > after && remind <= upTo)
+                {
+                    found.Add((item, moment));
+                }
+            }
+        }
+
+        return [.. found.OrderBy(f => f.Item2)];
+    }
+
     private void Change(Guid id, Action<AgendaItem> change)
     {
         lock (_gate)

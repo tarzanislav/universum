@@ -56,6 +56,12 @@ public sealed class MainViewModel : ObservableObject
             SendToBatch = SendEpisodesToBatchAsync,
         };
         Interests = new InterestsPageViewModel(services);
+        Calendar = new CalendarPageViewModel(services) { OpenNews = OpenInNews };
+        AgendaTasks = new PlaceholderPageViewModel(Loc.T("Plánované úlohy"),
+            "Moje úlohy, úlohy navrhnuté programom (napr. vybraný titul je vo vstupnom priečinku) a neskôr úlohy, ktoré UNIVERSUM vykoná sám. Úlohy s termínom už teraz vidno v Kalendári.", "etapa P2");
+        AgendaNotes = new PlaceholderPageViewModel(Loc.T("Poznámky"),
+            "Poznámky (aj hlasom), poznámky k titulom z Premiér a Noviniek, k dňom, úlohám a spracovaniu. Poznámky k dňu sa už teraz dajú písať v Kalendári.", "etapa P2");
+        NotesGuide = new PlaceholderPageViewModel(Loc.T("Návod"), "Stručný návod ku skupine POZNÁMKY – s obrázkami, zvýrazneniami a postupmi krok za krokom.", "etapa N");
         Mega = new MegaPageViewModel(services);
 
         // the input folder watched: new films and episodes are told, sent to Hromadné spracovanie on a click
@@ -68,12 +74,30 @@ public sealed class MainViewModel : ObservableObject
         };
         services.RestartWatch();
 
+        // owner, 31. 10. 2026: the reminders of the calendar while UNIVERSUM runs – a bar on top and the sound of Windows
+        DismissReminderCommand = new RelayCommand(() => ReminderText = "");
+        OpenReminderCommand = new RelayCommand(() =>
+        {
+            if (_reminderDay is { } day)
+            {
+                Open(Calendar);
+                Calendar.Select(day);
+            }
+
+            ReminderText = "";
+        });
+        _reminderCheck = DateTime.Now.AddMinutes(-1);
+        _reminderTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _reminderTimer.Tick += (_, _) => CheckReminders();
+        _reminderTimer.Start();
+
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup(Loc.T("NOVINKY A OBSAH"), Color.FromRgb(0x9B, 0x6B, 0xD6));
         var multiplexing = new ToolGroup(Loc.T("MULTIPLEXING"), Color.FromRgb(0x4A, 0x7B, 0xD9));
         var studios = new ToolGroup(Loc.T("EDITÁCIA VIDEOSTÔP (video, audio, titulky)"), Color.FromRgb(0x2B, 0xA6, 0xA6));
         var templates = new ToolGroup(Loc.T("ŠABLÓNY (TEMPLATE)"), Color.FromRgb(0x3E, 0xA8, 0x5F));
         var statistics = new ToolGroup(Loc.T("ŠTATISTIKA"), Color.FromRgb(0xD9, 0x8B, 0x2B));
+        var notes = new ToolGroup(Loc.T("POZNÁMKY"), CalendarColors.Group);
         Tools =
         [
             new(Loc.T("Dashboard"), "\uE80F", Dashboard),
@@ -82,6 +106,11 @@ public sealed class MainViewModel : ObservableObject
             new(Loc.T("Listy z HISTRA"), "\uE8F1", HistraLists, news),
             new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
             new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
+            // owner, 31. 10. 2026: the group POZNÁMKY – the calendar, the tasks, the notes and a guide
+            new(Loc.T("Kalendár"), "\uE787", Calendar, notes),
+            new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes),
+            new(Loc.T("Poznámky"), "\uE70B", AgendaNotes, notes),
+            new(Loc.T("Návod"), "\uE897", NotesGuide, notes),
             new(Loc.T("Zlučovanie"), "\uE71D", Mux, multiplexing),
             new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
             new(Loc.T("Kapitoly"), "\uE8FD", Chapters, multiplexing),
@@ -257,6 +286,49 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>New films and episodes came into the input folder.</summary>
     public bool HasArrivals => _services.Arrivals.Count > 0;
 
+    private readonly System.Windows.Threading.DispatcherTimer _reminderTimer;
+    private DateTime _reminderCheck;
+    private DateOnly? _reminderDay;
+    private string _reminderText = "";
+
+    /// <summary>The reminder shown on top ("🔔 20:00 Kino – …"); empty: none.</summary>
+    public string ReminderText
+    {
+        get => _reminderText;
+        private set
+        {
+            if (SetProperty(ref _reminderText, value))
+            {
+                OnPropertyChanged(nameof(HasReminder));
+            }
+        }
+    }
+
+    public bool HasReminder => ReminderText.Length > 0;
+
+    public RelayCommand DismissReminderCommand { get; }
+
+    public RelayCommand OpenReminderCommand { get; }
+
+    /// <summary>Shows the reminders due since the last check (the self-test calls it with its own moment).</summary>
+    public void CheckReminders(DateTime? now = null)
+    {
+        var upTo = now ?? DateTime.Now;
+        var due = _services.Agenda.Reminders(_reminderCheck, upTo);
+        _reminderCheck = upTo;
+        if (due.Count == 0)
+        {
+            return;
+        }
+
+        _reminderDay = DateOnly.FromDateTime(due[0].Start);
+        ReminderText = string.Join("   ·   ", due.Select(d => (d.Item.Time?.StartTime is null ? d.Start.ToString("d. M.", System.Globalization.CultureInfo.InvariantCulture) : d.Start.ToString("d. M. HH:mm", System.Globalization.CultureInfo.InvariantCulture)) + "  " + d.Item.Title));
+        if (_services.Settings.FinishSound)
+        {
+            _services.PlayFinishSound(false);
+        }
+    }
+
     /// <summary>"Na vstupe pribudli nové súbory (3): Vymyslený.Film.mkv, …".</summary>
     public string ArrivalsText =>
         $"Na vstupe pribudli nové súbory ({_services.Arrivals.Count}): " +
@@ -289,6 +361,15 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>TMDB poster – a poster of a film or series found on TMDB, written as folder.jpg (owner, 31. 10. 2026).</summary>
     public PosterPageViewModel Posters { get; }
+
+    /// <summary>Kalendár (the group POZNÁMKY).</summary>
+    public CalendarPageViewModel Calendar { get; }
+
+    public PlaceholderPageViewModel AgendaTasks { get; }
+
+    public PlaceholderPageViewModel AgendaNotes { get; }
+
+    public PlaceholderPageViewModel NotesGuide { get; }
 
     /// <summary>Premiéry – films and series, SK/CZ and the world.</summary>
     public PremieresPageViewModel Premieres { get; }
@@ -370,7 +451,36 @@ public sealed class MainViewModel : ObservableObject
             {
                 Interests.Shown();
             }
+
+            if (value?.Page == Calendar)
+            {
+                Calendar.Shown();
+            }
         }
+    }
+
+    /// <summary>The calendar opens a premiere in Premiéry or an episode in Novinky: its tab, the title looked for.</summary>
+    private void OpenInNews(CalendarLayer layer, string title)
+    {
+        var find = title.StartsWith("★ ", StringComparison.Ordinal) ? title[2..] : title;
+        if (layer is CalendarLayer.EpisodesDomestic or CalendarLayer.EpisodesWorld)
+        {
+            Open(SeriesNews);
+            SeriesNews.SelectedTab = SeriesNews.Tabs.First(t => t.Region == (layer == CalendarLayer.EpisodesDomestic ? Core.News.NewsRegion.Domestic : Core.News.NewsRegion.World));
+            SeriesNews.Filter = find;
+            return;
+        }
+
+        Open(Premieres);
+        Premieres.SelectedTab = Premieres.Tab(layer switch
+        {
+            CalendarLayer.FilmsDomestic => PremiereTab.FilmDomestic,
+            CalendarLayer.FilmsWorld => PremiereTab.FilmWorld,
+            CalendarLayer.SeriesDomestic => PremiereTab.SeriesDomestic,
+            _ => PremiereTab.SeriesWorld,
+        });
+        Premieres.ShowAll = true;
+        Premieres.Filter = find;
     }
 
     /// <summary>

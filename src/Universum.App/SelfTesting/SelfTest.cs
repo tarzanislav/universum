@@ -160,10 +160,10 @@ internal static class SelfTest
         model.Settings.UiLanguage = "sk";
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky, Návod | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
               "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
               "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia",
-            "left rail: Dashboard, then the groups Novinky a obsah, Multiplexing, Šablóny and Štatistika");
+            "left rail: Dashboard, then the groups Novinky a obsah, Poznámky, Multiplexing, Šablóny and Štatistika");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 
@@ -1278,11 +1278,144 @@ internal static class SelfTest
         await WaitFor(() => again.Tabs[0].Rows.Count > 0);
         Check(news.Requests.Count == asked && again.Tabs[0].Rows.Count == 2, "novinky: the kept days are shown at once at the next start, without asking the sources");
 
+        await TestCalendarAsync(model, window, services);
+
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SeriesNewsForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
         model.Open(model.Dashboard);
+    }
+
+    /// <summary>
+    /// Kalendár (owner, 31. 10. 2026): the kept premieres and episodes of the tests before on their days, the holidays and
+    /// names, the school holidays of a district, the layers, a record made in the editor (repeating, with a reminder), a
+    /// task and a note of the day, the seven views and the way to Novinky; invented titles only.
+    /// </summary>
+    private static async Task TestCalendarAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var calendar = model.Calendar;
+        model.Open(calendar);
+        await calendar.Ready;
+        // the calendar was shown once before (all pages are opened at the start): what Premiéry and Novinky keep now is read again
+        await calendar.RefreshCommand.ExecuteAsync(null);
+        calendar.IsMonth = true;
+        calendar.TodayCommand.Execute(null);
+        Check(calendar.Days.Count == 42 && calendar.Days.Count(d => d.IsToday) == 1 && calendar.Status.Length == 0, "calendar: the month of 42 days with today – " + calendar.Status);
+        var todayCell = calendar.Days.First(d => d.IsToday);
+        Check(todayCell.Entries.Any(e => e.Layer == CalendarLayer.EpisodesDomestic && e.Title.Contains("Domáci seriál", StringComparison.Ordinal)),
+            "calendar: today's episode of Novinky – " + string.Join(", ", todayCell.Entries.Select(e => e.Title)));
+        calendar.Select(FakeNews.Day(-2));
+        Check(calendar.DetailSections.Any(s => s.Entries.Any(e => e.Layer == CalendarLayer.FilmsWorld && e.Title.Contains("World Invented Film", StringComparison.Ordinal))),
+            "calendar: the premiere of Premiéry on its day – " + string.Join(" | ", calendar.DetailSections.Select(s => s.Title + ": " + string.Join(", ", s.Entries.Select(e => e.Title)))));
+        calendar.LayerGroups[0].AllOn = false;
+        Check(calendar.LayerGroups[0].Layers.All(l => !l.IsOn) && !calendar.DetailSections.Any(s => s.Entries.Any(e => e.Layer == CalendarLayer.FilmsWorld)) &&
+              services.Settings.CalendarHiddenLayers.Contains(nameof(CalendarLayer.FilmsWorld)), "calendar: the premieres switched off all at once (kept in the settings)");
+        calendar.LayerGroups[0].Layers[1].IsOn = true;
+        Check(calendar.LayerGroups[0].AllOn is null, "calendar: one layer of the group on – the group's switch shows some");
+        calendar.LayerGroups[0].AllOn = true;
+
+        calendar.Select(new DateOnly(2026, 12, 24));
+        Check(calendar.DetailSections.Any(s => s.Entries.Any(e => e.Layer == CalendarLayer.Holidays && e.Title == "Štedrý deň")) &&
+              calendar.DetailNames.Contains("SK: Adam, Eva") && calendar.DetailNames.Contains("CZ: Adam, Eva"),
+            "calendar: a holiday and the names of the day – " + string.Join(", ", calendar.DetailNames));
+        calendar.RegionSwitches.First(r => r.Code == Core.Calendar.HolidayRegions.Czechia).IsOn = true;
+        calendar.SchoolDistrict = calendar.SchoolDistricts.First(d => d.Value == "Zlín");
+        calendar.Select(new DateOnly(2027, 3, 10));
+        Check(calendar.HasCzechSchool && calendar.DetailSections.Any(s => s.Entries.Any(e => e.Layer == CalendarLayer.School && e.Title.StartsWith("Jarné prázdniny", StringComparison.Ordinal))),
+            "calendar: the spring holidays of the district Zlín");
+        calendar.Select(new DateOnly(2026, 9, 28));
+        Check(calendar.DetailSections.Any(s => s.Entries.Any(e => e.Title.Contains("Den české státnosti", StringComparison.Ordinal) || e.Title.Contains("Deň českej štátnosti", StringComparison.Ordinal))),
+            "calendar: the Czech holidays switched on");
+        calendar.RegionSwitches.First(r => r.Code == Core.Calendar.HolidayRegions.Czechia).IsOn = false;
+
+        // a record of the day: an event of the evening, weekly three times, an hour's reminder
+        var eventDay = FakeNews.Day(3);
+        calendar.Select(eventDay);
+        calendar.NewEventCommand.Execute(null);
+        var editor = calendar.Editor!;
+        editor.SaveCommand.Execute(null);
+        Check(calendar.HasEditor && editor.Problem.Length > 0, "calendar: a record without a name is not saved – " + editor.Problem);
+        editor.Title = "Kino – vymyslený film";
+        editor.AllDay = false;
+        editor.StartTimeText = "20:00";
+        editor.EndTimeText = "22:15";
+        editor.Repeat = AgendaEditor.Repeats.First(r => r.Value == Core.Agenda.RepeatEvery.Week);
+        editor.UntilDate = eventDay.AddDays(14).ToDateTime(TimeOnly.MinValue);
+        editor.Reminder = AgendaEditor.Reminders.First(r => r.Value == 60);
+        editor.TagsText = "#kino";
+        await Screenshot(window, "calendar-editor.png");
+        editor.SaveCommand.Execute(null);
+        var cinema = editor.Saved!;
+        Check(!calendar.HasEditor && calendar.DetailSections.Any(s => s.Entries.Any(e => e.Record == cinema && e.TimeText == "20:00")) &&
+              services.Agenda.Between(eventDay, eventDay.AddDays(30)).Count(o => o.Item == cinema) == 3 && cinema.Tags.SequenceEqual(["kino"]),
+            "calendar: the event saved, weekly three times");
+        model.CheckReminders(eventDay.ToDateTime(new TimeOnly(19, 5)));
+        Check(model.HasReminder && model.ReminderText.Contains("Kino – vymyslený film", StringComparison.Ordinal), "calendar: the reminder an hour before – " + model.ReminderText);
+        await Screenshot(window, "calendar-reminder.png");
+        model.DismissReminderCommand.Execute(null);
+
+        calendar.NewTaskCommand.Execute(null);
+        calendar.Editor!.Title = "Spracovať vymyslený seriál";
+        calendar.Editor.SaveCommand.Execute(null);
+        calendar.NewNoteCommand.Execute(null);
+        calendar.Editor!.Title = "Poznámka k vymyslenému dňu";
+        calendar.Editor.Text = "Vymyslený text poznámky.";
+        calendar.Editor.SaveCommand.Execute(null);
+        var mine = calendar.DetailSections.FirstOrDefault(s => s.Entries.Any(e => e.Record is not null));
+        Check(mine is not null && mine.Entries.Any(e => e.Layer == CalendarLayer.Tasks) && mine.Entries.Any(e => e.Layer == CalendarLayer.Notes) && mine.Entries.Any(e => e.Layer == CalendarLayer.Events),
+            "calendar: the event, the task and the note of the day together – " + string.Join(", ", mine?.Entries.Select(e => e.Layer + " " + e.Title) ?? []));
+        mine!.Entries.First(e => e.Record == cinema).OpenCommand!.Execute(null);
+        Check(calendar.Editor is { IsEvent: true, Title: "Kino – vymyslený film", HasRepeat: true }, "calendar: a record opens in the editor");
+        await Screenshot(window, "calendar-detail.png");
+        calendar.Editor!.CancelCommand.Execute(null);
+
+        calendar.TodayCommand.Execute(null);
+        await Screenshot(window, "calendar-month.png");
+        calendar.IsWeek = true;
+        Check(calendar.Days.Count == 7, "calendar: the week of seven days");
+        await Screenshot(window, "calendar-week.png");
+        calendar.IsWeekList = true;
+        Check(calendar.Days.Count == 7 && calendar.IsList, "calendar: the week as a list");
+        await Screenshot(window, "calendar-weeklist.png");
+        calendar.IsMonthList = true;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        Check(calendar.Days.Count == DateTime.DaysInMonth(today.Year, today.Month), "calendar: the month as a list");
+        calendar.HideEmptyDays = true;
+        Check(calendar.Days.All(d => d.Shown.Count > 0 || d.HasHoliday || d.IsToday), "calendar: the empty days left out");
+        await Screenshot(window, "calendar-monthlist.png");
+        calendar.HideEmptyDays = false;
+        calendar.IsYearMonths = true;
+        Check(calendar.Months.Count == 12 && calendar.Months[1].Cells.Count(c => c is not null) == DateTime.DaysInMonth(today.Year, 2), "calendar: the year as twelve months");
+        await Screenshot(window, "calendar-year.png");
+        calendar.IsYearRows = true;
+        Check(calendar.YearRows.Count == 31 && calendar.YearRows[30].Months.Count(m => m is not null) == 7, "calendar: the year in rows (31 days in seven months)");
+        await Screenshot(window, "calendar-yearrows.png");
+        calendar.IsAgenda = true;
+        Check(calendar.Days.Count > 0 && calendar.Days.All(d => d.Shown.Count > 0 || d.HasHoliday || d.IsToday) && calendar.Days.Any(d => d.Date == eventDay),
+            "calendar: the agenda – only the days with something");
+        await Screenshot(window, "calendar-agenda.png");
+        Check(services.Settings.CalendarView == nameof(CalendarView.Agenda), "calendar: the view kept in the settings");
+
+        // a click on an episode opens Novinky with the series looked for
+        calendar.IsMonth = true;
+        calendar.TodayCommand.Execute(null);
+        var episode = calendar.DetailSections.SelectMany(s => s.Entries).First(e => e.Layer == CalendarLayer.EpisodesDomestic);
+        episode.OpenCommand!.Execute(null);
+        Check(model.SelectedTool.Page == model.SeriesNews && model.SeriesNews.Filter.Contains("Domáci seriál", StringComparison.Ordinal), "calendar: an episode opens in Novinky – " + model.SeriesNews.Filter);
+        model.SeriesNews.Filter = "";
+
+        foreach (var record in services.Agenda.Items.ToList())
+        {
+            services.Agenda.Delete(record.Id);
+        }
+
+        services.Agenda.EmptyBin();
+        services.Settings.CalendarRegions = null;
+        services.Settings.CalendarSchoolDistrict = null;
+        services.Settings.Save();
+        model.Open(calendar);
+        calendar.Build();
     }
 
     private static async Task WaitFor(Func<bool> condition)

@@ -211,6 +211,18 @@ internal static class Translations
         ["ŠABLÓNY (TEMPLATE)"] = "ŠABLONY (TEMPLATE)",
         ["ŠTATISTIKA"] = "STATISTIKA",
         ["Špeciály do Season 00"] = "Speciály do Season 00",
+        ["Kalendár"] = "Kalendář",
+        ["Dnes"] = "Dnes",
+        ["+ Udalosť"] = "+ Událost",
+        ["Obnoviť"] = "Obnovit",
+        ["+ Úloha"] = "+ Úkol",
+        ["+ Poznámka"] = "+ Poznámka",
+        ["Do koša"] = "Do koše",
+        ["POZNÁMKY"] = "POZNÁMKY",
+        ["Plánované úlohy"] = "Plánované úkoly",
+        ["Poznámky"] = "Poznámky",
+        ["Návod"] = "Návod",
+        ["Otvoriť v kalendári"] = "Otevřít v kalendáři",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -418,5 +430,17 @@ internal static class Translations
         ["ŠABLÓNY (TEMPLATE)"] = "TEMPLATES",
         ["ŠTATISTIKA"] = "STATISTICS",
         ["Špeciály do Season 00"] = "Specials into Season 00",
+        ["Kalendár"] = "Calendar",
+        ["Dnes"] = "Today",
+        ["+ Udalosť"] = "+ Event",
+        ["Obnoviť"] = "Refresh",
+        ["+ Úloha"] = "+ Task",
+        ["+ Poznámka"] = "+ Note",
+        ["Do koša"] = "To the bin",
+        ["POZNÁMKY"] = "NOTES",
+        ["Plánované úlohy"] = "Planned tasks",
+        ["Poznámky"] = "Notes",
+        ["Návod"] = "Guide",
+        ["Otvoriť v kalendári"] = "Open in the calendar",
     };
 }

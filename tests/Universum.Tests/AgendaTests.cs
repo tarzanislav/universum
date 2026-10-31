@@ -62,6 +62,10 @@ public sealed class AgendaTests
             Assert.True(store.EmptyBin(TimeSpan.FromDays(30)) == 0 && store.EmptyBin() == 1 && new AgendaStore(file).Items.Count == 2, "the bin emptied – for good");
             Assert.True(changes == 7, "every change told – " + changes);
 
+            var reminders = store.Reminders(new DateTime(2026, 11, 6, 18, 0, 0), new DateTime(2026, 11, 6, 19, 0, 0));
+            Assert.True(reminders is [{ Start.Hour: 20 }] && store.Reminders(new DateTime(2026, 11, 6, 19, 0, 0), new DateTime(2026, 11, 6, 21, 0, 0)).Count == 0,
+                "the reminder an hour before the cinema, once");
+
             File.WriteAllText(file, "{ not json");
             var damaged = new AgendaStore(file);
             Assert.True(damaged.Items.Count == 0 && Directory.GetFiles(folder, "agenda.json.poskodeny-*").Length == 1, "a damaged file is kept aside");

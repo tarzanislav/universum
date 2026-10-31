@@ -3652,6 +3652,595 @@
                 </ScrollViewer>
             </DockPanel>
         </DataTemplate>
+        <!-- POZNÁMKY – Kalendár (owner, 31. 10. 2026): seven views, layers, the day's detail and the editor on the left -->
+        <DataTemplate DataType="{x:Type pages:AgendaEditor}">
+            <StackPanel>
+                <TextBlock Text="{Binding Heading}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,8" TextWrapping="Wrap" />
+                <WrapPanel Margin="0,0,0,8">
+                    <RadioButton Content="Udalosť" IsChecked="{Binding IsEvent}" GroupName="AgendaKind" MinWidth="0" Margin="0,0,14,0" />
+                    <RadioButton Content="Úloha" IsChecked="{Binding IsTask}" GroupName="AgendaKind" MinWidth="0" Margin="0,0,14,0" />
+                    <RadioButton Content="Poznámka" IsChecked="{Binding IsNote}" GroupName="AgendaKind" MinWidth="0" />
+                </WrapPanel>
+                <TextBlock Text="Názov" Style="{StaticResource Hint}" />
+                <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,8" />
+                <!-- an event: days, hours, repeat, reminder -->
+                <StackPanel Visibility="{Binding IsEvent, Converter={StaticResource BoolToVisibility}}">
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Od" Style="{StaticResource Hint}" />
+                            <DatePicker SelectedDate="{Binding StartDate}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Do (viac dní)" Style="{StaticResource Hint}" />
+                            <DatePicker SelectedDate="{Binding EndDate}" />
+                        </StackPanel>
+                    </Grid>
+                    <CheckBox Content="Celý deň" IsChecked="{Binding AllDay}" Margin="0,0,0,4" />
+                    <Grid Margin="0,0,0,6" Visibility="{Binding HasHours, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Čas od (20:00)" Style="{StaticResource Hint}" />
+                            <TextBox Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Čas do" Style="{StaticResource Hint}" />
+                            <TextBox Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Opakovanie" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Repeats}}" SelectedItem="{Binding Repeat}" Margin="0,2,0,6" HorizontalAlignment="Stretch" />
+                    <Grid Margin="0,0,0,6" Visibility="{Binding HasRepeat, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Každý(ch)" Style="{StaticResource Hint}" />
+                            <TextBox Text="{Binding IntervalText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Do dňa (nepovinné)" Style="{StaticResource Hint}" />
+                            <DatePicker SelectedDate="{Binding UntilDate}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Pripomienka" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Reminders}}" SelectedItem="{Binding Reminder}" Margin="0,2,0,6" HorizontalAlignment="Stretch" />
+                    <CheckBox Content="Aj ako úloha (v Plánovaných úlohách)" IsChecked="{Binding AlsoTask}" Margin="0,0,0,6" />
+                </StackPanel>
+                <!-- a task: due day, priority, done -->
+                <StackPanel Visibility="{Binding IsTask, Converter={StaticResource BoolToVisibility}}">
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="90" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Termín (prázdny = bez termínu)" Style="{StaticResource Hint}" />
+                            <DatePicker SelectedDate="{Binding DueDate}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Čas" Style="{StaticResource Hint}" />
+                            <TextBox Text="{Binding DueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Priorita" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Priorities}}" SelectedItem="{Binding Priority}" Margin="0,2,0,6" HorizontalAlignment="Stretch" />
+                </StackPanel>
+                <CheckBox Content="Hotovo" IsChecked="{Binding Done}" Margin="0,0,0,6">
+                    <CheckBox.Style>
+                        <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTask}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding AlsoTask}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </CheckBox.Style>
+                </CheckBox>
+                <!-- a note: pinned, on its day -->
+                <StackPanel Visibility="{Binding IsNote, Converter={StaticResource BoolToVisibility}}">
+                    <CheckBox Content="Pripnúť (hore v Poznámkach)" IsChecked="{Binding Pinned}" Margin="0,0,0,4" />
+                    <CheckBox Content="Ukázať v kalendári v tento deň" IsChecked="{Binding OnDay}" Margin="0,0,0,6" />
+                </StackPanel>
+                <TextBlock Text="Text" Style="{StaticResource Hint}" />
+                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="220"
+                         VerticalScrollBarVisibility="Auto" Margin="0,2,0,8" />
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="120" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Štítky (#kino #seriál)" Style="{StaticResource Hint}" />
+                        <TextBox Text="{Binding TagsText, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Farba" Style="{StaticResource Hint}" />
+                        <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Colors}}" SelectedItem="{Binding Color}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                <WrapPanel>
+                    <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveCommand}" Padding="14,5" Margin="0,0,8,6" FontWeight="SemiBold" />
+                    <Button Content="{loc:T 'Zrušiť'}" Command="{Binding CancelCommand}" Padding="12,5" Margin="0,0,8,6" />
+                    <Button Content="{loc:T 'Do koša'}" Command="{Binding DeleteCommand}" Padding="12,5" Margin="0,0,0,6" ToolTip="Záznam pôjde do koša – dá sa vrátiť" />
+                </WrapPanel>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="CalendarEntryChip">
+            <Border Margin="0,1,0,0" Padding="4,1" CornerRadius="3" ToolTip="{Binding ToolTip}">
+                <Border.Background>
+                    <SolidColorBrush Color="{Binding Color.Color}" Opacity="0.22" />
+                </Border.Background>
+                <DockPanel>
+                    <Border DockPanel.Dock="Left" Width="3" CornerRadius="1.5" Background="{Binding Color}" Margin="0,1,4,1" />
+                    <TextBlock DockPanel.Dock="Left" Text="{Binding TimeText}" FontSize="10.5" FontWeight="SemiBold" Margin="0,0,4,0"
+                               Visibility="{Binding HasTime, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding Title}" FontSize="11" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Done}" Value="True">
+                                        <Setter Property="TextDecorations" Value="Strikethrough" />
+                                        <Setter Property="Opacity" Value="0.6" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+        <Style x:Key="CalendarDayFrame" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsWeekend}" Value="True">
+                    <Setter Property="Background" Value="#0F808080" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSchoolHoliday}" Value="True">
+                    <Setter Property="Background" Value="#1CE8B93A" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsDayOff}" Value="True">
+                    <Setter Property="Background" Value="#22D94F4F" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="#D46A8C" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding InPeriod}" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <ControlTemplate x:Key="CalendarDayButton" TargetType="Button">
+            <ContentPresenter />
+        </ControlTemplate>
+        <DataTemplate DataType="{x:Type pages:CalendarPageViewModel}">
+            <DockPanel Margin="24,20,24,12">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kalendár'}" />
+                    <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
+                               Text="Premiéry, nové epizódy, sviatky, prázdniny, meniny a vaše udalosti, úlohy a poznámky na jednom mieste. Kliknite na deň – vľavo uvidíte všetko o ňom. Nič sa tu nesťahuje z internetu: premiéry a epizódy sú tie, ktoré uchovávajú Premiéry a Novinky." />
+                    <!-- the period and the views -->
+                    <DockPanel Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding PreviousCommand}" Padding="10,4" ToolTip="Predchádzajúce obdobie">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE76B;" FontSize="12" />
+                            </Button>
+                            <Button Content="{loc:T 'Dnes'}" Command="{Binding TodayCommand}" Padding="12,4" Margin="4,0" />
+                            <Button Command="{Binding NextCommand}" Padding="10,4" ToolTip="Nasledujúce obdobie">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="12" />
+                            </Button>
+                            <TextBlock Text="{Binding PeriodText}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,14,0" />
+                            <DatePicker SelectedDate="{Binding JumpDate}" Width="130" VerticalAlignment="Center" ToolTip="Skočiť na dátum" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="{loc:T '+ Udalosť'}" Command="{Binding NewEventCommand}" Padding="12,4" Margin="8,0,0,0" ToolTip="Nová udalosť vo vybraný deň" />
+                            <Button Content="{loc:T 'Obnoviť'}" Command="{Binding RefreshCommand}" Padding="12,4" Margin="8,0,0,0"
+                                    ToolTip="Znova prečíta premiéry a epizódy, ktoré uchovávajú Premiéry a Novinky (zo zdrojov ich obnovíte tam)" />
+                        </StackPanel>
+                        <WrapPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <RadioButton Content="Mesiac" IsChecked="{Binding IsMonth}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Týždeň" IsChecked="{Binding IsWeek}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Týždeň – zoznam" IsChecked="{Binding IsWeekList}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Mesiac – zoznam" IsChecked="{Binding IsMonthList}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Rok – mesiace" IsChecked="{Binding IsYearMonths}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Rok – riadky" IsChecked="{Binding IsYearRows}" GroupName="CalendarView" MinWidth="0" Margin="0,0,12,0" />
+                            <RadioButton Content="Agenda" IsChecked="{Binding IsAgenda}" GroupName="CalendarView" MinWidth="0" Margin="0,0,8,0" />
+                            <ComboBox ItemsSource="{Binding Source={x:Static pages:CalendarPageViewModel.AgendaSpans}}" SelectedItem="{Binding AgendaSpan}" Width="96" Margin="0,0,12,0"
+                                      Visibility="{Binding IsAgenda, Converter={StaticResource BoolToVisibility}}" />
+                            <CheckBox Content="Skryť prázdne dni" IsChecked="{Binding HideEmptyDays}" MinWidth="0"
+                                      Visibility="{Binding IsMonthList, Converter={StaticResource BoolToVisibility}}" />
+                        </WrapPanel>
+                    </DockPanel>
+                    <!-- the layers: each group switches all of its layers, each layer itself (owner, points c and d) -->
+                    <Border Style="{StaticResource Card}" Padding="12,6" Margin="0,0,0,6">
+                        <StackPanel>
+                            <WrapPanel>
+                                <ItemsControl ItemsSource="{Binding LayerGroups}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="0,2,22,2">
+                                                <CheckBox IsChecked="{Binding AllOn}" MinWidth="0" Margin="0,0,10,0" ToolTip="Všetko v skupine naraz">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                </CheckBox>
+                                                <ItemsControl ItemsSource="{Binding Layers}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <CheckBox IsChecked="{Binding IsOn}" MinWidth="0" Margin="0,0,8,0">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Border Width="10" Height="10" CornerRadius="5" Background="{Binding Color}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="{Binding Title}" />
+                                                                </StackPanel>
+                                                            </CheckBox>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <CheckBox Content="len vybrané tituly" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,2,0,2" ToolTip="Premiéry a epizódy len titulov zaškrtnutých vo Vybrané" />
+                            </WrapPanel>
+                            <Expander Header="Nastavenia kalendára – krajiny sviatkov, mená, prázdniny" Margin="0,4,0,0">
+                                <StackPanel Margin="0,6,0,4">
+                                    <TextBlock Text="Sviatky, dni pracovného pokoja a pamätné dni krajín (aj viac naraz):" Style="{StaticResource Hint}" />
+                                    <ItemsControl ItemsSource="{Binding RegionSwitches}" Margin="0,2,0,6">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Name}" IsChecked="{Binding IsOn}" MinWidth="0" Margin="0,0,14,0" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="Meniny (prvé je meno jazyka rozhrania, ďalšie pod ním):" Style="{StaticResource Hint}" />
+                                    <WrapPanel Margin="0,2,0,6">
+                                        <CheckBox Content="slovenské" IsChecked="{Binding NamesSk}" MinWidth="0" Margin="0,0,14,0" />
+                                        <CheckBox Content="české" IsChecked="{Binding NamesCs}" MinWidth="0" Margin="0,0,14,0" />
+                                        <CheckBox Content="anglické ekvivalenty (John, Mary …)" IsChecked="{Binding NamesEn}" MinWidth="0" />
+                                    </WrapPanel>
+                                    <WrapPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,20,0" Visibility="{Binding HasSlovakSchool, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Školské prázdniny SK – kraj:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox ItemsSource="{Binding SchoolRegions}" SelectedItem="{Binding SchoolRegion}" Width="190" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasCzechSchool, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Školní prázdniny CZ – okres:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox ItemsSource="{Binding SchoolDistricts}" SelectedItem="{Binding SchoolDistrict}" Width="190" />
+                                        </StackPanel>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
+                </StackPanel>
+                <!-- the day chosen, or the editor -->
+                <Border DockPanel.Dock="Left" Width="340" Margin="0,0,14,0" Style="{StaticResource Card}" Padding="0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="16,12,16,16">
+                            <ContentControl Content="{Binding Editor}" Visibility="{Binding HasEditor, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Visibility="{Binding HasEditor, Converter={StaticResource InverseBoolToVisibility}}">
+                                <TextBlock Text="{Binding DetailTitle}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DetailWeek}" Style="{StaticResource Hint}" FontSize="12" />
+                                <ItemsControl ItemsSource="{Binding DetailNames}" Margin="0,6,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="12.5" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <WrapPanel Margin="0,10,0,6">
+                                    <Button Content="{loc:T '+ Udalosť'}" Command="{Binding NewEventCommand}" Padding="10,4" Margin="0,0,6,4" />
+                                    <Button Content="{loc:T '+ Úloha'}" Command="{Binding NewTaskCommand}" Padding="10,4" Margin="0,0,6,4" />
+                                    <Button Content="{loc:T '+ Poznámka'}" Command="{Binding NewNoteCommand}" Padding="10,4" Margin="0,0,0,4" />
+                                </WrapPanel>
+                                <TextBlock Text="V tento deň tu zatiaľ nič nie je." Style="{StaticResource Hint}" Margin="0,6,0,0"
+                                           Visibility="{Binding DetailIsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding DetailSections}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,8,0,0">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{Binding Color}" Margin="0,0,0,3" />
+                                                <ItemsControl ItemsSource="{Binding Entries}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Margin="0,0,0,4" Padding="6,4" CornerRadius="4">
+                                                                <Border.Background>
+                                                                    <SolidColorBrush Color="{Binding Color.Color}" Opacity="0.14" />
+                                                                </Border.Background>
+                                                                <DockPanel>
+                                                                    <Border DockPanel.Dock="Left" Width="4" CornerRadius="2" Background="{Binding Color}" Margin="0,0,8,0" />
+                                                                    <Button DockPanel.Dock="Right" Command="{Binding OpenCommand}" Padding="6,2" VerticalAlignment="Top" Margin="6,0,0,0"
+                                                                            ToolTip="Otvoriť (záznam v editore, premiéru v Premiérach, epizódu v Novinkách)"
+                                                                            Visibility="{Binding CanOpen, Converter={StaticResource BoolToVisibility}}">
+                                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8A7;" FontSize="11" />
+                                                                    </Button>
+                                                                    <StackPanel>
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="{Binding TimeText}" FontWeight="SemiBold" Margin="0,0,6,0"
+                                                                                       Visibility="{Binding HasTime, Converter={StaticResource BoolToVisibility}}" />
+                                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" MaxWidth="230">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding Done}" Value="True">
+                                                                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                        </StackPanel>
+                                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" />
+                                                                    </StackPanel>
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+                <Grid>
+                    <!-- month grid -->
+                    <Grid Visibility="{Binding IsMonth, Converter={StaticResource BoolToVisibility}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <ItemsControl ItemsSource="{Binding WeekdayNames}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="7" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl Grid.Row="1" ItemsSource="{Binding Days}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="7" Rows="6" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding SelectCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" ToolTip="{Binding ToolTip}">
+                                        <Border Style="{StaticResource CalendarDayFrame}" Margin="1" Padding="4,2" ClipToBounds="True">
+                                            <DockPanel>
+                                                <DockPanel DockPanel.Dock="Top">
+                                                    <TextBlock DockPanel.Dock="Left" Text="{Binding DayText}" FontWeight="Bold" FontSize="14" Margin="0,0,6,0" />
+                                                    <TextBlock Text="{Binding Names1}" FontSize="10.5" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                </DockPanel>
+                                                <TextBlock DockPanel.Dock="Top" Text="{Binding Names2}" FontSize="10" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" />
+                                                <TextBlock DockPanel.Dock="Top" Text="{Binding Holiday}" FontSize="10.5" Foreground="#D94F4F" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding HasHoliday, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock DockPanel.Dock="Bottom" Text="{Binding More}" FontSize="10.5" Style="{StaticResource Hint}" />
+                                                <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource CalendarEntryChip}" />
+                                            </DockPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                    <!-- week: seven columns -->
+                    <ItemsControl ItemsSource="{Binding Days}" Visibility="{Binding IsWeek, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="7" Rows="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding SelectCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand">
+                                    <Border Style="{StaticResource CalendarDayFrame}" Margin="1" Padding="6,4">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                                                <TextBlock Text="{Binding LongText}" FontWeight="Bold" />
+                                                <TextBlock Text="{Binding Names1}" FontSize="11" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Names2}" FontSize="10.5" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Names3}" FontSize="10.5" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Holiday}" FontSize="11" Foreground="#D94F4F" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasHoliday, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding Shown}" ItemTemplate="{StaticResource CalendarEntryChip}" />
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- the week, the month and the agenda as lists -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsList, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl ItemsSource="{Binding Days}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding SelectCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand">
+                                        <Border Style="{StaticResource CalendarDayFrame}" Margin="0,0,0,4" Padding="10,6" CornerRadius="6">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Left" Width="190" Margin="0,0,12,0">
+                                                    <TextBlock Text="{Binding LongText}" FontWeight="Bold" FontSize="14" />
+                                                    <TextBlock Text="{Binding Names1}" FontSize="11.5" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Names2}" FontSize="11" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Names3}" FontSize="11" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Holiday}" Foreground="#D94F4F" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasHoliday, Converter={StaticResource BoolToVisibility}}" />
+                                                    <ItemsControl ItemsSource="{Binding Shown}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="0,1,0,1" ToolTip="{Binding ToolTip}">
+                                                                    <Border DockPanel.Dock="Left" Width="10" Height="10" CornerRadius="5" Background="{Binding Color}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                                    <TextBlock DockPanel.Dock="Left" Text="{Binding TimeText}" FontWeight="SemiBold" Width="44" />
+                                                                    <TextBlock>
+                                                                        <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                        <Run Text="  " />
+                                                                        <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    </TextBlock>
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <!-- the year: twelve small months -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsYearMonths, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl ItemsSource="{Binding Months}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}" Width="236" Margin="0,0,10,10" Padding="8,6">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                            <ItemsControl ItemsSource="{Binding DataContext.WeekdayNames, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="7" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" FontSize="10" Style="{StaticResource Hint}" HorizontalAlignment="Center" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl ItemsSource="{Binding Cells}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="7" Rows="6" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding SelectCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" ToolTip="{Binding ToolTip}" Height="26">
+                                                            <Border Style="{StaticResource CalendarDayFrame}" Margin="0.5" CornerRadius="3">
+                                                                <Grid>
+                                                                    <TextBlock Text="{Binding DayText}" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    <Ellipse Width="5" Height="5" Fill="#D46A8C" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,2"
+                                                                             Visibility="{Binding HasEntries, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                            </Border>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <!-- the year in rows: days 1 – 31 by months -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Visibility="{Binding IsYearRows, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel MinWidth="720">
+                            <DockPanel Margin="0,0,0,2">
+                                <TextBlock DockPanel.Dock="Left" Width="30" />
+                                <ItemsControl ItemsSource="{Binding MonthNames}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="12" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding YearRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Left" Width="30" Text="{Binding Day}" FontSize="11" VerticalAlignment="Center" Style="{StaticResource Hint}" />
+                                            <ItemsControl ItemsSource="{Binding Months}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="12" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Command="{Binding SelectCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" ToolTip="{Binding ToolTip}" Height="20">
+                                                            <Border Style="{StaticResource CalendarDayFrame}" Margin="0.5" Padding="3,0">
+                                                                <DockPanel>
+                                                                    <Ellipse DockPanel.Dock="Right" Width="5" Height="5" Fill="#D46A8C" VerticalAlignment="Center"
+                                                                             Visibility="{Binding HasEntries, Converter={StaticResource BoolToVisibility}}" />
+                                                                    <TextBlock Text="{Binding Holiday}" FontSize="9.5" Foreground="#D94F4F" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:HistraListsPageViewModel}">
             <DockPanel Margin="24,20,24,12">
                 <StackPanel DockPanel.Dock="Top">
@@ -4844,6 +5433,20 @@
                     </StackPanel>
                     <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE8B5;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding ArrivalsText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ArrivalsText}" />
+                </DockPanel>
+            </Border>
+            <!-- owner, 31. 10. 2026: a reminder of the calendar -->
+            <Border DockPanel.Dock="Top" Margin="16,10,16,0" CornerRadius="8" Padding="14,8" Background="#33D46A8C"
+                    Visibility="{Binding HasReminder, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="{loc:T 'Otvoriť v kalendári'}" Command="{Binding OpenReminderCommand}" Padding="12,4" Margin="8,0,8,0" FontWeight="SemiBold" />
+                        <Button Command="{Binding DismissReminderCommand}" Padding="8,4" ToolTip="Skryť pripomienku">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="12" />
+                        </Button>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xEA8F;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ReminderText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ReminderText}" FontWeight="SemiBold" />
                 </DockPanel>
             </Border>
             <ContentControl Content="{Binding SelectedTool.Page}" />

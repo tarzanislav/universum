@@ -694,6 +694,11 @@ public sealed class AppServices
 
     private Universum.Core.Agenda.AgendaStore? _agenda;
 
+    /// <summary>The voice of notes: recording and writing it down (POZNÁMKY).</summary>
+    public Pages.VoiceRecorder Voice => _voice ??= new(this);
+
+    private Pages.VoiceRecorder? _voice;
+
     private Universum.Core.Jobs.ProcessingLogStore? _processingLogs;
 
     // jobs already in the logs: the job and the end of its run (a job run again is logged again)

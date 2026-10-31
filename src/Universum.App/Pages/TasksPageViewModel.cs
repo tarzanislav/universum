@@ -303,7 +303,7 @@ public sealed class TasksPageViewModel : ObservableObject
     }
 
     public void Edit(AgendaItem? item) =>
-        Editor = new AgendaEditor(_services.Agenda, item, item?.Task?.Due ?? Today, AgendaKind.Task, () => Editor = null);
+        Editor = new AgendaEditor(_services.Agenda, item, item?.Task?.Due ?? Today, AgendaKind.Task, () => Editor = null) { Voice = _services.Voice };
 
     internal void Delete(AgendaItem item)
     {

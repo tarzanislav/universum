@@ -1280,12 +1280,104 @@ internal static class SelfTest
 
         await TestCalendarAsync(model, window, services);
         await TestTasksAsync(model, window, services);
+        await TestNotesAsync(model, window, services);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SeriesNewsForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
         model.Open(model.Dashboard);
+    }
+
+    /// <summary>
+    /// Poznámky (owner, 31. 10. 2026, stage P2): a quick note (its first sentence the title, #tags), a note of a day from
+    /// Kalendár, the note of a title of Premiéry kept with the title, pinning, search, the bin, and a recording written
+    /// down in the computer (the English speech of the test file, whisper.cpp); invented texts only.
+    /// </summary>
+    private static async Task TestNotesAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var notes = model.AgendaNotes;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        model.Open(notes);
+        await notes.Ready;
+        notes.ShowAll = true;
+        notes.QuickText = "Vymyslený nápad na plagát. Skúsiť tmavšie pozadie #nápad";
+        notes.AddCommand.Execute(null);
+        var idea = services.Agenda.Items.Single(i => i.Title == "Vymyslený nápad na plagát.");
+        Check(idea.Text == "Skúsiť tmavšie pozadie" && idea.Tags.SequenceEqual(["nápad"]) && idea.Note is not null && notes.Cards.Any(c => c.Record == idea),
+            "notes: a quick note – the first sentence its title, the tag – " + notes.Status);
+
+        model.Calendar.Select(today);
+        model.Calendar.NewNoteCommand.Execute(null);
+        model.Calendar.Editor!.Title = "Vymyslená poznámka k dňu";
+        model.Calendar.Editor.SaveCommand.Execute(null);
+        model.Open(notes);
+        notes.ShowDays = true;
+        Check(notes.Cards.Count == 1 && notes.Cards[0].Title == "Vymyslená poznámka k dňu" && notes.Cards[0].Where.StartsWith("k dňu", StringComparison.Ordinal),
+            "notes: the note of a day written in Kalendár – " + string.Join(", ", notes.Cards.Select(c => c.Title + " / " + c.Where)));
+
+        var film = services.PremiereStore.Load().Films.First();
+        var key = Core.News.MarkStore.Film(film.TmdbId);
+        var before = services.Marks.Get(key);
+        services.Marks.Set(key, before with { Note = "Vymyslená poznámka k titulu" });
+        notes.ShowTitles = true;
+        var titleCard = notes.Cards.SingleOrDefault(c => c.TitleKey == key);
+        Check(titleCard is not null && titleCard.Title == film.Caption && titleCard.Text == "Vymyslená poznámka k titulu", "notes: the note of a title of Premiéry, by its name – " + titleCard?.Title);
+        titleCard!.OpenCommand.Execute(null);
+        var titleEditor = (TitleNoteEditor)notes.Editor!;
+        titleEditor.Text = "Vymyslená poznámka k titulu – upravená";
+        titleEditor.SaveCommand.Execute(null);
+        Check(services.Marks.Get(key).Note == "Vymyslená poznámka k titulu – upravená" && !notes.HasEditor, "notes: the note of a title changed – kept with the title (Premiéry show it too)");
+
+        notes.ShowAll = true;
+        notes.Cards.First(c => c.Record == idea).PinCommand!.Execute(null);
+        Check(idea.Note!.Pinned && notes.Cards[0].Record == idea, "notes: a pinned note first");
+        notes.Filter = "pozadie";
+        Check(notes.Cards.Count == 1 && notes.Cards[0].Record == idea, "notes: looked for in the text");
+        notes.Filter = "";
+        await Screenshot(window, "notes.png");
+        notes.Cards.First(c => c.Record == idea).DeleteCommand.Execute(null);
+        notes.ShowBin = true;
+        Check(notes.Cards.Any(c => c.Record == idea && c.InBin) && notes.BinText.EndsWith("(1)", StringComparison.Ordinal), "notes: in the bin – " + notes.BinText);
+        notes.Cards.First(c => c.Record == idea).RestoreCommand!.Execute(null);
+        notes.ShowAll = true;
+        Check(notes.Cards.Any(c => c.Record == idea && !c.InBin), "notes: taken back from the bin");
+
+        // the voice written down in the computer: the English sentences of the test file (synthetic voice)
+        notes.Edit(idea);
+        var editor = (AgendaEditor)notes.Editor!;
+        Check(editor.HasVoice && editor.IsNote, "notes: the editor of a note offers the voice");
+        try
+        {
+            var tools = await services.SpeechAsync();
+            var samples = Path.Combine(_outputDirectory, "hlas.pcm");
+            var wave = Path.Combine(_outputDirectory, "hlas.wav");
+            var media = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "speech-und.mkv");
+            await services.Runner.RunAsync(Core.Speech.VoiceNotes.SamplesFromFileRequest(tools, media, 1, TimeSpan.Zero, TimeSpan.FromSeconds(28), samples));
+            Core.Speech.VoiceNotes.Wave(samples, wave);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var (text, problem) = await services.Voice.TranscribeAsync(wave, "en");
+            Write($"notes: the voice written down ({watch.Elapsed.TotalSeconds:0.0} s): {text ?? problem}");
+            Check(text is not null && new[] { "evening", "village", "miller", "river" }.Any(w => text.Contains(w, StringComparison.OrdinalIgnoreCase)),
+                "notes: English speech written down in the computer – " + (text ?? problem));
+            editor.AddSpoken(text ?? "", null);
+            Check(editor.Text.StartsWith("Skúsiť tmavšie pozadie", StringComparison.Ordinal) && editor.Text.Length > "Skúsiť tmavšie pozadie".Length + 10, "notes: the written text added to the note");
+        }
+        catch (Core.Speech.SpeechException ex)
+        {
+            Write("notes: the voice not tried – " + ex.Message);
+        }
+
+        await Screenshot(window, "notes-editor.png");
+        editor.CancelCommand.Execute(null);
+
+        services.Marks.Set(key, before);
+        foreach (var record in services.Agenda.Items.ToList())
+        {
+            services.Agenda.Delete(record.Id);
+        }
+
+        services.Agenda.EmptyBin();
     }
 
     /// <summary>

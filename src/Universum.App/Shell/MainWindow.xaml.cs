@@ -63,6 +63,17 @@ public partial class MainWindow : Window
     }
 
     // the button's menu opens on a click (not only with the right button), with the page as its data
+    // owner, 31. 10. 2026 (POZNÁMKY): Diktovať – the text of the note gets the focus and Windows' voice typing opens (Win + H)
+    private void OnDictateClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: System.Windows.Controls.TextBox box })
+        {
+            box.Focus();
+            box.CaretIndex = box.Text.Length;
+            Universum.Platform.Windows.VoiceTyping.Open();
+        }
+    }
+
     private void OnSpeechMenu(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { ContextMenu: { } menu } button)

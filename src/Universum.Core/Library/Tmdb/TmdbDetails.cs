@@ -11,6 +11,15 @@ public sealed record TmdbCollectionPart(int Id, string Title, string OriginalTit
     public string Caption => Year is { } year ? $"{OriginalTitle} ({year.ToString(CultureInfo.InvariantCulture)})" : OriginalTitle;
 }
 
+/// <summary>The poster of a season of a series (TMDB's main one).</summary>
+public sealed record TmdbSeasonPoster(int Number, string PosterPath);
+
+/// <summary>The still of an episode (a picture from it).</summary>
+public sealed record TmdbStill(int Season, int Episode, string Path);
+
+/// <summary>The pictures of a title: posters, backgrounds (backdrops) and title logos, each with its language, size and rating.</summary>
+public sealed record TmdbPictures(IReadOnlyList<TmdbPicture> Posters, IReadOnlyList<TmdbPicture> Backdrops, IReadOnlyList<TmdbPicture> Logos);
+
 /// <summary>A collection of films (TMDB: "belongs_to_collection") with its films in the order of their years.</summary>
 public sealed record TmdbCollection(int Id, string Name, IReadOnlyList<TmdbCollectionPart> Parts);
 
@@ -76,6 +85,9 @@ public sealed record TmdbDetails
 
     public string CollectionName { get; init; } = "";
 
+    /// <summary>The posters of the seasons of a series (without the specials).</summary>
+    public IReadOnlyList<TmdbSeasonPoster> SeasonPosters { get; init; } = [];
+
     /// <summary>The library title by the specification (original title in Latin script, else English title and ID).</summary>
     public TitleInfo? Title => TitleInfo.FromTmdb(Kind, Id, OriginalTitle, EnglishTitle, Year);
 
@@ -98,7 +110,8 @@ public sealed class TmdbTitleDetails(TmdbClient tmdb)
     /// <summary>The detail of a title; null when TMDB has no title with this ID.</summary>
     public async Task<TmdbDetails?> GetAsync(MediaKind kind, int id, CancellationToken cancellationToken = default)
     {
-        var path = $"{Kind(kind)}/{id.ToString(CultureInfo.InvariantCulture)}?language=en-US&append_to_response=credits,external_ids,translations";
+        // (the order of the parameters names the cache entry: details kept before the season posters had none)
+        var path = $"{Kind(kind)}/{id.ToString(CultureInfo.InvariantCulture)}?append_to_response=credits,external_ids,translations&language=en-US";
         using var document = await tmdb.GetCompactAsync(path, DetailLifetime, root => CompactDetails(kind, root), cancellationToken).ConfigureAwait(false);
         return document is null ? null : ParseDetails(kind, id, document.RootElement);
     }
@@ -107,20 +120,35 @@ public sealed class TmdbTitleDetails(TmdbClient tmdb)
     /// The posters of a title in Czech, Slovak, English, its original language and without text (TMDB's list of images,
     /// each with its language, size and rating).
     /// </summary>
-    public async Task<IReadOnlyList<TmdbPicture>> PostersAsync(MediaKind kind, int id, string? originalLanguage, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TmdbPicture>> PostersAsync(MediaKind kind, int id, string? originalLanguage, CancellationToken cancellationToken = default) =>
+        (await PicturesAsync(kind, id, originalLanguage, cancellationToken).ConfigureAwait(false)).Posters;
+
+    /// <summary>The posters, backgrounds and title logos of a title (one request; the languages as of the posters).</summary>
+    public async Task<TmdbPictures> PicturesAsync(MediaKind kind, int id, string? originalLanguage, CancellationToken cancellationToken = default)
     {
-        var languages = new[] { "cs", "sk", "en", originalLanguage?.ToLowerInvariant(), "null" }
+        // (null first: the order names the cache entry – pictures kept before had no backgrounds and logos)
+        var languages = new[] { "null", "cs", "sk", "en", originalLanguage?.ToLowerInvariant() }
             .Where(l => l is { Length: 2 } || l == "null").Distinct(StringComparer.Ordinal);
         var path = $"{Kind(kind)}/{id.ToString(CultureInfo.InvariantCulture)}/images?include_image_language={string.Join(",", languages)}";
         using var document = await tmdb.GetCompactAsync(path, PictureLifetime, CompactPictures, cancellationToken).ConfigureAwait(false);
-        if (document is null || !document.RootElement.TryGetProperty("p", out var posters) || posters.ValueKind != JsonValueKind.Array)
-        {
-            return [];
-        }
+        List<TmdbPicture> Of(string property) =>
+            document is not null && document.RootElement.TryGetProperty(property, out var list) && list.ValueKind == JsonValueKind.Array
+                ? list.EnumerateArray().Select(p => new TmdbPicture(
+                    Text(p, "f") ?? "", Text(p, "l"), Int(p, "w") ?? 0, Int(p, "h") ?? 0,
+                    p.TryGetProperty("v", out var v) && v.TryGetDouble(out var vote) ? vote : 0, Int(p, "c") ?? 0)).Where(p => p.Path.Length > 0).ToList()
+                : [];
+        return new TmdbPictures(Of("p"), Of("b"), Of("o"));
+    }
 
-        return posters.EnumerateArray().Select(p => new TmdbPicture(
-            Text(p, "f") ?? "", Text(p, "l"), Int(p, "w") ?? 0, Int(p, "h") ?? 0,
-            p.TryGetProperty("v", out var v) && v.TryGetDouble(out var vote) ? vote : 0, Int(p, "c") ?? 0)).Where(p => p.Path.Length > 0).ToList();
+    /// <summary>The stills of the episodes of a season (one request, kept 30 days).</summary>
+    public async Task<IReadOnlyList<TmdbStill>> StillsAsync(int seriesId, int season, CancellationToken cancellationToken = default)
+    {
+        var path = $"tv/{seriesId.ToString(CultureInfo.InvariantCulture)}/season/{season.ToString(CultureInfo.InvariantCulture)}?language=en-US";
+        using var document = await tmdb.GetCompactAsync(path, DetailLifetime, CompactStills, cancellationToken).ConfigureAwait(false);
+        return document is not null && document.RootElement.TryGetProperty("e", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Select(e => new TmdbStill(season, Int(e, "n") ?? 0, Text(e, "s") ?? ""))
+                .Where(s => s.Episode > 0 && PosterCache.IsValidPath(s.Path)).ToList()
+            : [];
     }
 
     /// <summary>The films of a collection, the earliest first; null when TMDB does not know it.</summary>
@@ -177,6 +205,8 @@ public sealed class TmdbTitleDetails(TmdbClient tmdb)
             PosterPath = PosterCache.IsValidPath(Text(root, "p")) ? Text(root, "p") : null,
             CollectionId = Int(root, "ci") is > 0 and var collection ? collection : null,
             CollectionName = Text(root, "cn") ?? "",
+            SeasonPosters = Array(root, "sp").Select(s => new TmdbSeasonPoster(Int(s, "n") ?? 0, Text(s, "p") ?? ""))
+                .Where(s => s.Number > 0 && PosterCache.IsValidPath(s.PosterPath)).ToList(),
         };
     }
 
@@ -221,13 +251,14 @@ public sealed class TmdbTitleDetails(TmdbClient tmdb)
             p = Text(root, "poster_path"),
             ci = Int(collection, "id"),
             cn = Text(collection, "name"),
+            sp = Array(root, "seasons").Select(s => new { n = Int(s, "season_number"), p = Text(s, "poster_path") }).Where(s => s.n > 0 && s.p is not null).ToList(),
         });
     }
 
-    // the posters keep their file, language, size and rating
-    internal static string CompactPictures(JsonElement root) => JsonSerializer.Serialize(new
+    // the posters, backgrounds and logos keep their file, language, size and rating
+    internal static string CompactPictures(JsonElement root)
     {
-        p = Array(root, "posters").Select(p => new
+        object Of(string property, int most) => Array(root, property).Select(p => new
         {
             f = Text(p, "file_path"),
             l = Text(p, "iso_639_1"),
@@ -235,7 +266,14 @@ public sealed class TmdbTitleDetails(TmdbClient tmdb)
             h = Int(p, "height"),
             v = p.TryGetProperty("vote_average", out var v) && v.TryGetDouble(out var vote) ? vote : 0,
             c = Int(p, "vote_count"),
-        }).Where(p => PosterCache.IsValidPath(p.f)).Take(300).ToList(),
+        }).Where(p => PosterCache.IsValidPath(p.f)).Take(most).ToList();
+        return JsonSerializer.Serialize(new { p = Of("posters", 300), b = Of("backdrops", 100), o = Of("logos", 60) });
+    }
+
+    // a season keeps the stills of its episodes
+    internal static string CompactStills(JsonElement root) => JsonSerializer.Serialize(new
+    {
+        e = Array(root, "episodes").Select(e => new { n = Int(e, "episode_number"), s = Text(e, "still_path") }).Where(e => e.s is not null).ToList(),
     });
 
     // a collection keeps the names, years and posters of its films

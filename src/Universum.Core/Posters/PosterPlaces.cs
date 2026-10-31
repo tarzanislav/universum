@@ -90,18 +90,19 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
     public sealed record Saved(bool Done, string? KeptAs, string? Problem);
 
     /// <summary>
-    /// Writes the poster as folder.jpg into a folder (created when missing). A folder.jpg already there is renamed first
-    /// ("folder-povodny.jpg", "folder-povodny-2.jpg" …) – never deleted or overwritten.
+    /// Writes the poster as folder.jpg (or another picture of the title as <paramref name="name"/>) into a folder (created
+    /// when missing). One already there is renamed first ("folder-povodny.jpg", "folder-povodny-2.jpg" …) – never deleted
+    /// or overwritten.
     /// </summary>
-    public static Saved Save(string folder, byte[] jpeg)
+    public static Saved Save(string folder, byte[] jpeg, string name = FileName)
     {
-        var target = Path.Combine(folder, FileName);
-        var temporary = Path.Combine(folder, FileName + ".universum-part");
+        var target = Path.Combine(folder, name);
+        var temporary = Path.Combine(folder, name + ".universum-part");
         try
         {
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(temporary, jpeg);
-            var kept = KeepOld(folder);
+            var kept = KeepOld(folder, name);
             File.Move(temporary, target, overwrite: false);
             return new Saved(true, kept, null);
         }
@@ -116,22 +117,24 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
                 // a leftover part of UNIVERSUM's own write
             }
 
-            return new Saved(false, null, $"{FileName} sa nedá zapísať do {folder}: {ex.Message}");
+            return new Saved(false, null, $"{name} sa nedá zapísať do {folder}: {ex.Message}");
         }
     }
 
-    /// <summary>The folder.jpg of a folder renamed to the first free "folder-povodny(-N).jpg"; its new name, or null when there was none.</summary>
-    public static string? KeepOld(string folder)
+    /// <summary>The picture of a folder (folder.jpg) renamed to the first free "folder-povodny(-N).jpg"; its new name, or null when there was none.</summary>
+    public static string? KeepOld(string folder, string fileName = FileName)
     {
-        var current = Path.Combine(folder, FileName);
+        var current = Path.Combine(folder, fileName);
         if (!File.Exists(current))
         {
             return null;
         }
 
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        var extension = Path.GetExtension(fileName);
         for (var number = 1; ; number++)
         {
-            var name = number == 1 ? "folder-povodny.jpg" : $"folder-povodny-{number}.jpg";
+            var name = number == 1 ? $"{stem}-povodny{extension}" : $"{stem}-povodny-{number}{extension}";
             var kept = Path.Combine(folder, name);
             if (!File.Exists(kept))
             {
@@ -174,7 +177,11 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
 }
 
 /// <summary>A poster waiting for its title to be processed (the title is only in the input folder).</summary>
-public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName, string File, DateTimeOffset Since);
+/// <param name="Extras">Other pictures of the main folder waiting with it (fanart.jpg, clearlogo.png, season posters): name → file.</param>
+public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName, string File, DateTimeOffset Since)
+{
+    public Dictionary<string, string> Extras { get; init; } = [];
+}
 
 /// <summary>
 /// Posters waiting for their titles (Zlúčiť poster s filmom, the title only in the input folder): kept in UNIVERSUM's
@@ -200,16 +207,25 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
         }
     }
 
-    /// <summary>A poster waits for the title (one per title: a newer one replaces the older).</summary>
-    public void Add(TitleInfo title, int tmdbId, byte[] jpeg)
+    /// <summary>A poster (and other pictures of the main folder) waits for the title (one per title: a newer one replaces the older).</summary>
+    public void Add(TitleInfo title, int tmdbId, byte[] jpeg, IReadOnlyDictionary<string, byte[]>? extras = null)
     {
         lock (Gate)
         {
             Directory.CreateDirectory(folder);
-            var file = Path.Combine(folder, $"{(title.Kind == MediaKind.Movie ? "film" : "serial")}-{tmdbId}.jpg");
+            var prefix = $"{(title.Kind == MediaKind.Movie ? "film" : "serial")}-{tmdbId}";
+            var file = Path.Combine(folder, prefix + ".jpg");
             File.WriteAllBytes(file, jpeg);
+            var kept = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, bytes) in extras ?? new Dictionary<string, byte[]>())
+            {
+                var extra = Path.Combine(folder, $"{prefix}-{Path.GetFileName(name)}");
+                File.WriteAllBytes(extra, bytes);
+                kept[Path.GetFileName(name)] = extra;
+            }
+
             var all = Load().Where(w => !(w.Kind == title.Kind && w.TmdbId == tmdbId)).ToList();
-            all.Add(new WaitingPoster(title.Kind, tmdbId, title.FolderName, file, DateTimeOffset.Now));
+            all.Add(new WaitingPoster(title.Kind, tmdbId, title.FolderName, file, DateTimeOffset.Now) { Extras = kept });
             Save(all);
         }
     }
@@ -269,7 +285,20 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
             var kept = PosterPlaces.KeepOld(main);
             File.Copy(waiting.File, target, overwrite: false);
             File.Delete(waiting.File);
-            return $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})");
+            var others = new List<string>();
+            foreach (var (extraName, file) in waiting.Extras)
+            {
+                if (File.Exists(file))
+                {
+                    var old = PosterPlaces.KeepOld(main, extraName);
+                    File.Copy(file, Path.Combine(main, extraName), overwrite: false);
+                    File.Delete(file);
+                    others.Add(old is null ? extraName : $"{extraName} (pôvodný premenovaný na {old})");
+                }
+            }
+
+            return $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})") +
+                   (others.Count > 0 ? "; ďalšie obrázky: " + string.Join(", ", others) : "");
         }
     }
 

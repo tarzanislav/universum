@@ -131,10 +131,55 @@ public sealed class PosterTests
         Assert.True(server.Requests.Single().Contains("append_to_response=credits,external_ids,translations", StringComparison.Ordinal), "one request");
         var posters = await details.PostersAsync(MediaKind.Movie, 101, d.OriginalLanguage);
         Assert.True(posters is [{ Path: "/cs.jpg", Language: "cs", Width: 1000 }], "posters, a bad path left out");
-        Assert.True(server.Requests[^1].Contains("include_image_language=cs,sk,en,null", StringComparison.Ordinal), "the languages asked – " + server.Requests[^1]);
+        Assert.True(server.Requests[^1].Contains("include_image_language=null,cs,sk,en", StringComparison.Ordinal), "the languages asked – " + server.Requests[^1]);
         var collection = await details.CollectionAsync(77);
         Assert.Sequence(["Vymyšlený kapr (2021)", "Kapr 2 (2024)"], collection!.Parts.Select(p => p.Caption), "the collection by years");
         Assert.True(d.Title?.FolderName == "Vymyšlený kapr (2021)", "the library name");
+    }
+
+    [Test]
+    public async Task OtherPicturesBackgroundLogoSeasonsEpisodes()
+    {
+        var server = new Server();
+        server.Answers["/3/tv/55"] = """
+            { "id": 55, "name": "Invented Series", "original_name": "Vymyslený seriál", "original_language": "sk", "first_air_date": "2025-01-01", "number_of_seasons": 2,
+              "seasons": [ { "season_number": 0, "poster_path": "/specialy.jpg" }, { "season_number": 1, "poster_path": "/s1.jpg" }, { "season_number": 2, "poster_path": null } ] }
+            """;
+        server.Answers["/3/tv/55/images"] = """
+            { "posters": [],
+              "backdrops": [ { "file_path": "/b-en.jpg", "iso_639_1": "en", "width": 3840, "height": 2160, "vote_average": 9, "vote_count": 9 },
+                             { "file_path": "/b-small.jpg", "iso_639_1": null, "width": 800, "height": 450, "vote_average": 8, "vote_count": 9 },
+                             { "file_path": "/b.jpg", "iso_639_1": null, "width": 1920, "height": 1080, "vote_average": 5, "vote_count": 1 } ],
+              "logos": [ { "file_path": "/l-en.png", "iso_639_1": "en", "width": 800, "height": 300 }, { "file_path": "/l-cs.png", "iso_639_1": "cs", "width": 400, "height": 150 },
+                         { "file_path": "/l.svg", "iso_639_1": "cs", "width": 400, "height": 150 } ] }
+            """;
+        server.Answers["/3/tv/55/season/1"] = """{ "episodes": [ { "episode_number": 1, "still_path": "/e1.jpg" }, { "episode_number": 2, "still_path": null } ] }""";
+        var details = new TmdbTitleDetails(new TmdbClient(server.Http, "abc123", pacer: Fast));
+        var series = await details.GetAsync(MediaKind.Series, 55);
+        Assert.True(series!.SeasonPosters is [{ Number: 1, PosterPath: "/s1.jpg" }] && series.Seasons == 2, "season posters, without the specials");
+        var pictures = await details.PicturesAsync(MediaKind.Series, 55, "sk");
+        Assert.Equal("/b.jpg", PosterChoice.BestBackdrop(pictures.Backdrops)?.Path, "a background without text, 16:9, large enough");
+        Assert.Equal("/l-cs.png", PosterChoice.BestLogo(pictures.Logos, "sk")?.Path, "a Czech PNG logo first");
+        Assert.True(await details.StillsAsync(55, 1) is [{ Season: 1, Episode: 1, Path: "/e1.jpg" }], "the stills of a season");
+
+        var root = Directory.CreateTempSubdirectory("universum-extras-").FullName;
+        try
+        {
+            var library = new LibraryLayout(Path.Combine(root, "OUTPUT"));
+            var title = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2025);
+            var main = library.TitleDirectory(title);
+            Directory.CreateDirectory(Path.Combine(main, "Season 01"));
+            File.WriteAllBytes(Path.Combine(main, "fanart.jpg"), [1]);
+            var waiting = new PendingPosters(Path.Combine(root, "waiting"), () => library.Root);
+            waiting.Add(title, 55, [2], new Dictionary<string, byte[]> { ["fanart.jpg"] = [3, 3], ["clearlogo.png"] = [4] });
+            var done = waiting.Deliver(Path.Combine(main, "Season 01"));
+            Assert.True(done!.Contains("clearlogo.png", StringComparison.Ordinal) && File.ReadAllBytes(Path.Combine(main, "fanart.jpg")).Length == 2 &&
+                        File.Exists(Path.Combine(main, "fanart-povodny.jpg")) && File.Exists(Path.Combine(main, "clearlogo.png")), "the other pictures with the poster, an older one renamed – " + done);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Test]

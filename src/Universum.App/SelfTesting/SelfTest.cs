@@ -1518,6 +1518,14 @@ internal static class SelfTest
         await page.ProcessCommand.ExecuteAsync(null);
         Check(File.Exists(Path.Combine(folder, "folder-povodny.jpg")) && page.Result.Contains("folder-povodny.jpg", StringComparison.Ordinal), "posters: the older one renamed – " + page.Result);
 
+        // Ďalšie TMDB obrázky: off by default; then the background and the logo beside folder.jpg
+        Check(!page.Extras && !File.Exists(Path.Combine(folder, "fanart.jpg")), "posters: the other pictures are off by default");
+        page.Extras = true;
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(File.ReadAllBytes(Path.Combine(folder, "fanart.jpg")) is [0xFF, 0xD8, ..] && File.Exists(Path.Combine(folder, "clearlogo.png")) && page.ExtrasText.Contains("pozadie", StringComparison.Ordinal),
+            $"posters: fanart.jpg and clearlogo.png – {page.Result} | {page.ExtrasText}");
+        page.Extras = false;
+
         await page.DraftCommand.ExecuteAsync(null);
         Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("api.cloudflare.com", StringComparison.Ordinal)),
             "posters: a draft by AI (Cloudflare) – " + page.DraftStatus);
@@ -1571,7 +1579,9 @@ internal static class SelfTest
                         """,
                     "/3/movie/777001/images" => """
                         { "posters": [ { "file_path": "/en-plagat.png", "iso_639_1": "en", "width": 2000, "height": 3000, "vote_average": 6, "vote_count": 3 },
-                                       { "file_path": "/cz-plagat.png", "iso_639_1": "cs", "width": 1000, "height": 1500, "vote_average": 5.3, "vote_count": 1 } ] }
+                                       { "file_path": "/cz-plagat.png", "iso_639_1": "cs", "width": 1000, "height": 1500, "vote_average": 5.3, "vote_count": 1 } ],
+                          "backdrops": [ { "file_path": "/pozadie.png", "iso_639_1": null, "width": 1920, "height": 1080, "vote_average": 5, "vote_count": 1 } ],
+                          "logos": [ { "file_path": "/logo-cz.png", "iso_639_1": "cs", "width": 400, "height": 150 } ] }
                         """,
                     "/3/collection/777" => """
                         { "name": "Vymyslené plagáty", "parts": [ { "id": 777001, "title": "Invented Poster", "original_title": "Vymyslený plagát", "release_date": "2026-03-01" },

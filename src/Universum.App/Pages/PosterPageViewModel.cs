@@ -100,6 +100,7 @@ public sealed class PosterPageViewModel : ObservableObject
     private VideoChoice<MediaKind?> _kind;
     private VideoChoice<int> _height;
     private CancellationTokenSource _title = new();
+    private TmdbPictures? _pictures;
 
     public PosterPageViewModel(AppServices services)
     {
@@ -171,6 +172,9 @@ public sealed class PosterPageViewModel : ObservableObject
             if (SetProperty(ref _card, value))
             {
                 OnPropertyChanged(nameof(HasCard));
+                OnPropertyChanged(nameof(IsSeries));
+                _pictures = null;
+                OnPropertyChanged(nameof(ExtrasText));
                 Refresh();
             }
         }
@@ -272,6 +276,45 @@ public sealed class PosterPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>Ďalšie TMDB obrázky (owner, 31. 10. 2026; off by default – the choices below greyed): background, logo, season posters, episode stills.</summary>
+    public bool Extras { get => _services.Settings.PosterExtras; set => Store(value, _services.Settings.PosterExtras, v => _services.Settings.PosterExtras = v); }
+
+    /// <summary>The background as fanart.jpg (Kodi, Jellyfin, Plex).</summary>
+    public bool ExtraBackdrop { get => _services.Settings.PosterBackdrop; set => Store(value, _services.Settings.PosterBackdrop, v => _services.Settings.PosterBackdrop = v); }
+
+    /// <summary>The logo of the title as clearlogo.png (transparent).</summary>
+    public bool ExtraLogo { get => _services.Settings.PosterLogo; set => Store(value, _services.Settings.PosterLogo, v => _services.Settings.PosterLogo = v); }
+
+    /// <summary>The posters of the seasons as season01-poster.jpg … in the main folder of the series.</summary>
+    public bool ExtraSeasons { get => _services.Settings.PosterSeasons; set => Store(value, _services.Settings.PosterSeasons, v => _services.Settings.PosterSeasons = v); }
+
+    /// <summary>The stills of the episodes as "…-thumb.jpg" beside each episode.</summary>
+    public bool ExtraEpisodes { get => _services.Settings.PosterEpisodes; set => Store(value, _services.Settings.PosterEpisodes, v => _services.Settings.PosterEpisodes = v); }
+
+    /// <summary>The title is a series (season posters and episode stills).</summary>
+    public bool IsSeries => Card?.Kind == MediaKind.Series;
+
+    /// <summary>What TMDB has of the other pictures.</summary>
+    public string ExtrasText
+    {
+        get
+        {
+            if (_pictures is not { } pictures || Card?.Details is not { } details)
+            {
+                return "";
+            }
+
+            var backdrop = PosterChoice.BestBackdrop(pictures.Backdrops);
+            var logo = PosterChoice.BestLogo(pictures.Logos, details.OriginalLanguage);
+            return string.Join(" · ", new[]
+            {
+                backdrop is null ? "pozadie: TMDB nemá" : $"pozadie: {backdrop.Width} × {backdrop.Height}{(backdrop.Language is null ? " bez textu" : "")}",
+                logo is null ? "logo: TMDB nemá" : $"logo: {(logo.Language is { Length: > 0 } l ? (l == "cs" ? "CZ" : l.ToUpperInvariant()) : "bez jazyka")}",
+                details.Kind == MediaKind.Series ? $"plagáty sérií: {details.SeasonPosters.Count}" : null,
+            }.OfType<string>());
+        }
+    }
+
     public AsyncRelayCommand ProcessCommand { get; }
 
     public RelayCommand OpenPosterFolderCommand { get; }
@@ -365,7 +408,10 @@ public sealed class PosterPageViewModel : ObservableObject
         try
         {
             OfferStatus = "Čítam plagáty z TMDB…";
-            var posters = await tmdb.PostersAsync(details.Kind, details.Id, details.OriginalLanguage, cancellationToken);
+            var pictures = await tmdb.PicturesAsync(details.Kind, details.Id, details.OriginalLanguage, cancellationToken);
+            _pictures = pictures;
+            OnPropertyChanged(nameof(ExtrasText));
+            var posters = pictures.Posters;
             var looks = new Dictionary<string, PictureLook>(StringComparer.Ordinal);
             if (_services.Posters is { } cache)
             {
@@ -489,20 +535,24 @@ public sealed class PosterPageViewModel : ObservableObject
             var places = new PosterPlaces(library, _services.InputDirectory);
             if (!Merge)
             {
-                Result = Done(PosterPlaces.Save(places.PosterFolder(title), jpeg), places.PosterFolder(title), size);
+                var folder = places.PosterFolder(title);
+                var done = Done(PosterPlaces.Save(folder, jpeg), folder, size);
+                Result = done + await ExtrasAsync(folder, details, processed: false);
                 return;
             }
 
             if (places.LibraryFolder(title, details.Id) is { } processed)
             {
-                Result = Done(PosterPlaces.Save(processed, jpeg), processed, size);
+                var done = Done(PosterPlaces.Save(processed, jpeg), processed, size);
+                Result = done + await ExtrasAsync(processed, details, processed: true);
                 return;
             }
 
             Result = "Hľadám film alebo seriál na vstupe…";
             if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
             {
-                _services.WaitingPosters.Add(title, details.Id, jpeg);
+                var extras = Extras ? await MainFolderExtrasAsync(details) : new Dictionary<string, byte[]>();
+                _services.WaitingPosters.Add(title, details.Id, jpeg, extras);
                 Result = $"{(details.Kind == MediaKind.Movie ? "Film" : "Seriál")} je na vstupe ({Path.GetFileName(input)}), ešte nie je spracovaný – plagát čaká. " +
                          $"Keď ho UNIVERSUM spracuje, dá {PosterPlaces.FileName} do jeho priečinka v {(details.Kind == MediaKind.Movie ? LibraryNames.MoviesFolder : LibraryNames.ShowsFolder)}.";
                 return;
@@ -519,6 +569,129 @@ public sealed class PosterPageViewModel : ObservableObject
         {
             _busy = false;
             Refresh();
+        }
+    }
+
+    // the other pictures of TMDB into the folder of the title (and the episode stills beside the episodes); what was done in words
+    private async Task<string> ExtrasAsync(string folder, TmdbDetails details, bool processed)
+    {
+        if (!Extras)
+        {
+            return "";
+        }
+
+        var written = new List<string>();
+        var problems = new List<string>();
+        foreach (var (name, bytes) in await MainFolderExtrasAsync(details))
+        {
+            var saved = PosterPlaces.Save(folder, bytes, name);
+            if (saved.Done)
+            {
+                written.Add(saved.KeptAs is { } kept ? $"{name} (pôvodný premenovaný na {kept})" : name);
+            }
+            else if (saved.Problem is { } problem)
+            {
+                problems.Add(problem);
+            }
+        }
+
+        var episodes = details.Kind == MediaKind.Series && ExtraEpisodes ? await EpisodeStillsAsync(folder, details, processed) : 0;
+        return (written.Count > 0 ? " Ďalšie obrázky: " + string.Join(", ", written) + "." : "") +
+               (episodes > 0 ? $" Obrázky epizód: {episodes}." : "") +
+               (problems.Count > 0 ? " " + string.Join(" ", problems) : "");
+    }
+
+    // fanart.jpg, clearlogo.png and the season posters, as they go into the main folder of the title
+    private async Task<Dictionary<string, byte[]>> MainFolderExtrasAsync(TmdbDetails details)
+    {
+        var extras = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        if (_pictures is not { } pictures || _services.Posters is not { } cache)
+        {
+            return extras;
+        }
+
+        async Task<byte[]?> Original(string path) =>
+            await cache.GetAsync(path, PosterSize.Original) is { } file ? await File.ReadAllBytesAsync(file) : null;
+
+        if (ExtraBackdrop && PosterChoice.BestBackdrop(pictures.Backdrops) is { } backdrop && await Original(backdrop.Path) is { } background)
+        {
+            Result = "Sťahujem pozadie…";
+            extras["fanart.jpg"] = PictureTools.ToJpeg(background, 1080, Quality);
+        }
+
+        if (ExtraLogo && PosterChoice.BestLogo(pictures.Logos, details.OriginalLanguage) is { } logo && await Original(logo.Path) is { Length: > 8 } png &&
+            png[0] == 0x89 && png[1] == 0x50)
+        {
+            extras["clearlogo.png"] = png;
+        }
+
+        if (details.Kind == MediaKind.Series && ExtraSeasons)
+        {
+            foreach (var season in details.SeasonPosters)
+            {
+                Result = $"Sťahujem plagát {season.Number}. série…";
+                if (await Original(season.PosterPath) is { } poster)
+                {
+                    extras[$"season{season.Number:00}-poster.jpg"] = PictureTools.ToJpeg(poster, Height.Value, Quality);
+                }
+            }
+        }
+
+        return extras;
+    }
+
+    // the stills of the episodes: beside the episodes processed ("<episode>-thumb.jpg" in their season folders); in POSTER
+    // in season folders named as in TVSHOWS ("S01E02-thumb.jpg"); how many were written
+    private async Task<int> EpisodeStillsAsync(string folder, TmdbDetails details, bool processed)
+    {
+        if (_services.TitleDetails is not { } tmdb || _services.Posters is not { } cache)
+        {
+            return 0;
+        }
+
+        var count = 0;
+        var seasons = details.Seasons is { } total ? Enumerable.Range(1, total) : details.SeasonPosters.Select(s => s.Number);
+        foreach (var season in seasons)
+        {
+            var seasonFolder = Path.Combine(folder, LibraryNames.SeasonFolder(season));
+            var episodes = processed
+                ? (Directory.Exists(seasonFolder) ? Directory.EnumerateFiles(seasonFolder, "*.mkv").Select(f => (File: f, Number: EpisodeNumber.TryParse(Path.GetFileName(f)))).Where(e => e.Number?.Season == season).ToList() : [])
+                : null;
+            if (processed && episodes!.Count == 0)
+            {
+                continue;
+            }
+
+            var stills = await tmdb.StillsAsync(details.Id, season);
+            foreach (var still in stills)
+            {
+                var name = processed
+                    ? episodes!.FirstOrDefault(e => e.Number is { } n && (n.Episode == still.Episode || (n.Episode <= still.Episode && n.LastEpisode >= still.Episode))).File is { } file
+                        ? Path.GetFileNameWithoutExtension(file) + "-thumb.jpg" : null
+                    : $"S{season:00}E{still.Episode:00}-thumb.jpg";
+                if (name is null)
+                {
+                    continue;
+                }
+
+                Result = $"Sťahujem obrázky epizód ({++count})…";
+                if (await cache.GetAsync(still.Path, PosterSize.Original) is { } source)
+                {
+                    PosterPlaces.Save(seasonFolder, PictureTools.ToJpeg(await File.ReadAllBytesAsync(source), 1080, Quality), name);
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private void Store(bool value, bool current, Action<bool> set, [System.Runtime.CompilerServices.CallerMemberName] string? name = null)
+    {
+        if (value != current)
+        {
+            set(value);
+            _services.Settings.Save();
+            OnPropertyChanged(name);
         }
     }
 

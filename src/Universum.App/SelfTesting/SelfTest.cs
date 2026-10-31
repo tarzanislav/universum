@@ -1991,7 +1991,7 @@ internal static class SelfTest
         }
 
         Show(window, "Text z obrázkov (OCR)");
-        _ = page.ReadTextCommand.ExecuteAsync(null);
+        var readingText = page.ReadTextCommand.ExecuteAsync(null);
         var asked = 0;
         for (var i = 0; i < 600 && (page.ReadTextCommand.IsRunning || page.IsAsking); i++)
         {
@@ -2018,15 +2018,16 @@ internal static class SelfTest
 
         var srt = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.sk.srt");
         await WaitFor(() => page.Rows.Any(r => r.ExternalPath == srt));
+        Check(readingText.IsCompletedSuccessfully, $"OCR: the reading finished – {readingText.Status} {readingText.Exception?.GetBaseException()}".Replace('\n', ' ').Replace('\r', ' '));
         if (asked == 0)
         {
             // what the reading took the square for: the shapes of the third subtitle and their nearest letters
             var shapes = new Core.Subtitles.Ocr.SubtitleOcr(await OcrFonts.TemplatesAsync(), null, "sk")
                 .Read(Core.Subtitles.Ocr.OcrPicture.Of(Core.Subtitles.Pictures.PgsReader.Read(supBytes)));
-            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && c.Shape.Pixels > 20))
+            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && c.Shape.Pixels > 20 && Math.Abs(c.Shape.Aspect - 1) < 0.25f).Take(3))
             {
-                Write($"info  OCR shape {shape.Text} {shape.Distance:0.000} {shape.Sample.Width}x{shape.Sample.Height}: " +
-                      string.Join(", ", shape.Candidates.Select(c => $"{c.Text} {c.Distance:0.000}")));
+                Check(false, $"OCR diagnostics: shape {shape.Text} {shape.Distance:0.000} {shape.Sample.Width}x{shape.Sample.Height}: " +
+                             string.Join(", ", shape.Candidates.Select(c => $"{c.Text} {c.Distance:0.000}")));
             }
         }
 

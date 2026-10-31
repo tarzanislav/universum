@@ -956,7 +956,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         }
 
         var audio = file.TracksOf(TrackType.Audio).ToList();
-        var ordinal = Math.Max(0, audio.FindIndex(t => t.Flags.Default));
+        var listed = Math.Max(0, audio.FindIndex(t => t.Flags.Default));
+        var ordinal = await _services.AudioOrdinalAsync(file.Path, audio[listed], listed, cancellationToken);
         var info = new FileInfo(file.Path);
         var key = $"{file.Path}|{(info.Exists ? info.Length : 0)}|{(info.Exists ? info.LastWriteTimeUtc.Ticks : 0)}|{ordinal}";
         if (_speech is { } known && known.Key == key)

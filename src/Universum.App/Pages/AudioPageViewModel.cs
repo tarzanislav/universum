@@ -292,7 +292,7 @@ public sealed class AudioPageViewModel : ObservableObject
             var ordinal = 0;
             foreach (var track in _file.TracksOf(TrackType.Audio))
             {
-                Rows.Add(new AudioRow(track, ordinal++, null, Changed));
+                Rows.Add(new AudioRow(track, await _services.AudioOrdinalAsync(path, track, ordinal++), null, Changed));
             }
 
             Reference = Rows.FirstOrDefault(r => r.Track.Flags.Default) ?? Rows.FirstOrDefault();
@@ -569,7 +569,7 @@ public sealed class AudioPageViewModel : ObservableObject
                         var row = new AudioRow(track with
                         {
                             Id = _nextId++, ExternalFile = path, ExternalTrack = track.Id, Flags = track.Flags with { Default = false }, CodecId = AudioRecipe.CodecIdOf(track),
-                        }, ordinal++, path, Changed);
+                        }, await _services.AudioOrdinalAsync(path, track, ordinal++), path, Changed);
                         Rows.Add(row);
                         SelectedRow = row;
                         added++;

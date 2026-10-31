@@ -457,43 +457,17 @@ public sealed class AudioPageViewModel : ObservableObject
         _busy = true;
         using var work = _work = new CancellationTokenSource();
         RefreshCommands();
-        var folder = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "zvuk-" + Guid.NewGuid().ToString("N"));
         try
         {
-            Directory.CreateDirectory(folder);
-            // the sounds as they are now (the page cannot change them while it writes)
+            // the sounds as they are now (the page cannot change them while it writes); a sound written anew is written by
+            // the processor right before mkvmerge (as in Hromadné spracovanie)
             var rows = Rows.ToList();
-            var written = rows.ToDictionary(r => r, r => r.Track);
-            var encoded = rows.Where(r => r is { Include: true, Recipe.NeedsEncoding: true }).ToList();
-            var ffmpeg = encoded.Count == 0 ? "" : (await _services.SpeechAsync()).Ffmpeg;
-            for (var i = 0; i < encoded.Count; i++)
-            {
-                var row = encoded[i];
-                var output = Path.Combine(folder, $"{i + 1:00}.mka");
-                var at = i;
-                Result = $"Zapisujem zvuk {row.Source} ({i + 1} z {encoded.Count})…";
-                var progress = new Progress<double>(share => Progress = (at + share) / (encoded.Count + 1));
-                var problem = await AudioEncoder.EncodeAsync(_services.Runner, ffmpeg, row.ExternalPath ?? file.Path, row.Ordinal, row.Track, row.Recipe, output,
-                    file.Duration, progress, work.Token);
-                if (problem is not null)
-                {
-                    Result = $"Zvuk {row.Source} sa nepodarilo zapísať – nič sa nezapísalo. {problem}";
-                    return;
-                }
-
-                var (codec, _) = row.Recipe.Encoder(row.Track);
-                written[row] = row.Track with
-                {
-                    Id = row.IsExternal ? row.Track.Id : _nextId++, ExternalFile = output, ExternalTrack = 0, Codec = codec ?? row.Track.Codec,
-                    CodecId = row.Recipe.WrittenCodecId(row.Track),
-                    AudioChannels = row.Stereo ? 2 : row.Track.AudioChannels, Number = null, Uid = null, StatisticsFrames = null, StatisticsBytes = null,
-                };
-            }
-
-            Result = "Zapisujem nový súbor…";
-            Progress = encoded.Count / (encoded.Count + 1.0);
+            var written = rows.ToDictionary(r => r, r => r.Include && r.Recipe.NeedsEncoding
+                ? new SoundEncoding(r.ExternalPath ?? file.Path, r.Ordinal, r.Track, r.Recipe).ToTrack(r.IsExternal ? r.Track.Id : _nextId++)
+                : r.Track);
+            Result = rows.Any(r => r is { Include: true, Recipe.NeedsEncoding: true }) ? "Zapisujem zvuk znova a potom nový súbor…" : "Zapisujem nový súbor…";
             var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(Build(file, written, rows)), placement, new OutputOptions(OriginalHandling.Keep),
-                cancellationToken: work.Token);
+                new Progress<double>(share => Progress = share), work.Token);
             Progress = 1;
             Result = result.Status switch
             {
@@ -512,15 +486,6 @@ public sealed class AudioPageViewModel : ObservableObject
         }
         finally
         {
-            try
-            {
-                Directory.Delete(folder, recursive: true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // a temporary folder left behind is harmless
-            }
-
             _work = null;
             _busy = false;
             RefreshCommands();

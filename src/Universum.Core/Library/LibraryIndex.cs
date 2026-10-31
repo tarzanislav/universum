@@ -69,7 +69,14 @@ public sealed class LibraryIndex
                 text.Append("|sync:").Append(timing.MkvMergeValue);
             }
 
-            if (track.Source.ExternalFile is { } external)
+            if (track.Source.Encode is { } encode)
+            {
+                // a sound written anew: by its source (the file as it is now) and how it is written – not read whole
+                var info = new FileInfo(encode.Path);
+                text.Append(CultureInfo.InvariantCulture, $"|encode:{Path.GetFullPath(encode.Path)}/{(info.Exists ? info.Length : -1)}/{(info.Exists ? info.LastWriteTimeUtc.Ticks : 0)}/{encode.Ordinal}/")
+                    .Append(System.Text.Json.JsonSerializer.Serialize(encode.Recipe));
+            }
+            else if (track.Source.ExternalFile is { } external)
             {
                 text.Append("|file:").Append(ContentHash(external));
             }

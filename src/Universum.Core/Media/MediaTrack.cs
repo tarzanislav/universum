@@ -77,4 +77,10 @@ public sealed record MediaTrack
 
     /// <summary>The track's ID in <see cref="ExternalFile"/> (mkvmerge's; 0 for a file of one track – a subtitle file, a sound).</summary>
     public int ExternalTrack { get; init; }
+
+    /// <summary>
+    /// A sound written anew (Úprava audiostopy: a change of speed, codec, channels, loudness) from a track of
+    /// <see cref="ExternalFile"/> – the video itself or another file; it is written right before mkvmerge reads it.
+    /// </summary>
+    public Audio.SoundEncoding? Encode { get; init; }
 }

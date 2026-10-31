@@ -34,6 +34,9 @@ public sealed class FileProcessor(
     /// <summary>The library index the processor records its results in (null without one).</summary>
     public LibraryIndex? Index => index;
 
+    /// <summary>Finds FFmpeg when a sound is to be written anew (<see cref="MediaTrack.Encode"/>); null: such a plan fails.</summary>
+    public Func<CancellationToken, Task<string>>? FindFfmpeg { get; init; }
+
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
     /// (MEGA spracovanie keeps it with a batch).
@@ -584,6 +587,42 @@ public sealed class FileProcessor(
         return Result(plan, ProcessingStatus.Done, final, null, messages);
     }
 
+    // the sounds of the target written anew by FFmpeg (the first half of the work), by track ID
+    private async Task<(IReadOnlyDictionary<int, string> Encoded, string? Problem)> EncodeAsync(TargetState target, string folder, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var tracks = target.Tracks.Where(t => t.IsAdded && t.Source.Encode is not null).ToList();
+        var encoded = new Dictionary<int, string>();
+        if (tracks.Count == 0)
+        {
+            return (encoded, null);
+        }
+
+        if (FindFfmpeg is null)
+        {
+            return (encoded, "a sound is to be written anew, but FFmpeg is not available");
+        }
+
+        var ffmpeg = await FindFfmpeg(cancellationToken).ConfigureAwait(false);
+        Directory.CreateDirectory(folder);
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            var encoding = tracks[i].Source.Encode!;
+            var output = Path.Combine(folder, $"zvuk-{i + 1:00}.mka");
+            var at = i;
+            var part = progress is null ? null : new Progress<double>(p => progress.Report((at + p) / tracks.Count * 0.5));
+            var problem = await Audio.AudioEncoder.EncodeAsync(runner, ffmpeg, encoding.Path, encoding.Ordinal, encoding.Source, encoding.Recipe, output,
+                target.Source.Duration, part, cancellationToken).ConfigureAwait(false);
+            if (problem is not null)
+            {
+                return (encoded, $"the sound {encoding.Ordinal + 1} of {Path.GetFileName(encoding.Path)} cannot be written anew: {problem}");
+            }
+
+            encoded[tracks[i].TrackId] = output;
+        }
+
+        return (encoded, null);
+    }
+
     /// <summary>Writes and verifies the result as <paramref name="temporary"/>; returns the problems (empty = success).</summary>
     private async Task<IReadOnlyList<string>> WriteTemporaryAsync(EditPlan plan, string temporary, IProgress<double>? progress, CancellationToken cancellationToken)
     {
@@ -603,7 +642,16 @@ public sealed class FileProcessor(
                     return [problem];
                 }
 
-                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs), progress, cancellationToken);
+                // sounds written anew (Úprava audiostopy) first, each into its own file; mkvmerge then takes them
+                var (encoded, encodingProblem) = await EncodeAsync(plan.Target, folder, progress, cancellationToken).ConfigureAwait(false);
+                if (encodingProblem is not null)
+                {
+                    return [encodingProblem];
+                }
+
+                var share = encoded.Count == 0 ? 0 : 0.5;
+                result = await RunAsync(MkvToolNixTool.MkvMerge, MkvToolNixArguments.Remux(plan.Target, source, temporary, chapters.Path, inputs, encoded),
+                    progress is null || share == 0 ? progress : new Progress<double>(p => progress.Report(share + ((1 - share) * p))), cancellationToken);
             }
             finally
             {

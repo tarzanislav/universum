@@ -121,7 +121,12 @@ public sealed class AppServices
     /// (owner, 30. 10. 2026); every other tool keeps them.
     /// </param>
     public FileProcessor Processor(MkvToolNixInstallation installation, bool deleteOriginals = false) =>
-        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex) { DeleteOriginalsAllowed = deleteOriginals };
+        new(installation, Runner, new WindowsRecycleBin(), AppSettings.JournalDirectory, LibraryIndex)
+        {
+            DeleteOriginalsAllowed = deleteOriginals,
+            // a sound written anew (Úprava audiostopy, also in Hromadné spracovanie and MEGA): FFmpeg of the installation
+            FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
+        };
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private TmdbClient? _tmdb;

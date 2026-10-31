@@ -824,7 +824,10 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
             var (target, _) = Build(_file, written);
             Result = "Zapisujem nový súbor…";
-            var result = await _services.Processor(installation).ProcessAsync(EditPlan.For(target), placement, new OutputOptions(OriginalHandling.Keep));
+            var plan = EditPlan.For(target);
+            var started = DateTime.UtcNow;
+            var result = await _services.Processor(installation).ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep));
+            _services.LogProcessing("Úprava titulkostopy", plan, result, started);
             Result = result.Status switch
             {
                 ProcessingStatus.Done => $"Uložené do knižnice: {result.OutputPath}. Originál ostal nezmenený.",

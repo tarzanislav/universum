@@ -456,7 +456,9 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         {
             var plan = EditPlan.For(target);
             var processor = _services.Processor(installation);
+            var started = DateTime.UtcNow;
             var result = await processor.ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep), new Progress<double>(p => Progress = p));
+            _services.LogProcessing("Úprava hlavičky", plan, result, started);
             _services.Inspector(installation).Invalidate(target.Source.Path);
             _undoRecord = result.UndoRecordPath;
             Result = result.Status switch

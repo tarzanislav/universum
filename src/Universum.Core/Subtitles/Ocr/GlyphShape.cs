@@ -29,9 +29,13 @@ public readonly record struct GlyphShape(
                    BitOperations.PopCount(a.Body2 & ~b.Near2) + BitOperations.PopCount(a.Body3 & ~b.Near3) +
                    BitOperations.PopCount(b.Body0 & ~a.Near0) + BitOperations.PopCount(b.Body1 & ~a.Near1) +
                    BitOperations.PopCount(b.Body2 & ~a.Near2) + BitOperations.PopCount(b.Body3 & ~a.Near3);
-        var ink = Math.Max(1, Count(a) + Count(b));
+        var (countA, countB) = (Count(a), Count(b));
+        var ink = Math.Max(1, countA + countB);
         var trust = MathF.Min(1, MathF.Max(0.35f, MathF.Min(a.Pixels, b.Pixels) / 16));
-        var body = trust * ((0.25f * exact / 256f) + (0.9f * away / ink));
+
+        // a full box (a blot, a bar, a dot) is no bold letter, though the letter's strokes are near the blot everywhere
+        var fill = Math.Max(countA, countB) >= 220 ? MathF.Abs(countA - countB) / 256f : 0;
+        var body = trust * ((0.25f * exact / 256f) + (0.9f * away / ink) + (0.5f * fill));
         var proportions = MathF.Min(1, MathF.Abs(MathF.Log(a.Aspect / b.Aspect)));
         var place = MathF.Abs(a.Top - b.Top) + MathF.Abs(a.Bottom - b.Bottom);
         return body + (0.35f * proportions) + (0.8f * place) + MarkDistance(a, b);

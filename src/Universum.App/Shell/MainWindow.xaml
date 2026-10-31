@@ -1280,13 +1280,38 @@
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
                                     <StackPanel>
                                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                                   Text="Obrázkové titulky (PGS z Blu-ray) vybranej stopy UNIVERSUM prečíta vlastným rozpoznávaním textu: písmená porovná s písmami Windows, a tvary, ktoré nepozná, sa opýta – raz za film, zapamätá si ich aj pre ďalšie filmy. Text sa uloží vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor, originál ostane) a pridá sa ako nová titulková stopa. VobSub (DVD) zatiaľ nie." />
+                                                   Text="Obrázkové titulky (PGS z Blu-ray) vybranej stopy UNIVERSUM prečíta vlastným rozpoznávaním textu: písmená porovná s písmami Windows, pochybné slová opraví podľa jazyka a tvary, ktoré nepozná, sa opýta – raz za film, zapamätá si ich aj pre ďalšie filmy. Text sa uloží vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor, originál ostane) a pridá sa ako nová titulková stopa; časy sú pôvodné časy obrázkov. VobSub (DVD) zatiaľ nie." />
                                         <WrapPanel Margin="0,6,0,0">
                                             <Button Content="Rozpoznať text" Command="{Binding ReadTextCommand}" Padding="12,3" Margin="0,0,8,0"
                                                     ToolTip="Vyberte v zozname stopu s obrázkovými titulkami (PGS) – stopu videa alebo súbor .sup" />
-                                            <Button Content="Zastaviť" Command="{Binding StopReadingTextCommand}" Padding="12,3" />
+                                            <Button Content="Zastaviť" Command="{Binding StopReadingTextCommand}" Padding="12,3" Margin="0,0,16,0" />
+                                            <CheckBox Content="Opraviť text podľa jazyka" IsChecked="{Binding OcrCheckText}" VerticalAlignment="Center" Margin="0,0,16,0"
+                                                      ToolTip="Slová, ktorými si čítanie nebolo isté, opraví podľa slovníka z vašich titulkov a slov, ktoré vo filme prečítalo isto; každú opravu môžete vrátiť" />
+                                            <Button Content="Naučiť slovník z titulkov…" Command="{Binding LearnLexiconCommand}" Padding="12,3"
+                                                    ToolTip="Vyberte priečinok s vašimi textovými titulkami (SRT, ASS, VTT, SUB), napr. knižnicu – UNIVERSUM si z nich zapamätá slová každého jazyka (len v tomto počítači, každý súbor raz)" />
                                         </WrapPanel>
+                                        <TextBlock Text="{Binding LexiconSummary}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         <TextBlock Text="{Binding OcrStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                        <StackPanel Visibility="{Binding HasOcrCorrections, Converter={StaticResource BoolToVisibility}}" Margin="0,6,0,0">
+                                            <TextBlock Text="Opravené podľa jazyka (Vrátiť dá späť slovo, ako sa prečítalo – v novej stope, ako zmena v Časoch titulkov):" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <ItemsControl ItemsSource="{Binding OcrCorrections}" MaxHeight="180" Margin="0,4,0,0">
+                                                <ItemsControl.Template>
+                                                    <ControlTemplate>
+                                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                            <ItemsPresenter />
+                                                        </ScrollViewer>
+                                                    </ControlTemplate>
+                                                </ItemsControl.Template>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <DockPanel Margin="0,1">
+                                                            <Button DockPanel.Dock="Left" Content="Vrátiť" Padding="8,1" Margin="0,0,8,0" Command="{Binding RevertCommand}" CommandParameter="{Binding}" />
+                                                            <TextBlock Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        </DockPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                         <Border Visibility="{Binding IsAsking, Converter={StaticResource BoolToVisibility}}" BorderBrush="#C8C8C8" BorderThickness="1"
                                                 CornerRadius="4" Padding="10" Margin="0,8,0,0">
                                             <StackPanel>

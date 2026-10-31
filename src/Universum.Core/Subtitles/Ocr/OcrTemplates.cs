@@ -80,18 +80,23 @@ public sealed class OcrTemplates
     /// <summary>The nearest template and the nearest one of another text, each with its distance.</summary>
     public (OcrTemplate Best, float Distance, (OcrTemplate Template, float Distance) Second, bool Found) NearestTwo(in GlyphShape shape)
     {
-        var cap = shape.CapPixels();
-        var near = cap > 0 ? NearestTwo(shape, cap / 1.7f) : default;
-        return near.Found ? near : NearestTwo(shape, 0);
+        var ranked = Ranked(shape, 2);
+        return ranked.Count == 0 ? (default, float.MaxValue, (default, float.MaxValue), false)
+            : (ranked[0].Template, ranked[0].Distance, ranked.Count > 1 ? ranked[1] : (default, float.MaxValue), true);
     }
 
-    // among the templates drawn with a height of capitals of at least `low` pixels
-    private (OcrTemplate Best, float Distance, (OcrTemplate Template, float Distance) Second, bool Found) NearestTwo(in GlyphShape shape, float low)
+    /// <summary>The nearest templates of different texts – at most <paramref name="count"/>, the nearest first.</summary>
+    public IReadOnlyList<(OcrTemplate Template, float Distance)> Ranked(in GlyphShape shape, int count)
     {
-        var best = -1;
-        var second = -1;
-        var bestDistance = float.MaxValue;
-        var secondDistance = float.MaxValue;
+        var cap = shape.CapPixels();
+        var near = cap > 0 ? Ranked(shape, count, cap / 1.7f) : [];
+        return near.Count > 0 ? near : Ranked(shape, count, 0);
+    }
+
+    // among the templates drawn with a height of capitals of at least `low` pixels: the best of each text, kept in order
+    private List<(OcrTemplate Template, float Distance)> Ranked(in GlyphShape shape, int count, float low)
+    {
+        var ranked = new List<(OcrTemplate Template, float Distance)>(count + 1);
         for (var i = 0; i < _templates.Length; i++)
         {
             if (_caps[i] > 0 && _caps[i] < low)
@@ -100,23 +105,45 @@ public sealed class OcrTemplates
             }
 
             var distance = GlyphShape.Distance(shape, _templates[i].Shape);
-            if (distance < bestDistance)
+            if (ranked.Count == count && distance >= ranked[^1].Distance)
             {
-                if (best >= 0 && _templates[best].Text != _templates[i].Text)
+                continue;
+            }
+
+            var text = _templates[i].Text;
+            var same = -1;
+            for (var r = 0; r < ranked.Count; r++)
+            {
+                if (ranked[r].Template.Text == text)
                 {
-                    (second, secondDistance) = (best, bestDistance);
+                    same = r;
+                    break;
+                }
+            }
+
+            if (same >= 0)
+            {
+                if (distance >= ranked[same].Distance)
+                {
+                    continue;
                 }
 
-                (best, bestDistance) = (i, distance);
+                ranked.RemoveAt(same);
             }
-            else if (distance < secondDistance && _templates[best].Text != _templates[i].Text)
+
+            var at = ranked.Count;
+            while (at > 0 && ranked[at - 1].Distance > distance)
             {
-                (second, secondDistance) = (i, distance);
+                at--;
+            }
+
+            ranked.Insert(at, (_templates[i], distance));
+            if (ranked.Count > count)
+            {
+                ranked.RemoveAt(count);
             }
         }
 
-        return best < 0
-            ? (default, float.MaxValue, (default, float.MaxValue), false)
-            : (_templates[best], bestDistance, (second < 0 ? default : _templates[second], secondDistance), true);
+        return ranked;
     }
 }

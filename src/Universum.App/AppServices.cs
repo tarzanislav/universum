@@ -876,6 +876,9 @@ public sealed class AppSettings
     /// <summary>A sound when the queue (Hromadné spracovanie too) has done all its jobs (owner, 29. 10. 2026).</summary>
     public bool FinishSound { get; set; } = true;
 
+    /// <summary>Text z obrázkov (OCR): the text read is checked by the language and mended (owner, 31. 10. 2026).</summary>
+    public bool OcrCheckText { get; set; } = true;
+
     public DateTime? LastUpdateCheckUtc { get; set; }
 
     /// <summary>"Skip this version" (MKVToolNix, UNIVERSUM).</summary>

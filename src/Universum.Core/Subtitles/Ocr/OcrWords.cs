@@ -10,7 +10,8 @@ namespace Universum.Core.Subtitles.Ocr;
 /// </summary>
 public static partial class OcrWords
 {
-    private const string SameShape = "CJKOPSUVWXYZČŠŽÓÔÚÝŮŤ";
+    /// <summary>Capitals whose small letter has the same shape (only the size tells them apart).</summary>
+    internal const string SameShape = "CJKOPSUVWXYZČŠŽÓÔÚÝŮŤ";
 
     public static string Mend(string line, string? language)
     {
@@ -36,6 +37,24 @@ public static partial class OcrWords
 
     [System.Text.RegularExpressions.GeneratedRegex(@" ([.,!?:;)])(?=\s|$|[.,!?:;)“\""])", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
     private static partial System.Text.RegularExpressions.Regex Punctuation();
+
+    /// <summary>The text with the first <paramref name="word"/> standing as a whole word replaced; null when it is not there.</summary>
+    public static string? ReplaceWord(string text, string word, string replacement)
+    {
+        for (var at = text.IndexOf(word, StringComparison.Ordinal); at >= 0 && word.Length > 0; at = text.IndexOf(word, at + 1, StringComparison.Ordinal))
+        {
+            var end = at + word.Length;
+            if ((at == 0 || !char.IsLetter(text[at - 1])) && (end == text.Length || !char.IsLetter(text[end])))
+            {
+                return text[..at] + replacement + text[end..];
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>One word mended by its context (numbers, I/l, case, the carons of ď ť ľ Ľ).</summary>
+    internal static string MendWord(string word, bool slavic) => Word(word, slavic);
 
     private static string Word(string word, bool slavic)
     {

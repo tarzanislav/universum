@@ -1960,8 +1960,15 @@ internal static class SelfTest
     // the video as a new SRT and added as a track, the .sup stays as it was
     private static async Task TestReadingTextAsync(SubtitlesPageViewModel page, MainWindow window, string folder)
     {
+        // anew each run: no result of an earlier run, no shape told before
         var reading = Path.Combine(folder, "citanie");
+        if (Directory.Exists(reading))
+        {
+            Directory.Delete(reading, recursive: true);
+        }
+
         Directory.CreateDirectory(reading);
+        File.Delete(SubtitlesPageViewModel.OcrMemoryFile);
         var video = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.mkv");
         File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
         string[] lines = ["Vymyslený titulok číslo jeden.", "Žltý kôň úpel ďábelské ódy!", "■ Ľudia ťahajú kapra ■"];
@@ -2011,6 +2018,18 @@ internal static class SelfTest
 
         var srt = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.sk.srt");
         await WaitFor(() => page.Rows.Any(r => r.ExternalPath == srt));
+        if (asked == 0)
+        {
+            // what the reading took the square for: the shapes of the third subtitle and their nearest letters
+            var shapes = new Core.Subtitles.Ocr.SubtitleOcr(await OcrFonts.TemplatesAsync(), null, "sk")
+                .Read(Core.Subtitles.Ocr.OcrPicture.Of(Core.Subtitles.Pictures.PgsReader.Read(supBytes)));
+            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && c.Shape.Pixels > 20))
+            {
+                Write($"info  OCR shape {shape.Text} {shape.Distance:0.000} {shape.Sample.Width}x{shape.Sample.Height}: " +
+                      string.Join(", ", shape.Candidates.Select(c => $"{c.Text} {c.Distance:0.000}")));
+            }
+        }
+
         var read = page.Rows.FirstOrDefault(r => r.ExternalPath == srt)?.Document?.Cues.Select(c => c.Text).ToList() ?? [];
         Check(read.SequenceEqual(lines), $"OCR: the text read and added as a new track ({asked} shape(s) asked) – {string.Join(" | ", read)} | {page.OcrStatus}");
         Check(asked >= 1 && File.Exists(SubtitlesPageViewModel.OcrMemoryFile), "OCR: the unknown shape asked and kept for other films");

@@ -506,6 +506,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             if (row == _ocrRow)
             {
                 ForgetReading();
+                OcrStatus = "";
             }
 
             Rows.Remove(row);
@@ -539,6 +540,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         ShowPreview(null, []);
         _pictures.Clear();
         ForgetReading();
+        OcrCorrections.Clear();
+        OcrStatus = "";
         _reading.Clear();
         _readingStop.Cancel();
         _readingStop.Dispose();

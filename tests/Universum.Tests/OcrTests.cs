@@ -20,6 +20,8 @@ public sealed class OcrTests
         Assert.Equal("„Áno,“ povedal.", OcrWords.Mend(",,Áno,'' povedal.", "cs"), "Czech quotation marks");
         Assert.Equal("didn't it'd", OcrWords.Mend("didn't it'd", "en"), "English apostrophes stay");
         Assert.Equal("Ide Ivan", OcrWords.Mend("Ide Ivan", "sk"), "a capital I at the start of a word stays");
+        Assert.Equal("<i>Ľudia ťahajú, ťahali</i>", OcrWords.ReplaceWord("<i>Ľudia tahajú, ťahali</i>", "tahajú", "ťahajú"), "a whole word put back");
+        Assert.True(OcrWords.ReplaceWord("ťahajúci", "ťahajú", "x") is null, "not a part of a longer word");
     }
 
     [Test]
@@ -94,6 +96,61 @@ public sealed class OcrTests
             var (letters, known) = run.Coverage;
             Assert.True(read.SequenceEqual(lines), $"read back ({known}/{letters} letters, {run.Clusters.Count} shapes, {took.TotalMilliseconds:0} ms): {string.Join(" | ", read)}");
             Assert.True(took < TimeSpan.FromSeconds(5), "quick");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Test]
+    public void LexiconKnowsWordsAndTheirLetters()
+    {
+        var lexicon = new OcrLexicon();
+        lexicon.Learn("<i>Vymyslený</i> kôň ťahá voz, kôň spí.\nĽudia sa pozerajú.");
+        Assert.True(lexicon.Frequency("Kôň") == 2 && lexicon.Frequency("ľudia") == 1 && lexicon.Frequency("i") == 0 && lexicon.Count == 8, "words counted, tags left out");
+        Assert.True(lexicon.Likeness("kôň") > lexicon.Likeness("ňkô") + 1, $"usual letters more likely: {lexicon.Likeness("kôň"):0.00} / {lexicon.Likeness("ňkô"):0.00}");
+        var folder = Directory.CreateTempSubdirectory("universum-ocr-").FullName;
+        try
+        {
+            var file = Path.Combine(folder, "slovnik.json");
+            lexicon.Save(file);
+            var again = OcrLexicon.Load(file);
+            Assert.True(again.Count == 8 && again.Frequency("kôň") == 2 && Math.Abs(again.Likeness("ťahá") - lexicon.Likeness("ťahá")) < 1e-9, "kept in a file");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task CapitalsWithAccentsAndShortLinesAreRead()
+    {
+        if (Tools() is not { } tools)
+        {
+            Assert.Skip("FFmpeg with drawtext and the DejaVu font are not here");
+            return;
+        }
+
+        var (ffmpeg, font) = tools;
+        var folder = Directory.CreateTempSubdirectory("universum-ocr-").FullName;
+        try
+        {
+            var templates = OcrTemplates.From(await DrawAlphabetAsync(ffmpeg, font, folder));
+
+            // a few letters, an accented capital the tallest of them: its accent is not the height of capitals
+            string[] lines = ["Čo je to?", "Áno.", "Žiadny.", "Vymyslený titulok číslo dva.", "Čo tu robíte? Ústa zavrite, Úbohý Šimon."];
+            var pictures = new List<OcrPicture>();
+            for (var i = 0; i < lines.Length; i++)
+            {
+                pictures.Add(new OcrPicture(TimeSpan.FromSeconds(i), TimeSpan.FromSeconds(i + 1), await DrawSubtitleAsync(ffmpeg, font, folder, lines[i], 44)));
+            }
+
+            // a line of a dash and dots under a line of text, close: a line of its own
+            pictures.Add(new OcrPicture(TimeSpan.FromSeconds(9), TimeSpan.FromSeconds(10), await DrawLinesAsync(ffmpeg, font, folder, ["- Kto je tam?", "- ..."], 44, 1.09)));
+            var read = new SubtitleOcr(templates, null, "sk").Read(pictures).Document().Cues.Select(c => c.Text).ToList();
+            Assert.True(read.SequenceEqual([.. lines, "- Kto je tam?\n- …"]), "read: " + string.Join(" | ", read));
         }
         finally
         {
@@ -272,13 +329,17 @@ public sealed class OcrTests
             }
 
             var second = new SubtitleOcr(templates, null, "sk").Read(small);
-            foreach (var unknown in second.Unknown)
-            {
-                second.Teach(unknown, "?");
-            }
 
             // small italic letters are the hardest (a caron or a dot may land on the next letter): most of the text
             var smallRead = second.Document().Cues.Select(c => c.Text).ToList();
+
+            // checked by the language: the words of the user's own subtitles (an invented text) mend what the reading doubted
+            var lexicon = new OcrLexicon();
+            lexicon.Learn(InventedText);
+            second.Check(lexicon);
+            var checkedRead = second.Document().Cues.Select(c => c.Text).ToList();
+            Assert.True(checkedRead.Select(t => t.Replace("<i>", "").Replace("</i>", "")).SequenceEqual(lines),
+                $"checked by the language – {string.Join(" | ", checkedRead)} ({string.Join("; ", second.Corrections.Select(c => $"{c.Before} → {c.After} ({c.Why})"))})");
             var all = lines.Sum(l => l.Length);
             var wrong = lines.Zip(smallRead).Sum(p => Edits(p.First, p.Second.Replace("<i>", "").Replace("</i>", "")));
             Assert.True(wrong <= all / 10 && smallRead[0] == lines[0] && smallRead[2].StartsWith("<i>", StringComparison.Ordinal),
@@ -288,6 +349,29 @@ public sealed class OcrTests
         {
             Directory.Delete(folder, recursive: true);
         }
+    }
+
+    // an invented Slovak text, as the user's own subtitles would teach the lexicon
+    private const string InventedText =
+        "Vymyslený titulok číslo jeden ukáže, čo vieme. Ďalší titulok je tiež vymyslený. Ľudia ťahajú vymysleného kapra z rybníka " +
+        "a žltý kôň sa na nich pozerá. Kôň úpel, keď počul ďábelské ódy. Vymysleného kapra potom ľudia pustili späť do vody. " +
+        "Ďalší deň ťahajú siete znova. Žltý titulok sa nikomu nepáčil, ale ľudia ho čítali. Ódy sa spievajú pri ohni, kapor pláva a kôň spí.";
+
+    // lines of a subtitle drawn as a Blu-ray draws them, the baselines <paramref name="spacing"/> × size apart
+    private static async Task<InkBitmap> DrawLinesAsync(string ffmpeg, string font, string folder, string[] lines, int size, double spacing)
+    {
+        var filters = new List<string>();
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var file = Path.Combine(folder, $"r{i}.txt");
+            await File.WriteAllTextAsync(file, lines[i]);
+            var baseline = 70 + (int)Math.Round(i * spacing * size);
+            filters.Add($"drawtext=fontfile={font}:textfile={file}:fontsize={size}:fontcolor=white:borderw=3:bordercolor=black:x=20:y={baseline}-ascent");
+        }
+
+        const int width = 1100, height = 200;
+        var bgra = await DrawAsync(ffmpeg, folder, width, height, string.Join(",", filters), "bgra");
+        return InkBitmap.FromBgra(bgra, width, height, width * 4);
     }
 
     // how many letters must change to make one text the other (Levenshtein)

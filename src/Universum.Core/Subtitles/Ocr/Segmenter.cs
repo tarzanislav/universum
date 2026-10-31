@@ -18,6 +18,11 @@ public sealed class FoundGlyph(int x0, int y0, int x1, int y1, int[] parts)
     /// <summary>The labels of its pieces of ink (a letter with a dot or an accent has more).</summary>
     public int[] Parts { get; private set; } = parts;
 
+    /// <summary>The top and bottom of its body – its largest piece, without a dot or an accent.</summary>
+    public int BodyY0 { get; } = y0;
+
+    public int BodyY1 { get; } = y1;
+
     internal void Absorb(FoundGlyph other)
     {
         X0 = Math.Min(X0, other.X0);
@@ -92,15 +97,16 @@ public static class Segmenter
 
     private static float Center(Box box) => (box.Y0 + box.Y1) / 2f;
 
-    // the baseline (where most of the tall letters end) and the height of capitals (the tall letters' tops above it)
+    // the baseline (where most of the tall letters end) and the height of capitals (the tall letters' tops above it) –
+    // measured on the letters' bodies: the accent of "Č" or "Á" is above the height of capitals
     private static (float Baseline, float Cap) Metrics(List<FoundGlyph> glyphs)
     {
-        var tallest = glyphs.Max(g => g.Height);
-        var tall = glyphs.Where(g => g.Height >= tallest * 0.5f).ToList();
-        var baseline = tall.GroupBy(g => g.Y1).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key;
+        var tallest = glyphs.Max(g => g.BodyY1 - g.BodyY0);
+        var tall = glyphs.Where(g => g.BodyY1 - g.BodyY0 >= tallest * 0.5f).ToList();
+        var baseline = tall.GroupBy(g => g.BodyY1).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key;
 
         // letters on the baseline (not descenders): the 90th percentile of their heights above it
-        var heights = tall.Where(g => Math.Abs(g.Y1 - baseline) <= Math.Max(2, tallest / 10)).Select(g => (float)(baseline - g.Y0)).Order().ToList();
+        var heights = tall.Where(g => Math.Abs(g.BodyY1 - baseline) <= Math.Max(2, tallest / 10)).Select(g => (float)(baseline - g.BodyY0)).Order().ToList();
         var cap = heights.Count == 0 ? tallest : heights[(int)Math.Min(heights.Count - 1, Math.Floor(heights.Count * 0.9))];
         return (baseline, Math.Max(1, cap));
     }
@@ -146,7 +152,8 @@ public static class Segmenter
         }
     }
 
-    // the rows with ink in runs; a thin run (an accent above capitals) joins the run below it, or above it
+    // the rows with ink in runs; a thin run close to another (accents above capitals) joins it – the one below first; a
+    // thin run farther away is a line of its own ("- ...")
     private static List<(int Top, int Bottom)> Bands(InkBitmap ink)
     {
         var runs = new List<(int Top, int Bottom)>();
@@ -187,6 +194,11 @@ public static class Segmenter
             // join the nearer neighbour – the one below first (accents are above their letters)
             var below = i + 1 < runs.Count ? runs[i + 1].Top - runs[i].Bottom : int.MaxValue;
             var above = i > 0 ? runs[i].Top - runs[i - 1].Bottom : int.MaxValue;
+            if (Math.Min(below, above) > Math.Max(2, tallest * 0.15f))
+            {
+                continue;
+            }
+
             if (below <= above && i + 1 < runs.Count)
             {
                 runs[i + 1] = (runs[i].Top, runs[i + 1].Bottom);

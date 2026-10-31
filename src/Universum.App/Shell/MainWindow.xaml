@@ -19,6 +19,24 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- owner, 31. 10. 2026: links to the pages where the keys of the services are got (Nastavenia) -->
+        <Style x:Key="ServiceLinks" TargetType="ItemsControl">
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <Button Content="{Binding Text}" Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Padding="10,4" Margin="0,0,8,6" />
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- the tables of Premiéry and Novinky: sharp text, links right after the title, optional posters, Vybrané and a note -->
         <Style x:Key="NewsCell" TargetType="TextBlock">
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -3936,7 +3954,8 @@
                         <StackPanel>
                             <TextBlock Text="TMDB – názvy filmov a seriálov" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
-                                       Text="Vlastný bezplatný kľúč z themoviedb.org (Nastavenia účtu → API): API Key alebo API Read Access Token. Na TMDB sa posiela len názov alebo ID titulu." />
+                                       Text="Stačí bezplatný kľúč: zaregistrujte sa na themoviedb.org, v Nastaveniach účtu → API si vyžiadajte kľúč (Developer, osobné použitie) a vložte sem API Key alebo API Read Access Token. Na TMDB sa posiela len názov alebo ID titulu." />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.Tmdb}" Style="{StaticResource ServiceLinks}" />
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="Overiť a uložiť" Command="{Binding SaveTmdbKeyCommand}" Margin="8,0,8,0" Padding="12,5" />
@@ -3980,7 +3999,10 @@
                             <TextBlock Text="TMDB poster – návrh plagátu cez AI a ďalšie hodnotenia" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,8"
                                        Text="Keď TMDB plagát nemá, nakreslí návrh AI: s kľúčom OpenAI platené (gpt-image-2, ~0,04 $ za návrh, kľúč z platform.openai.com), inak zadarmo Cloudflare Workers AI (FLUX.2, denný limit; účet na dash.cloudflare.com → Workers AI, Account ID a API token s povolením Workers AI). Posiela sa len názov, rok, žánre a dej. OMDb (bezplatný kľúč z omdbapi.com) pridá do karty titulu hodnotenia IMDb, Rotten Tomatoes a Metacritic – posiela sa len IMDb ID. Kľúče sú chránené pre vaše konto Windows." />
-                            <TextBlock Text="Cloudflare Workers AI (zadarmo)" Margin="0,2,0,2" />
+                            <TextBlock Text="Cloudflare Workers AI – stačí bezplatný účet" Margin="0,2,0,2" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                       Text="Zaregistrujte sa, skopírujte Account ID zo stránky Workers AI a vytvorte API token (šablóna Workers AI); obe vložte sem." />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.Cloudflare}" Style="{StaticResource ServiceLinks}" />
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="Uložiť" Command="{Binding SaveCloudflareCommand}" Margin="8,0,8,0" Padding="12,5" />
@@ -3991,7 +4013,8 @@
                                     <TextBox Text="{Binding Token, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový API token" />
                                 </UniformGrid>
                             </DockPanel>
-                            <TextBlock Text="OpenAI (platené)" Margin="0,8,0,2" />
+                            <TextBlock Text="OpenAI – platené (nepovinné; bez neho kreslí Cloudflare zadarmo)" Margin="0,8,0,2" />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.OpenAi}" Style="{StaticResource ServiceLinks}" />
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="Uložiť" Command="{Binding SaveOpenAiCommand}" Margin="8,0,8,0" Padding="12,5" />
@@ -3999,7 +4022,10 @@
                                 </StackPanel>
                                 <TextBox Text="{Binding OpenAi, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč OpenAI (sk-…)" />
                             </DockPanel>
-                            <TextBlock Text="OMDb (hodnotenia IMDb, Rotten Tomatoes, Metacritic)" Margin="0,8,0,2" />
+                            <TextBlock Text="OMDb (hodnotenia IMDb, Rotten Tomatoes, Metacritic) – stačí bezplatný kľúč" Margin="0,8,0,2" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
+                                       Text="Vyberte FREE (1 000 dopytov denne), zadajte e-mail, kľúč príde e-mailom – po kliknutí na aktivačný odkaz ho vložte sem." />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.Omdb}" Style="{StaticResource ServiceLinks}" />
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="Uložiť" Command="{Binding SaveOmdbCommand}" Margin="8,0,8,0" Padding="12,5" />
@@ -4071,7 +4097,9 @@
                         <StackPanel>
                             <TextBlock Text="Titulky – sťahovanie a preklad (vaše účty)" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
-                                       Text="OpenSubtitles.com (anglické titulky, aj SDH): API kľúč z profilu (API Consumers), meno a heslo na sťahovanie. svsub.net: váš token (svs_…) – prekladá sa vaším AI kľúčom uloženým v nastaveniach služby. Kľúče a heslo sa ukladajú šifrovane len pre váš účet Windows; nič sa neposiela, kým v Úprave titulkostopy nehľadáte, nesťahujete ani neprekladáte." />
+                                       Text="OpenSubtitles.com (anglické titulky, aj SDH): stačí bezplatný účet – zaregistrujte sa, v profile → API Consumers vytvorte API kľúč a sem vložte kľúč, meno a heslo. svsub.net: váš token (svs_…) – prekladá sa vaším AI kľúčom uloženým v nastaveniach služby. Kľúče a heslo sa ukladajú šifrovane len pre váš účet Windows; nič sa neposiela, kým v Úprave titulkostopy nehľadáte, nesťahujete ani neprekladáte." />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.OpenSubtitles}" Style="{StaticResource ServiceLinks}" />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.SvSub}" Style="{StaticResource ServiceLinks}" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="2*" />
@@ -4150,6 +4178,9 @@
                                 <CheckBox Content="Zobrazovať obrázky článkov" IsChecked="{Binding Images}" VerticalAlignment="Center" MinWidth="0" />
                             </WrapPanel>
                             <TextBlock Text="Preklad (DeepL – vlastný kľúč)" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,6"
+                                       Text="Stačí bezplatný kľúč DeepL API Free (500 000 znakov mesačne): zaregistrujte sa, skopírujte kľúč (končí :fx) a vložte ho sem." />
+                            <ItemsControl ItemsSource="{x:Static pages:ServiceLinks.DeepL}" Style="{StaticResource ServiceLinks}" />
                             <DockPanel Margin="0,6,0,0">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="Overiť a uložiť" Command="{Binding SaveKeyCommand}" Margin="8,0,8,0" Padding="12,5" />

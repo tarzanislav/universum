@@ -2491,6 +2491,18 @@ internal static class SelfTest
         Check(batch.Items.Count(i => i.AlreadyInLibraryAt is not null) >= 3 && batch.Items.Count(i => i.NeedsWork) <= 1,
             $"batch: the written originals are 'už v knižnici' at the analysis – {batch.Simulation}");
 
+        // owner, 31. 10. 2026: Revízia – a file 'už v knižnici' chosen to be written again, then left as it was
+        var present = batch.Items.First(i => i.AlreadyInLibraryAt is not null);
+        batch.SelectedGroup = batch.Groups.First(g => g.Group == present.Group);
+        var presentRow = batch.FileRows.First(f => f.Item.File.Path == present.File.Path);
+        Check(presentRow.CanRevise && !presentRow.Revision, "batch: Revízia offered for a file 'už v knižnici'");
+        presentRow.Revision = true;
+        presentRow = batch.FileRows.First(f => f.Item.File.Path == present.File.Path);
+        Check(presentRow.Revision && presentRow.Item.NeedsWork && presentRow.Status.StartsWith("revízia", StringComparison.Ordinal),
+            $"batch: the revision will write it again – {presentRow.Status}");
+        presentRow.Revision = false;
+        Check(batch.Items.First(i => i.File.Path == present.File.Path).AlreadyInLibraryAt is not null, "batch: without the revision it is 'už v knižnici' again");
+
         // owner, 30. 10. 2026: Upraviť v štúdiu – a file of the batch in Úprava titulkostopy, back with Uložiť do úlohy
         var studioItem = batch.Items.First(i => i.Target.Tracks.Any(t => t.Type == TrackType.Subtitles && !t.IsAdded && t.Source.IsTextSubtitles));
         var studioTrack = studioItem.Target.Tracks.First(t => t.Type == TrackType.Subtitles && !t.IsAdded && t.Source.IsTextSubtitles).TrackId;

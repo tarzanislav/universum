@@ -33,6 +33,7 @@ public sealed class MainViewModel : ObservableObject
         Chapters = new ChaptersPageViewModel(services);
         Subtitles = new SubtitlesPageViewModel(services);
         Audio = new AudioPageViewModel(services);
+        Video = new VideoPageViewModel(services);
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Dashboard = new DashboardPageViewModel(services, this);
@@ -64,8 +65,7 @@ public sealed class MainViewModel : ObservableObject
             new("Kapitoly", "\uE8FD", Chapters, multiplexing),
             new("Informácie", "\uE946", Info, multiplexing),
             // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
-            new("Úprava videostopy", "\uE714", new PlaceholderPageViewModel("Úprava videostopy",
-                "Štúdio obrazu: strih, prekódovanie, pomer strán, otočenie – s rovnakým prehrávačom ako Úprava titulkostopy.", "fáza 4"), studios),
+            new("Úprava videostopy", "\uE714", Video, studios),
             new("Úprava audiostopy", "\uE8D6", Audio, studios),
             new("Úprava titulkostopy", "\uE7F0", Subtitles, studios),
             new("Single spracovanie", "\uE90F", Rules, templates),
@@ -270,6 +270,9 @@ public sealed class MainViewModel : ObservableObject
     /// automatically, codec, stereo, loudness, language and name.
     /// </summary>
     public AudioPageViewModel Audio { get; }
+
+    /// <summary>Úprava videostopy (owner, 30. 10. 2026): cut, proportions, turned, another height or codec – with the player.</summary>
+    public VideoPageViewModel Video { get; }
 
     public Jobs.JobQueuePageViewModel Queue { get; }
 

@@ -243,6 +243,7 @@ internal static class SelfTest
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
+        await TestVideoAsync(model, window, services, work);
         TestSeriesMemory(model, services, work);
 
         // TMDB key: protected for the Windows account, never stored as plain text
@@ -1796,6 +1797,69 @@ internal static class SelfTest
             Segment(1.6, 0x80, []);
             return [.. data];
         }
+    }
+
+    // owner, 30. 10. 2026: Úprava videostopy – the proportions (without writing the picture), an exact cut of a turned picture
+    private static async Task TestVideoAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var folder = Path.Combine(work, "obraz");
+        Directory.CreateDirectory(folder);
+        var video = Path.Combine(folder, "Vymyslený.Obrazový.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
+        var originalBytes = File.ReadAllBytes(video);
+        var page = model.Video;
+        model.SelectedTool = model.Tools.First(t => t.Page == page);
+        await page.LoadAsync([video]);
+        Check(page.IsVideo && page.Summary.Contains("video", StringComparison.Ordinal), "video: the film open – " + page.Summary);
+        await page.PlayerOpening;
+        await WaitFor(() => page.Player.FramesShown > 0);
+        await page.KeyframesReading;
+        Check(page.Player.IsOpen && page.Status.StartsWith("Kľúčové snímky", StringComparison.Ordinal), $"video: in the player, its key frames read – {page.Status} | {page.Player.Message}");
+
+        page.Aspect = page.Aspects.First(a => a.Value == "4/3");
+        page.UseRules = false;
+        page.Library.IsMovie = true;
+        page.Library.TitleText = "Obrazový test (2026)";
+        Check(page.SaveCommand.CanExecute(null) && page.Changes.Contains("4:3", StringComparison.Ordinal), $"video: 4:3 ready to save – {page.Changes} {page.Blocked}");
+        await page.SaveCommand.ExecuteAsync(null);
+        Check(page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal), "video: saved – " + page.Result);
+        var result = Directory.EnumerateFiles(Path.Combine(_outputDirectory, "library"), "*.mkv", SearchOption.AllDirectories)
+            .FirstOrDefault(f => f.Contains("Obrazový test (2026)", StringComparison.Ordinal));
+        if (result is not null)
+        {
+            var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(result);
+            Check(written.TracksOf(TrackType.Video).Single().DisplayAspect is { } aspect && Math.Abs(aspect - (4 / 3.0)) < 0.05,
+                "video: shown 4:3 – " + written.TracksOf(TrackType.Video).Single().DisplayDimensions);
+        }
+        else
+        {
+            Check(false, "video: the result in the library");
+        }
+
+        // an exact cut of a turned picture: the encoders of Windows (Media Foundation) – a computer without them is said
+        page.AddPart(TimeSpan.FromSeconds(0.3), TimeSpan.FromSeconds(1.5));
+        page.ExactCut = true;
+        page.Rotation = page.Rotations.First(r => r.Value == 90);
+        page.Library.TitleText = "Obrazový test strih (2026)";
+        Check(page.Parts is [{ Written: "presne" }] && page.WritesPicture && page.Changes.Contains("presne", StringComparison.Ordinal), "video: an exact cut, turned – " + page.Changes);
+        await Screenshot(window, "studio-video.png");
+        await page.SaveCommand.ExecuteAsync(null);
+        var cut = Directory.EnumerateFiles(Path.Combine(_outputDirectory, "library"), "*.mkv", SearchOption.AllDirectories)
+            .FirstOrDefault(f => f.Contains("Obrazový test strih (2026)", StringComparison.Ordinal));
+        if (page.Result.StartsWith("Uložené do knižnice", StringComparison.Ordinal) && cut is not null)
+        {
+            var written = await new MkvMergeInspector(services.CurrentMkvToolNix!, services.Runner).InspectAsync(cut);
+            Check(written.TracksOf(TrackType.Video).Single().CodecId == "V_MPEG4/ISO/AVC" && written.Duration is { } length && Math.Abs(length.TotalSeconds - 1.2) < 0.35,
+                $"video: written anew by the encoders of Windows, cut exactly – {written.TracksOf(TrackType.Video).Single().PixelDimensions} {written.Duration}");
+        }
+        else
+        {
+            Check(page.Result.Contains("FFmpeg", StringComparison.Ordinal) && !File.Exists(cut ?? ""), "video: without the encoders of Windows it is said, nothing written – " + page.Result);
+            Write("info  video: the encoders of Windows did not write here – " + page.Result);
+        }
+
+        Check(File.ReadAllBytes(video).AsSpan().SequenceEqual(originalBytes), "video: the original unchanged");
+        page.ClearCommand.Execute(null);
     }
 
     // owner, 30. 10. 2026: Úprava audiostopy – a dub (invented: the film's own sound moved) added, written anew, saved

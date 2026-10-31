@@ -254,8 +254,8 @@ public sealed class SubtitleOcr(OcrTemplates templates, OcrMemory? memory = null
             (best, distance, second) = (second.Template, second.Distance, (best, distance));
         }
 
-        // small letters (a few pixels per stroke) differ more from any template
-        var slack = cluster.Shape.Pixels < 24 ? 0.05f : 0;
+        // small letters (a small font: a few pixels per stroke) differ more from any template
+        var slack = cluster.Shape.CapPixels() is > 0 and < 24 ? 0.05f : 0;
         if (distance <= Known + slack)
         {
             cluster.Text = best.Text;
@@ -299,7 +299,7 @@ public sealed class SubtitleOcr(OcrTemplates templates, OcrMemory? memory = null
         }
 
         // small letters (a few pixels per stroke) with the same slack as a letter alone
-        var slack = cluster.Shape.Pixels < 24 ? 0.05f : 0;
+        var slack = cluster.Shape.CapPixels() is > 0 and < 24 ? 0.05f : 0;
         (string Text, bool Italic, float Score)? best = null;
         var others = new List<(string Text, float Distance)>();
         var cuts = Enumerable.Range(ink.Width / 4, Math.Max(1, ink.Width / 2)).OrderBy(x => columns[Math.Min(x, ink.Width - 1)]).Take(4);

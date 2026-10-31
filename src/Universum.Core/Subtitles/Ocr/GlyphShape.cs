@@ -38,7 +38,10 @@ public readonly record struct GlyphShape(
         var body = trust * ((0.25f * exact / 256f) + (0.9f * away / ink) + (0.5f * fill));
         var proportions = MathF.Min(1, MathF.Abs(MathF.Log(a.Aspect / b.Aspect)));
         var place = MathF.Abs(a.Top - b.Top) + MathF.Abs(a.Bottom - b.Bottom);
-        return body + (0.35f * proportions) + (0.8f * place) + MarkDistance(a, b);
+
+        // the height against the capitals, beyond what fonts differ by (half again): a dot is a fraction of a blot of its shape
+        var height = MathF.Max(0, MathF.Min(1.5f, MathF.Abs(MathF.Log(MathF.Max(0.05f, a.Top - a.Bottom) / MathF.Max(0.05f, b.Top - b.Bottom)))) - 0.4f);
+        return body + (0.35f * proportions) + (0.8f * place) + (0.35f * height) + MarkDistance(a, b);
     }
 
     /// <summary>The height of capitals of its line in pixels (the scale it was drawn at); 0 when not known.</summary>

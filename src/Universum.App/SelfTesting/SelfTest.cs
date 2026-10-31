@@ -1402,7 +1402,8 @@ internal static class SelfTest
         calendar.TodayCommand.Execute(null);
         var episode = calendar.DetailSections.SelectMany(s => s.Entries).First(e => e.Layer == CalendarLayer.EpisodesDomestic);
         episode.OpenCommand!.Execute(null);
-        Check(model.SelectedTool.Page == model.SeriesNews && model.SeriesNews.Filter.Contains("Domáci seriál", StringComparison.Ordinal), "calendar: an episode opens in Novinky – " + model.SeriesNews.Filter);
+        Check(model.SelectedTool.Page == model.SeriesNews && model.SeriesNews.Filter.Length > 0 && episode.Title.TrimStart('★', ' ').StartsWith(model.SeriesNews.Filter, StringComparison.Ordinal),
+            $"calendar: an episode opens in Novinky with its series looked for – {episode.Title} → {model.SeriesNews.Filter}");
         model.SeriesNews.Filter = "";
 
         foreach (var record in services.Agenda.Items.ToList())

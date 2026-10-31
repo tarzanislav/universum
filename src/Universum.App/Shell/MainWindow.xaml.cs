@@ -116,6 +116,28 @@ public partial class MainWindow : Window
         }
     }
 
+    // OCR: the answer is typed at once – the box takes the focus when it appears and with every next shape asked
+    private void OnOcrAnswerVisible(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox { DataContext: SubtitlesPageViewModel page } box || e.NewValue is not true)
+        {
+            return;
+        }
+
+        if (_ocrBoxes.Add(box))
+        {
+            page.PropertyChanged += (_, change) =>
+            {
+                if (change.PropertyName == nameof(SubtitlesPageViewModel.OcrQuestion) && box.IsVisible)
+                {
+                    Dispatcher.BeginInvoke(() => box.Focus());
+                }
+            };
+        }
+
+        Dispatcher.BeginInvoke(() => box.Focus());
+    }
+
     // the row's edit ends with the text's, before the list is made anew with the changed text
     private void OnCueCellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
     {
@@ -135,6 +157,7 @@ public partial class MainWindow : Window
     }
 
     private readonly HashSet<System.Windows.Controls.DataGrid> _cueGrids = [];
+    private readonly HashSet<System.Windows.Controls.TextBox> _ocrBoxes = [];
 
     private void OnNewsLoadingRow(object sender, System.Windows.Controls.DataGridRowEventArgs e) =>
         e.Row.SetBinding(System.Windows.Controls.DataGridRow.DetailsVisibilityProperty,

@@ -1956,6 +1956,230 @@ internal static class SelfTest
         Check(page.Logs.Count == 0 && services.ProcessingLogs.All().Count == 0, "logs: all deleted");
     }
 
+    // owner, 31. 10. 2026: Text z obrázkov – UNIVERSUM's own OCR reads invented PGS subtitles drawn in Arial (a white text
+    // with a black outline, as on a Blu-ray); a shape no font has (■) is asked once and kept; the text is saved next to
+    // the video as a new SRT and added as a track, the .sup stays as it was
+    private static async Task TestReadingTextAsync(SubtitlesPageViewModel page, MainWindow window, string folder)
+    {
+        // anew each run: no result of an earlier run, no shape told before
+        var reading = Path.Combine(folder, "citanie");
+        if (Directory.Exists(reading))
+        {
+            Directory.Delete(reading, recursive: true);
+        }
+
+        Directory.CreateDirectory(reading);
+        File.Delete(SubtitlesPageViewModel.OcrMemoryFile);
+        var video = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.mkv");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), video, overwrite: true);
+        string[] lines = ["Vymyslený titulok číslo jeden.", "Žltý kôň úpel ďábelské ódy!", "■ Ľudia ťahajú kapra ■"];
+        var sup = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.sk.sup");
+        File.WriteAllBytes(sup, TextSup(lines));
+        var supBytes = File.ReadAllBytes(sup);
+        await page.LoadAsync([video]);
+        foreach (var found in page.Found.ToList())
+        {
+            found.AddCommand.Execute(null);
+            await WaitFor(() => !page.Rows.All(r => r.ExternalPath != found.Match.Path) && page.OpenVideoCommand.CanExecute(null));
+        }
+
+        var row = page.Rows.FirstOrDefault(r => r.ExternalPath == sup);
+        page.SelectedRow = row;
+        Check(row is { IsText: false } && page.ReadTextCommand.CanExecute(null), "OCR: the picture subtitles selected, Rozpoznať text ready");
+        if (row is null)
+        {
+            return;
+        }
+
+        Show(window, "Text z obrázkov (OCR)");
+        var readingText = page.ReadTextCommand.ExecuteAsync(null);
+        var asked = 0;
+        for (var i = 0; i < 600 && (page.ReadTextCommand.IsRunning || page.IsAsking); i++)
+        {
+            if (page.IsAsking)
+            {
+                // the first unknown shape is told (■), any other stays unknown
+                asked++;
+                if (asked == 1)
+                {
+                    await Screenshot(window, "ocr-question.png");
+                    page.OcrAnswer = "■";
+                    await page.TeachCommand.ExecuteAsync(null);
+                }
+                else
+                {
+                    await page.SkipShapeCommand.ExecuteAsync(null);
+                }
+
+                continue;
+            }
+
+            await Task.Delay(100);
+        }
+
+        var srt = Path.Combine(reading, "Vymyslený.Čítaný.Film.2026.sk.srt");
+        await WaitFor(() => page.Rows.Any(r => r.ExternalPath == srt));
+        Check(readingText.IsCompletedSuccessfully, $"OCR: the reading finished – {readingText.Status} {readingText.Exception?.GetBaseException()}".Replace('\n', ' ').Replace('\r', ' '));
+        if (asked == 0)
+        {
+            // what the reading took the square for: the shapes of the third subtitle and their nearest letters
+            var shapes = new Core.Subtitles.Ocr.SubtitleOcr(await OcrFonts.TemplatesAsync(), null, "sk")
+                .Read(Core.Subtitles.Ocr.OcrPicture.Of(Core.Subtitles.Pictures.PgsReader.Read(supBytes)));
+            foreach (var shape in shapes.Clusters.Where(c => c.Cue == 2 && shapes.Context(c).X0 == 0).Take(2))
+            {
+                Check(false, $"OCR diagnostics: shape {shape.Text} {shape.Distance:0.000} {shape.Sample.Width}x{shape.Sample.Height}: " +
+                             string.Join(", ", shape.Candidates.Select(c => $"{c.Text} {c.Distance:0.000}")));
+            }
+        }
+
+        var read = page.Rows.FirstOrDefault(r => r.ExternalPath == srt)?.Document?.Cues.Select(c => c.Text).ToList() ?? [];
+        Check(read.SequenceEqual(lines), $"OCR: the text read and added as a new track ({asked} shape(s) asked) – {string.Join(" | ", read)} | {page.OcrStatus}");
+        Check(asked >= 1 && File.Exists(SubtitlesPageViewModel.OcrMemoryFile), "OCR: the unknown shape asked and kept for other films");
+        Check(File.ReadAllBytes(sup).SequenceEqual(supBytes) && page.SelectedRow?.ExternalPath == srt, "OCR: the .sup unchanged, the text shown at once");
+        await Screenshot(window, "ocr-read.png");
+        Show(window, "Stopy titulkov");
+        page.ClearCommand.Execute(null);
+
+        // a tab of the page brought forward (for the pictures)
+        static void Show(DependencyObject parent, string header)
+        {
+            foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+            {
+                if (child is System.Windows.Controls.TabItem { Header: string text } tab && text == header)
+                {
+                    tab.IsSelected = true;
+                    return;
+                }
+
+                Show(child, header);
+            }
+        }
+
+        // the lines as PGS subtitles (2 s each from 1 s): Arial 44 px white, a black outline of 3 px, the rest transparent
+        static byte[] TextSup(IReadOnlyList<string> texts)
+        {
+            var data = new List<byte>();
+            void Segment(double seconds, byte type, byte[] body)
+            {
+                var pts = (uint)Math.Round(seconds * 90000);
+                data.AddRange([(byte)'P', (byte)'G', (byte)(pts >> 24), (byte)(pts >> 16), (byte)(pts >> 8), (byte)pts, 0, 0, 0, 0, type, (byte)(body.Length >> 8), (byte)body.Length]);
+                data.AddRange(body);
+            }
+
+            static byte[] Two(int value) => [(byte)(value >> 8), (byte)value];
+            for (var i = 0; i < texts.Count; i++)
+            {
+                var (width, height, colours) = Draw(texts[i]);
+                var rle = Rle(colours, width, height);
+                double start = 1 + (i * 2), end = start + 1.5;
+                const int x = 200, y = 900;
+                Segment(start, 0x16, [0x07, 0x80, 0x04, 0x38, 0x10, .. Two(i * 2), 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, .. Two(x), .. Two(y)]);
+                Segment(start, 0x17, [0x01, 0x00, .. Two(x), .. Two(y), .. Two(width), .. Two(height)]);
+                Segment(start, 0x14, [0x00, 0x00, 0x01, 235, 128, 128, 255, 0x02, 16, 128, 128, 255]);
+                var length = rle.Length + 4;
+                Segment(start, 0x15, [0x00, 0x00, 0x00, 0xC0, (byte)(length >> 16), (byte)(length >> 8), (byte)length, .. Two(width), .. Two(height), .. rle]);
+                Segment(start, 0x80, []);
+                Segment(end, 0x16, [0x07, 0x80, 0x04, 0x38, 0x10, .. Two((i * 2) + 1), 0x00, 0x00, 0x00, 0x00]);
+                Segment(end, 0x17, [0x01, 0x00, .. Two(x), .. Two(y), .. Two(width), .. Two(height)]);
+                Segment(end, 0x80, []);
+            }
+
+            return [.. data];
+        }
+
+        // 1 where the letters are, 2 for three pixels around them, 0 elsewhere
+        static (int Width, int Height, byte[] Colours) Draw(string text)
+        {
+            var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Arial"), 44, Brushes.White, 1);
+            int width = (int)Math.Ceiling(formatted.WidthIncludingTrailingWhitespace) + 16, height = (int)Math.Ceiling(formatted.Height) + 16;
+            var visual = new DrawingVisual();
+            using (var drawing = visual.RenderOpen())
+            {
+                drawing.DrawText(formatted, new Point(8, 8));
+            }
+
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            var bgra = new byte[width * height * 4];
+            bitmap.CopyPixels(bgra, width * 4, 0);
+            var colours = new byte[width * height];
+            for (var py = 0; py < height; py++)
+            {
+                for (var px = 0; px < width; px++)
+                {
+                    if (bgra[(((py * width) + px) * 4) + 3] < 128)
+                    {
+                        continue;
+                    }
+
+                    colours[(py * width) + px] = 1;
+                    for (var dy = -3; dy <= 3; dy++)
+                    {
+                        for (var dx = -3; dx <= 3; dx++)
+                        {
+                            int nx = px + dx, ny = py + dy;
+                            if (nx >= 0 && ny >= 0 && nx < width && ny < height && colours[(ny * width) + nx] == 0 && bgra[(((ny * width) + nx) * 4) + 3] < 128)
+                            {
+                                colours[(ny * width) + nx] = 2;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return (width, height, colours);
+        }
+
+        // PGS runs line by line: a colour byte, or 0 and a code (a run of 0 or of a colour, short or long), 0 0 at the end of a line
+        static byte[] Rle(byte[] colours, int width, int height)
+        {
+            var rle = new List<byte>();
+            for (var py = 0; py < height; py++)
+            {
+                for (var px = 0; px < width;)
+                {
+                    var colour = colours[(py * width) + px];
+                    var run = 1;
+                    while (px + run < width && colours[(py * width) + px + run] == colour && run < 16383)
+                    {
+                        run++;
+                    }
+
+                    if (colour != 0 && run < 3)
+                    {
+                        rle.AddRange(Enumerable.Repeat(colour, run));
+                    }
+                    else
+                    {
+                        var flags = (colour != 0 ? 0x80 : 0) | (run >= 64 ? 0x40 : 0);
+                        rle.Add(0);
+                        if (run >= 64)
+                        {
+                            rle.Add((byte)(flags | (run >> 8)));
+                            rle.Add((byte)run);
+                        }
+                        else
+                        {
+                            rle.Add((byte)(flags | run));
+                        }
+
+                        if (colour != 0)
+                        {
+                            rle.Add(colour);
+                        }
+                    }
+
+                    px += run;
+                }
+
+                rle.Add(0);
+                rle.Add(0);
+            }
+
+            return [.. rle];
+        }
+    }
+
     // owner, 30. 10. 2026: Úprava videostopy – the proportions (without writing the picture), an exact cut of a turned picture
     private static async Task TestVideoAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
@@ -2222,6 +2446,7 @@ internal static class SelfTest
         page.DiscardWorkCommand.Execute(null);
         Check(!page.HasWork && services.StudioWork.Load(video) is null, "studio: the work discarded");
         await TestPictureSubtitlesAsync(page, window, folder);
+        await TestReadingTextAsync(page, window, folder);
 
         // subtitle files alone: a new SRT in UTF-8 next to them, the original stays
         page.ClearCommand.Execute(null);

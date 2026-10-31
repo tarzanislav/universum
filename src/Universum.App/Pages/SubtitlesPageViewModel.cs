@@ -101,6 +101,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         Player = new Player.PlayerViewModel(services);
         CreateTaskCommands();
+        CreateOcrCommands();
         StartsNowCommand = new RelayCommand(StartsNow, () => Player.IsOpen && _selected is not null);
         MarkFirstCommand = new RelayCommand(() => MarkPoint(first: true), () => Player.IsOpen && _selected is not null);
         MarkSecondCommand = new RelayCommand(() => MarkPoint(first: false), () => Player.IsOpen && _selected is not null);
@@ -502,6 +503,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 Proposal = null;
             }
 
+            if (row == _ocrRow)
+            {
+                ForgetReading();
+                OcrStatus = "";
+            }
+
             Rows.Remove(row);
             _pictures.Remove(row);
             _reading.Remove(row);
@@ -532,6 +539,9 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         Found.Clear();
         ShowPreview(null, []);
         _pictures.Clear();
+        ForgetReading();
+        OcrCorrections.Clear();
+        OcrStatus = "";
         _reading.Clear();
         _readingStop.Cancel();
         _readingStop.Dispose();
@@ -924,6 +934,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         UndoCueEditsCommand?.NotifyCanExecuteChanged();
         DiscardWorkCommand?.NotifyCanExecuteChanged();
         ApplyProposalCommand?.NotifyCanExecuteChanged();
+        RefreshOcrCommands();
     }
 
     // the times of a row's subtitles: the external file's, the index of the video's own track, or the whole track read

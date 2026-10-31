@@ -2363,6 +2363,18 @@
                     </Grid.ColumnDefinitions>
                     <DataGrid ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                        <!-- owner, 31. 10. 2026: groups with files new since the analysis before – a pastel background, dark text to stay readable -->
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                        <Setter Property="Background" Value="#DDF3E4" />
+                                        <Setter Property="Foreground" Value="#1B1B1B" />
+                                        <Setter Property="ToolTip" Value="Nové súbory od predchádzajúcej analýzy" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
                             <DataGridTextColumn Header="Skupina (film / seriál)" Binding="{Binding Title}" Width="*" MinWidth="90">

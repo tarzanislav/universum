@@ -206,6 +206,8 @@ public sealed class BatchPageViewModel : ObservableObject
         _studioEdits.Clear();
         _additions.Clear();
         _revisions.Clear();
+        _knownFiles.Clear();
+        _groupRanks.Clear();
 
         _subtitleReading?.Cancel();
         _analysis = null;
@@ -376,6 +378,45 @@ public sealed class BatchPageViewModel : ObservableObject
 
     // the studio's edits by the files' paths: given again to the groups of every new analysis of the folder
     private readonly Dictionary<string, StudioEdits> _studioEdits = new(Paths.Comparer);
+
+    // the files of the analyses before (of the same folder) and the place of each one's group in the list
+    private readonly HashSet<string> _knownFiles = new(Paths.Comparer);
+    private readonly Dictionary<string, int> _groupRanks = new(Paths.Comparer);
+    private string? _knownFolder;
+
+    /// <summary>
+    /// The groups in the order of the analysis before (owner, 31. 10. 2026): a group with files known before keeps its
+    /// place; groups of only new files (folders and files put into the input folder since) follow at the end. A group
+    /// with new files is shown on a pastel background. The first analysis of a folder keeps the analysis' own order.
+    /// </summary>
+    private List<GroupRow> Arranged(string folder, IReadOnlyList<BatchGroup> groups)
+    {
+        if (_knownFolder is null || !Paths.Same(_knownFolder, folder))
+        {
+            _knownFiles.Clear();
+            _groupRanks.Clear();
+            _knownFolder = folder;
+        }
+
+        var before = _knownFiles.Count > 0;
+        var rows = groups.Select((group, index) =>
+        {
+            var ranks = group.Files.Where(f => _groupRanks.ContainsKey(f.Path)).Select(f => _groupRanks[f.Path]).ToList();
+            return (Row: new GroupRow(group) { Title = GroupTitle(group), IsNew = before && group.Files.Any(f => !_knownFiles.Contains(f.Path)) },
+                Rank: ranks.Count > 0 ? ranks.Min() : int.MaxValue, Index: index);
+        }).OrderBy(x => x.Rank).ThenBy(x => x.Index).Select(x => x.Row).ToList();
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            foreach (var file in rows[i].Group.Files)
+            {
+                _knownFiles.Add(file.Path);
+                _groupRanks[file.Path] = i;
+            }
+        }
+
+        return rows;
+    }
 
     // Doplnok k názvu by the files' paths: given again to the groups of every new analysis of the folder
     private readonly Dictionary<string, string> _additions = new(Paths.Comparer);
@@ -1257,9 +1298,9 @@ public sealed class BatchPageViewModel : ObservableObject
             _needsAnalysis = false;
             TrySave(inspector);
             Groups.Clear();
-            foreach (var group in _analysis.Groups)
+            foreach (var row in Arranged(folder, _analysis.Groups))
             {
-                Groups.Add(new GroupRow(group) { Title = GroupTitle(group) });
+                Groups.Add(row);
             }
 
             Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
@@ -2559,6 +2600,13 @@ public sealed class BatchPageViewModel : ObservableObject
                   (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
                   (cancelled ? " – zrušené vo fronte úloh." : stopped ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
             _ranSinceAnalysis = true;
+
+            // a group processed is no longer new
+            foreach (var row in Groups.Where(g => g.IsNew && g.Group.Files.Any(f => _results.Any(r => Paths.Same(r.SourcePath, f.Path)))))
+            {
+                row.IsNew = false;
+            }
+
             var took = started.Elapsed;
             var time = took.TotalMinutes >= 1 ? $"{(int)took.TotalHours}:{took.Minutes:00}:{took.Seconds:00}" : $"{Math.Max(1, (int)took.TotalSeconds)} s";
             Finish = new BatchFinish(

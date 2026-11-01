@@ -64,7 +64,13 @@ public sealed class MainViewModel : ObservableObject
             OpenLog = OpenProcessingLog,
         };
         AgendaNotes = new NotesPageViewModel(services);
-        NotesGuide = new PlaceholderPageViewModel(Loc.T("Návod"), "Stručný návod ku skupine POZNÁMKY – s obrázkami, zvýrazneniami a postupmi krok za krokom.", "etapa N");
+        // owner, 31. 10. 2026: a guide under each group (POZNÁMKY, EDITÁCIA VIDEOSTÔP under Úprava titulkostopy, ŠABLÓNY under MEGA)
+        NotesGuide = new GuidePageViewModel(services, "poznamky", CalendarColors.Group, OpenNamed);
+        StudiosGuide = new GuidePageViewModel(services, "editacia", Color.FromRgb(0x2B, 0xA6, 0xA6), OpenNamed);
+        TemplatesGuide = new GuidePageViewModel(services, "sablony", Color.FromRgb(0x3E, 0xA8, 0x5F), OpenNamed);
+        NewsGuide = new GuidePageViewModel(services, "novinky", Color.FromRgb(0x9B, 0x6B, 0xD6), OpenNamed);
+        MultiplexingGuide = new GuidePageViewModel(services, "multiplexing", Color.FromRgb(0x4A, 0x7B, 0xD9), OpenNamed);
+        StatisticsGuide = new GuidePageViewModel(services, "statistika", Color.FromRgb(0xD9, 0x8B, 0x2B), OpenNamed);
         Mega = new MegaPageViewModel(services);
 
         // the input folder watched: new films and episodes are told, sent to Hromadné spracovanie on a click
@@ -117,6 +123,7 @@ public sealed class MainViewModel : ObservableObject
             new(Loc.T("Listy z HISTRA"), "\uE8F1", HistraLists, news),
             new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
             new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
+            new(Loc.T("Návod"), "\uE897", NewsGuide, news),
             // owner, 31. 10. 2026: the group POZNÁMKY – the calendar, the tasks, the notes and a guide
             new(Loc.T("Kalendár"), "\uE787", Calendar, notes, CalendarBadge),
             new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes, TasksBadge),
@@ -126,17 +133,21 @@ public sealed class MainViewModel : ObservableObject
             new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
             new(Loc.T("Kapitoly"), "\uE8FD", Chapters, multiplexing),
             new(Loc.T("Informácie"), "\uE946", Info, multiplexing),
+            new(Loc.T("Návod"), "\uE897", MultiplexingGuide, multiplexing),
             // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
             new(Loc.T("Úprava videostopy"), "\uE714", Video, studios),
             new(Loc.T("Úprava audiostopy"), "\uE8D6", Audio, studios),
             new(Loc.T("Úprava titulkostopy"), "\uE7F0", Subtitles, studios),
+            new(Loc.T("Návod"), "\uE897", StudiosGuide, studios),
             new(Loc.T("Single spracovanie"), "\uE90F", Rules, templates),
             new(Loc.T("Hromadné spracovanie"), "\uE8B7", Batch, templates),
             new(Loc.T("MEGA spracovanie"), "\uE945", Mega, templates),
+            new(Loc.T("Návod"), "\uE897", TemplatesGuide, templates),
             new(Loc.T("Fronta úloh"), "\uE823", Queue, statistics),
             new(Loc.T("Výstup úloh"), "\uE7C3", Output, statistics),
             new(Loc.T("Záznamy spracovania"), "\uE81C", Logs, statistics),
             new(Loc.T("Nastavenia"), "\uE713", Settings, statistics),
+            new(Loc.T("Návod"), "\uE897", StatisticsGuide, statistics),
         ];
         var view = new ListCollectionView(Tools.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ToolItem.Group)));
@@ -515,7 +526,59 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Poznámky (the group POZNÁMKY).</summary>
     public NotesPageViewModel AgendaNotes { get; }
 
-    public PlaceholderPageViewModel NotesGuide { get; }
+    public GuidePageViewModel NotesGuide { get; }
+
+    public GuidePageViewModel StudiosGuide { get; }
+
+    public GuidePageViewModel TemplatesGuide { get; }
+
+    public GuidePageViewModel NewsGuide { get; }
+
+    public GuidePageViewModel MultiplexingGuide { get; }
+
+    public GuidePageViewModel StatisticsGuide { get; }
+
+    /// <summary>All the guides (the self-test).</summary>
+    public IReadOnlyList<GuidePageViewModel> Guides => [NewsGuide, NotesGuide, MultiplexingGuide, StudiosGuide, TemplatesGuide, StatisticsGuide];
+
+    /// <summary>Opens a category by its name in a guide (@otvorit Calendar); false: no such category.</summary>
+    public bool OpenNamed(string name)
+    {
+        object? page = name switch
+        {
+            "Dashboard" => Dashboard,
+            "Premieres" => Premieres,
+            "SeriesNews" => SeriesNews,
+            "HistraLists" => HistraLists,
+            "Posters" => Posters,
+            "Interests" => Interests,
+            "Calendar" => Calendar,
+            "AgendaTasks" => AgendaTasks,
+            "AgendaNotes" => AgendaNotes,
+            "Mux" => Mux,
+            "HeaderEditor" => HeaderEditor,
+            "Chapters" => Chapters,
+            "Info" => Info,
+            "Video" => Video,
+            "Audio" => Audio,
+            "Subtitles" => Subtitles,
+            "Rules" => Rules,
+            "Batch" => Batch,
+            "Mega" => Mega,
+            "Queue" => Queue,
+            "Output" => Output,
+            "Logs" => Logs,
+            "Settings" => Settings,
+            _ => null,
+        };
+        if (page is null || !Tools.Any(t => t.Page == page))
+        {
+            return false;
+        }
+
+        Open(page);
+        return true;
+    }
 
     /// <summary>Premiéry – films and series, SK/CZ and the world.</summary>
     public PremieresPageViewModel Premieres { get; }
@@ -581,6 +644,11 @@ public sealed class MainViewModel : ObservableObject
             if (value?.Page == Dashboard)
             {
                 Dashboard.Shown();
+            }
+
+            if (value?.Page is GuidePageViewModel guide)
+            {
+                guide.Opened();
             }
 
             if (value?.Page == Premieres)

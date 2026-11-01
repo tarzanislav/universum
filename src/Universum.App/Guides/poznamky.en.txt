@@ -1,0 +1,74 @@
+# Guide – NOTES
+The **NOTES** group brings the calendar, tasks and notes together. It is all **one store** – a task with a due date is
+automatically in the Calendar too, and a note of a day in Notes too. Nothing is sent anywhere; the data stays on your computer.
+
+## Calendar
+The Calendar shows your records together with premieres, episodes, holidays, name days and UNIVERSUM's work.
+![Calendar – month](calendar-month.jpg)
+### Views
+- **Mesiac**, **Týždeň**, **Týždeň ako zoznam**, **Mesiac ako zoznam**, **Rok – 12 mesiacov**, **Rok v riadkoch** and **Agenda**
+  (only the days that have something in them).
+- The arrows move you by one period; the [Today] button takes you back to today.
+- **Click a day** to see everything about it on the left: holidays, name days, records, premieres and episodes.
+### Layers
+Layers can be switched on **one by one or by group** – Premieres, New episodes, Mine, Almanac and UNIVERSUM
+(scheduled actions, MEGA batches, processed runs). UNIVERSUM remembers your choices.
+!tip Tick [len vybrané tituly] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
+### New record
+1. Click a day.
+2. Choose [+ Event], [+ Task] or [+ Note].
+3. Fill in the title and, if you like, the time, repeat (every day, week, month, year) and a reminder.
+4. Save with the [Save] button.
+![Record editor](calendar-editor.jpg)
+!info Reminders come while UNIVERSUM is running – **a bar at the top and a Windows sound**. Clicking the bar opens the day in the Calendar.
+@otvorit Calendar Open Calendar
+
+## Planned tasks
+### A task in one line
+Write the task the way you would say it and press **Enter**:
+- *tomorrow at 20:00 process film #cinema !* – a task for tomorrow at 20:00, tag #cinema, **high** priority (!);
+- *call by Friday* – due on Friday;
+- *check subtitles in 3 days* – due in three days.
+Below the line you can see how UNIVERSUM understood it, before you add it.
+![Planned tasks](tasks-list.jpg)
+### List and board
+- **Zoznam** splits tasks into *Overdue* (red), *Today*, *Tomorrow*, *This week*, *Later* and *No due day*.
+- **Tabuľa** has the columns *Na urobenie*, *Rozpracované*, *Hotové* – move a task with the arrows.
+- A task can have a **checklist** of steps (in the editor).
+### UNIVERSUM suggests
+At the top are suggestions that UNIVERSUM works out by itself (a chosen title in the input folder, a new episode, a premiere…).
+[Take] turns a suggestion into a task, [Hide] hides it for good.
+### UNIVERSUM does by itself
+[New UNIVERSUM action…] schedules work that the program does by itself at a set time – for example **every night at 3:00**:
+- refresh Premieres and News – Series,
+- sync the HISTRA lists,
+- analyse the Batch processing folder,
+- start a waiting MEGA batch.
+!pozor An action runs **only while UNIVERSUM is running**. A missed time is not made up, and nothing irreversible starts by itself.
+![UNIVERSUM actions](actions-tasks.jpg)
+@otvorit AgendaTasks Open Planned tasks
+
+## Notes
+- **Rýchla poznámka**: the first sentence is the title, words with # are tags – *Poster idea. Try a darker background #idea*.
+- In one place you have **my notes**, **notes of days** from the Calendar and **notes of titles** from Premieres and News – Series.
+- The pin on a card pins the note to the top; a deleted note goes to the **bin**, from where you can restore it.
+### By voice
+- **Windows voice typing** (Win + H) types straight where you click – but it goes through Microsoft (internet).
+- [Nahrať hlasom] records from the microphone and **transcribes the recording right on your computer** – nothing leaves it.
+  The recording stays with the note and can be played back.
+![Notes](notes.jpg)
+@otvorit AgendaNotes Open Notes
+
+## Print and export
+[Print and export…] is in the Calendar, Tasks and Notes.
+- Reports: day, week, month (grid and list), year, agenda, tasks, notes.
+- Options: paper, orientation, **1, 2 or 4 pages per sheet**, lighter print, no backgrounds, a margin for hole punching,
+  double-sided printing, header and footer.
+- Save as: **PDF**, **HTML**, **iCalendar (.ics)** for Outlook and Google, **CSV** for Excel, **Markdown**, a **JSON** backup.
+- [Read an iCalendar file (.ics)…] adds events and tasks from another program – anything already in UNIVERSUM is not added twice.
+![Print preview](print-preview.jpg)
+
+## Dashboard and the left menu
+- The Dashboard shows a **7-day calendar**, overdue and today's tasks, **pinned notes** and a line for jotting down a task quickly.
+- The items in the left menu show **live counts**: today's records, overdue tasks (**in red**) and the number of notes.
+!tip You can tick off a task right on the Dashboard – no need to open Planned tasks.

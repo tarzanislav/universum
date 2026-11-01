@@ -39,6 +39,63 @@ public sealed record BoxItem(double X, double Y, double Width, double Height, Rg
 /// <summary>A straight line.</summary>
 public sealed record LineItem(double X1, double Y1, double X2, double Y2, Rgb Color, double Width = 0.5) : PageItem;
 
+/// <summary>A picture (a JPEG, as it is kept – the PDF takes it without decoding) placed in a rectangle.</summary>
+public sealed record ImageItem(double X, double Y, double Width, double Height, Jpeg Picture) : PageItem;
+
+/// <summary>A JPEG picture with its size in pixels and colour components (1 grey, 3 colour), read from its frame header.</summary>
+public sealed record Jpeg(byte[] Bytes, int Width, int Height, int Components)
+{
+    /// <summary>The picture of a JPEG file; null when it is not a JPEG UNIVERSUM can put in a PDF (progressive, CMYK, damaged).</summary>
+    public static Jpeg? Read(byte[] bytes)
+    {
+        if (bytes.Length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8)
+        {
+            return null;
+        }
+
+        var i = 2;
+        while (i + 4 <= bytes.Length)
+        {
+            if (bytes[i] != 0xFF)
+            {
+                return null;
+            }
+
+            var marker = bytes[i + 1];
+            if (marker == 0xFF)
+            {
+                i++;
+                continue;
+            }
+
+            var length = (bytes[i + 2] << 8) | bytes[i + 3];
+            // SOF0 baseline, SOF1 extended: the frame header (precision, height, width, components)
+            if (marker is 0xC0 or 0xC1)
+            {
+                if (i + 10 > bytes.Length)
+                {
+                    return null;
+                }
+
+                var height = (bytes[i + 5] << 8) | bytes[i + 6];
+                var width = (bytes[i + 7] << 8) | bytes[i + 8];
+                var components = bytes[i + 9];
+                return width > 0 && height > 0 && components is 1 or 3 ? new Jpeg(bytes, width, height, components) : null;
+            }
+
+            // another frame (progressive, lossless …) or the image data before a frame: not taken
+            if (marker is >= 0xC2 and <= 0xCF and not 0xC4 and not 0xC8 and not 0xCC || marker == 0xDA || length < 2)
+            {
+                return null;
+            }
+
+            i += 2 + length;
+        }
+
+        return null;
+    }
+}
+
 /// <summary>A laid-out page of a report.</summary>
 public sealed class ReportPage(double width, double height)
 {

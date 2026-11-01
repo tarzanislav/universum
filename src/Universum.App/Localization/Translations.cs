@@ -243,6 +243,8 @@ internal static class Translations
         ["Nová akcia UNIVERSUM…"] = "Nová akce UNIVERSUM…",
         ["UNIVERSUM vykoná sám"] = "UNIVERSUM provede sám",
         ["Upraviť"] = "Upravit",
+        ["Obsah"] = "Obsah",
+        ["Nič sa nenašlo."] = "Nic se nenašlo.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -482,5 +484,7 @@ internal static class Translations
         ["Nová akcia UNIVERSUM…"] = "New UNIVERSUM action…",
         ["UNIVERSUM vykoná sám"] = "UNIVERSUM does by itself",
         ["Upraviť"] = "Edit",
+        ["Obsah"] = "Contents",
+        ["Nič sa nenašlo."] = "Nothing found.",
     };
 }

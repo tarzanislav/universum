@@ -1,0 +1,74 @@
+# Návod – POZNÁMKY
+Skupina **POZNÁMKY** spojuje kalendář, úkoly a poznámky do jednoho celku. Vše je **jedno úložiště** – úkol s termínem je
+automaticky i v Kalendáři, poznámka ke dni i v Poznámkách. Nic se nikam neposílá, údaje jsou jen ve vašem počítači.
+
+## Kalendář
+Kalendář ukazuje vaše záznamy spolu s premiérami, epizodami, svátky, jmeninami a prací UNIVERSUM.
+![Kalendář – měsíc](calendar-month.jpg)
+### Zobrazení
+- **Mesiac**, **Týždeň**, **Týždeň ako zoznam**, **Mesiac ako zoznam**, **Rok – 12 mesiacov**, **Rok v riadkoch** a **Agenda**
+  (jen dny, ve kterých něco je).
+- Šipkami se posouváte o období, tlačítko [Dnes] vás vrátí na dnešek.
+- **Klik na den** ukáže vlevo vše o něm: svátky, jmeniny, záznamy, premiéry a epizody.
+### Vrstvy
+Vrstvy se zapínají **jednotlivě i po skupinách** – Premiéry, Novinky – Seriály, Moje, Kalendárium a UNIVERSUM
+(naplánované akce, MEGA dávky, zpracované běhy). Volby si UNIVERSUM pamatuje.
+!tip Zaškrtněte [len vybrané tituly] a kalendář ukáže jen tituly, které máte v Premiérách a Novinkách označené jako *Vybrané*.
+### Nový záznam
+1. Klikněte na den.
+2. Zvolte [+ Událost], [+ Úkol] nebo [+ Poznámka].
+3. Vyplňte název, případně čas, opakování (každý den, týden, měsíc, rok) a připomínku.
+4. Uložte tlačítkem [Uložit].
+![Editor záznamu](calendar-editor.jpg)
+!info Připomínka přijde, dokud UNIVERSUM běží – **lišta nahoře a zvuk Windows**. Klik na lištu otevře den v Kalendáři.
+@otvorit Calendar Otevřít Kalendář
+
+## Plánované úkoly
+### Úkol jedním řádkem
+Napište úkol tak, jak byste ho řekli, a stiskněte **Enter**:
+- *zítra ve 20:00 zpracovat film #kino !* – úkol na zítra ve 20:00, štítek #kino, **vysoká** priorita (!);
+- *do pátku zavolat* – termín v pátek;
+- *za 3 dny zkontrolovat titulky* – termín za tři dny.
+Pod řádkem vidíte, jak ho UNIVERSUM pochopilo, ještě před přidáním.
+![Plánované úkoly](tasks-list.jpg)
+### Seznam a tabule
+- **Zoznam** dělí úkoly na *Po termínu* (červeně), *Dnes*, *Zítra*, *Tento týden*, *Později* a *Bez termínu*.
+- **Tabuľa** má sloupce *Na urobenie*, *Rozpracované*, *Hotové* – úkol posunete šipkami.
+- Úkol může mít **kontrolní seznam** kroků (v editoru).
+### UNIVERSUM navrhuje
+Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupní složce, nová epizoda, premiéra…).
+[Převzít] z návrhu udělá úkol, [Skrýt] ho schová natrvalo.
+### UNIVERSUM provede sám
+[Nová akce UNIVERSUM…] naplánuje práci, kterou program udělá sám v nastaveném čase – například **každou noc ve 3:00**:
+- obnovit Premiéry a Novinky,
+- synchronizovat seznamy z HISTRA,
+- analyzovat složku Hromadného zpracování,
+- spustit čekající MEGA dávku.
+!pozor Akce se provede, **jen když UNIVERSUM běží**. Zmeškaný čas se nedohání a nic nevratného se samo nespouští.
+![Akce UNIVERSUM](actions-tasks.jpg)
+@otvorit AgendaTasks Otevřít Plánované úkoly
+
+## Poznámky
+- **Rýchla poznámka**: první věta je název, slova s # jsou štítky – *Nápad na plakát. Zkusit tmavší pozadí #nápad*.
+- Na jednom místě jsou **moje poznámky**, **poznámky ke dnům** z Kalendáře a **poznámky k titulům** z Premiér a Novinek.
+- Špendlík na lístku připne poznámku nahoru; smazaná poznámka jde do **koše**, odkud se dá vrátit.
+### Hlasem
+- **Hlasové psaní Windows** (Win + H) píše hned tam, kam kliknete – jde však přes Microsoft (internet).
+- [Nahrať hlasom] nahraje mikrofon a nahrávku **přepíše přímo ve vašem počítači** – nic neodchází ven.
+  Nahrávka zůstane u poznámky a dá se přehrát.
+![Poznámky](notes.jpg)
+@otvorit AgendaNotes Otevřít Poznámky
+
+## Tisk a export
+[Tisk a export…] je v Kalendáři, Úkolech i Poznámkách.
+- Sestavy: den, týden, měsíc (mřížka i seznam), rok, agenda, úkoly, poznámky.
+- Volby: papír, orientace, **1, 2 nebo 4 strany na list**, světlejší tisk, bez pozadí, okraj pro děrování,
+  oboustranný tisk, záhlaví a zápatí.
+- Uložení: **PDF**, **HTML**, **iCalendar (.ics)** pro Outlook a Google, **CSV** pro Excel, **Markdown**, záloha **JSON**.
+- [Načíst iCalendar (.ics)…] přidá události a úkoly z jiného programu – co už v UNIVERSUM je, se nepřidá podruhé.
+![Náhled tisku](print-preview.jpg)
+
+## Přehled a levé menu
+- Přehled ukazuje **kalendář na 7 dní**, úkoly po termínu a dnešní, **připnuté poznámky** a řádek pro rychlý zápis úkolu.
+- U položek v levém menu jsou **živé počty**: dnešní záznamy, úkoly po termínu (**červeně**) a počet poznámek.
+!tip Úkol odškrtnete přímo na Přehledu – nemusíte otevírat Plánované úkoly.

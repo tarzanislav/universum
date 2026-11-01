@@ -1,0 +1,103 @@
+# Návod – NOVINKY A OBSAH
+Skupina **NOVINKY A OBSAH** vám ukáže, čo nové vychádza: **premiéry** filmov a seriálov, **nové epizódy** seriálov,
+vaše **listy z HISTRA**, **plagáty z TMDB** a **zaujímavosti** zo sveta filmu. Odtiaľto pošlete titul rovno na
+spracovanie a z vašich výberov čerpá aj Dashboard.
+
+!info Zdroje sa pýtajú **len pri prvom spustení dňa** alebo tlačidlom [Obnoviť]. Uložené údaje sa zobrazia hneď.
+
+## Premiéry
+Štyri farebné karty: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** a
+**SERIÁL – SVET premiéry**. Číslo na karte je počet titulov. *SK/CZ* sú len české a slovenské tituly, *SVET* všetky ostatné.
+1. Kliknite na kartu, napr. **FILM – SK/CZ premiéry**.
+2. Zvoľte pohľad: [Týždeň spätne], [Nadchádzajúce], [História] alebo [Zobraziť všetko] (história, posledný týždeň
+  aj nadchádzajúce naraz).
+3. Titul, na ktorý sa tešíte, zaškrtnite v stĺpci **Vybrané**. Voľba [Zobraziť vybrané] potom ukáže len vybrané.
+4. Do stĺpca **Poznámky** si môžete napísať čokoľvek – vložená webová adresa sa zmení na slovo-odkaz.
+- Filmy majú stĺpce **Názov filmu**, **Žáner**, **Produkcia**, **Premiéra**, **Kedy**, **Deň**, **VOD / TV / kino**.
+- Seriály majú navyše **Séria · epizóda**, **Periodicita** a **Epizódy**.
+- Pri názve sú odkazy [TMDB] a [HISTRA]; zelený riadok **▶ služba (krajina)** hovorí, kde sa dá titul legálne pozerať.
+- [Zobraziť aj postery] pridá plagáty, posuvník **Veľkosť POSTERU** ich zväčší až 2×. Pole [Hľadať:] hľadá aj bez diakritiky.
+!tip Premiéra prejde do **Histórie** deň po svojom dátume a ostane tam natrvalo.
+!pozor České a slovenské seriály potrebujú zdroj – pridáte ho v **Nastaveniach → Zdroje noviniek**.
+![Premiéry – filmy](premieres-films.jpg)
+@otvorit Premieres Otvoriť Premiéry
+
+## Novinky – Seriály
+Epizódy bežiacich seriálov za posledný týždeň, na kartách **SERIÁL – CZ/SK** a **SERIÁL – SVET**. Seriály sú
+zoradené abecedne s najbližšou epizódou; šípka vľavo rozbalí **strom epizód**.
+1. Skontrolujte hore **Vstupný priečinok** – tam UNIVERSUM hľadá stiahnuté epizódy ([Zmeniť…], [Otvoriť]).
+2. Zaškrtnite epizódy v strome alebo políčko v stĺpci **Spracovať** (všetky odvysielané epizódy seriálu).
+3. Kliknite na [Odoslať na spracovanie]. **Jeden súbor** ide do *Single spracovania*, **viac súborov** (aj z viacerých
+  seriálov) do *Hromadného spracovania*.
+- Stĺpec **Najbližšia** ukazuje najbližšiu epizódu a zelené **✓ v priečinku**, keď už súbor čaká na vstupe.
+- **Vybrané** a **Poznámky** sú spoločné s Premiérami – seriál vybraný tu je vybraný aj tam.
+- Pohľady [Týždeň spätne], [Nadchádzajúce], [História], [Zobraziť všetko]; voľba [len z mojich listov HISTRA].
+- Epizóda, ktorá ešte nie je vo vstupnom priečinku, čaká dole v **Čaká na súbor vo vstupnom priečinku** –
+  po stiahnutí kliknite na [Skontrolovať znova].
+!info Keď Hromadné spracovanie práve pracuje, seriály počkajú v bloku **Pripravené pre Hromadné spracovanie** –
+  neskôr ich pošlete tlačidlom [Do Hromadného spracovania]. Súbory sa **len čítajú**.
+![Novinky – Seriály](novinky.jpg)
+@otvorit SeriesNews Otvoriť Novinky – Seriály
+
+## Listy z HISTRA
+Vaše listy filmov a seriálov z HISTRA. UNIVERSUM ich **len číta** (nič tam nezapisuje) a uchováva ich len vo vašom počítači.
+1. V **Nastaveniach** uložte svoj token HISTRA.
+2. Kliknite na [Importovať listy…], zaškrtnite listy (alebo [Vybrať všetky]) a potvrďte [Importovať vybrané].
+3. Kliknite na plagát titulu – vľavo sa otvorí jeho **karta**: plagát, odkazy, identifikátory, názvy, žáner, réžia,
+  herci, dej a kolekcia.
+4. Z karty pokračujte tlačidlom [Otvoriť v TMDB Poster] (výber plagátu) alebo [Do Single spracovania].
+- [Do Single spracovania] nájde titul vo vstupnom priečinku: film alebo jedna epizóda ide do *Single spracovania*,
+  viac epizód do *Hromadného spracovania*.
+- [Synchronizovať] načíta všetky importované listy znova – inak sa samy **neobnovujú**.
+- Poradie listov zmeníte **ťahaním za úchyt** alebo šípkami; kôš odstráni list z UNIVERSUM (v HISTRA ostane).
+!tip Pole [Hľadať:] hľadá vo všetkých listoch naraz – český aj pôvodný názov alebo rok.
+![Listy z HISTRA](histra-lists.jpg)
+@otvorit HistraLists Otvoriť Listy z HISTRA
+
+## TMDB poster
+Nájde plagát filmu či seriálu a uloží ho ako **folder.jpg** – do priečinka **POSTER** vo výstupe alebo
+priamo k spracovanému titulu.
+1. Napíšte názov (aj s rokom, napr. *Vymyslený film 2026*), TMDB alebo IMDb ID, zvoľte *Filmy aj seriály*,
+  *Filmy* alebo *Seriály* a kliknite na [Hľadať].
+2. Kliknite na výsledok – vľavo sa ukáže karta titulu, vpravo blok **Plagát**.
+3. Vyberte plagát; odporúčaný má **★** a UNIVERSUM pod ním vysvetlí, prečo ho odporúča.
+4. Nastavte kompresiu: [Veľkosť folder.jpg:] (odporúčané *1000 × 1500*) a [Kvalita JPEG:] (90 = takmer ako originál).
+5. Kliknite na [Spracovať poster]; výsledok nájdete cez [Otvoriť priečinok POSTER].
+- [Zlúčiť poster s filmom/seriálom] uloží plagát do hlavného priečinka filmu (*MOVIES*) alebo seriálu (*TVSHOWS*).
+  Ak je titul zatiaľ len na vstupe, plagát **počká**, kým ho UNIVERSUM spracuje.
+- Keď TMDB plagát nemá, pomôže [Navrhnúť plagát cez AI].
+### Ďalšie TMDB obrázky
+Po zaškrtnutí [Ďalšie TMDB obrázky] vyberiete myšou **pozadie** (*fanart.jpg*), **logo názvu** (*clearlogo.png*),
+pri seriáli aj **plagáty sérií** a **obrázky epizód**. Uloží ich tlačidlo [Spracovať ďalšie TMDB obrázky];
+[Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom] ich dá k spracovanému titulu.
+!pozor Existujúci súbor sa neprepíše – premenuje sa na *folder-povodny.jpg* (alebo *…-povodny*).
+![TMDB poster](tmdb-poster.jpg)
+@otvorit Posters Otvoriť TMDB poster
+
+## Zaujímavosti
+Novinky, recenzie a zaujímavosti zo sveta filmu – **preložené do vášho jazyka**, celé články sú u ich autorov.
+1. Zdroje pridajte v **Nastaveniach → Zaujímavosti**; pre preklad tam uložte kľúč DeepL.
+2. Zvoľte obdobie [Dnes], [Tento týždeň] alebo [Všetko (História)].
+3. Kliknutím na farebný štítok zdroja ukážete len jeho články (ďalší klik = všetky).
+4. [Čítať celý článok] (alebo [Čítať]) otvorí článok na stránke autora.
+- [Originál / preklad] a [Originál] prepnú jeden článok, voľba [Zobraziť originál] všetky naraz.
+- Hviezdička **☆** označí obľúbený článok; [Len obľúbené ★] ukáže len ich.
+!info Bez kľúča DeepL sa články zobrazia v pôvodnom jazyku.
+![Zaujímavosti](zaujimavosti.jpg)
+@otvorit Interests Otvoriť Zaujímavosti
+
+## Dashboard
+- **Tento týždeň – seriály** a **Tento týždeň – filmy**: epizódy vybraných seriálov a premiéry tohto týždňa
+  (★ = vybraný titul). Tlačidlá [Novinky – Seriály] a [Premiéry] otvoria celé stránky.
+- **Kde pozerať – vybrané tituly**: kde sa dajú vybrané tituly legálne pozerať na Slovensku a v Česku; **NOVÉ** = nová
+  ponuka. [Skontrolovať] zistí stav hneď (inak raz denne).
+- **Pripravené vo vstupnom priečinku**: epizódy seriálov z Noviniek a vybrané filmy, ktoré už čakajú na vstupe –
+  [Spracovať] ich pošle na spracovanie.
+![Dashboard – Tento týždeň](dashboard-week.jpg)
+@otvorit Dashboard Otvoriť Dashboard
+
+## Tipy
+- Zaškrtávajte **Vybrané** – z nich čerpá Dashboard (*Tento týždeň*, *Kde pozerať*, vybrané filmy vo vstupnom priečinku).
+- Nastavte **Vstupný priečinok** raz – platí pre Premiéry, Novinky, Listy z HISTRA aj Dashboard.
+- Titul z listu HISTRA dostane plagát dvoma klikmi: [Otvoriť v TMDB Poster] → [Spracovať poster].
+- Ak niečo chýba, skúste [Obnoviť] – zdroje sa inak pýtajú len raz denne.

@@ -24,10 +24,16 @@
     <Resource Include="Assets\universum-256.png" />
     <!-- icons of the Explorer's context menu items (the installer points the registry at them) -->
     <Content Include="Assets\menu-*.ico" CopyToOutputDirectory="PreserveNewest" />
-    <!-- licences of the bundled third-party works (the name-day list, CommunityToolkit.Mvvm), installed with the program -->
+    <!-- licences of the bundled third-party works (CommunityToolkit.Mvvm), installed with the program -->
     <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Assets\tmdb-logo.svg" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Návody: the guides in UNIVERSUM's own markup (SK, CZ, EN) and their pictures, cut from the self-test's screenshots
+         (invented titles and files only) -->
+    <EmbeddedResource Include="Guides\*.txt" LogicalName="Guides.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Guides\obrazky\*.jpg" LogicalName="Guides.obrazky.%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Universum.Core\Universum.Core.csproj" />

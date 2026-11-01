@@ -1,0 +1,99 @@
+# Guide – TRACK EDITING
+The **TRACK EDITING (video, audio, subtitles)** group is for editing the individual tracks of a film: cutting and rotating the picture,
+fitting a dub, shifting and fixing subtitles. You **watch and listen to everything in the player** first and only then save.
+The original **never changes** – the result is always a **new file** (the video in the library, subtitles next to the original ones).
+
+!info The player is the same on all three pages: [−5 s], [+5 s], play / pause (**space bar**),
+  volume, audio track choice and a jump to the previous / next subtitle.
+
+## Video track editing
+Here you **cut out the parts you don't need** (e.g. the intro or adverts), change the **aspect ratio**, **rotate** the picture,
+reduce the **height** or change the **codec**.
+### Cutting
+1. Click [Open a video…] and choose e.g. *Vymyslený film (2026).mkv*.
+2. Play the film and, where the section should **start**, click [Start of section].
+3. Where the section should **end**, click [End of section] – the section is added to the list (*Od*, *Do*, *Dĺžka*).
+4. Repeat for more sections. **Only the sections in the list are kept**; everything else is cut out.
+5. At the bottom, fill in [Titul:] (or use [TMDB]) and click [Save].
+- **Double-click** a section to move the player to its start; [Remove] takes it off the list.
+- [Whole film] clears all sections – nothing is cut out.
+!tip Without [Presný strih (obraz sa zapíše znova)], cutting is **fast and lossless** – a section just moves
+  to the nearest point where a cut is possible (usually a fraction of a second). An exact cut is frame-accurate but takes a long time.
+### Picture
+- **Pomer strán** – how players display the picture; it is written without any loss of quality.
+- [Otočiť:] *o 90° doprava*, *o 180°*, *o 90° doľava*; [Výška (riadky):] e.g. from 2160 to 1080.
+- **Prekódovanie** – *H.264* or *H.265 (HEVC)* and the [Kvalita:] slider.
+!pozor Rotating, a different height, a different codec and an exact cut **write the picture again** with the Windows encoders – this takes a long time.
+  Sound and subtitles stay unchanged.
+![Video track editing – section, rotation](studio-video.jpg)
+@otvorit Video Open Video track editing
+
+## Audio track editing
+Here you **fit a dub** from another release, fix sound that lags behind, convert sound between **PAL 25 and 23.976 FPS**,
+and change the codec or the volume. The chosen sound plays with the picture **exactly as it will be written**.
+### Fitting a dub
+1. [Open a video…] – e.g. *Vymyslený film (2026).mkv*.
+2. [Add a sound…] – an audio file (MKA, AC-3, DTS, AAC, FLAC, WAV…) or **another film** to take the sound from.
+3. Choose the added sound in the list and, at **Napasovať vybraný zvuk na:**, pick the film's original sound.
+4. Click [Fit]. A certain result (shift and FPS change) is **set automatically**.
+5. Check it by playing it back and click [Save].
+!info An uncertain result is not used automatically – the [Use the suggestion] button appears. Use it only after checking it in the player.
+### Manual changes to the chosen sound
+- **Posun** below the player: [−1000] [−100] [−10] … [+1000] ms – you hear the change straight away.
+- **Zmena FPS (PAL 25 ↔ 23,976)** – with [Zachovať výšku tónu] voices sound the same, just slower or faster.
+- **Kodek a hlasitosť** – [Kodek:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (bezstratovo)*;
+  [Stereo (zmiešať 5.1 do dvoch kanálov)], [Normalizovať hlasitosť na −23 LUFS (EBU R128)], [Zosilniť / stlmiť:].
+- [Jazyk:] and [Názov stopy:]; the **Ponechať** column decides whether the track stays in the result.
+- [Reset the changes] returns the chosen sound to its original state.
+!tip A **shift on its own is written losslessly**. An FPS change, codec, stereo and volume write the sound again.
+![Audio track editing – an added dub](studio-audio.jpg)
+@otvorit Audio Open Audio track editing
+
+## Subtitle track editing
+Here you **shift, fit, fix, download, translate** or **read subtitles from pictures**. The subtitles you are editing
+are **white at the bottom** of the picture; those chosen in [Porovnať s:] are **yellow at the top**.
+### Shifting while you watch
+1. [Open a video…] (or [Open subtitles…] for subtitle files on their own).
+2. On the **Stopy titulkov** tab, choose the subtitles you want to edit.
+3. Play the film. When a subtitle is late, click [Subtitle starts now] at the moment the character starts speaking.
+4. Fine-tune with [−100] / [+100] (ms) and click [Save].
+### Automatic fitting
+- Tick **podľa zvuku** and/or **podľa titulkov:** (other subtitles that match the film, even in another language).
+- [Fit] sets the shift and also an **FPS change** or speed. An uncertain result waits for [Use the suggestion].
+- [Check the video's subtitles] tells you for each track: in sync, late, early or a different FPS.
+- **Synchronizácia podľa dvoch titulkov**: at a subtitle near the start of the film click [Point 1], at a subtitle near the end
+  click [Point 2] – speed and shift are worked out automatically.
+### Tabs
+- **Časy titulkov** – all subtitles with the time *Teraz* and *Po zmene*. Fix the text with the **F2** key;
+  the right mouse button offers *Odstrániť titulok* and *Vrátiť všetky úpravy textu*.
+- **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com via the browser and translation via svsub.net.
+  The result is saved next to the video, e.g. *Vymyslený film (2026).sk.srt*.
+- **Text z obrázkov (OCR)** – turns picture subtitles from Blu-ray (PGS) into text: choose the track and click
+  [Recognise the text]. When it meets a shape it doesn't know, it **asks once per film** and remembers it.
+![Subtitle track editing](studio-subtitles.jpg)
+![OCR asks about an unknown shape](ocr-question.jpg)
+!info When OCR asks, type the letter and press [Next]; a smudge is [Not a letter], and if you are unsure, [Don't know].
+  [Opraviť text podľa jazyka] then fixes doubtful words – you can [Vrátiť] any fix.
+!pozor Subtitle files are saved as **new SRT or WebVTT files next to the original ones**, never over an existing file.
+@otvorit Subtitles Open Subtitle track editing
+
+## Using the studio from Batch processing
+You can edit a file from Batch processing in the studio **before the job starts**:
+1. In Batch processing, choose the file and click [Titulky v štúdiu] or [Zvuk v štúdiu]
+   (or right-click: *Upraviť v štúdiu (titulky)* / *Upraviť v štúdiu (zvuk)*).
+2. The file opens in Subtitle track editing or Audio track editing, with the changes made so far.
+3. Change what you need and click [Save to the job]. The changes are written **only when the job runs**.
+- [Back without saving] goes back without any changes.
+- Outside a job, you can put unfinished work aside with [Save the work] – the next time you open **the same video**
+  it comes back. Nothing is written to the files; [Discard the work] forgets it.
+!pozor **Subtitle text fixes** (F2, elements for the deaf, formatting, overlaps) cannot be saved to a job –
+  the studio warns you about this. Save such subtitles directly with [Save].
+![Studio opened from a job](studio-task.jpg)
+@otvorit Batch Open Batch processing
+
+## Tips
+- **Listen first, save later** – check every change in the player; it plays straight away exactly as it will be written.
+- [Clear] forgets the open video – nothing changes on the disk.
+- Before [Save] you can switch on [Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)].
+!tip A dub from a PAL release (25 FPS) for a film at 23.976 FPS: [Fit] finds the FPS change too – no need to enter it by hand.
+!tip Subtitles from OpenSubtitles show whether the **FPS matches** the film – pick the ones that match.

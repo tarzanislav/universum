@@ -47,6 +47,10 @@ public static class HtmlWriter
 
                         html.Append("\"></div>\n");
                         break;
+                    case ImageItem image:
+                        html.Append("<img class=\"b\" alt=\"\" style=\"left:").Append(N(image.X)).Append("pt;top:").Append(N(image.Y)).Append("pt;width:").Append(N(image.Width))
+                            .Append("pt;height:").Append(N(image.Height)).Append("pt\" src=\"data:image/jpeg;base64,").Append(Convert.ToBase64String(image.Picture.Bytes)).Append("\">\n");
+                        break;
                     case LineItem line:
                         var length = Math.Sqrt(Math.Pow(line.X2 - line.X1, 2) + Math.Pow(line.Y2 - line.Y1, 2));
                         var angle = Math.Atan2(line.Y2 - line.Y1, line.X2 - line.X1) * 180 / Math.PI;

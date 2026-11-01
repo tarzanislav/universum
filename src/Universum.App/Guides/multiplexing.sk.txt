@@ -1,0 +1,96 @@
+# Návod – MULTIPLEXING
+Skupina **MULTIPLEXING** slúži na skladanie a úpravu súborov MKV: **zlúčite** stopy z viacerých súborov do jedného,
+opravíte **hlavičku** (názvy, jazyky, príznaky stôp), upravíte **kapitoly** a pozriete si **informácie** o stopách.
+Originály sa **nikdy nemenia** – výsledok je vždy **nový súbor** (vedľa zdroja alebo v knižnici).
+
+## Zlučovanie
+Tu z filmu, zvukov a titulkov zložíte **jeden nový súbor MKV** – vyberiete stopy, ich poradie, názvy, jazyky a príznaky.
+### Postup
+1. Kliknite na [Pridať súbory…] alebo súbory **pretiahnite myšou** do okna – napr. *Vymyslený film (2026).mkv*
+   a *Vymyslený film (2026).sk.srt*.
+2. UNIVERSUM sa opýta, **čo sa má so súbormi urobiť** – pridať do aktuálnych nastavení, vytvoriť nové nastavenia,
+   pripojiť k existujúcemu súboru (pokračovanie) alebo pridať ako ďalšie časti. Potvrďte [OK].
+3. V zozname **Stopy vo výstupe** nechajte zaškrtnuté v stĺpci **Vziať** len stopy, ktoré chcete.
+4. Kliknite na [Pravidlá UNIVERSUM] – vyplnia sa názvy, jazyky, príznaky a poradie stôp. Skontrolujte ich.
+5. Zvoľte [film] alebo [seriál], vyplňte [Titul:] (alebo kliknite na [TMDB]), pri seriáli aj [Epizóda:] (napr. S01E04).
+6. Kliknite na [Spustiť zlučovanie] (pridá do fronty a spustí) alebo na [Do fronty] (len pridá).
+![Zlučovanie – stopy, vlastnosti a výstup](mux.jpg)
+![Ako pridať súbory](mux-add-files.jpg)
+### Zdrojové súbory
+- Stĺpce **Názov súboru**, **Kontajner**, **Veľkosť**, **Priečinok**; každý súbor má **svoju farbu**, rovnaká farba
+  je pri jeho stopách.
+- [Odstrániť] vyhodí vybraný súbor aj s jeho stopami, [Vymazať všetko] všetky – **na disku sa nič nezmení**.
+- [Informácie] ukáže vybraný súbor na stránke **Informácie**.
+- **Pravé tlačidlo** ponúkne napr. *Pripojiť súbory…* (2. časť filmu), *Pridať súbory ako ďalšie časti…*
+  (VOB rozdelený na časti), *Nastaviť názov výstupného súboru podľa vybraného súboru*, *Vybrať všetky stopy zo súboru*.
+### Stopy vo výstupe a Vlastnosti
+- Stĺpce **Vziať**, **Typ**, **Kodek**, **Jazyk**, **Názov**, **Default**, **Forced**, **Ďalšie**; riadky sú v poradí,
+  v akom budú vo výstupe. Poradie zmeníte šípkami (**Ctrl+↑** / **Ctrl+↓**).
+- Po výbere stopy sa vpravo v časti **Vlastnosti** dá zmeniť [Názov stopy], [Jazyk] a príznaky
+  [Predvolená stopa (Default)], [Zapnutá (Enabled)], [Vynútené zobrazenie (Forced)].
+- [Ďalšie príznaky a rozšírené vlastnosti]: SDH, audio popis, komentár, oneskorenie (ms), FPS, pomer strán, orez,
+  kódovanie znakov titulkov (pre staré české a slovenské titulky zvyčajne *cp1250*).
+- Po výbere zdrojového súboru určíte, či sa z neho vezmú aj **Kapitoly**, **Prílohy (písma, obrázky)** a **Tagy**.
+- [Výstup: názov, kapitoly, prílohy] – názov (title) výstupu, kapitoly zo súboru (XML, OGM .txt, cue) a nové prílohy.
+!info Stopy **pripojeného súboru** sú sivé a šikmé – pokračujú stopou, ku ktorej patria, a preberajú jej názov,
+  jazyk aj príznaky. Na úpravu kliknite na [Upraviť hlavnú stopu].
+### Výstupný súbor a knižnica
+- Predvolene vznikne výstup **vedľa prvého zdroja**; so zadaným titulom dostane **názov podľa pravidiel**.
+- [Vybrať…] zvolí iný priečinok a meno, [Resetovať] vráti predvolený výstup.
+- [Do knižnice] pošle výsledok do knižnice (**MOVIES** / **TVSHOWS**) – cesta sa potom nedá upravovať.
+  [Knižnica…] určí, do ktorej knižnice.
+### Viac nastavení naraz
+- Každý výstupný súbor má **vlastnú záložku**; novú pridáte tlačidlom **+** (*Nové nastavenia zlučovania*).
+- Bodka **•** pri záložke znamená, že zmeny **ešte nie sú vo fronte**. Zatvorenie takej záložky sa najprv opýta.
+- Dole vľavo je stav **fronty** a priebeh bežiacej úlohy.
+!pozor Ak je titul neistý, objaví sa [Potvrdiť titul] – kým ho nepotvrdíte, zápis do knižnice nezačne.
+@otvorit Mux Otvoriť Zlučovanie
+
+## Úprava hlavičky
+Tu opravíte **názvy, jazyky a príznaky stôp** súboru MKV **bez nového zlučovania**. Hlavička sa zmení na kópii
+v knižnici – trvá to sekundy až minúty.
+1. Kliknite na [Otvoriť súbor…] alebo súbor pretiahnite myšou – napr. *Vymyslený seriál S01E02.mkv*.
+2. Kliknite na [Pravidlá UNIVERSUM] – vyplnia sa názvy, jazyky, príznaky a poradie; potom ich môžete upraviť ručne.
+3. V tabuľke upravte stĺpce **Názov**, **Jazyk**, **Default**, **Enabled**, **Forced**; stĺpec **Zmeny** ukazuje,
+   čo sa zmení (pôvodná hodnota je v bublinke).
+4. Dole zvoľte [film] / [seriál], vyplňte [Titul:] a kliknite na [Uložiť] (alebo [Do fronty]).
+- [Názov (title):] je názov celého súboru, ktorý ukazujú prehrávače; prázdny ho odstráni.
+- [Odstrániť tagy] zmaže tagy (názvy, štatistiky, údaje o kódovaní); [Obnoviť zo súboru] zahodí neuložené úpravy.
+- **▲ / ▼** menia poradie (zvuk medzi zvukom, titulky medzi titulkami), **Vynechať** stopu z výsledku vyhodí.
+- Časť **Kontrola** upozorní napr. na viac stôp s Default alebo na forced titulky bez Default.
+!info Zmena poradia alebo vynechanie stopy **zapíše nový súbor** – trvá to minúty. Pod tabuľkou vždy vidíte,
+  ako sa výsledok zapíše. [Vrátiť späť] vráti poslednú uloženú zmenu, keď sa to dá.
+![Úprava hlavičky](header-editor.jpg)
+@otvorit HeaderEditor Otvoriť Úpravu hlavičky
+
+## Kapitoly
+Tu kapitoly súboru **pridáte, opravíte, vygenerujete alebo posuniete**.
+1. Kliknite na [Otvoriť súbor…] – zobrazí sa trvanie a doterajšie kapitoly.
+2. Upravte **Začiatok (HH:MM:SS.mmm)**, **Názov** a **Jazyk**. Chybný čas sa zafarbí na červeno.
+3. Vyplňte [Titul:] a kliknite na [Uložiť] – kópia s novými kapitolami sa uloží do knižnice.
+- [Pridať] vloží kapitolu za vybranú (o minútu neskôr), [Odstrániť] ju vyhodí, [Zoradiť podľa času] ich usporiada.
+- **Každých** … **min** a [Vygenerovať] nahradí zoznam kapitolami po celej dĺžke súboru.
+- **Posun** … **s** a [Posunúť všetky] posunie všetky kapitoly naraz (aj záporne, napr. -1).
+- [Načítať zo súboru…] (XML alebo OGM .txt), [Odstrániť všetky], [Obnoviť zo súboru], [Vrátiť späť].
+!pozor Súbor s viacerými vydaniami alebo vnorenými kapitolami UNIVERSUM **nemení** – upravte ho v MKVToolNix GUI.
+![Kapitoly](chapters.jpg)
+@otvorit Chapters Otvoriť Kapitoly
+
+## Informácie
+Tu si **pozriete stopy** ľubovoľného videa (MKV, MP4, AVI, TS…) – nič sa tu nemení.
+1. Kliknite na [Otvoriť súbor…] alebo vľavo v zozname **Súbory v práci** (súbory zo Zlučovania a Hromadného
+   spracovania) kliknite na súbor.
+2. Hore sa zobrazí kontajner, trvanie a počet stôp, kapitol, tagov a príloh.
+3. Tabuľka má stĺpce **ID**, **Typ**, **Kodek**, **Jazyk**, **Názov**, **Default**, **Enabled**, **Forced**,
+   **Ďalšie príznaky** a **Vlastnosti**; riadky sú **farebné podľa typu** stopy.
+![Informácie o súbore zo Zlučovania](info-files.jpg)
+@otvorit Info Otvoriť Informácie
+
+## Tipy
+- **Najprv [Pravidlá UNIVERSUM], potom ručné úpravy** – pravidlá sa dajú použiť znova kedykoľvek.
+- Stopám s **neurčeným jazykom** jazyk vyberte a pravidlá použite znova.
+- [Titul:] píšte v tvare *Názov (rok)*, napr. *Vymyslený film (2026)*; vložiť môžete aj adresu TMDB.
+- [Doplnok:] odlíši inú verziu titulu, napr. *Directors Cut* alebo *Remaster*.
+!tip Viac úloh naraz pridajte cez [Do fronty] a spustite ich spolu na stránke **Fronta úloh**.
+@otvorit Queue Otvoriť Frontu úloh
+!tip Riadok s **upozornením** pod stopami (Zlučovanie) ukáže, čo by pravidlá ešte zmenili – podrobnosti sú v bublinke.

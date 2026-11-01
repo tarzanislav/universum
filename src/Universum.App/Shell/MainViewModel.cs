@@ -90,9 +90,17 @@ public sealed class MainViewModel : ObservableObject
             ReminderText = "";
         });
         _reminderCheck = DateTime.Now.AddMinutes(-1);
+        _actionCheck = DateTime.Now;
         _reminderTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-        _reminderTimer.Tick += (_, _) => CheckReminders();
+        _reminderTimer.Tick += (_, _) =>
+        {
+            CheckReminders();
+            _ = CheckActionsAsync();
+            RefreshBadges();
+        };
         _reminderTimer.Start();
+        services.Agenda.Changed += () => Jobs.JobRow.OnUi(RefreshBadges);
+        RefreshBadges();
 
         // the left rail: Dashboard on its own, then framed groups, each with its own tint (owner's order, 27. and 28. 10.)
         var news = new ToolGroup(Loc.T("NOVINKY A OBSAH"), Color.FromRgb(0x9B, 0x6B, 0xD6));
@@ -110,9 +118,9 @@ public sealed class MainViewModel : ObservableObject
             new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
             new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
             // owner, 31. 10. 2026: the group POZNÁMKY – the calendar, the tasks, the notes and a guide
-            new(Loc.T("Kalendár"), "\uE787", Calendar, notes),
-            new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes),
-            new(Loc.T("Poznámky"), "\uE70B", AgendaNotes, notes),
+            new(Loc.T("Kalendár"), "\uE787", Calendar, notes, CalendarBadge),
+            new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes, TasksBadge),
+            new(Loc.T("Poznámky"), "\uE70B", AgendaNotes, notes, NotesBadge),
             new(Loc.T("Návod"), "\uE897", NotesGuide, notes),
             new(Loc.T("Zlučovanie"), "\uE71D", Mux, multiplexing),
             new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
@@ -291,7 +299,140 @@ public sealed class MainViewModel : ObservableObject
 
     private readonly System.Windows.Threading.DispatcherTimer _reminderTimer;
     private DateTime _reminderCheck;
+    private DateTime _actionCheck;
+    private bool _actionsRunning;
     private DateOnly? _reminderDay;
+
+    /// <summary>The live counts of the group POZNÁMKY in the left rail (owner, 31. 10. 2026).</summary>
+    public ToolBadge CalendarBadge { get; } = new();
+
+    public ToolBadge TasksBadge { get; } = new();
+
+    public ToolBadge NotesBadge { get; } = new();
+
+    /// <summary>Today's records in Kalendár, the late tasks (red; otherwise today's), the number of notes.</summary>
+    public void RefreshBadges()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var items = _services.Agenda.Items;
+        var todays = _services.Agenda.Between(today, today).Count;
+        CalendarBadge.Set(todays > 0 ? todays.ToString(System.Globalization.CultureInfo.InvariantCulture) : "", false, Loc.T("Dnešné záznamy"));
+        var late = items.Count(i => i.Task is { IsOpen: true, Due: { } due } && due < today);
+        var dueToday = items.Count(i => i.Task is { IsOpen: true } task && task.Due == today);
+        TasksBadge.Set(late > 0 ? late.ToString(System.Globalization.CultureInfo.InvariantCulture) : dueToday > 0 ? dueToday.ToString(System.Globalization.CultureInfo.InvariantCulture) : "",
+            late > 0, late > 0 ? Loc.T("Úlohy po termíne") : Loc.T("Dnešné úlohy"));
+        var notes = items.Count(i => i.Note is not null);
+        NotesBadge.Set(notes > 0 ? notes.ToString(System.Globalization.CultureInfo.InvariantCulture) : "", false, Loc.T("Poznámky"));
+    }
+
+    /// <summary>
+    /// The actions of UNIVERSUM due since the last look (owner, 31. 10. 2026 – tasks for UNIVERSUM): each is done once, how it
+    /// ended is kept with the record and told in the bar on top. A time missed while UNIVERSUM did not run is not caught up.
+    /// </summary>
+    public async Task CheckActionsAsync(DateTime? now = null)
+    {
+        if (_actionsRunning)
+        {
+            // the span waits for the next look
+            return;
+        }
+
+        var upTo = now ?? DateTime.Now;
+        var due = _services.Agenda.DueActions(_actionCheck, upTo);
+        _actionCheck = upTo;
+        if (due.Count == 0)
+        {
+            return;
+        }
+
+        _actionsRunning = true;
+        try
+        {
+            var told = new List<string>();
+            foreach (var (item, _) in due.DistinctBy(d => d.Item.Id))
+            {
+                if (item.Action is not { } action)
+                {
+                    continue;
+                }
+
+                string outcome;
+                try
+                {
+                    outcome = await RunActionAsync(action);
+                }
+                catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.Net.Http.HttpRequestException)
+                {
+                    outcome = "nepodarilo sa – " + ex.Message;
+                }
+
+                action.LastRun = DateTimeOffset.Now;
+                action.LastOutcome = outcome;
+                _services.Agenda.Save(item);
+                told.Add(item.Title + ": " + outcome);
+            }
+
+            _reminderDay = DateOnly.FromDateTime(upTo);
+            ReminderText = "⚙ UNIVERSUM vykonal – " + string.Join("   ·   ", told);
+        }
+        finally
+        {
+            _actionsRunning = false;
+        }
+    }
+
+    // one action, done as its own button would do it (never while that tool is working); how it ended, in words
+    private async Task<string> RunActionAsync(Core.Agenda.AgendaAction action)
+    {
+        switch (action.Kind)
+        {
+            case Core.Agenda.AgendaActionKind.RefreshNews:
+                var parts = new List<string>();
+                foreach (var (refresh, name) in new[] { (Premieres.RefreshCommand, "Premiéry"), (SeriesNews.RefreshCommand, "Novinky") })
+                {
+                    if (refresh.CanExecute(null))
+                    {
+                        await refresh.ExecuteAsync(null);
+                        parts.Add(name + " obnovené");
+                    }
+                    else
+                    {
+                        parts.Add(name + " práve pracujú – vynechané");
+                    }
+                }
+
+                return string.Join(", ", parts);
+            case Core.Agenda.AgendaActionKind.SyncHistra:
+                if (!HistraLists.SyncCommand.CanExecute(null))
+                {
+                    return "HISTRA nie je zapnutá, nemá listy alebo práve pracuje – vynechané";
+                }
+
+                await HistraLists.SyncCommand.ExecuteAsync(null);
+                return HistraLists.Status.Length > 0 ? HistraLists.Status : "listy HISTRA synchronizované";
+            case Core.Agenda.AgendaActionKind.AnalyzeInput:
+                if (Batch.IsEditingMega || !Batch.AnalyzeCommand.CanExecute(null))
+                {
+                    return "Hromadné spracovanie práve pracuje alebo nemá priečinok – vynechané";
+                }
+
+                await Batch.AnalyzeCommand.ExecuteAsync(null);
+                return Batch.Summary.Length > 0 ? Batch.Summary : "priečinok analyzovaný";
+            default:
+                if (_services.Mega.Batches.FirstOrDefault(b => b.Id == action.Batch) is not { } batch)
+                {
+                    return "MEGA dávka už neexistuje";
+                }
+
+                if (batch.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed))
+                {
+                    return batch.Label + " už nečaká – vynechané";
+                }
+
+                await Mega.StartAsync(batch);
+                return batch.State == Core.Mega.MegaBatchState.Queued ? batch.Label + " je vo fronte úloh" : batch.Label + ": " + Mega.Message;
+        }
+    }
     private string _reminderText = "";
 
     /// <summary>The reminder shown on top ("🔔 20:00 Kino – …"); empty: none.</summary>

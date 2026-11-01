@@ -308,6 +308,93 @@ public sealed class AgendaStore
         return [.. found.OrderBy(f => f.Item2)];
     }
 
+    /// <summary>
+    /// The actions due after <paramref name="after"/> up to <paramref name="upTo"/>: each start of a record with an action
+    /// and an hour that falls in that span.
+    /// </summary>
+    public IReadOnlyList<(AgendaItem Item, DateTime Start)> DueActions(DateTime after, DateTime upTo)
+    {
+        var found = new List<(AgendaItem, DateTime)>();
+        foreach (var item in Items)
+        {
+            if (item.Action is null || item.Time is not { StartTime: { } hour } time)
+            {
+                continue;
+            }
+
+            foreach (var start in Recurrences.Starts(time, DateOnly.FromDateTime(after), DateOnly.FromDateTime(upTo)))
+            {
+                var moment = start.ToDateTime(hour);
+                if (moment > after && moment <= upTo)
+                {
+                    found.Add((item, moment));
+                }
+            }
+        }
+
+        return [.. found.OrderBy(f => f.Item2)];
+    }
+
+    /// <summary>The next start of a timed record after a moment (within two years); null: none more.</summary>
+    public static DateTime? NextStart(AgendaItem item, DateTime after)
+    {
+        if (item.Time is not { } time)
+        {
+            return null;
+        }
+
+        var from = DateOnly.FromDateTime(after);
+        foreach (var start in Recurrences.Starts(time, from, from.AddYears(2)))
+        {
+            var moment = start.ToDateTime(time.StartTime ?? TimeOnly.MinValue);
+            if (moment > after)
+            {
+                return moment;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Records read from an iCalendar file added: one already here (the same UID, or a record exported by UNIVERSUM itself)
+    /// is left out; how many were added.
+    /// </summary>
+    public int Add(IEnumerable<AgendaItem> records)
+    {
+        var added = 0;
+        lock (_gate)
+        {
+            var items = Loaded();
+            foreach (var record in records)
+            {
+                if (items.Any(i => i.Id == record.Id || (record.Uid is { } uid && (i.Uid == uid || OwnUid(i, uid)))))
+                {
+                    continue;
+                }
+
+                items.Add(record);
+                added++;
+            }
+
+            if (added > 0)
+            {
+                Write(items);
+            }
+        }
+
+        if (added > 0)
+        {
+            Changed?.Invoke();
+        }
+
+        return added;
+    }
+
+    // "0f8f…@universum", "…-uloha@universum": a record UNIVERSUM exported itself
+    private static bool OwnUid(AgendaItem item, string uid) =>
+        uid.EndsWith("@universum", StringComparison.OrdinalIgnoreCase) && uid.Length >= 32 && uid[..32].Equals(item.Id.ToString("N"), StringComparison.OrdinalIgnoreCase);
+
     private void Change(Guid id, Action<AgendaItem> change)
     {
         lock (_gate)

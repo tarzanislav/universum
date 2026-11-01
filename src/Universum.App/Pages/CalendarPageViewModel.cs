@@ -85,7 +85,8 @@ public sealed partial class CalendarPageViewModel : ObservableObject
                  Layer(CalendarLayer.School, L("školské prázdniny", "školní prázdniny", "school holidays")), Layer(CalendarLayer.NameDays, L("meniny", "jmeniny", "name days"))], LayersChanged),
             // what UNIVERSUM plans (MEGA batches with a time) and did (the logs of processing)
             new CalendarLayerGroup("UNIVERSUM",
-                [Layer(CalendarLayer.Mega, L("MEGA dávky", "MEGA dávky", "MEGA batches")), Layer(CalendarLayer.Processed, L("spracované", "zpracované", "processed"))], LayersChanged),
+                [Layer(CalendarLayer.Actions, L("naplánované akcie", "naplánované akce", "scheduled actions")), Layer(CalendarLayer.Mega, L("MEGA dávky", "MEGA dávky", "MEGA batches")),
+                 Layer(CalendarLayer.Processed, L("spracované", "zpracované", "processed"))], LayersChanged),
         ];
         var regions = Regions;
         RegionSwitches = [.. HolidayRegions.All.Select(r => new CalendarRegionSwitch(r, HolidayRegions.Name(r, Loc.Language), regions.Contains(r), RegionsChanged))];
@@ -379,6 +380,8 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             new(L("Obnoviť zo zálohy…", "Obnovit ze zálohy…", "Restore from a backup…"), "JSON|*.json", "",
                 path => L("Zo zálohy pridané alebo obnovené záznamy: ", "Ze zálohy přidané nebo obnovené záznamy: ", "Records added or restored: ") + store.Import(path).ToString(CultureInfo.InvariantCulture),
                 Opens: true, ToolTip: "Pridá záznamy, ktoré tu nie sú, a obnoví staršie verzie novšími zo zálohy – nič sa nemaže"),
+            new(L("Načítať iCalendar (.ics)…", "Načíst iCalendar (.ics)…", "Read an iCalendar file (.ics)…"), "iCalendar|*.ics", "", ImportIcs,
+                Opens: true, ToolTip: "Udalosti a úlohy z Outlooku, Googlu alebo zo súboru UNIVERSUM – čo tu už je, sa nepridá druhý raz"),
         ];
         return new ReportViewModel(_services, L("Kalendár", "Kalendář", "Calendar") + " – " + PeriodText, forms, BuildReport, exports);
     }
@@ -490,6 +493,31 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         Detail();
     }
 
+    /// <summary>The events and tasks of an iCalendar file added to the agenda; what it did, in words.</summary>
+    public string ImportIcs(string path)
+    {
+        var read = AgendaImport.Ics(File.ReadAllText(path));
+        var added = _services.Agenda.Add(read.Items);
+        var text = L($"Z iCalendar pridané záznamy: {added} z {read.Items.Count}", $"Z iCalendar přidané záznamy: {added} z {read.Items.Count}", $"Records added from iCalendar: {added} of {read.Items.Count}");
+        if (read.Items.Count > added)
+        {
+            text += L(" (ostatné tu už sú)", " (ostatní tu už jsou)", " (the others are here already)");
+        }
+
+        if (read.Skipped > 0)
+        {
+            text += L($" · vynechané: {read.Skipped} (bez dňa alebo sviatky)", $" · vynechané: {read.Skipped} (bez dne nebo svátky)", $" · left out: {read.Skipped} (no day, or holidays)");
+        }
+
+        if (read.Simplified > 0)
+        {
+            text += L($" · zjednodušené opakovanie: {read.Simplified}", $" · zjednodušené opakování: {read.Simplified}", $" · repeat simplified: {read.Simplified}");
+        }
+
+        Status = text;
+        return text;
+    }
+
     /// <summary>Shows a day: the period with it, the day chosen (the reminders, the Dashboard).</summary>
     public void Show(DateOnly date)
     {
@@ -528,6 +556,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     })
     {
         Voice = _services.Voice,
+        MegaBatches = AgendaEditor.MegaChoices(_services.Mega, item?.Action?.Batch),
     };
 
     private async Task LoadAsync()
@@ -796,7 +825,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         foreach (var occurrence in _services.Agenda.Between(from, to))
         {
             var item = occurrence.Item;
-            var layer = item.Time is not null ? CalendarLayer.Events : CalendarLayer.Tasks;
+            var layer = item.Action is not null ? CalendarLayer.Actions : item.Time is not null ? CalendarLayer.Events : CalendarLayer.Tasks;
             for (var day = occurrence.First; day <= occurrence.Last; day = day.AddDays(1))
             {
                 Add(day, Record(item, layer, day == occurrence.First));
@@ -915,6 +944,11 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             parts.Add(AgendaEditor.Priorities[Math.Clamp(task.Priority, 0, 2)].Label + " " + L("priorita", "priorita", "priority"));
         }
 
+        if (item.Action is { } action)
+        {
+            parts.Add(AgendaEditor.ActionText(action.Kind) + (action.LastOutcome.Length > 0 ? " · " + L("naposledy: ", "naposledy: ", "last: ") + action.LastOutcome : ""));
+        }
+
         if (item.Text.Length > 0)
         {
             parts.Add(item.Text.Length > 140 ? item.Text[..140] + "…" : item.Text);
@@ -923,7 +957,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         return new CalendarEntry
         {
             Layer = layer,
-            Title = item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0],
+            Title = (item.Action is not null ? "⚙ " : "") + (item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0]),
             Detail = string.Join(" · ", parts),
             Time = time,
             Color = CalendarColors.Of(layer, item.Color),
@@ -963,7 +997,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             Section(L("Premiéry filmov", "Premiéry filmů", "Film premieres"), CalendarLayer.FilmsDomestic, CalendarLayer.FilmsDomestic, CalendarLayer.FilmsWorld),
             Section(L("Premiéry seriálov", "Premiéry seriálů", "Series premieres"), CalendarLayer.SeriesDomestic, CalendarLayer.SeriesDomestic, CalendarLayer.SeriesWorld),
             Section(L("Novinky – Seriály", "Novinky – Seriály", "New episodes"), CalendarLayer.EpisodesWorld, CalendarLayer.EpisodesDomestic, CalendarLayer.EpisodesWorld),
-            Section("UNIVERSUM", CalendarLayer.Mega, CalendarLayer.Mega, CalendarLayer.Processed),
+            Section("UNIVERSUM", CalendarLayer.Actions, CalendarLayer.Actions, CalendarLayer.Mega, CalendarLayer.Processed),
         }.OfType<CalendarSection>().ToList();
         OnPropertyChanged(nameof(DetailIsEmpty));
     }

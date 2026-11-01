@@ -104,6 +104,40 @@ public sealed class AgendaNote
     public string? Recording { get; set; }
 }
 
+/// <summary>What UNIVERSUM can do by itself at the time of a record (owner, 31. 10. 2026 – tasks for UNIVERSUM).</summary>
+public enum AgendaActionKind
+{
+    /// <summary>The folder of Hromadné spracovanie analysed (as the button Analyzovať does).</summary>
+    AnalyzeInput,
+
+    /// <summary>Premiéry and Novinky – Seriály read again from their sources.</summary>
+    RefreshNews,
+
+    /// <summary>The lists of HISTRA synchronised.</summary>
+    SyncHistra,
+
+    /// <summary>A waiting batch of MEGA spracovanie started (added to the job queue).</summary>
+    StartMega,
+}
+
+/// <summary>
+/// The action side of a timed record: UNIVERSUM does it by itself at each start of the record while it runs (a time
+/// missed while it was not running is not caught up, as with MEGA). Nothing irreversible is ever started this way.
+/// </summary>
+public sealed class AgendaAction
+{
+    public AgendaActionKind Kind { get; set; }
+
+    /// <summary>The batch of MEGA spracovanie to start (<see cref="AgendaActionKind.StartMega"/>).</summary>
+    public Guid? Batch { get; set; }
+
+    /// <summary>When it was done the last time.</summary>
+    public DateTimeOffset? LastRun { get; set; }
+
+    /// <summary>How it ended the last time, in words.</summary>
+    public string LastOutcome { get; set; } = "";
+}
+
 /// <summary>What a record can be linked to.</summary>
 public enum LinkKind
 {
@@ -167,4 +201,10 @@ public sealed class AgendaItem
     public AgendaTask? Task { get; set; }
 
     public AgendaNote? Note { get; set; }
+
+    /// <summary>What UNIVERSUM does by itself at the record's time (only with a time of day).</summary>
+    public AgendaAction? Action { get; set; }
+
+    /// <summary>The UID of a record read from an iCalendar file (so the same file read again adds nothing twice).</summary>
+    public string? Uid { get; set; }
 }

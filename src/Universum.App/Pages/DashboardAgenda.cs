@@ -125,7 +125,7 @@ public sealed class AgendaOverview : ObservableObject
 
     // the premieres and episodes have their own panels on the Dashboard, the tasks their own list here
     private static readonly IReadOnlyCollection<CalendarLayer> CalendarLayers =
-        [CalendarLayer.Events, CalendarLayer.Notes, CalendarLayer.Holidays, CalendarLayer.Mega];
+        [CalendarLayer.Events, CalendarLayer.Notes, CalendarLayer.Holidays, CalendarLayer.Actions, CalendarLayer.Mega];
 
     private readonly AppServices _services;
     private readonly Shell.MainViewModel _main;

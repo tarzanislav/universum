@@ -536,19 +536,19 @@ public sealed class LibraryJob(LibraryLayout layout)
         return EpisodeParser.FromPath(path, Root) switch
         {
             { NameSeason: { } named } found =>
-                $"OTÁZKA: súbor je v priečinku špeciálov (Season 00), ale meno uvádza sezónu {named:00} – patrí do Season 00 ({found.Number.Tag}) " +
-                $"alebo do Season {named:00} ({(found.Number with { Season = named }).Tag})? Zadajte číslo epizódy",
+                CoreText.F("OTÁZKA: súbor je v priečinku špeciálov (Season 00), ale meno uvádza sezónu {0:00} – patrí do Season 00 ({1}) " +
+                "alebo do Season {0:00} ({2})? Zadajte číslo epizódy", named, found.Number.Tag, (found.Number with { Season = named }).Tag),
             { FolderSeason: { } folder, Number.Season: 0 } found =>
-                $"OTÁZKA: meno uvádza špeciál ({found.Number.Tag}), ale súbor je v priečinku Season {folder:00} – patrí do Season 00 " +
-                $"alebo do Season {folder:00} ({(found.Number with { Season = folder }).Tag})? Zadajte číslo epizódy",
+                CoreText.F("OTÁZKA: meno uvádza špeciál ({0}), ale súbor je v priečinku Season {1:00} – patrí do Season 00 " +
+                "alebo do Season {1:00} ({2})? Zadajte číslo epizódy", found.Number.Tag, folder, (found.Number with { Season = folder }).Tag),
             { Number: { Episode: 0, Season: > 0 } number } =>
-                $"OTÁZKA: epizóda 00 ({number.Tag}) – je to špeciál (Season 00) alebo časť sezóny {number.Season:00}? Zadajte číslo epizódy",
-            { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia",
-            { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
-            { RangeRejected: true } => "rozsah epizód v mene sa nedá zapísať (iná sezóna alebo opačné poradie) – berie sa prvá epizóda",
+                CoreText.F("OTÁZKA: epizóda 00 ({0}) – je to špeciál (Season 00) alebo časť sezóny {1:00}? Zadajte číslo epizódy", number.Tag, number.Season),
+            { FolderSeason: { } folder } found => CoreText.F("sezóna v mene ({0}) a v priečinku ({1}) sa líšia", found.Number.Season, folder),
+            { SeasonAssumed: true } => CoreText.T("sezóna nie je v mene ani v priečinku – predpokladá sa 1"),
+            { RangeRejected: true } => CoreText.T("rozsah epizód v mene sa nedá zapísať (iná sezóna alebo opačné poradie) – berie sa prvá epizóda"),
             null when SeasonQuestions.Contains(path) && EpisodeSuggestions.TryGetValue(path, out var special) =>
-                $"OTÁZKA: súbor bez čísla je pod priečinkom špeciálov – patrí do Season 00 (návrh {special.Tag}) alebo do bežnej sezóny? Zadajte číslo epizódy",
-            null when EpisodeSuggestions.ContainsKey(path) => "číslo nie je v mene – návrh podľa poradia",
+                CoreText.F("OTÁZKA: súbor bez čísla je pod priečinkom špeciálov – patrí do Season 00 (návrh {0}) alebo do bežnej sezóny? Zadajte číslo epizódy", special.Tag),
+            null when EpisodeSuggestions.ContainsKey(path) => CoreText.T("číslo nie je v mene – návrh podľa poradia"),
             _ => null,
         };
     }

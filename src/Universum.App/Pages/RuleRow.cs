@@ -214,6 +214,6 @@ public sealed class RuleRow : ObservableObject
         }
 
         var language = Languages.Find(tag.Primary);
-        return language is null ? tag.ToString() : $"{language.SlovakName} ({tag.Primary})";
+        return language is null ? tag.ToString() : $"{language.Name} ({tag.Primary})";
     }
 }

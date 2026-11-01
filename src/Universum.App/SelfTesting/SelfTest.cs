@@ -3679,6 +3679,12 @@ internal static class SelfTest
         foreach (var (language, marks) in new[] { ("en", "áäčďéíĺľňóôŕšťúýžÁÄČĎÉÍĽĹŇÓÔŔŠŤÚÝŽ"), ("cs", "äĺľôŕÄĹĽÔŔ") })
         {
             Localization.Loc.Init(language);
+
+            // stage 4: the texts of the core follow the window – names of languages, the weather
+            var german = Universum.Core.Media.Languages.Find("de")?.Name;
+            var snow = Universum.Core.Weather.OpenMeteo.Describe(71);
+            Check((language, german, snow) is ("en", "German", "light snow") or ("cs", "němčina", "slabé sněžení"),
+                $"languages: the core's texts in {language} – {german}, {snow}");
             MainViewModel? model = null;
             Window? window = null;
             try

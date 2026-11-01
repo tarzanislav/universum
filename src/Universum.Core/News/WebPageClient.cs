@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using Universum.Core.Library;
+using Universum.Core.Text;
 
 namespace Universum.Core.News;
 
@@ -35,22 +36,22 @@ public sealed partial class WebPageClient(HttpClient http)
     {
         if (!address.IsAbsoluteUri || address.Scheme != Uri.UriSchemeHttps || address.UserInfo.Length > 0)
         {
-            throw new NewsSourceException("Zdroj sa číta len cez https://.");
+            throw new NewsSourceException(CoreText.T("Zdroj sa číta len cez https://."));
         }
 
         var robots = await RobotsAsync(address, cancellationToken).ConfigureAwait(false);
         if (!robots.Allows(address.PathAndQuery))
         {
-            throw new NewsSourceException($"Stránka {address.Host} strojové čítanie tejto adresy nedovoľuje (robots.txt) – zdroj sa nečíta.");
+            throw new NewsSourceException(CoreText.F("Stránka {0} strojové čítanie tejto adresy nedovoľuje (robots.txt) – zdroj sa nečíta.", address.Host));
         }
 
         var (status, body, _) = await FetchAsync(address, cancellationToken).ConfigureAwait(false);
         return status switch
         {
             HttpStatusCode.OK => body,
-            HttpStatusCode.TooManyRequests => throw new NewsSourceException($"Stránka {address.Host} žiada spomaliť – skúste to neskôr."),
-            HttpStatusCode.Forbidden => throw new NewsSourceException($"Stránka {address.Host} prístup odmietla (403)."),
-            _ => throw new NewsSourceException($"Stránka {address.Host} odpovedala chybou {(int)status}."),
+            HttpStatusCode.TooManyRequests => throw new NewsSourceException(CoreText.F("Stránka {0} žiada spomaliť – skúste to neskôr.", address.Host)),
+            HttpStatusCode.Forbidden => throw new NewsSourceException(CoreText.F("Stránka {0} prístup odmietla (403).", address.Host)),
+            _ => throw new NewsSourceException(CoreText.F("Stránka {0} odpovedala chybou {1}.", address.Host, (int)status)),
         };
     }
 
@@ -112,11 +113,11 @@ public sealed partial class WebPageClient(HttpClient http)
         }
         catch (HttpRequestException ex)
         {
-            throw new NewsSourceException($"Stránka {address.Host} nie je dostupná: {ex.Message}", ex);
+            throw new NewsSourceException(CoreText.F("Stránka {0} nie je dostupná: {1}", address.Host, ex.Message), ex);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new NewsSourceException($"Stránka {address.Host} neodpovedá.", ex);
+            throw new NewsSourceException(CoreText.F("Stránka {0} neodpovedá.", address.Host), ex);
         }
 
         using (response)
@@ -124,12 +125,12 @@ public sealed partial class WebPageClient(HttpClient http)
             var final = response.RequestMessage?.RequestUri ?? address;
             if (final.Scheme != Uri.UriSchemeHttps || !string.Equals(final.Host, address.Host, StringComparison.OrdinalIgnoreCase))
             {
-                throw new NewsSourceException($"Stránka {address.Host} presmerovala na inú adresu ({final.Host}) – nepoužila sa.");
+                throw new NewsSourceException(CoreText.F("Stránka {0} presmerovala na inú adresu ({1}) – nepoužila sa.", address.Host, final.Host));
             }
 
             if (response.Content.Headers.ContentLength > MaxBytes)
             {
-                throw new NewsSourceException($"Stránka {address.Host} je neprimerane veľká – nepoužila sa.");
+                throw new NewsSourceException(CoreText.F("Stránka {0} je neprimerane veľká – nepoužila sa.", address.Host));
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -140,7 +141,7 @@ public sealed partial class WebPageClient(HttpClient http)
             {
                 if (buffer.Length + read > MaxBytes)
                 {
-                    throw new NewsSourceException($"Stránka {address.Host} je neprimerane veľká – nepoužila sa.");
+                    throw new NewsSourceException(CoreText.F("Stránka {0} je neprimerane veľká – nepoužila sa.", address.Host));
                 }
 
                 buffer.Write(chunk, 0, read);

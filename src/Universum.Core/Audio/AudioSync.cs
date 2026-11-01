@@ -1,6 +1,7 @@
 using System.Globalization;
 using Universum.Core.Subtitles;
 using Universum.Core.Subtitles.Sync;
+using Universum.Core.Text;
 
 namespace Universum.Core.Audio;
 
@@ -69,7 +70,7 @@ public static class AudioSync
         {
             // only the search over the whole sound: a proposal
             var rates = SubtitleSync.Snap(scale, length, filmFps).Rates;
-            return Result(scale, rates, offset, false, $"zvuk sa našiel len hrubo ({coarseParts.Count(p => p.IsClear)} z {coarseParts.Count} častí)", coarseParts);
+            return Result(scale, rates, offset, false, CoreText.F("zvuk sa našiel len hrubo ({0} z {1} častí)", coarseParts.Count(p => p.IsClear), coarseParts.Count), coarseParts);
         }
 
         var measured = Slope(clear) ?? scale;
@@ -83,7 +84,7 @@ public static class AudioSync
         }
 
         var reliable = agreeing.Count >= 4 && agreeing.Count * 3 >= clear.Count * 2;
-        return Result(factor, snapped, shift, reliable, $"zvuk sedí v {agreeing.Count} z {parts.Count} častí filmu", parts);
+        return Result(factor, snapped, shift, reliable, CoreText.F("zvuk sedí v {0} z {1} častí filmu", agreeing.Count, parts.Count), parts);
     }
 
     private static AudioSyncResult Result(double factor, (FrameRate From, FrameRate To)? rates, double shift, bool reliable, string found, IReadOnlyList<AudioSyncPart> parts)
@@ -93,8 +94,8 @@ public static class AudioSync
             : Math.Abs(factor - 1) < 1e-9 ? SubtitleTiming.Delay(delay)
             : new SubtitleTiming(delay, (long)Math.Round(factor * 1_000_000), 1_000_000);
         var sk = CultureInfo.GetCultureInfo("sk-SK");
-        var speed = rates is { } r ? $", FPS {r.From} → {r.To}" : timing.Numerator != timing.Denominator ? string.Create(sk, $", rýchlosť × {timing.Factor:0.######}") : "";
-        return new AudioSyncResult(timing, rates, reliable, string.Create(sk, $"{found}{speed}, posun {delay:+#,0;−#,0;0} ms"), parts);
+        var speed = rates is { } r ? $", FPS {r.From} → {r.To}" : timing.Numerator != timing.Denominator ? CoreText.F(", rýchlosť × {0}", timing.Factor.ToString("0.######", sk)) : "";
+        return new AudioSyncResult(timing, rates, reliable, CoreText.F("{0}{1}, posun {2} ms", found, speed, delay.ToString("+#,0;−#,0;0", sk)), parts);
     }
 
     // the search over the whole other sound at every change of frame rate: the scale and shift most parts agree on

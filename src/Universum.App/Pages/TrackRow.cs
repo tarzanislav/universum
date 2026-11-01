@@ -25,7 +25,7 @@ public sealed class TrackRow(MediaTrack track)
         get
         {
             var language = Languages.Find(Track.Language.Primary);
-            var name = Track.Language.IsUndetermined ? Loc.T("neurčený (und)") : language?.SlovakName ?? Track.Language.Primary;
+            var name = Track.Language.IsUndetermined ? Loc.T("neurčený (und)") : language?.Name ?? Track.Language.Primary;
             return $"{name} – {Track.Language}";
         }
     }

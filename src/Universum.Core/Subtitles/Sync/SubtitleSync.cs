@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.Subtitles.Sync;
 
 /// <summary>
@@ -170,7 +172,7 @@ public static class SubtitleSync
 
         if (best is not { } found)
         {
-            return new SyncResult(SubtitleTiming.None, false, $"{method}: v skúmaných častiach filmu sa nedalo nič zistiť (bez reči alebo bez titulkov).", []);
+            return new SyncResult(SubtitleTiming.None, false, CoreText.F("{0}: v skúmaných častiach filmu sa nedalo nič zistiť (bez reči alebo bez titulkov).", Method(method)), []);
         }
 
         // the lag at the film's time x: d(x) = a + b·x, the subtitle for x is now at u = k·t = x + d(x)
@@ -192,10 +194,10 @@ public static class SubtitleSync
             : SubtitleTiming.FromFactor(factor, milliseconds);
 
         var reliable = found.Good.Count >= Math.Max(2, (windows.Count + 1) / 2) || (windows.Count <= 2 && found.Good.Count == windows.Count);
-        var rate = rates is { } fps ? $"FPS titulkov {fps.From.Label} → film {fps.To.Label}, " : "";
-        var detail = $"{method}: {rate}" + (timing.IsNone ? "titulky sedia" : timing.Describe()) +
-                     $" – zhoduje sa {found.Good.Count} z {windows.Count} častí filmu" + (found.Clear > found.Good.Count ? $" ({found.Clear - found.Good.Count} iné)" : "") +
-                     (reliable ? "." : " – NEISTÉ (titulky môžu byť posunuté o viac ako 90 s alebo patria k inej verzii filmu), overte prehraním.");
+        var rate = rates is { } fps ? CoreText.F("FPS titulkov {0} → film {1}, ", fps.From.Label, fps.To.Label) : "";
+        var detail = $"{Method(method)}: {rate}" + (timing.IsNone ? CoreText.T("titulky sedia") : timing.Describe()) +
+                     CoreText.F(" – zhoduje sa {0} z {1} častí filmu", found.Good.Count, windows.Count) + (found.Clear > found.Good.Count ? CoreText.F(" ({0} iné)", found.Clear - found.Good.Count) : "") +
+                     (reliable ? "." : CoreText.T(" – NEISTÉ (titulky môžu byť posunuté o viac ako 90 s alebo patria k inej verzii filmu), overte prehraním."));
         return new SyncResult(timing, reliable, detail, found.Parts) { Rates = rates };
     }
 
@@ -219,9 +221,15 @@ public static class SubtitleSync
         var checks = new[] { TimeSpan.FromMinutes(1), duration / 2, duration };
         var apart = checks.Max(t => Math.Abs((byAudio.Timing.Apply(t) - bySubtitles.Timing.Apply(t)).TotalMilliseconds));
         return apart <= 300
-            ? byAudio with { Detail = byAudio.Detail + " Titulky v inom jazyku to potvrdzujú – isté." }
-            : byAudio with { Reliable = false, Detail = byAudio.Detail + $" POZOR: podľa iných titulkov to vychádza inak (rozdiel {apart / 1000:0.0} s) – overte prehraním." };
+            ? byAudio with { Detail = byAudio.Detail + CoreText.T(" Titulky v inom jazyku to potvrdzujú – isté.") }
+            : byAudio with { Reliable = false, Detail = byAudio.Detail + CoreText.F(" POZOR: podľa iných titulkov to vychádza inak (rozdiel {0:0.0} s) – overte prehraním.", apart / 1000) };
     }
+
+    // the method the page names ("podľa zvuku", "podľa titulkov cs") in the language of the window; another one as it is
+    private static string Method(string method) =>
+        method == "podľa zvuku" ? CoreText.T("podľa zvuku")
+        : method.StartsWith("podľa titulkov", StringComparison.Ordinal) ? CoreText.T("podľa titulkov") + method["podľa titulkov".Length..]
+        : method;
 
     // every change of frame rate the page offers (subtitles of `From` fps shown with a film of `To` fps): times × From/To
     private static IEnumerable<(FrameRate From, FrameRate To, double Ratio)> Pairs() =>

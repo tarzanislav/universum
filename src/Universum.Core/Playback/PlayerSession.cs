@@ -1,4 +1,5 @@
 using Universum.Core.Media;
+using Universum.Core.Text;
 
 namespace Universum.Core.Playback;
 
@@ -306,7 +307,7 @@ public sealed class PlayerSession : IAsyncDisposable
 
             if (written == 0 && sound?.Problem is { } problem)
             {
-                _soundProblem = "zvuk: " + problem;
+                _soundProblem = CoreText.T("zvuk: ") + problem;
             }
 
             var silence = new byte[Pcm.BytesPerSecond / 20];
@@ -334,7 +335,7 @@ public sealed class PlayerSession : IAsyncDisposable
         {
             await SeekAsync(at).ConfigureAwait(true);
             failed.Dispose();
-            _soundProblem = "Zvukové zariadenie neprijíma zvuk – film ide ďalej bez zvuku.";
+            _soundProblem = CoreText.T("Zvukové zariadenie neprijíma zvuk – film ide ďalej bez zvuku.");
         }
         finally
         {

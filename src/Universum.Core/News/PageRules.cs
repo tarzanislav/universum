@@ -73,12 +73,12 @@ public sealed partial record PageRules
         }
         catch (JsonException ex)
         {
-            throw new FormatException("Súbor pravidiel nie je platný JSON: " + ex.Message, ex);
+            throw new FormatException(CoreText.T("Súbor pravidiel nie je platný JSON: ") + ex.Message, ex);
         }
 
         if (rules is null)
         {
-            throw new FormatException("Súbor pravidiel je prázdny.");
+            throw new FormatException(CoreText.T("Súbor pravidiel je prázdny."));
         }
 
         rules.Validate();
@@ -90,12 +90,12 @@ public sealed partial record PageRules
     {
         if (Format != FormatName)
         {
-            throw new FormatException($"Súbor nie je v tvare „{FormatName}“.");
+            throw new FormatException(CoreText.F("Súbor nie je v tvare „{0}“.", FormatName));
         }
 
         if (string.IsNullOrWhiteSpace(Name) || Name.Length > 100)
         {
-            throw new FormatException("Zdroj nemá názov.");
+            throw new FormatException(CoreText.T("Zdroj nemá názov."));
         }
 
         Uri? sample = null;
@@ -111,7 +111,7 @@ public sealed partial record PageRules
         if (sample is null || !sample.IsAbsoluteUri || sample.Scheme != Uri.UriSchemeHttps || sample.UserInfo.Length > 0 ||
             Placeholder().Replace(Address, "").Contains('{', StringComparison.Ordinal))
         {
-            throw new FormatException("Adresa zdroja musí byť https://… (deň sa doplní za {d}, {dd}, {M}, {MM}, {yyyy}).");
+            throw new FormatException(CoreText.T("Adresa zdroja musí byť https://… (deň sa doplní za {d}, {dd}, {M}, {MM}, {yyyy})."));
         }
 
         HtmlSelector.Parse(Item);
@@ -124,7 +124,7 @@ public sealed partial record PageRules
         {
             if (!KnownFields.Contains(name))
             {
-                throw new FormatException($"Neznáme pole „{name}“ (známe sú: {string.Join(", ", KnownFields)}).");
+                throw new FormatException(CoreText.F("Neznáme pole „{0}“ (známe sú: {1}).", name, string.Join(", ", KnownFields)));
             }
 
             if (field.Select is { Length: > 0 } select && select != ":self")
@@ -134,18 +134,18 @@ public sealed partial record PageRules
 
             if (field.Take is not ("text" or "own") && !field.Take.StartsWith("attr:", StringComparison.Ordinal))
             {
-                throw new FormatException($"Pole „{name}“: neznáme „take“ – {field.Take}.");
+                throw new FormatException(CoreText.F("Pole „{0}“: neznáme „take“ – {1}.", name, field.Take));
             }
         }
 
         if (!Fields.ContainsKey("title") || !Fields.ContainsKey("episode"))
         {
-            throw new FormatException("Pravidlá musia určiť aspoň polia title a episode.");
+            throw new FormatException(CoreText.T("Pravidlá musia určiť aspoň polia title a episode."));
         }
 
         if (DaysBack is < 0 or > 30 || DaysAhead is < 0 or > 60)
         {
-            throw new FormatException("Počet dní dozadu môže byť 0–30, dopredu 0–60.");
+            throw new FormatException(CoreText.T("Počet dní dozadu môže byť 0–30, dopredu 0–60."));
         }
     }
 

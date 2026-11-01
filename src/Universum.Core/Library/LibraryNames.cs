@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text;
+using Universum.Core.Text;
 
 namespace Universum.Core.Library;
 
@@ -44,16 +45,16 @@ public static class LibraryNames
 
         if (!addition.All(c => char.IsLetterOrDigit(c) || c is ' ' or '-'))
         {
-            return (null, "Doplnok k názvu môže mať len písmená, číslice, medzery a pomlčky.");
+            return (null, CoreText.T("Doplnok k názvu môže mať len písmená, číslice, medzery a pomlčky."));
         }
 
         if (addition.Length > MaxAdditionLength)
         {
-            return (null, $"Doplnok k názvu môže mať najviac {MaxAdditionLength} znakov.");
+            return (null, CoreText.F("Doplnok k názvu môže mať najviac {0} znakov.", MaxAdditionLength));
         }
 
         return SizeClasses.AllLabels.Any(label => addition.Split(' ').Contains(label, StringComparer.OrdinalIgnoreCase) || label.Equals(addition, StringComparison.OrdinalIgnoreCase))
-            ? (null, "Veľkostnú triedu (BIG, SMALL, BluRay …) dáva UNIVERSUM na koniec názvu samo – do doplnku nepatrí.")
+            ? (null, CoreText.T("Veľkostnú triedu (BIG, SMALL, BluRay …) dáva UNIVERSUM na koniec názvu samo – do doplnku nepatrí."))
             : (addition.Normalize(NormalizationForm.FormC), null);
     }
 

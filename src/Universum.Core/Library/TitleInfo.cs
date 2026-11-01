@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.Library;
 
 /// <summary>What is being stored: a film (MOVIES) or a series (TVSHOWS).</summary>
@@ -44,11 +46,11 @@ public sealed record TitleInfo(MediaKind Kind, string Name, int? Year, int? Tmdb
     /// a title in another script needs its English name and TMDB ID, and the year is required.
     /// </summary>
     public string? Problem =>
-        CleanName.Length == 0 ? "chýba názov"
-        : !LibraryNames.IsLatinScript(CleanName) ? "názov nie je latinkou – použite anglický názov s TMDB ID (napr. Nine Puzzles (2025) [tmdbid-227191])"
-        : LibraryNames.IsReserved(FolderName) ? "názov nie je vo Windows povolený"
-        : IncludeId && TmdbId is null ? "chýba TMDB ID"
-        : Year is null ? "chýba rok"
+        CleanName.Length == 0 ? CoreText.T("chýba názov")
+        : !LibraryNames.IsLatinScript(CleanName) ? CoreText.T("názov nie je latinkou – použite anglický názov s TMDB ID (napr. Nine Puzzles (2025) [tmdbid-227191])")
+        : LibraryNames.IsReserved(FolderName) ? CoreText.T("názov nie je vo Windows povolený")
+        : IncludeId && TmdbId is null ? CoreText.T("chýba TMDB ID")
+        : Year is null ? CoreText.T("chýba rok")
         : null;
 
     public override string ToString() => FolderName;

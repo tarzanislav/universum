@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Universum.Core.Text;
 
 namespace Universum.Core.Updates;
 
@@ -37,8 +38,8 @@ public sealed record Compatibility(Version MkvToolNix, string Universum, DateTim
     /// <summary>Text for the update window: verified with this MKVToolNix version, or not (yet).</summary>
     public static string Describe(Compatibility? report, Version latest) => report switch
     {
-        { Passed: true } r when r.MkvToolNix == latest => $"overené s UNIVERSUM ({r.TestedUtc:d. M. yyyy})",
-        { Passed: false } r when r.MkvToolNix == latest => "test s UNIVERSUM ZLYHAL – odporúčame počkať na opravu",
-        _ => "zatiaľ neoverené s UNIVERSUM",
+        { Passed: true } r when r.MkvToolNix == latest => CoreText.F("overené s UNIVERSUM ({0:d. M. yyyy})", r.TestedUtc),
+        { Passed: false } r when r.MkvToolNix == latest => CoreText.T("test s UNIVERSUM ZLYHAL – odporúčame počkať na opravu"),
+        _ => CoreText.T("zatiaľ neoverené s UNIVERSUM"),
     };
 }

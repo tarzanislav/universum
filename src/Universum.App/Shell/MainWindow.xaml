@@ -445,7 +445,7 @@
                                         <TextBlock Text="{Binding LanguageAfter}" FontWeight="SemiBold" Visibility="{Binding CanChooseLanguage, Converter={StaticResource InverseBoolToVisibility}}" />
                                         <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" Visibility="{Binding CanChooseLanguage, Converter={StaticResource BoolToVisibility}}"
                                                   ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
-                                                  DisplayMemberPath="SlovakName" MinWidth="160" ToolTip="{loc:T 'Jazyk stopy – neurčený, alebo nesprávny jazyk zapísaný v súbore'}" />
+                                                  DisplayMemberPath="Name" MinWidth="160" ToolTip="{loc:T 'Jazyk stopy – neurčený, alebo nesprávny jazyk zapísaný v súbore'}" />
                                         <TextBlock Text="{Binding LanguageNote}" FontSize="11" TextWrapping="Wrap" MaxWidth="260" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                                    Visibility="{Binding HasLanguageNote, Converter={StaticResource BoolToVisibility}}" />
                                         <CheckBox Visibility="{Binding CanKeep, Converter={StaticResource BoolToVisibility}}" IsChecked="{Binding KeepChecked, UpdateSourceTrigger=PropertyChanged}"
@@ -2623,7 +2623,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <!-- owner, 29. 10. 2026: also a language written in the file can be corrected ("EN" that is Czech) -->
-                                            <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="SlovakName"
+                                            <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Name"
                                                       SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
                                                       ToolTip="{loc:T 'Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk'}" />
                                         </DataTemplate>

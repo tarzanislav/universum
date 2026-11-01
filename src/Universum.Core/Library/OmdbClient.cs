@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Universum.Core.Text;
 
 namespace Universum.Core.Library;
 
@@ -48,23 +49,23 @@ public sealed partial class OmdbClient(HttpClient http, string key, string? cach
             using var response = await Pacer.RunAsync(() => http.GetAsync(address, cancellationToken), cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                throw new OmdbException("Kľúč OMDb nie je platný alebo vyčerpal denný limit – skontrolujte ho v Nastaveniach.");
+                throw new OmdbException(CoreText.T("Kľúč OMDb nie je platný alebo vyčerpal denný limit – skontrolujte ho v Nastaveniach."));
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new OmdbException($"OMDb odpovedalo chybou {(int)response.StatusCode}.");
+                throw new OmdbException(CoreText.F("OMDb odpovedalo chybou {0}.", (int)response.StatusCode));
             }
 
             body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
-            throw new OmdbException("OMDb nie je dostupné: " + ex.Message);
+            throw new OmdbException(CoreText.T("OMDb nie je dostupné: ") + ex.Message);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new OmdbException("OMDb neodpovedá.");
+            throw new OmdbException(CoreText.T("OMDb neodpovedá."));
         }
 
         var ratings = Parse(body);

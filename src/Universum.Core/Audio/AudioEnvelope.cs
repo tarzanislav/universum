@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Audio;
 
@@ -78,7 +79,7 @@ public sealed class AudioEnvelope(float[] values)
         if (samples < SampleRate)
         {
             await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
-            return (null, process.ErrorText is { Length: > 0 } error ? error.Split('\n')[^1].Trim() : "FFmpeg nevrátil žiadny zvuk.");
+            return (null, process.ErrorText is { Length: > 0 } error ? error.Split('\n')[^1].Trim() : CoreText.T("FFmpeg nevrátil žiadny zvuk."));
         }
 
         return (builder.Build(), null);

@@ -7,6 +7,7 @@ using Universum.Core.Library;
 using Universum.Core.Media;
 using Universum.Core.Muxing;
 using Universum.Core.Rules;
+using Universum.Core.Text;
 
 namespace Universum.Core.Mega;
 
@@ -376,7 +377,7 @@ public sealed class MegaBatch
     public bool IsOpen => State is MegaBatchState.Waiting or MegaBatchState.Queued or MegaBatchState.Missed;
 
     [JsonIgnore]
-    public string Label => $"Dávka {Number}";
+    public string Label => CoreText.F("Dávka {0}", Number);
 }
 
 /// <summary>

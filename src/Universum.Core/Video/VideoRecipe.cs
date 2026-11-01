@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Universum.Core.Media;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Video;
 
@@ -40,9 +41,9 @@ public sealed record VideoRecipe(int Rotation = 0, VideoCodec Codec = VideoCodec
     public string WrittenCodecId(MediaTrack track) => Encoder(track).Encoder == "hevc_mf" ? "V_MPEGH/ISO/HEVC" : "V_MPEG4/ISO/AVC";
 
     /// <summary>Why it cannot be written, or null.</summary>
-    public string? Problem => Rotation is not (0 or 90 or 180 or 270) ? "Otočiť sa dá o 90, 180 alebo 270°."
-        : Quality is < 1 or > 100 ? "Kvalita je od 1 do 100."
-        : Height is < 120 or > 4320 ? "Výška obrazu od 120 do 4320 riadkov."
+    public string? Problem => Rotation is not (0 or 90 or 180 or 270) ? CoreText.T("Otočiť sa dá o 90, 180 alebo 270°.")
+        : Quality is < 1 or > 100 ? CoreText.T("Kvalita je od 1 do 100.")
+        : Height is < 120 or > 4320 ? CoreText.T("Výška obrazu od 120 do 4320 riadkov.")
         : null;
 
     /// <summary>In words: "otočiť o 90°, 720 riadkov, H.264 kvalita 75".</summary>
@@ -51,17 +52,17 @@ public sealed record VideoRecipe(int Rotation = 0, VideoCodec Codec = VideoCodec
         var parts = new List<string>();
         if (Rotation % 360 != 0)
         {
-            parts.Add($"otočiť o {Rotation}°");
+            parts.Add(CoreText.F("otočiť o {0}°", Rotation));
         }
 
         if (Height is { } height)
         {
-            parts.Add($"{height} riadkov");
+            parts.Add(CoreText.F("{0} riadkov", height));
         }
 
         if (NeedsEncoding)
         {
-            parts.Add($"{Encoder(track).Name} kvalita {Quality}");
+            parts.Add(CoreText.F("{0} kvalita {1}", Encoder(track).Name, Quality));
         }
 
         return parts.Count == 0 ? "bez zmeny" : string.Join(", ", parts);
@@ -190,7 +191,7 @@ public static partial class VideoEncoder
         }, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0 || !File.Exists(output))
         {
-            return "FFmpeg: " + (result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? $"skončil s kódom {result.ExitCode}");
+            return "FFmpeg: " + (result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? CoreText.F("skončil s kódom {0}", result.ExitCode));
         }
 
         progress?.Report(1);

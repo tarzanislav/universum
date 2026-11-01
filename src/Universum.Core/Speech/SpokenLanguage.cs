@@ -89,7 +89,7 @@ public static partial class SpokenLanguage
     {
         if (!File.Exists(tools.Ffmpeg) || !File.Exists(tools.Whisper))
         {
-            throw new SpeechException("Nástroje rozpoznávania reči chýbajú – preinštalujte UNIVERSUM.");
+            throw new SpeechException(CoreText.T("Nástroje rozpoznávania reči chýbajú – preinštalujte UNIVERSUM."));
         }
 
         // a new folder with a random name for the pieces and transcriptions: it is whisper's working folder when it
@@ -101,7 +101,7 @@ public static partial class SpokenLanguage
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new SpeechException("Dočasný priečinok pre úseky zvuku sa nedá vytvoriť: " + ex.Message, ex);
+            throw new SpeechException(CoreText.T("Dočasný priečinok pre úseky zvuku sa nedá vytvoriť: ") + ex.Message, ex);
         }
 
         try
@@ -110,15 +110,15 @@ public static partial class SpokenLanguage
         }
         catch (ProcessStartException ex)
         {
-            throw new SpeechException("Nástroj rozpoznávania reči sa nedá spustiť: " + ex.Message, ex);
+            throw new SpeechException(CoreText.T("Nástroj rozpoznávania reči sa nedá spustiť: ") + ex.Message, ex);
         }
         catch (TimeoutException ex)
         {
-            throw new SpeechException("Nástroj rozpoznávania reči neskončil včas (súbor je možno na pomalom disku alebo v sieti) – skúste to znova.", ex);
+            throw new SpeechException(CoreText.T("Nástroj rozpoznávania reči neskončil včas (súbor je možno na pomalom disku alebo v sieti) – skúste to znova."), ex);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new SpeechException("Úsek zvuku sa nedá zapísať alebo prečítať: " + ex.Message, ex);
+            throw new SpeechException(CoreText.T("Úsek zvuku sa nedá zapísať alebo prečítať: ") + ex.Message, ex);
         }
         finally
         {
@@ -202,7 +202,7 @@ public static partial class SpokenLanguage
 
         if (pieces.All(p => p is { Language: null, Silent: false }) && problem is not null)
         {
-            throw new SpeechException("Reč sa nepodarilo spracovať: " + problem);
+            throw new SpeechException(CoreText.T("Reč sa nepodarilo spracovať: ") + problem);
         }
 
         // Czech or Slovak – also when the pieces split between them – is compared by transcription
@@ -249,7 +249,7 @@ public static partial class SpokenLanguage
 
         if (decided.Language is not null && language != decided.Language)
         {
-            rest = Join($"podľa prepisu {(language == "sk" ? "slovenčina, nie čeština" : "čeština, nie slovenčina")}", rest);
+            rest = Join(CoreText.T(language == "sk" ? "podľa prepisu slovenčina, nie čeština" : "podľa prepisu čeština, nie slovenčina"), rest);
         }
 
         return decided with { Language = language, Comparison = comparison, Doubt = rest };
@@ -390,7 +390,7 @@ public static partial class SpokenLanguage
         var sure = pieces.Where(p => p.Language is not null && p.Probability >= MinimumProbability).ToList();
         if (sure.Count == 0)
         {
-            var why = pieces.Count > 0 && pieces.All(p => p.Silent) ? "v úsekoch nie je reč (ticho)" : "reč sa nedala spoľahlivo rozpoznať (hudba alebo šum?)";
+            var why = pieces.Count > 0 && pieces.All(p => p.Silent) ? CoreText.T("v úsekoch nie je reč (ticho)") : CoreText.T("reč sa nedala spoľahlivo rozpoznať (hudba alebo šum?)");
             return new SpokenLanguageResult(null, 0, pieces, why);
         }
 
@@ -401,7 +401,7 @@ public static partial class SpokenLanguage
         var agreement = winner.Score / total;
         if (agreement <= 0.5)
         {
-            return new SpokenLanguageResult(null, agreement, pieces, "úseky sa nezhodli: " + Counts(scores));
+            return new SpokenLanguageResult(null, agreement, pieces, CoreText.T("úseky sa nezhodli: ") + Counts(scores));
         }
 
         string? doubt = null;
@@ -409,11 +409,11 @@ public static partial class SpokenLanguage
         {
             doubt = (IsCzechOrSlovak(winner.Language) && scores.Any(s => s.Language != winner.Language && IsCzechOrSlovak(s.Language))
                 ? "čeština alebo slovenčina – overte; "
-                : "") + "úseky: " + Counts(scores);
+                : "") + CoreText.T("úseky: ") + Counts(scores);
         }
         else if (sure.Count == 1)
         {
-            doubt = "rozpoznané len z jedného úseku";
+            doubt = CoreText.T("rozpoznané len z jedného úseku");
         }
 
         return new SpokenLanguageResult(winner.Language, agreement, pieces, doubt);
@@ -473,12 +473,12 @@ public static partial class SpokenLanguage
     private static bool IsCzechOrSlovak(string language) => language is "cs" or "sk";
 
     private static string Counts(IEnumerable<(string Language, double Score, int Count)> scores) =>
-        string.Join(", ", scores.Select(s => $"{Languages.Find(s.Language)?.SlovakName ?? s.Language} {s.Count}×"));
+        string.Join(", ", scores.Select(s => $"{Languages.Find(s.Language)?.Name ?? s.Language} {s.Count}×"));
 
     private static int Threads => Math.Clamp(Environment.ProcessorCount, 1, 8);
 
     private static string LastLine(string text) =>
-        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "neznáma chyba";
+        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? CoreText.T("neznáma chyba");
 
     [GeneratedRegex(@"auto-detected language:\s*(?<language>[a-z]{2,3})\s*\(p\s*=\s*(?<p>[0-9.]+)\)", RegexOptions.CultureInvariant)]
     private static partial Regex Detected();

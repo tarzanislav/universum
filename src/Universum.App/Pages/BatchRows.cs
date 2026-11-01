@@ -417,7 +417,7 @@ public sealed class FileSlotRow : ObservableObject
         { } known => Loc.F("automaticky ({0})", Name(known.Language)),
     };
 
-    private static string Name(LanguageTag tag) => Languages.Find(tag.Primary)?.SlovakName ?? Texts.Language(tag);
+    private static string Name(LanguageTag tag) => Languages.Find(tag.Primary)?.Name ?? Texts.Language(tag);
 }
 
 /// <summary>One item of a file's language list: a language, or (null) what applies without a choice for the file.</summary>
@@ -435,7 +435,7 @@ public sealed class FileLanguageItem(Language? language, string display) : Obser
             var languages = Universum.Core.Media.Languages.All;
             if (_all is not { } built || !ReferenceEquals(built.Source, languages))
             {
-                built = (languages, [.. languages.Select(l => new FileLanguageItem(l, l.SlovakName))]);
+                built = (languages, [.. languages.Select(l => new FileLanguageItem(l, l.Name))]);
                 _all = built;
             }
 

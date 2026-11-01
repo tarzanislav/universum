@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Universum.Core.Text;
 
 namespace Universum.Core.Subtitles;
 
@@ -40,7 +41,7 @@ public static partial class SubtitleReader
         catch (Exception ex) when (ex is OverflowException or ArgumentException or System.Xml.XmlException or InvalidOperationException or IndexOutOfRangeException)
         {
             // a damaged file (times too big, broken XML): not subtitles UNIVERSUM can read
-            throw new FormatException("Titulky sú poškodené: " + ex.Message, ex);
+            throw new FormatException(CoreText.T("Titulky sú poškodené: ") + ex.Message, ex);
         }
     }
 
@@ -98,7 +99,7 @@ public static partial class SubtitleReader
             return new SubtitleDocument(SubViewer(text), "SubViewer");
         }
 
-        throw new FormatException("Neznámy formát titulkov – nie sú to SRT, WebVTT, ASS/SSA, TTML, SAMI, SubViewer, MicroDVD, MPL2 ani TMPlayer.");
+        throw new FormatException(CoreText.T("Neznámy formát titulkov – nie sú to SRT, WebVTT, ASS/SSA, TTML, SAMI, SubViewer, MicroDVD, MPL2 ani TMPlayer."));
     }
 
     private static List<SubtitleCue> Srt(string text)
@@ -497,7 +498,7 @@ public static partial class SubtitleReader
         // a time of years is a damaged file, not subtitles
         if (double.IsNaN(seconds) || seconds is < 0 or > 100_000_000)
         {
-            throw new FormatException("Nemožný čas titulku: " + value);
+            throw new FormatException(CoreText.T("Nemožný čas titulku: ") + value);
         }
 
         return TimeSpan.FromTicks((long)Math.Round(seconds * TimeSpan.TicksPerSecond));

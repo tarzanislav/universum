@@ -28,6 +28,31 @@ public static class Loc
             "en" => Translations.English,
             _ => null,
         };
+
+        // the texts of the core (names of languages, the weather, results of jobs …) by the same dictionary
+        _pieces = null;
+        Universum.Core.Text.CoreText.Use(Language, T, IsTranslation);
+    }
+
+    private static string[]? _pieces;
+
+    /// <summary>
+    /// The text contains a longer piece of a translation (between its values {0} …): UNIVERSUM's own sentence in Czech or
+    /// English, not a line of a tool – the processing logs keep such sentences as steps.
+    /// </summary>
+    public static bool IsTranslation(string text)
+    {
+        if (_table is not { } table || text.Length < 16)
+        {
+            return false;
+        }
+
+        var pieces = _pieces ??= [.. table.Values
+            .SelectMany(value => System.Text.RegularExpressions.Regex.Split(value, @"\{\d+(?:[,:][^}]*)?\}"))
+            .Select(piece => piece.Trim(' ', ':', '–', '·', '.', ',', '(', ')'))
+            .Where(piece => piece.Length >= 16)
+            .Distinct(StringComparer.Ordinal)];
+        return pieces.Any(piece => text.Contains(piece, StringComparison.Ordinal));
     }
 
     /// <summary>The text in the language of the window (the Slovak one when it has no translation).</summary>

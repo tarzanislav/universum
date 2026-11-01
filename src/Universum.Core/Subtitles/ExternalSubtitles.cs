@@ -104,7 +104,7 @@ public static class ExternalSubtitles
         var videoName = Words.Normalize(video);
         if (videoName.Length > 0 && (Words.Normalize(rest) == videoName || Words.Normalize(name) == videoName))
         {
-            return (100, "rovnaký názov ako video");
+            return (100, CoreText.T("rovnaký názov ako video"));
         }
 
         var episode = EpisodeParser.FromText(name);
@@ -133,7 +133,7 @@ public static class ExternalSubtitles
                 var sameYear = title!.Year is not { } year || videoTitle?.Year is not { } videoYear || year == videoYear;
                 if (Words.Normalize(title.Name) == videoWords && sameYear)
                 {
-                    return videoIsEpisode ? (90, $"názov seriálu a epizóda {videoEpisode!.Number.Tag}") : (80, "slová názvu" + (title.Year is { } y ? $" a rok {y}" : ""));
+                    return videoIsEpisode ? (90, CoreText.F("názov seriálu a epizóda {0}", videoEpisode!.Number.Tag)) : (80, title.Year is { } y ? CoreText.F("slová názvu a rok {0}", y) : CoreText.T("slová názvu"));
                 }
             }
 
@@ -144,10 +144,10 @@ public static class ExternalSubtitles
         // no title in the subtitle file's name ("S01E04.cze.srt", "titulky.srt")
         if (videoIsEpisode)
         {
-            return (60, $"epizóda {videoEpisode!.Number.Tag}");
+            return (60, CoreText.F("epizóda {0}", videoEpisode!.Number.Tag));
         }
 
-        return videosInFolder == 1 ? (40, "jediné video v priečinku") : null;
+        return videosInFolder == 1 ? (40, CoreText.T("jediné video v priečinku")) : null;
     }
 
     // a title made of more than the words every subtitle file may carry ("titulky", "cze", "forced")

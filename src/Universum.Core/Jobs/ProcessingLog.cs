@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Universum.Core.Text;
 
 namespace Universum.Core.Jobs;
 
@@ -54,14 +55,14 @@ public sealed record ProcessingLog(string Kind, DateTime StartedUtc, DateTime Fi
                 }
             }
 
-            Add(LoggedOutcome.Done, "hotovo");
-            Add(LoggedOutcome.AlreadyInLibrary, "už v knižnici");
-            Add(LoggedOutcome.Unchanged, "bez zmeny");
-            Add(LoggedOutcome.Skipped, "preskočené");
-            Add(LoggedOutcome.Cancelled, "zrušené");
-            Add(LoggedOutcome.Failed, Count(LoggedOutcome.Failed) == 1 ? "chyba" : "chyby");
-            Add(LoggedOutcome.Attention, "POZOR");
-            var files = Files.Count == 1 ? "1 súbor" : Files.Count is >= 2 and <= 4 ? $"{Files.Count} súbory" : $"{Files.Count} súborov";
+            Add(LoggedOutcome.Done, CoreText.T("hotovo"));
+            Add(LoggedOutcome.AlreadyInLibrary, CoreText.T("už v knižnici"));
+            Add(LoggedOutcome.Unchanged, CoreText.T("bez zmeny"));
+            Add(LoggedOutcome.Skipped, CoreText.T("preskočené"));
+            Add(LoggedOutcome.Cancelled, CoreText.T("zrušené"));
+            Add(LoggedOutcome.Failed, Count(LoggedOutcome.Failed) == 1 ? CoreText.T("chyba") : CoreText.T("chyby"));
+            Add(LoggedOutcome.Attention, CoreText.T("POZOR"));
+            var files = Files.Count == 1 ? CoreText.T("1 súbor") : Files.Count is >= 2 and <= 4 ? CoreText.F("{0} súbory", Files.Count) : CoreText.F("{0} súborov", Files.Count);
             return parts.Count == 0 ? files : $"{files}: {string.Join(", ", parts)}";
         }
     }

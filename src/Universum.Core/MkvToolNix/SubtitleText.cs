@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Universum.Core.Media;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.MkvToolNix;
 
@@ -333,7 +334,7 @@ public static partial class SubtitleText
     public static Batch.LanguageEvidence Evidence(Text.SubtitleLanguageResult result) =>
         new(LanguageTag.FromCode(result.Language), Batch.Confidence.High, Batch.EvidenceSource.SubtitleAnalysis)
         {
-            Detail = (result.Certain ? "isté" : "najpravdepodobnejšie") + " – " + result.Detail,
+            Detail = (result.Certain ? CoreText.T("isté") : CoreText.T("najpravdepodobnejšie")) + " – " + result.Detail,
         };
 
     // the Matroska text formats FFmpeg converts to SRT (USF, Kate … are read by mkvextract)

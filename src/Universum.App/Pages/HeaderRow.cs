@@ -34,7 +34,7 @@ public sealed record LanguageChoice(LanguageTag Tag, string Display)
         }
 
         var language = Languages.Find(tag.Primary);
-        return new LanguageChoice(tag, language is null ? tag.ToString() : $"{language.SlovakName} ({tag.Primary})");
+        return new LanguageChoice(tag, language is null ? tag.ToString() : $"{language.Name} ({tag.Primary})");
     }
 
     public bool Same(LanguageTag other) => string.Equals(Tag.Primary, other.Primary, StringComparison.OrdinalIgnoreCase);

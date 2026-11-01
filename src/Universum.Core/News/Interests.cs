@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Universum.Core.Text;
 
 namespace Universum.Core.News;
 
@@ -46,11 +47,11 @@ public sealed class DeepLClient(HttpClient http, string key)
         }
         catch (HttpRequestException ex)
         {
-            throw new TranslationException("DeepL nie je dostupný: " + ex.Message, ex);
+            throw new TranslationException(CoreText.T("DeepL nie je dostupný: ") + ex.Message, ex);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TranslationException("DeepL neodpovedá.", ex);
+            throw new TranslationException(CoreText.T("DeepL neodpovedá."), ex);
         }
 
         using (response)
@@ -58,27 +59,27 @@ public sealed class DeepLClient(HttpClient http, string key)
             switch (response.StatusCode)
             {
                 case HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized:
-                    throw new TranslationException("DeepL neprijal kľúč – skontrolujte ho v Nastaveniach.");
+                    throw new TranslationException(CoreText.T("DeepL neprijal kľúč – skontrolujte ho v Nastaveniach."));
                 case (HttpStatusCode)456:
-                    throw new TranslationException("Mesačný počet znakov kľúča DeepL je vyčerpaný – ďalšie články ostanú v origináli.");
+                    throw new TranslationException(CoreText.T("Mesačný počet znakov kľúča DeepL je vyčerpaný – ďalšie články ostanú v origináli."));
                 case HttpStatusCode.TooManyRequests:
-                    throw new TranslationException("DeepL žiada spomaliť – zvyšok sa preloží pri ďalšej aktualizácii.");
+                    throw new TranslationException(CoreText.T("DeepL žiada spomaliť – zvyšok sa preloží pri ďalšej aktualizácii."));
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new TranslationException($"DeepL odpovedal chybou {(int)response.StatusCode}.");
+                throw new TranslationException(CoreText.F("DeepL odpovedal chybou {0}.", (int)response.StatusCode));
             }
 
             try
             {
                 using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
                 var translated = document.RootElement.GetProperty("translations").EnumerateArray().Select(t => t.GetProperty("text").GetString() ?? "").ToList();
-                return translated.Count == texts.Count ? translated : throw new TranslationException("DeepL vrátil neúplný preklad.");
+                return translated.Count == texts.Count ? translated : throw new TranslationException(CoreText.T("DeepL vrátil neúplný preklad."));
             }
             catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
             {
-                throw new TranslationException("Odpoveď DeepL sa nedá prečítať.", ex);
+                throw new TranslationException(CoreText.T("Odpoveď DeepL sa nedá prečítať."), ex);
             }
         }
     }
@@ -178,7 +179,7 @@ public sealed class Interests(WebPageClient pages, InterestStore store)
         for (var i = 0; i < enabled.Count; i++)
         {
             var source = enabled[i];
-            progress?.Report($"Zaujímavosti: {source.Name} ({i + 1}/{enabled.Count})");
+            progress?.Report(CoreText.F("Zaujímavosti: {0} ({1}/{2})", source.Name, i + 1, enabled.Count));
             try
             {
                 read.AddRange(await ReadAsync(source, cancellationToken).ConfigureAwait(false));
@@ -209,7 +210,7 @@ public sealed class Interests(WebPageClient pages, InterestStore store)
     /// <summary>The articles of one source: its feed, or the feed its page names.</summary>
     public async Task<IReadOnlyList<FeedItem>> ReadAsync(FeedSource source, CancellationToken cancellationToken = default)
     {
-        var address = source.Address ?? throw new FormatException("zdroj nemá bezpečnú adresu https.");
+        var address = source.Address ?? throw new FormatException(CoreText.T("zdroj nemá bezpečnú adresu https."));
         var text = await pages.GetAsync(address, cancellationToken).ConfigureAwait(false);
         if (!FeedParser.IsFeed(text))
         {
@@ -217,7 +218,7 @@ public sealed class Interests(WebPageClient pages, InterestStore store)
             if (FeedParser.Discover(text, address) is not { } feed)
             {
                 var listed = FeedParser.FromPage(text, address, source.Name, source.Language);
-                return listed.Count > 0 ? listed : throw new FormatException("stránka nemá kanál RSS ani zoznam článkov – zadajte priamo adresu kanála alebo stránky s článkami.");
+                return listed.Count > 0 ? listed : throw new FormatException(CoreText.T("stránka nemá kanál RSS ani zoznam článkov – zadajte priamo adresu kanála alebo stránky s článkami."));
             }
 
             text = await pages.GetAsync(feed, cancellationToken).ConfigureAwait(false);
@@ -237,10 +238,10 @@ public sealed class Interests(WebPageClient pages, InterestStore store)
             var characters = batch.Sum(i => i.Title.Length + i.Summary.Length);
             if (used + characters > MonthBudget)
             {
-                throw new TranslationException("Tento mesiac je preložených už takmer 500 000 znakov (limit bezplatného DeepL) – ďalšie články ostanú v origináli.");
+                throw new TranslationException(CoreText.T("Tento mesiac je preložených už takmer 500 000 znakov (limit bezplatného DeepL) – ďalšie články ostanú v origináli."));
             }
 
-            progress?.Report($"Prekladám články ({waiting.IndexOf(batch[0]) + 1}/{waiting.Count})");
+            progress?.Report(CoreText.F("Prekladám články ({0}/{1})", waiting.IndexOf(batch[0]) + 1, waiting.Count));
             var texts = await translator.TranslateAsync(batch.SelectMany(i => new[] { i.Title, i.Summary.Length > 0 ? i.Summary : "." }).ToList(), language, cancellationToken).ConfigureAwait(false);
             used += characters;
             var done = batch.Select((item, n) => item with

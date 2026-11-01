@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Speech;
 
@@ -85,7 +86,7 @@ public static partial class VoiceNotes
     {
         if (!tools.Model.All(char.IsAscii))
         {
-            return (null, "Prepis nejde: priečinok modelu reči má v ceste písmená s diakritikou.");
+            return (null, CoreText.T("Prepis nejde: priečinok modelu reči má v ceste písmená s diakritikou."));
         }
 
         var name = Path.GetFileNameWithoutExtension(wave) + "-prepis";
@@ -95,11 +96,11 @@ public static partial class VoiceNotes
             var result = await runner.RunAsync(SpokenLanguage.TranscriptionRequest(tools, wave, language, name) with { Timeout = TimeSpan.FromMinutes(15) }, cancellationToken).ConfigureAwait(false);
             if (result.ExitCode != 0 || !File.Exists(json))
             {
-                return (null, "Prepis sa nepodaril (whisper.cpp skončil s kódom " + result.ExitCode.ToString(CultureInfo.InvariantCulture) + ").");
+                return (null, CoreText.F("Prepis sa nepodaril (whisper.cpp skončil s kódom {0}).", result.ExitCode.ToString(CultureInfo.InvariantCulture)));
             }
 
             var text = Text(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false));
-            return text.Length > 0 ? (text, null) : (null, "V nahrávke nebolo počuť reč.");
+            return text.Length > 0 ? (text, null) : (null, CoreText.T("V nahrávke nebolo počuť reč."));
         }
         finally
         {

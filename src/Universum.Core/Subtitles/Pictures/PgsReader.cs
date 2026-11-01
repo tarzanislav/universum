@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using Universum.Core.Text;
 
 namespace Universum.Core.Subtitles.Pictures;
 
@@ -51,7 +52,7 @@ public static class PgsReader
     {
         if (new FileInfo(path).Length > MaximumFileBytes)
         {
-            throw new InvalidDataException("Súbor obrázkových titulkov je príliš veľký.");
+            throw new InvalidDataException(CoreText.T("Súbor obrázkových titulkov je príliš veľký."));
         }
 
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);

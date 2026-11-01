@@ -315,7 +315,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 
     public string Attribution =>
         Loc.T("Zdroje: ") + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled && s.Kind != NewsSourceKind.TmdbFilms)
-            .Select(s => s.Kind == NewsSourceKind.TvMaze ? TvMazeClient.Attribution : s.Name)) + ".";
+            .Select(s => s.Kind == NewsSourceKind.TvMaze ? Loc.T(TvMazeClient.Attribution) : s.Name)) + ".";
 
     /// <summary>Opens Single spracovanie with a file and the series' title; false when it is busy. Set by the main window.</summary>
     public Func<string, string, string, Task<bool>> SendToSingle { get; set; } = (_, _, _) => Task.FromResult(false);

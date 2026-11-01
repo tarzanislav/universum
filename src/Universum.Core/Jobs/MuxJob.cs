@@ -1,4 +1,5 @@
 using Universum.Core.Muxing;
+using Universum.Core.Text;
 
 namespace Universum.Core.Jobs;
 
@@ -7,7 +8,7 @@ public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec 
 {
     public MuxSpec Spec { get; } = spec;
 
-    public string LogKind => "Zlučovanie";
+    public string LogKind => CoreText.T("Zlučovanie");
 
     public IReadOnlyList<LoggedFile> LoggedFiles => Result is { } result ? [Describe(Spec, result)] : [];
 
@@ -19,13 +20,13 @@ public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec 
         var problems = explained.Where(e => e.Words is (_, { } problem)).Select(e => e.Words!.Value.Problem!).ToList();
         if (result.Status == MuxStatus.Failed && problems.Count == 0)
         {
-            problems.Add(new LoggedProblem("Zlučovanie sa nepodarilo (podrobnosti sú v technických riadkoch).", "Skontrolujte vstupné súbory a voľné miesto na disku a skúste znova."));
+            problems.Add(new LoggedProblem(CoreText.T("Zlučovanie sa nepodarilo (podrobnosti sú v technických riadkoch)."), CoreText.T("Skontrolujte vstupné súbory a voľné miesto na disku a skúste znova.")));
         }
 
         return new LoggedFile(spec.Sources.FirstOrDefault()?.File.Path ?? "", result.OutputPath,
             result.Status switch { MuxStatus.Done => LoggedOutcome.Done, MuxStatus.Cancelled => LoggedOutcome.Cancelled, _ => LoggedOutcome.Failed },
-            result.Status switch { MuxStatus.Done => "Hotovo – nový súbor", MuxStatus.Cancelled => "Zrušené – nič sa nezapísalo", _ => "Chyba – nič sa nezapísalo" },
-            [$"Zlúčené: {spec.Sources.Count} vstup(y), {spec.Tracks.Count} stôp.", .. explained.Where(e => e.Words is ({ } step, null)).Select(e => e.Words!.Value.Step!)],
+            result.Status switch { MuxStatus.Done => CoreText.T("Hotovo – nový súbor"), MuxStatus.Cancelled => CoreText.T("Zrušené – nič sa nezapísalo"), _ => CoreText.T("Chyba – nič sa nezapísalo") },
+            [CoreText.F("Zlúčené: {0} vstup(y), {1} stôp.", spec.Sources.Count, spec.Tracks.Count), .. explained.Where(e => e.Words is ({ } step, null)).Select(e => e.Words!.Value.Step!)],
             problems, [.. explained.Where(e => e.Words is null or (_, not null)).Select(e => e.Message)]);
     }
 
@@ -34,9 +35,9 @@ public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec 
     protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
     {
         var output = Spec.Placement is { } placement
-            ? Path.Combine(placement.Directory, placement.Prefix) + " … (názov podľa pravidiel, veľkosť sa doplní po zápise)"
+            ? Path.Combine(placement.Directory, placement.Prefix) + CoreText.T(" … (názov podľa pravidiel, veľkosť sa doplní po zápise)")
             : Spec.OutputPath;
-        context.Log(JobSeverity.Info, $"Zlučovanie: {Spec.Sources.Count} vstup(y), {Spec.Tracks.Count} stôp → {output}");
+        context.Log(JobSeverity.Info, CoreText.F("Zlučovanie: {0} vstup(y), {1} stôp → {2}", Spec.Sources.Count, Spec.Tracks.Count, output));
         var result = await multiplexer.MuxAsync(Spec, new Reporter(context), cancellationToken);
         Result = result;
         foreach (var message in result.Messages)
@@ -50,9 +51,9 @@ public sealed class MuxJob(string description, Multiplexer multiplexer, MuxSpec 
 
         Outcome = result.Status switch
         {
-            MuxStatus.Done => "Hotovo: " + result.OutputPath,
-            MuxStatus.Cancelled => "Zrušené – nič sa nezapísalo.",
-            _ => "Nepodarilo sa – nič sa nezapísalo.",
+            MuxStatus.Done => CoreText.F("Hotovo: {0}", result.OutputPath),
+            MuxStatus.Cancelled => CoreText.T("Zrušené – nič sa nezapísalo."),
+            _ => CoreText.T("Nepodarilo sa – nič sa nezapísalo."),
         };
         return result.Status switch
         {

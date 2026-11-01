@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Universum.Core.Text;
 
 namespace Universum.Core.Agenda;
 
@@ -241,7 +242,7 @@ public sealed class AgendaStore
     /// </summary>
     public int Import(string file)
     {
-        var backup = JsonSerializer.Deserialize<List<AgendaItem>>(File.ReadAllText(file), Json) ?? throw new JsonException("Prázdna záloha.");
+        var backup = JsonSerializer.Deserialize<List<AgendaItem>>(File.ReadAllText(file), Json) ?? throw new JsonException(CoreText.T("Prázdna záloha."));
         var changed = 0;
         lock (_gate)
         {

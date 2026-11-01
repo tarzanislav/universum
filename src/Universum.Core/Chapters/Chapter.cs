@@ -1,5 +1,6 @@
 using System.Globalization;
 using Universum.Core.Media;
+using Universum.Core.Text;
 
 namespace Universum.Core.Chapters;
 
@@ -61,13 +62,13 @@ public static class ChapterChecks
             var chapter = chapters[i];
             if (duration is { } length && chapter.Start >= length)
             {
-                problems.Add($"Kapitola {i + 1} začína po konci súboru ({ChapterTime.Format(chapter.Start)} ≥ {ChapterTime.Format(length)}).");
+                problems.Add(CoreText.F("Kapitola {0} začína po konci súboru ({1} ≥ {2}).", i + 1, ChapterTime.Format(chapter.Start), ChapterTime.Format(length)));
             }
         }
 
         foreach (var same in chapters.GroupBy(c => c.Start).Where(g => g.Count() > 1))
         {
-            problems.Add($"Viac kapitol začína v rovnakom čase {ChapterTime.Format(same.Key)}.");
+            problems.Add(CoreText.F("Viac kapitol začína v rovnakom čase {0}.", ChapterTime.Format(same.Key)));
         }
 
         return problems;

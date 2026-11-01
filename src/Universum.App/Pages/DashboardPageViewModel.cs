@@ -194,7 +194,7 @@ public sealed class DashboardPageViewModel : ObservableObject
         : _weather is { } w ? Loc.F("Aktualizované o {0}", w.TakenUtc.ToLocalTime().ToString("HH:mm", Slovak))
         : "";
 
-    public string WeatherAttribution => OpenMeteo.Attribution;
+    public string WeatherAttribution => Loc.T(OpenMeteo.Attribution);
 
     public AsyncRelayCommand RefreshWeatherCommand { get; }
 
@@ -507,7 +507,7 @@ public sealed class WeekOverview : ObservableObject
 
     public AsyncRelayCommand CheckWatchCommand { get; }
 
-    public string WatchAttribution => WatchProviders.Attribution;
+    public string WatchAttribution => Loc.T(WatchProviders.Attribution);
 
     private void ShowOffers()
     {

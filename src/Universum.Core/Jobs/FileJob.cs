@@ -1,6 +1,7 @@
 using Universum.Core.Execution;
 using Universum.Core.Library;
 using Universum.Core.Planning;
+using Universum.Core.Text;
 
 namespace Universum.Core.Jobs;
 
@@ -17,8 +18,8 @@ public sealed class FileJob(string description, FileProcessor processor, EditPla
     public string LogKind => Description.Split(':')[0].Trim();
 
     public IReadOnlyList<LoggedFile> LoggedFiles => Result is { } result ? [ProcessingWords.Describe(Plan.Target.Source.Path, Plan, result)]
-        : Status == JobStatus.Failed ? [new LoggedFile(Plan.Target.Source.Path, null, LoggedOutcome.Failed, "Chyba – originál ostal nezmenený", [],
-            [.. Messages.Where(m => m.Severity == JobSeverity.Error).Select(m => new LoggedProblem(m.Text, "Skúste súbor spracovať znova."))], [])]
+        : Status == JobStatus.Failed ? [new LoggedFile(Plan.Target.Source.Path, null, LoggedOutcome.Failed, CoreText.T("Chyba – originál ostal nezmenený"), [],
+            [.. Messages.Where(m => m.Severity == JobSeverity.Error).Select(m => new LoggedProblem(m.Text, CoreText.T("Skúste súbor spracovať znova.")))], [])]
         : [];
 
     /// <summary>The result of the last run.</summary>
@@ -39,14 +40,14 @@ public sealed class FileJob(string description, FileProcessor processor, EditPla
 
         Outcome = result.Status switch
         {
-            ProcessingStatus.Done => "Hotovo: " + result.OutputPath,
-            ProcessingStatus.Unchanged => "Bez zmien.",
-            ProcessingStatus.AlreadyInLibrary => "Rovnaký stream už v knižnici je: " + result.OutputPath,
-            ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať.",
-            ProcessingStatus.Cancelled => "Zrušené – originál ostal nezmenený.",
-            _ when FileProcessor.NeedsAttention(result) => "POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri výstup.",
-            _ when result.Messages.Contains(FileProcessor.RestoredMessage) => "Nepodarilo sa – originál je vrátený do pôvodného stavu.",
-            _ => "Nepodarilo sa – originál ostal nezmenený.",
+            ProcessingStatus.Done => CoreText.F("Hotovo: {0}", result.OutputPath),
+            ProcessingStatus.Unchanged => CoreText.T("Bez zmien."),
+            ProcessingStatus.AlreadyInLibrary => CoreText.F("Rovnaký stream už v knižnici je: {0}", result.OutputPath),
+            ProcessingStatus.NeedsReview => CoreText.T("Súbor treba najprv skontrolovať."),
+            ProcessingStatus.Cancelled => CoreText.T("Zrušené – originál ostal nezmenený."),
+            _ when FileProcessor.NeedsAttention(result) => CoreText.T("POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri výstup."),
+            _ when result.Messages.Contains(FileProcessor.RestoredMessage) => CoreText.T("Nepodarilo sa – originál je vrátený do pôvodného stavu."),
+            _ => CoreText.T("Nepodarilo sa – originál ostal nezmenený."),
         };
         Finished?.Invoke(this, result);
         return result.Status switch
@@ -70,9 +71,9 @@ public sealed class FileJob(string description, FileProcessor processor, EditPla
 
     private static string Method(WriteMethod method) => method switch
     {
-        WriteMethod.HeaderEdit => "Úprava hlavičky",
-        WriteMethod.Remux => "Nový súbor (mkvmerge)",
-        _ => "Presun do knižnice",
+        WriteMethod.HeaderEdit => CoreText.T("Úprava hlavičky"),
+        WriteMethod.Remux => CoreText.T("Nový súbor (mkvmerge)"),
+        _ => CoreText.T("Presun do knižnice"),
     };
 
     /// <summary>Tool lines say what they are ("Warning: …", "#GUI#error …"); other messages count as errors when the job failed.</summary>

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Universum.Core.Media;
 using Universum.Core.Rules;
+using Universum.Core.Text;
 
 namespace Universum.Core.Templates;
 
@@ -29,7 +30,7 @@ public sealed record BatchTemplate
     };
 
     /// <summary>The default: no slots – every file is processed by the rules alone.</summary>
-    public static BatchTemplate RulesOnly { get; } = new() { Name = "Len pravidlá UNIVERSUM" };
+    public static BatchTemplate RulesOnly { get; } = new() { Name = CoreText.T("Len pravidlá UNIVERSUM") };
 
     public required string Name { get; init; }
 

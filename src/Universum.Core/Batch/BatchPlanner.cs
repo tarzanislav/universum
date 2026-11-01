@@ -246,7 +246,7 @@ public static class BatchPlanner
         var kind = library.KindFor(path);
         if (!library.KindConfirmedFor(path))
         {
-            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: kind == MediaKind.Series ? "seriál" : "filmy"));
+            reasons.Add(new ReviewReason(ReviewReasonKind.KindNotConfirmed, Detail: kind == MediaKind.Series ? CoreText.T("seriál") : CoreText.T("filmy")));
         }
 
         // owner, 29. 10. 2026: in a folder sorted into MOVIES and TVSHOWS the user sorts every file (nothing is guessed)

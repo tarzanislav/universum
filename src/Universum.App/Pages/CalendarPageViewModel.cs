@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Universum.App.Localization;
 using Universum.Core.Agenda;
 using Universum.Core.Calendar;
+using Universum.Core.Mega;
 using Universum.Core.News;
 using Universum.Core.Reports;
 
@@ -38,7 +39,8 @@ public sealed class CalendarRegionSwitch(string code, string name, bool on, Acti
 /// Kalendár (owner, 31. 10. 2026 – the group POZNÁMKY): the days in seven views (month grid, week columns, week and month
 /// as lists, year as 12 months or as rows, agenda); layers switched one by one or by groups – the premieres of
 /// Premiéry, the episodes of Novinky, the user's records, the holidays and memorial days of the chosen countries, the
-/// school holidays of the chosen region or district, the names of the day in Slovak, Czech and English; a click on a day
+/// school holidays of the chosen region or district, the names of the day in Slovak, Czech and English, the batches of MEGA
+/// planned for an hour and the runs of processing (the layer UNIVERSUM); a click on a day
 /// shows all about it on the left, where records are also made and changed. Nothing is asked from the internet here: the
 /// premieres and episodes are those Premiéry and Novinky keep.
 /// </summary>
@@ -81,6 +83,9 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             new CalendarLayerGroup(L("Kalendárium", "Kalendárium", "Almanac"),
                 [Layer(CalendarLayer.Holidays, L("sviatky a voľné dni", "svátky a volné dny", "holidays")), Layer(CalendarLayer.Memorial, L("pamätné dni", "významné dny", "memorial days")),
                  Layer(CalendarLayer.School, L("školské prázdniny", "školní prázdniny", "school holidays")), Layer(CalendarLayer.NameDays, L("meniny", "jmeniny", "name days"))], LayersChanged),
+            // what UNIVERSUM plans (MEGA batches with a time) and did (the logs of processing)
+            new CalendarLayerGroup("UNIVERSUM",
+                [Layer(CalendarLayer.Mega, L("MEGA dávky", "MEGA dávky", "MEGA batches")), Layer(CalendarLayer.Processed, L("spracované", "zpracované", "processed"))], LayersChanged),
         ];
         var regions = Regions;
         RegionSwitches = [.. HolidayRegions.All.Select(r => new CalendarRegionSwitch(r, HolidayRegions.Name(r, Loc.Language), regions.Contains(r), RegionsChanged))];
@@ -105,6 +110,10 @@ public sealed partial class CalendarPageViewModel : ObservableObject
                 Build();
             }
         };
+
+        // a batch planned or changed in MEGA spracovanie, a run of processing ended or a log deleted (from other threads too)
+        services.MegaChanged += () => Jobs.JobRow.OnUi(Build);
+        services.ProcessingLogs.Changed += () => Jobs.JobRow.OnUi(() => _ = ReloadRunsAsync());
         Build();
     }
 
@@ -116,6 +125,12 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
     /// <summary>Opens a premiere in Premiéry or an episode in Novinky (set by the main window): the layer and the title to look for.</summary>
     public Action<CalendarLayer, string> OpenNews { get; set; } = (_, _) => { };
+
+    /// <summary>Opens a batch of MEGA spracovanie (set by the main window).</summary>
+    public Action<Guid> OpenMega { get; set; } = _ => { };
+
+    /// <summary>Opens a log of processing (set by the main window).</summary>
+    public Action<string> OpenLog { get; set; } = _ => { };
 
     /// <summary>The premieres and episodes kept by Premiéry and Novinky are read (awaited by the self-test).</summary>
     public Task Ready { get; private set; } = Task.CompletedTask;
@@ -475,6 +490,36 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         Detail();
     }
 
+    /// <summary>Shows a day: the period with it, the day chosen (the reminders, the Dashboard).</summary>
+    public void Show(DateOnly date)
+    {
+        _anchor = date;
+        Select(date);
+        Build();
+    }
+
+    /// <summary>
+    /// The entries of the days for the Dashboard: those of the given layers that are switched on, by day and in the order of
+    /// a day (a record of several days only on its first day shown).
+    /// </summary>
+    public IReadOnlyList<(DateOnly Day, CalendarEntry Entry)> EntriesOf(DateOnly from, DateOnly to, IReadOnlyCollection<CalendarLayer> layers)
+    {
+        var found = new List<(DateOnly, CalendarEntry)>();
+        var records = new HashSet<Guid>();
+        foreach (var (day, entries) in Collect(from, to).OrderBy(p => p.Key))
+        {
+            foreach (var entry in entries.Where(e => layers.Contains(e.Layer) && e.InCell).OrderBy(e => e.Rank).ThenBy(e => e.Time ?? TimeOnly.MinValue))
+            {
+                if (entry.Record is not { } record || records.Add(record.Id))
+                {
+                    found.Add((day, entry));
+                }
+            }
+        }
+
+        return found;
+    }
+
     /// <summary>Opens the editor for a new record of the chosen day, or for a record.</summary>
     public void Edit(AgendaItem? item, AgendaKind kind) => Editor = new AgendaEditor(_services.Agenda, item, _selected, kind, () =>
     {
@@ -743,6 +788,11 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             Add(day, entry);
         }
 
+        foreach (var (day, entry) in _sources.OwnWork(from, to, OpenMega, OpenLog))
+        {
+            Add(day, entry);
+        }
+
         foreach (var occurrence in _services.Agenda.Between(from, to))
         {
             var item = occurrence.Item;
@@ -913,13 +963,34 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             Section(L("Premiéry filmov", "Premiéry filmů", "Film premieres"), CalendarLayer.FilmsDomestic, CalendarLayer.FilmsDomestic, CalendarLayer.FilmsWorld),
             Section(L("Premiéry seriálov", "Premiéry seriálů", "Series premieres"), CalendarLayer.SeriesDomestic, CalendarLayer.SeriesDomestic, CalendarLayer.SeriesWorld),
             Section(L("Novinky – Seriály", "Novinky – Seriály", "New episodes"), CalendarLayer.EpisodesWorld, CalendarLayer.EpisodesDomestic, CalendarLayer.EpisodesWorld),
+            Section("UNIVERSUM", CalendarLayer.Mega, CalendarLayer.Mega, CalendarLayer.Processed),
         }.OfType<CalendarSection>().ToList();
         OnPropertyChanged(nameof(DetailIsEmpty));
     }
 
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpper(text[0], Culture) + text[1..];
 
-    private static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
+    internal static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
+
+    // the runs of processing read again (a run ended, logs deleted) – only once the calendar has read its sources
+    private async Task ReloadRunsAsync()
+    {
+        if (!_sources.Loaded)
+        {
+            return;
+        }
+
+        try
+        {
+            await _sources.LoadRunsAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // the runs shown stay as they were
+        }
+
+        Build();
+    }
 }
 
 /// <summary>
@@ -930,6 +1001,7 @@ internal sealed partial class CalendarSources(AppServices services)
 {
     private PremiereArchive _archive = new();
     private IReadOnlyList<SeriesEpisode> _episodes = [];
+    private IReadOnlyList<KeptRun> _runs = [];
 
     public bool Loaded { get; private set; }
 
@@ -942,8 +1014,83 @@ internal sealed partial class CalendarSources(AppServices services)
         var history = await Task.Run(() => news.History(today.AddDays(-SeriesNewsPageViewModel.RecentDays)));
         _archive = archive;
         _episodes = SeriesNews.Merge(history.Concat(kept.Episodes));
+        await LoadRunsAsync();
         Loaded = true;
     }
+
+    /// <summary>The runs of processing kept in the logs (only what the calendar shows of them).</summary>
+    public async Task LoadRunsAsync() =>
+        _runs = await Task.Run(() => services.ProcessingLogs.All().Select(log => new KeptRun(log.Id, log.Kind, log.FinishedUtc, log.Summary, log.HasProblems)).ToList());
+
+    /// <summary>
+    /// What UNIVERSUM plans and did on the days: the batches of MEGA spracovanie with a day and an hour of their start, and
+    /// the runs of processing on the day they ended (owner, 31. 10. 2026 – the calendar shows UNIVERSUM's own work too).
+    /// </summary>
+    public IEnumerable<(DateOnly Day, CalendarEntry Entry)> OwnWork(DateOnly from, DateOnly to, Action<Guid> openMega, Action<string> openLog)
+    {
+        foreach (var batch in services.Mega.Batches)
+        {
+            if (batch.Start != MegaStart.At || batch.StartAt is not { } at)
+            {
+                continue;
+            }
+
+            var day = DateOnly.FromDateTime(at);
+            if (day < from || day > to)
+            {
+                continue;
+            }
+
+            var id = batch.Id;
+            yield return (day, new CalendarEntry
+            {
+                Layer = CalendarLayer.Mega,
+                Title = batch.Label + (batch.Name.Length > 0 ? ": " + batch.Name : ""),
+                Detail = MegaState(batch.State) + " · " + Files(batch.Files.Count) + (batch.Outcome.Length > 0 && !batch.IsOpen ? " · " + batch.Outcome : ""),
+                Time = TimeOnly.FromDateTime(at),
+                Color = CalendarColors.Of(CalendarLayer.Mega),
+                OpenCommand = new RelayCommand(() => openMega(id)),
+            });
+        }
+
+        foreach (var run in _runs)
+        {
+            var ended = run.FinishedUtc.ToLocalTime();
+            var day = DateOnly.FromDateTime(ended);
+            if (day < from || day > to)
+            {
+                continue;
+            }
+
+            var id = run.Id;
+            yield return (day, new CalendarEntry
+            {
+                Layer = CalendarLayer.Processed,
+                Title = (run.Problems ? "⚠ " : "") + run.Kind,
+                Detail = run.Summary,
+                Time = TimeOnly.FromDateTime(ended),
+                Color = CalendarColors.Of(CalendarLayer.Processed),
+                OpenCommand = new RelayCommand(() => openLog(id)),
+            });
+        }
+    }
+
+    private static string MegaState(MegaBatchState state) => state switch
+    {
+        MegaBatchState.Waiting => CalendarPageViewModel.L("čaká na spustenie", "čeká na spuštění", "waiting for its start"),
+        MegaBatchState.Queued => CalendarPageViewModel.L("vo fronte úloh", "ve frontě úloh", "in the job queue"),
+        MegaBatchState.Done => CalendarPageViewModel.L("hotová", "hotová", "done"),
+        MegaBatchState.DoneWithProblems => CalendarPageViewModel.L("hotová s problémami", "hotová s problémy", "done with problems"),
+        MegaBatchState.Cancelled => CalendarPageViewModel.L("zrušená", "zrušená", "cancelled"),
+        _ => CalendarPageViewModel.L("zmeškaná – UNIVERSUM vtedy nebežal", "zmeškaná – UNIVERSUM tehdy neběžel", "missed – UNIVERSUM was not running"),
+    };
+
+    private static string Files(int count) => Loc.Language switch
+    {
+        "cs" => count == 1 ? "1 soubor" : count is >= 2 and <= 4 ? $"{count} soubory" : $"{count} souborů",
+        "en" => count == 1 ? "1 file" : $"{count} files",
+        _ => count == 1 ? "1 súbor" : count is >= 2 and <= 4 ? $"{count} súbory" : $"{count} súborov",
+    };
 
     /// <summary>The premieres (with their VOD and TV days) and episodes of the days, as entries of the calendar.</summary>
     public IEnumerable<(DateOnly Day, CalendarEntry Entry)> Between(DateOnly from, DateOnly to, bool onlyChosen, Action<CalendarLayer, string> open)
@@ -1016,6 +1163,9 @@ internal sealed partial class CalendarSources(AppServices services)
         Color = CalendarColors.Of(layer),
         OpenCommand = new RelayCommand(() => open(layer, find ?? title)),
     };
+
+    // a run of processing as the calendar shows it (the files of the log are not kept here)
+    private sealed record KeptRun(string Id, string Kind, DateTime FinishedUtc, string Summary, bool Problems);
 
     // "VOD 12. 12. 2026 · TV 1. 3. 2027 (USA)"
     [GeneratedRegex(@"\b(VOD|TV) (\d{1,2})\. ?(\d{1,2})\. ?(\d{4})", RegexOptions.CultureInvariant)]

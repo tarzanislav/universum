@@ -5080,6 +5080,139 @@
                             </DockPanel>
                         </Border>
                     </Grid>
+                    <!-- POZNÁMKY: the coming week of the calendar; the open tasks, a task in one line and the pinned notes -->
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Card}" Padding="20,14" BorderBrush="#66D46A8C">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#2ED46A8C" Offset="0" />
+                                    <GradientStop Color="#1AA78BE6" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,8">
+                                    <Button DockPanel.Dock="Right" Content="{loc:T 'Kalendár'}" Command="{Binding Agenda.OpenCalendarCommand}" Padding="10,2" />
+                                    <Button DockPanel.Dock="Right" Content="+" Command="{Binding Agenda.NewEventCommand}" Padding="10,2" Margin="0,0,6,0" FontWeight="Bold"
+                                            ToolTip="{loc:T 'Nová udalosť dnes'}" />
+                                    <TextBlock Text="{loc:T 'Kalendár – najbližších 7 dní'}" FontWeight="SemiBold" FontSize="15" Foreground="#B8466E" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="{loc:T 'Na najbližších 7 dní nie je v kalendári nič – udalosť pridáte tlačidlom +.'}" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                           Visibility="{Binding Agenda.NoCalendar, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Agenda.Calendar}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Command="{Binding OpenCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" ToolTip="{Binding ToolTip}">
+                                                <Grid Margin="0,2" Background="Transparent">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="86" />
+                                                        <ColumnDefinition Width="46" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="Day" Text="{Binding Day}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                               Visibility="{Binding FirstOfDay, Converter={StaticResource BoolToVisibility}}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Time}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+                                                    <DockPanel Grid.Column="2">
+                                                        <Border DockPanel.Dock="Left" Width="4" CornerRadius="2" Background="{Binding Color}" Margin="0,2,8,2" />
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource NewsSubtitle}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Grid>
+                                            </Button>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                    <Setter TargetName="Day" Property="Foreground" Value="#B8466E" />
+                                                    <Setter TargetName="Day" Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="20,14" BorderBrush="#66E09A3E">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#2EE09A3E" Offset="0" />
+                                    <GradientStop Color="#1AC9A227" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,6">
+                                    <Button DockPanel.Dock="Right" Content="{loc:T 'Plánované úlohy'}" Command="{Binding Agenda.OpenTasksCommand}" Padding="10,2" />
+                                    <TextBlock Text="{loc:T 'Úlohy'}" FontWeight="SemiBold" FontSize="15" Foreground="#B5731F" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBox Text="{Binding Agenda.QuickText, UpdateSourceTrigger=PropertyChanged}" Padding="8,4">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding Agenda.AddCommand}" />
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <TextBlock Text="{Binding Agenda.QuickHint}" Style="{StaticResource Hint}" FontSize="11.5" Margin="2,2,0,6" TextWrapping="Wrap" />
+                                <TextBlock Text="{loc:T 'Žiadna otvorená úloha na najbližších 7 dní.'}" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                           Visibility="{Binding Agenda.NoTasks, Converter={StaticResource BoolToVisibility}}" />
+                                <ItemsControl ItemsSource="{Binding Agenda.Tasks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,1">
+                                                <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsDone}" MinWidth="0" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                          ToolTip="{loc:T 'Hotovo'}" />
+                                                <TextBlock x:Name="Due" DockPanel.Dock="Right" Text="{Binding Due}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock DockPanel.Dock="Left" Text="!" Foreground="#D9534F" FontWeight="Bold" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                           Visibility="{Binding High, Converter={StaticResource BoolToVisibility}}" />
+                                                <Button Command="{Binding OpenCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" VerticalAlignment="Center">
+                                                    <TextBlock Background="Transparent" TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Tags, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                                    </TextBlock>
+                                                </Button>
+                                            </DockPanel>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Late}" Value="True">
+                                                    <Setter TargetName="Due" Property="Foreground" Value="#D9534F" />
+                                                    <Setter TargetName="Due" Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock FontSize="12" Margin="0,4,0,0" Visibility="{Binding Agenda.HasMoreTasks, Converter={StaticResource BoolToVisibility}}">
+                                    <Hyperlink Command="{Binding Agenda.OpenTasksCommand}"><Run Text="{Binding Agenda.MoreTasks, Mode=OneWay}" /></Hyperlink>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Agenda.Status}" Style="{StaticResource NewsSubtitle}" Margin="0,4,0,0" />
+                                <!-- the pinned notes -->
+                                <StackPanel Margin="0,12,0,0" Visibility="{Binding Agenda.HasNotes, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel Margin="0,0,0,4">
+                                        <Button DockPanel.Dock="Right" Content="{loc:T 'Poznámky'}" Command="{Binding Agenda.OpenNotesCommand}" Padding="10,2" />
+                                        <TextBlock Text="{loc:T 'Pripnuté poznámky'}" FontWeight="SemiBold" FontSize="14" Foreground="#9A7A10" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding Agenda.Notes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding OpenCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand">
+                                                    <DockPanel Margin="0,2" Background="Transparent">
+                                                        <Border DockPanel.Dock="Left" Width="4" CornerRadius="2" Background="{Binding Color}" Margin="0,2,8,2" />
+                                                        <TextBlock DockPanel.Dock="Right" Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Preview}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                                                       Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                     <!-- this week: episodes of the chosen series and premieres, films premiering -->
                     <Grid Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>

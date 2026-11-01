@@ -178,10 +178,17 @@ public sealed class TasksPageViewModel : ObservableObject
                     "For example: tomorrow 20:00 process the film #cinema !   ·   friday call   ·   in 3 days …");
             }
 
-            var task = QuickEntry.Parse(QuickText, Today);
-            return "→ " + (task.Title.Length > 0 ? task.Title : "…") + " · " + Due(task.Due, task.Time) + (task.Priority == 2 ? " · ! vysoká" : task.Priority == 0 ? " · nízka" : "") +
-                   (task.Tags.Count > 0 ? " · " + string.Join(" ", task.Tags.Select(t => "#" + t)) : "");
+            return HintOf(QuickText);
         }
+    }
+
+    /// <summary>What a line of the quick entry will make, as it is understood now (here and on the Dashboard).</summary>
+    internal static string HintOf(string line)
+    {
+        var task = QuickEntry.Parse(line, Today);
+        return "→ " + (task.Title.Length > 0 ? task.Title : "…") + " · " + Due(task.Due, task.Time) +
+               (task.Priority == 2 ? L(" · ! vysoká", " · ! vysoká", " · ! high") : task.Priority == 0 ? L(" · nízka", " · nízká", " · low") : "") +
+               (task.Tags.Count > 0 ? " · " + string.Join(" ", task.Tags.Select(t => "#" + t)) : "");
     }
 
     public RelayCommand AddCommand { get; }
@@ -393,6 +400,15 @@ public sealed class TasksPageViewModel : ObservableObject
             return;
         }
 
+        var item = AddQuick(_services.Agenda, line);
+        QuickText = "";
+        OnPropertyChanged(nameof(QuickHint));
+        Status = L("Pridané: ", "Přidáno: ", "Added: ") + item.Title + " · " + Due(item.Task?.Due, item.Task?.DueTime);
+    }
+
+    /// <summary>A task made of one line of the quick entry and kept (here and on the Dashboard).</summary>
+    internal static AgendaItem AddQuick(AgendaStore store, string line)
+    {
         var parsed = QuickEntry.Parse(line, Today);
         var item = new AgendaItem
         {
@@ -400,10 +416,8 @@ public sealed class TasksPageViewModel : ObservableObject
             Tags = [.. parsed.Tags],
             Task = new AgendaTask { Due = parsed.Due, DueTime = parsed.Time, Priority = parsed.Priority },
         };
-        _services.Agenda.Save(item);
-        QuickText = "";
-        OnPropertyChanged(nameof(QuickHint));
-        Status = L("Pridané: ", "Přidáno: ", "Added: ") + item.Title + " · " + Due(parsed.Due, parsed.Time);
+        store.Save(item);
+        return item;
     }
 
     private void EmptyDone()
@@ -607,7 +621,7 @@ public sealed class TasksPageViewModel : ObservableObject
 
     // ---------------------------------------------------------------- words
 
-    private static string Due(DateOnly? due, TimeOnly? time)
+    internal static string Due(DateOnly? due, TimeOnly? time)
     {
         if (due is not { } day)
         {

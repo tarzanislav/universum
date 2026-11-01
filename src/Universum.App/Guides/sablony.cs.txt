@@ -1,4 +1,4 @@
-# Návod – ŠABLONY
+# Nápověda – ŠABLONY
 Skupina **ŠABLONY (TEMPLATE)** upraví video podle *pravidel UNIVERSUM* – jazyky a pořadí stop, příznaky, názvy stop, název souboru a místo v knihovně. Můžete zpracovat jeden soubor, celou složku najednou nebo připravit dávky na později.
 
 !info Originál se **nikdy nemění** – výsledek je vždy **nový soubor** v knihovně. Originály se dají smazat jen v Hromadném a MEGA zpracování, jen pokud to sami zvolíte, a vždy jen **do Koše Windows**.

@@ -3,7 +3,7 @@
 # 28. 10. 2026: part of the installation, FFmpeg whole):
 #   ffmpeg/   FFmpeg (LGPL 2.1+) built here from its source at a fixed commit – ffmpeg.exe, ffprobe.exe, licence, SOURCE.txt
 #   whisper/  whisper.cpp (MIT) – the official Windows build, checked against a fixed SHA-256
-#   models/   the speech model "base" (MIT) – the official file at a fixed revision, checked against a fixed SHA-256
+#   models/   the speech models "base" (quick) and "large-v3-turbo" q5_0 (accurate), MIT – the official file at a fixed revision, checked against a fixed SHA-256
 #   manifest.json  SHA-256 of every file; UNIVERSUM starts nothing that does not match it
 # and, for the release, the complete FFmpeg source with the build script (the LGPL asks for it to be offered with
 # the program).
@@ -17,7 +17,9 @@ WHISPER_VERSION=1.9.2
 WHISPER_COMMIT=306c88f4d1286aec1bf96e544632897886af5501
 WHISPER_ZIP_SHA256=49dcc16de826f20bd53d44f947a1ae49dfa81f86cad67a64d80820cb192d674a
 MODEL_REVISION=98aa99a0a9db05ae2342309f5096248665f7cba3
-MODEL_SHA256=60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
+BASE_SHA256=60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
+ACCURATE_NAME=ggml-large-v3-turbo-q5_0.bin
+ACCURATE_SHA256=394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2
 
 here="$(cd "$(dirname "$0")" && pwd)"
 out="$(mkdir -p "$1" && cd "$1" && pwd)"
@@ -72,10 +74,13 @@ cp "$work/whisper-source/LICENSE" "$out/whisper/LICENSE"
 printf 'whisper.cpp %s (https://github.com/ggml-org/whisper.cpp), MIT licence (LICENSE).\nOfficial Windows build whisper-bin-x64.zip, SHA-256 %s.\n' \
   "$WHISPER_VERSION" "$WHISPER_ZIP_SHA256" > "$out/whisper/SOURCE.txt"
 
-# the speech model "base" (multilingual): OpenAI Whisper weights converted for whisper.cpp
-download "https://huggingface.co/ggerganov/whisper.cpp/resolve/$MODEL_REVISION/ggml-base.bin" "$out/models/ggml-base.bin" "$MODEL_SHA256"
+# the speech models (multilingual): OpenAI Whisper weights converted for whisper.cpp – "base" for the quick language
+# of each piece, "large-v3-turbo" quantised q5_0 for Czech against Slovak and dictation (owner, 1. 11. 2026)
+download "https://huggingface.co/ggerganov/whisper.cpp/resolve/$MODEL_REVISION/ggml-base.bin" "$out/models/ggml-base.bin" "$BASE_SHA256"
+download "https://huggingface.co/ggerganov/whisper.cpp/resolve/$MODEL_REVISION/$ACCURATE_NAME" "$out/models/$ACCURATE_NAME" "$ACCURATE_SHA256"
 cat > "$out/models/LICENSE" <<'TXT'
-The speech model ggml-base.bin is OpenAI's Whisper model "base" converted for whisper.cpp
+The speech models ggml-base.bin and ggml-large-v3-turbo-q5_0.bin are OpenAI's Whisper models "base" and
+"large-v3-turbo" converted for whisper.cpp (the second quantised to q5_0)
 (https://huggingface.co/ggerganov/whisper.cpp, https://github.com/openai/whisper).
 
 MIT License
@@ -100,7 +105,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 TXT
-printf 'Model revision %s, SHA-256 %s.\n' "$MODEL_REVISION" "$MODEL_SHA256" > "$out/models/SOURCE.txt"
+printf 'Model revision %s; ggml-base.bin SHA-256 %s; %s SHA-256 %s.\n' "$MODEL_REVISION" "$BASE_SHA256" "$ACCURATE_NAME" "$ACCURATE_SHA256" > "$out/models/SOURCE.txt"
 
 # the manifest: SHA-256 of every file (paths with "/")
 python3 - "$out" <<'PY'

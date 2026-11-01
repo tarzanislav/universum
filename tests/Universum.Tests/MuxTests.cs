@@ -172,6 +172,38 @@ public sealed class MuxTests
     }
 
     [Test]
+    public void TheOrderOfATypeFollowsTheLanguages()
+    {
+        var film = Film("film.mkv");
+        var subs = new MediaFile
+        {
+            Path = "sub.srt",
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8" },
+                new MediaTrack { Id = 1, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8" },
+                new MediaTrack { Id = 2, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8" },
+                new MediaTrack { Id = 3, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8" },
+            ],
+        };
+        var sources = new[] { new MuxSource(film), new MuxSource(subs) };
+        var tracks = new List<MuxTrack>
+        {
+            new(0, 0, null, LanguageTag.Undetermined, new TrackFlags()),
+            new(1, 0, null, LanguageTag.FromCode("sk"), new TrackFlags()),
+            new(0, 1, "English", LanguageTag.FromCode("en"), new TrackFlags()),
+            new(1, 1, "Komentár režiséra – commentary", LanguageTag.FromCode("cs"), new TrackFlags()),
+            new(0, 2, "CZ", LanguageTag.FromCode("cs"), new TrackFlags()),
+            new(1, 2, null, LanguageTag.FromCode("cs"), new TrackFlags()),
+            new(1, 3, null, LanguageTag.FromCode("cs"), new TrackFlags(Forced: true)),
+        };
+
+        // audio: Czech above English; subtitles: Czech forced, Czech, Slovak, commentary last
+        Assert.Sequence([4, 2], MuxRules.OrderOfType(sources, tracks, TrackType.Audio), "Czech audio first");
+        Assert.Sequence([6, 5, 1, 3], MuxRules.OrderOfType(sources, tracks, TrackType.Subtitles), "CZ forced, CZ, SK, commentary");
+    }
+
+    [Test]
     public async Task MuxWritesVerifiesAndNeverOverwrites()
     {
         var installation = await TestData.RequireMkvToolNixAsync();

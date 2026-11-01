@@ -1,4 +1,4 @@
-# Návod – MULTIPLEXING
+# Nápověda – MULTIPLEXING
 Skupina **MULTIPLEXING** slouží ke skládání a úpravě souborů MKV: **sloučíte** stopy z více souborů do jednoho,
 opravíte **hlavičku** (názvy, jazyky, příznaky stop), upravíte **kapitoly** a prohlédnete si **informace** o stopách.
 Originály se **nikdy nemění** – výsledek je vždy **nový soubor** (vedle zdroje nebo v knihovně).
@@ -25,7 +25,9 @@ Tady z filmu, zvuků a titulků složíte **jeden nový soubor MKV** – vyberet
   (VOB rozdělený na části), *Nastavit název výstupního souboru podle vybraného souboru*, *Vybrat všechny stopy ze souboru*.
 ### Stopy ve výstupu a Vlastnosti
 - Sloupce **Vzít**, **Typ**, **Kodek**, **Jazyk**, **Název**, **Default**, **Forced**, **Další**; řádky jsou v pořadí,
-  v jakém budou ve výstupu. Pořadí změníte šipkami (**Ctrl+↑** / **Ctrl+↓**).
+  v jakém budou ve výstupu. Pořadí změníte šipkami (**Ctrl+↑** / **Ctrl+↓**), šipkami u stopy nebo přetažením za úchyt ve sloupci **Pořadí**
+  (v rámci zvuků nebo titulků). Když stopě změníte jazyk nebo Forced, stopy se po **2 sekundách** samy seřadí
+  podle pravidel: CZ nahoře, SK pod ní, potom ostatní, komentáře na konec.
 - Po výběru stopy se vpravo v části **Vlastnosti** dá změnit [Název stopy], [Jazyk] a příznaky
   [Výchozí stopa (Default)], [Zapnutá (Enabled)], [Vynucené zobrazení (Forced)].
 - [Další příznaky a rozšířené vlastnosti]: SDH, audio popis, komentář, zpoždění (ms), FPS, poměr stran, ořez,

@@ -157,6 +157,16 @@ public static class SubtitleLanguage
                 $"krátky text bez ě, ř, ů, ľ, ô – podľa krátkych slov (české {czechShort}×, slovenské {slovakShort}×" + (dz > 0 ? $", dz/dž {dz}×" : "") + ") – overte");
         }
 
+        // a longer text with háčky and with á, é, í, ó, ú, ý, ď, ť or ň (Slovenian and Croatian write none of them) but without
+        // ě, ř, ů, ľ, ô (owner, 1. 11. 2026: simple Slovak lines read as nothing): Czech or Slovak by their own short words
+        var longVowels = lower.Count(c => "áéíóúýďťň".Contains(c));
+        if (hacek > 0 && longVowels > 0 && czechOwn + slovakOwn >= 3 && czechOwn != slovakOwn)
+        {
+            var language = slovakOwn + (dz * 0.5) > czechOwn ? "sk" : "cs";
+            return new SubtitleLanguageResult(language, false,
+                $"bez ě, ř, ů, ľ, ô – podľa krátkych slov (české {czechOwn}×, slovenské {slovakOwn}×" + (dz > 0 ? $", dz/dž {dz}×" : "") + ") – overte");
+        }
+
         // a short text with háčky but without ě, ř, ů, ľ … (forced subtitles): the most probable by the frequent words; in
         // a long text it is Slovenian, Croatian, Lithuanian – none of the two; without háčky nothing to say
         return other is null || words.Count >= ManyWords || hacek == 0 ? null

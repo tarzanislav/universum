@@ -10,15 +10,27 @@ public sealed class SpeechException(string message, Exception? inner = null) : E
 /// <summary>
 /// The tools of the recognition of the spoken language, installed with UNIVERSUM in its "speech" folder (decided by
 /// the owner on 28. 10. 2026: part of the installation, nothing is downloaded): FFmpeg (LGPL, the whole program – it
-/// reads the audio and will serve more later), whisper.cpp (MIT) and the speech model "base" (MIT). The build writes
+/// reads the audio and will serve more later), whisper.cpp (MIT) and two speech models (MIT): the quick "base" and the
+/// accurate "large-v3-turbo" quantised q5_0 (owner, 1. 11. 2026: "base" mixed up Czech and Slovak – the accurate model
+/// decides between them and writes down dictation, the quick one keeps the recognition as fast as before). The build writes
 /// a manifest with the SHA-256 of every file; nothing is started before the files match it.
 /// </summary>
 /// <param name="Ffmpeg">ffmpeg.exe</param>
 /// <param name="Whisper">whisper-cli.exe</param>
-/// <param name="Model">ggml-base.bin</param>
-public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, string Model)
+/// <param name="Model">ggml-base.bin – the quick model (the language of each piece)</param>
+/// <param name="Accurate">ggml-large-v3-turbo-q5_0.bin – the accurate model (Czech or Slovak, dictation); null when not installed</param>
+public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, string Model, string? Accurate = null)
 {
     public const string ManifestName = "manifest.json";
+
+    /// <summary>The quick speech model: Whisper base (142 MB).</summary>
+    public const string ModelName = "ggml-base.bin";
+
+    /// <summary>The accurate speech model: Whisper large-v3-turbo, quantised q5_0 (574 MB).</summary>
+    public const string AccurateName = "ggml-large-v3-turbo-q5_0.bin";
+
+    /// <summary>The model that writes down speech: the accurate one when installed.</summary>
+    public string Writer => Accurate ?? Model;
 
     private static string Exe(string name) => OperatingSystem.IsWindows() ? name + ".exe" : name;
 
@@ -32,7 +44,8 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
             folder,
             Path.Combine(folder, "ffmpeg", Exe("ffmpeg")),
             Path.Combine(folder, "whisper", Exe("whisper-cli")),
-            Path.Combine(folder, "models", "ggml-base.bin"));
+            Path.Combine(folder, "models", ModelName),
+            File.Exists(Path.Combine(folder, "models", AccurateName)) ? Path.Combine(folder, "models", AccurateName) : null);
         return File.Exists(tools.Ffmpeg) && File.Exists(tools.Whisper) && File.Exists(tools.Model) && File.Exists(Path.Combine(folder, ManifestName))
             ? tools
             : null;
@@ -68,7 +81,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
         }
 
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Folder));
-        foreach (var required in new[] { Ffmpeg, Whisper, Model })
+        foreach (var required in new[] { Ffmpeg, Whisper, Model, Accurate }.OfType<string>())
         {
             if (!files.ContainsKey(Path.GetRelativePath(root, required).Replace('\\', '/')))
             {

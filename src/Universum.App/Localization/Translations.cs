@@ -2783,6 +2783,29 @@ internal static class Translations
         ["Skupina Film"] = "Skupina Film",
         ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Tažením změníte výšku seznamů seriálů a filmů",
 
+        // speech recognition: the gauge (1. 11. 2026)
+        ["Zastaviť rozpoznávanie reči"] = "Zastavit rozpoznávání řeči",
+        ["vyberám úseky zvuku"] = "vybírám úseky zvuku",
+        ["počúvam úseky (rýchly model)"] = "poslouchám úseky (rychlý model)",
+        ["rozlišujem češtinu a slovenčinu (presný model)"] = "rozlišuji češtinu a slovenštinu (přesný model)",
+        ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0} %",
+        ["Pripravujem stopy na počúvanie…"] = "Připravuji stopy k poslechu…",
+
+        // Zlučovanie: languages of audio and subtitles, forced (1. 11. 2026)
+        ["Rozpoznať jazyk zvuku"] = "Rozpoznat jazyk zvuku",
+        ["Rozpoznať jazyk titulkov a Forced"] = "Rozpoznat jazyk titulků a Forced",
+        ["Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy"] = "Poslechne si zvukové stopy bez jazyka (když ho mají všechny, všechny): rychlý model, čeština × slovenština přesným modelem; jazyk se zapíše do stopy",
+        ["Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope"] = "Jazyk textových titulků podle jejich textu; forced podle názvu stopy nebo souboru a podle počtu titulků oproti nejplnější stopě",
+        ["stopa {0} ({1})"] = "stopa {0} ({1})",
+        ["zastavené"] = "zastaveno",
+        ["Jazyk zvuku z reči: {0} z {1} stôp."] = "Jazyk zvuku z řeči: {0} z {1} stop.",
+        ["Čítam titulky {0}/{1}: {2} – {3:0} %"] = "Čtu titulky {0}/{1}: {2} – {3:0} %",
+        ["{0}: text sa nedal prečítať"] = "{0}: text se nepodařilo přečíst",
+        ["{0}: obrázkové titulky – jazyk z textu až po OCR v Úprave titulkostopy"] = "{0}: obrázkové titulky – jazyk z textu až po OCR v Úpravě titulkové stopy",
+        ["Titulky: jazyk určený pri {0} stopách, forced pri {1}."] = "Titulky: jazyk určen u {0} stop, forced u {1}.",
+        ["podľa názvu stopy"] = "podle názvu stopy",
+        ["podľa názvu súboru"] = "podle názvu souboru",
+
         // stage 2b (1. 11. 2026): the texts of the windows left out before (every attribute of an element), VobSub
         ["Account ID (32 znakov)"] = "Account ID (32 znaků)",
         ["Adresa servera plagátov (https://…)"] = "Adresa serveru plakátů (https://…)",
@@ -2987,6 +3010,13 @@ internal static class Translations
         ["interpunkcia"] = "interpunkce",
         ["pravopis"] = "pravopis",
         ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} slov, {2:N0} dvojic slov",
+        // NÁPOVEDA: one group of the guides (1. 11. 2026)
+        ["NÁPOVEDA"] = "NÁPOVĚDA",
+        ["Novinky a obsah"] = "Novinky a obsah",
+        ["Multiplexing"] = "Multiplexing",
+        ["Editácia videostôp"] = "Editace videostop",
+        ["Šablóny (template)"] = "Šablony (template)",
+        ["Štatistika"] = "Statistika",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5766,6 +5796,29 @@ internal static class Translations
         ["Skupina Film"] = "Film groups",
         ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Drag to change the height of the series and film lists",
 
+        // speech recognition: the gauge (1. 11. 2026)
+        ["Zastaviť rozpoznávanie reči"] = "Stop the speech recognition",
+        ["vyberám úseky zvuku"] = "picking parts of the audio",
+        ["počúvam úseky (rýchly model)"] = "listening to the parts (quick model)",
+        ["rozlišujem češtinu a slovenčinu (presný model)"] = "telling Czech from Slovak (accurate model)",
+        ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0}%",
+        ["Pripravujem stopy na počúvanie…"] = "Preparing the tracks for listening…",
+
+        // Zlučovanie: languages of audio and subtitles, forced (1. 11. 2026)
+        ["Rozpoznať jazyk zvuku"] = "Recognize the audio language",
+        ["Rozpoznať jazyk titulkov a Forced"] = "Recognize the subtitle language and Forced",
+        ["Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy"] = "Listens to the audio tracks without a language (all of them when each has one): the quick model, Czech × Slovak by the accurate model; the language is written into the track",
+        ["Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope"] = "The language of text subtitles by their text; forced by the name of the track or file and by the number of subtitles against the fullest track",
+        ["stopa {0} ({1})"] = "track {0} ({1})",
+        ["zastavené"] = "stopped",
+        ["Jazyk zvuku z reči: {0} z {1} stôp."] = "Audio language from speech: {0} of {1} tracks.",
+        ["Čítam titulky {0}/{1}: {2} – {3:0} %"] = "Reading subtitles {0}/{1}: {2} – {3:0}%",
+        ["{0}: text sa nedal prečítať"] = "{0}: the text could not be read",
+        ["{0}: obrázkové titulky – jazyk z textu až po OCR v Úprave titulkostopy"] = "{0}: picture subtitles – the language from the text only after OCR in Subtitle track editing",
+        ["Titulky: jazyk určený pri {0} stopách, forced pri {1}."] = "Subtitles: language set for {0} tracks, forced for {1}.",
+        ["podľa názvu stopy"] = "by the track name",
+        ["podľa názvu súboru"] = "by the file name",
+
         // stage 2b (1. 11. 2026): the texts of the windows left out before (every attribute of an element), VobSub
         ["Account ID (32 znakov)"] = "Account ID (32 characters)",
         ["Adresa servera plagátov (https://…)"] = "Poster server address (https://…)",
@@ -5970,5 +6023,12 @@ internal static class Translations
         ["interpunkcia"] = "punctuation",
         ["pravopis"] = "spelling",
         ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} words, {2:N0} word pairs",
+        // NÁPOVEDA: one group of the guides (1. 11. 2026)
+        ["NÁPOVEDA"] = "HELP",
+        ["Novinky a obsah"] = "News and content",
+        ["Multiplexing"] = "Multiplexing",
+        ["Editácia videostôp"] = "Track editing",
+        ["Šablóny (template)"] = "Templates",
+        ["Štatistika"] = "Statistics",
     };
 }

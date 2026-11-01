@@ -29,6 +29,32 @@ public static class MuxRules
         return ManualTarget.Create(file, file.Tracks.Select(t => new TrackEdit(t.Id, t.Name, t.Language, t.Flags)).ToList(), removeTags: !keepsTags);
     }
 
+    /// <summary>
+    /// The tracks of one type in the order of the rules (owner, 1. 11. 2026: in Zlučovanie the order follows a language as
+    /// soon as it is set – CZ at the top, SK under it): the profile's languages first in its order (subtitles: its order of
+    /// subtitles, then the languages of the audio), forced before the full ones of a language, commentary last, otherwise
+    /// as they are. The positions in <paramref name="tracks"/> of the tracks of the type, in their new order.
+    /// </summary>
+    public static IReadOnlyList<int> OrderOfType(IReadOnlyList<MuxSource> sources, IReadOnlyList<MuxTrack> tracks, TrackType type, RuleProfile? profile = null)
+    {
+        profile ??= RuleProfile.Default;
+        var kinds = tracks.Select(t => sources[t.Source].File.Tracks.FirstOrDefault(s => s.Id == t.TrackId)).ToList();
+        var audio = tracks.Where((_, i) => kinds[i]?.Type == TrackType.Audio && !tracks[i].Language.IsUndetermined).Select(t => t.Language.Primary).ToList();
+        var subtitleOrder = profile.SubtitleOrder(audio);
+        int Priority(MuxTrack track) => track.Language.IsUndetermined
+            ? int.MaxValue
+            : type == TrackType.Subtitles ? RuleProfile.PositionIn(subtitleOrder, track.Language.Primary) : profile.Priority(track.Language.Primary);
+        bool Commentary(int i) => tracks[i].Flags.Commentary || Text.Words.ContainsAny(tracks[i].Name ?? kinds[i]?.Name, profile.CommentaryKeywords);
+
+        return Enumerable.Range(0, tracks.Count)
+            .Where(i => kinds[i]?.Type == type)
+            .OrderBy(i => Commentary(i) ? 1 : 0)
+            .ThenBy(i => Priority(tracks[i]))
+            .ThenBy(i => tracks[i].Flags.Forced ? 0 : 1)
+            .ThenBy(i => i)
+            .ToList();
+    }
+
     /// <summary>One file made of the chosen tracks: ID = position, values = the ones chosen so far.</summary>
     private static (MediaFile File, Dictionary<int, MuxTrack> Map) Combined(IReadOnlyList<MuxSource> sources, IReadOnlyList<MuxTrack> tracks)
     {

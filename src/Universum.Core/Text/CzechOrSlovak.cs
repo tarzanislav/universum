@@ -50,6 +50,61 @@ public static class CzechOrSlovak
     /// <summary>The language the texts lean to: at least three of its words and half as many again as of the other; else null.</summary>
     public static string? Lean(params string?[] texts) => By(Count(texts), 1.5);
 
+    /// <summary>
+    /// The weight of Czech and of Slovak in a transcription by the accurate model (owner, 1. 11. 2026): a few seconds of
+    /// speech hold few short words, so also the letters and endings only one of the languages writes – ä ô ľ ĺ ŕ, "-om",
+    /// "-ť" for Slovak; ř for Czech (ě and ů weigh little: whisper writes them in Slovak speech too).
+    /// </summary>
+    public static (double Czech, double Slovak) Weigh(string? text)
+    {
+        double czech = 0, slovak = 0;
+        foreach (var word in Words(text))
+        {
+            if (Czech.Contains(word))
+            {
+                czech += 2;
+            }
+            else if (Slovak.Contains(word))
+            {
+                slovak += 2;
+            }
+
+            if (word.IndexOfAny(['ä', 'ô', 'ľ', 'ĺ', 'ŕ']) >= 0)
+            {
+                slovak += 2;
+            }
+
+            if (word.Contains('ř', StringComparison.Ordinal))
+            {
+                czech += 2;
+            }
+
+            if (word.Contains('ů', StringComparison.Ordinal))
+            {
+                czech += 1;
+            }
+
+            if (word.Contains('ě', StringComparison.Ordinal))
+            {
+                czech += 0.5;
+            }
+
+            if (word.Length >= 4 && word.All(char.IsLetter) && (word.EndsWith("om", StringComparison.Ordinal) || word.EndsWith('ť')))
+            {
+                slovak += 1;
+            }
+        }
+
+        return (czech, slovak);
+    }
+
+    /// <summary>"cs" or "sk" by <see cref="Weigh"/>: at least 2,5 and twice the other (<paramref name="times"/>); else null.</summary>
+    public static string? DecideWeighed(string? text, double times = 2.0)
+    {
+        var (czech, slovak) = Weigh(text);
+        return slovak >= 2.5 && slovak >= times * czech ? "sk" : czech >= 2.5 && czech >= times * slovak ? "cs" : null;
+    }
+
     private static string? By((int Czech, int Slovak) count, double times) =>
         count.Slovak >= 3 && count.Slovak >= times * count.Czech ? "sk"
         : count.Czech >= 3 && count.Czech >= times * count.Slovak ? "cs"

@@ -114,6 +114,39 @@ public sealed class SubtitleLanguageTests
     }
 
     [Test]
+    public void SimpleSlovakLinesWithoutLAndOAreSlovak()
+    {
+        // owner, 1. 11. 2026: no ľ, ô, ä in the whole file – ď, ť and the long vowels say Czech or Slovak, the short words which
+        var line = "Ako sa máš? Som tu, čo ešte chceš, keď je teraz všetko také, ako má byť.";
+        var result = SubtitleLanguage.Detect(string.Join("\n", Enumerable.Repeat(line, 12)));
+        Assert.True(result is { Language: "sk", Certain: false }, "Slovak, to be checked: " + result);
+    }
+
+    [Test]
+    public async Task ASubtitleFileOnItsOwnIsReadWhole()
+    {
+        // owner, 1. 11. 2026: an SRT added in Zlučovanie (in Windows-1250, as old Czech files are) – its language from its text
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-srt-");
+        try
+        {
+            var srt = Path.Combine(work.FullName, "Vymyslený film.srt");
+            var text = string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
+                $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nŘekl jsem ti, že tady budu. Co ještě chceš, když je teď všechno takové, jaké to má být?")) + "\n";
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            await File.WriteAllBytesAsync(srt, System.Text.Encoding.GetEncoding(1250).GetBytes(text));
+            var file = await new MkvMergeInspector(installation, new ProcessRunner()).InspectAsync(srt);
+            Assert.True(SubtitleText.StandaloneText(file) is { } whole && whole.Contains("Řekl jsem ti", StringComparison.Ordinal), "read whole in its encoding");
+            var found = await SubtitleText.DetectAsync(installation, new ProcessRunner(), null, file);
+            Assert.True(found.Values.SingleOrDefault() is { Language: "cs" }, "Czech: " + string.Join(", ", found.Values));
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public async Task TheIndexOfTheFileTellsWhereTheSubtitlesAre()
     {
         // mkvmerge indexes every subtitle: only the index is read, never the film

@@ -1,4 +1,4 @@
-# Guide – STATISTICS
+# Help – STATISTICS
 The **STATISTICS** group shows what UNIVERSUM is doing now and what it has done: the **job queue**, the **tool output** and
 the **processing logs** in plain words. **Settings** belong here too – library, input folder, service keys, language and updates.
 

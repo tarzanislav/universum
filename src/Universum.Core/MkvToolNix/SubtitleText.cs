@@ -316,7 +316,9 @@ public static partial class SubtitleText
     public static async Task<IReadOnlyDictionary<int, Text.SubtitleLanguageResult>> DetectAsync(
         MkvToolNixInstallation installation, IProcessRunner runner, string? ffmpeg, MediaFile file, CancellationToken cancellationToken = default)
     {
-        var texts = await SampleAsync(installation, runner, ffmpeg, file, file.TracksOf(TrackType.Subtitles).ToList(), cancellationToken).ConfigureAwait(false);
+        var texts = StandaloneText(file) is { } whole
+            ? new Dictionary<int, string> { [file.TracksOf(TrackType.Subtitles).Single().Id] = whole }
+            : await SampleAsync(installation, runner, ffmpeg, file, file.TracksOf(TrackType.Subtitles).ToList(), cancellationToken).ConfigureAwait(false);
         var found = new Dictionary<int, Text.SubtitleLanguageResult>();
         foreach (var (id, text) in texts)
         {
@@ -328,6 +330,34 @@ public static partial class SubtitleText
         }
 
         return found;
+    }
+
+    /// <summary>
+    /// A subtitle file on its own (SRT, ASS, SSA, WebVTT – e.g. added in Zlučovanie) is read whole, in its own encoding: it
+    /// is small and has no film to take parts of. Null for anything else or when it cannot be read.
+    /// </summary>
+    public static string? StandaloneText(MediaFile file)
+    {
+        if (file.IsMatroska || file.Tracks.Count != 1 || file.Tracks[0] is not { Type: TrackType.Subtitles, IsTextSubtitles: true } ||
+            Path.GetExtension(file.Path).ToLowerInvariant() is not (".srt" or ".ass" or ".ssa" or ".vtt"))
+        {
+            return null;
+        }
+
+        try
+        {
+            var info = new FileInfo(file.Path);
+            if (!info.Exists || info.Length > 20 * 1024 * 1024)
+            {
+                return null;
+            }
+
+            return Clean(Subtitles.SubtitleEncoding.Decode(File.ReadAllBytes(file.Path)).Text) is { Length: > 0 } text ? text : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The evidence of a language read from the text, applied as UNIVERSUM's suggestion.</summary>

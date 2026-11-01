@@ -1,4 +1,4 @@
-# Návod – EDITÁCIA VIDEOSTÔP
+# Nápoveda – EDITÁCIA VIDEOSTÔP
 Skupina **EDITÁCIA VIDEOSTÔP (video, audio, titulky)** slúži na úpravu jednotlivých stôp filmu: strih a otočenie obrazu,
 napasovanie dabingu, posun a opravu titulkov. Všetko si najprv **pozriete a vypočujete v prehrávači** a až potom uložíte.
 Originál sa **nikdy nemení** – výsledok je vždy **nový súbor** (video v knižnici, titulky vedľa pôvodných).

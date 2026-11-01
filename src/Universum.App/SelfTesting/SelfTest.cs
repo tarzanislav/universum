@@ -32,6 +32,9 @@ internal static class SelfTest
             ? dir
             : Path.Combine(Path.GetTempPath(), "UNIVERSUM-selftest");
         Directory.CreateDirectory(_outputDirectory);
+
+        // the tracks arranged at once after a change (the pause the user gets is tried in Zlučovanie on its own)
+        ArrangeLater.Delay = TimeSpan.Zero;
         Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
 
         MkvToolNixInstallation? installation = null;
@@ -161,11 +164,12 @@ internal static class SelfTest
         model.Settings.UiLanguage = "sk";
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti, Návod | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky, Návod | " +
-              "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie, Návod | " +
-              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy, Návod | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie, Návod | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia, Návod",
-            "left rail: Dashboard, then the groups Novinky a obsah, Poznámky, Multiplexing, Šablóny and Štatistika, each with its guide last");
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky | " +
+              "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia | " +
+              "NÁPOVEDA: Novinky a obsah, Poznámky, Multiplexing, Editácia videostôp, Šablóny (template), Štatistika",
+            "left rail: Dashboard, the groups, then NÁPOVEDA with the guides in the order of the groups (owner, 1. 11. 2026)");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 
@@ -255,6 +259,7 @@ internal static class SelfTest
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
         await TestMegaSourcesAsync(model, window, services, work);
+        await TestMuxRecognitionAsync(model, window, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -447,9 +452,10 @@ internal static class SelfTest
         var set = mux.Current;
         mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent, null, false);
         await mux.AddFilesAsync([film, srt]);
-        set.Tracks[2].Language = set.Tracks[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
-        set.Tracks[3].Language = set.Tracks[3].LanguageChoices.First(c => c.Tag.Primary == "cs");
-        set.Tracks[^1].Language = set.Tracks[^1].LanguageChoices.First(c => c.Tag.Primary == "sk");
+        var (dub, forcedRow, srtRow) = (set.Tracks[2], set.Tracks[3], set.Tracks[^1]);
+        dub.Language = dub.LanguageChoices.First(c => c.Tag.Primary == "cs");
+        forcedRow.Language = forcedRow.LanguageChoices.First(c => c.Tag.Primary == "cs");
+        srtRow.Language = srtRow.LanguageChoices.First(c => c.Tag.Primary == "sk");
         set.ApplyRules();
         set.Library.IsMovie = true;
         set.Library.TitleText = "Zlúčený pre MEGA (2026)";
@@ -562,10 +568,14 @@ internal static class SelfTest
         Check(!set.UseLibrary && set.OutputEditable && set.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "en-und-cz-forced (1).mkv"),
             "mux: the output is beside the source by default, as in MKVToolNix – " + set.OutputPath);
         LanguageChoice Lang(MuxTrackRow row, string code) => row.LanguageChoices.First(c => c.Tag.Primary == code);
-        set.Tracks[2].Language = Lang(set.Tracks[2], "cs");
-        set.Tracks[3].Language = Lang(set.Tracks[3], "cs");
-        set.Tracks[6].Language = Lang(set.Tracks[6], "sk");
-        set.Tracks[5].Include = false;
+        // the rows held before: a language set moves its track among the tracks of its type (owner, 1. 11. 2026)
+        var (dub, forcedRow, englishSubtitles, srtRow) = (set.Tracks[2], set.Tracks[3], set.Tracks[5], set.Tracks[6]);
+        dub.Language = Lang(dub, "cs");
+        Check(set.Tracks.IndexOf(dub) == 1, "mux: the Czech dub moved above the English audio as soon as its language was set");
+        forcedRow.Language = Lang(forcedRow, "cs");
+        srtRow.Language = Lang(srtRow, "sk");
+        Check(set.Tracks.IndexOf(srtRow) == 5 && set.Tracks.IndexOf(englishSubtitles) == 6, "mux: the Slovak subtitles moved above the English ones");
+        englishSubtitles.Include = false;
         set.ApplyRules();
         set.Library.IsMovie = true;
         set.Library.TitleText = "Zlúčený film (2026)";
@@ -3296,10 +3306,56 @@ internal static class SelfTest
             var synthetic = batch.Analysis!.Groups[0].Files[0];
             foreach (var (ordinal, spoken) in new[] { (0, "cs"), (1, "en"), (2, "sk") })
             {
-                var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
-                Write($"speech detail: audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
+                var timed = System.Diagnostics.Stopwatch.StartNew();
+                var stages = new List<string>();
+                var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration,
+                    new Progress<Core.Speech.SpeechProgress>(p => stages.Add($"{p.Stage}@{timed.Elapsed.TotalSeconds:0.0}s")));
+                Write($"speech detail ({timed.Elapsed.TotalSeconds:0.0} s; accurate model {(tools.Accurate is null ? "not installed" : "installed")}; " +
+                      $"{string.Join(" ", stages.Distinct().Where((_, i) => i % 4 == 0).Take(12))}): audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
                       $"written in {result.Comparison?.TextLanguage ?? (result.Comparison?.TextLeaning is { } lean ? lean + "?" : "–")}, pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, " +
                       $"doubt: {result.Doubt} | as cs: {result.Comparison?.CzechText} | as sk: {result.Comparison?.SlovakText}");
+                if (spoken != "en" && tools.Accurate is not null)
+                {
+                    // the same with the quick model only (as before the accurate model) – for the comparison of speed
+                    timed.Restart();
+                    var quick = await Core.Speech.SpokenLanguage.DetectAsync(tools with { Accurate = null }, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
+                    Write($"speech detail, quick model only ({timed.Elapsed.TotalSeconds:0.0} s): audio {ordinal + 1} spoken {spoken} → {quick.Language ?? "?"}, doubt: {quick.Doubt}");
+
+                    // the way of 0.3.17 (a run of FFmpeg and of whisper for each piece, two transcriptions with the search of
+                    // alternatives) – how long it took, for the comparison
+                    timed.Restart();
+                    var old = Path.Combine(_outputDirectory, "rec-old");
+                    Directory.CreateDirectory(old);
+                    var oldPiece = Path.Combine(old, "piece-1.wav");
+                    await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Ffmpeg, Core.Speech.SpokenLanguage.CutArguments(synthetic.Path, ordinal, TimeSpan.Zero, oldPiece)));
+                    await services.Runner.RunAsync(Core.Speech.SpokenLanguage.WhisperRequest(tools, oldPiece) with { Background = false });
+                    foreach (var language in new[] { "cs", "sk" })
+                    {
+                        await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Whisper,
+                            ["-m", tools.Model, "-f", "-", "-l", language, "-nt", "-ojf", "-of", "old-" + language, "-t", Math.Clamp(Environment.ProcessorCount, 1, 8).ToString(CultureInfo.InvariantCulture)])
+                            { WorkingDirectory = old, StandardInputFile = oldPiece });
+                    }
+
+                    Write($"speech detail, the way of 0.3.17 ({timed.Elapsed.TotalSeconds:0.0} s): audio {ordinal + 1}");
+                    Directory.Delete(old, recursive: true);
+                }
+            }
+
+            // where the accurate model spends its time (load, encoder, decoder) on 6 s of speech – for tuning the speed
+            if (tools.Accurate is { } accurateModel)
+            {
+                var timing = Path.Combine(_outputDirectory, "rec-timing");
+                Directory.CreateDirectory(timing);
+                var piece = Path.Combine(timing, "piece.wav");
+                await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Ffmpeg, Core.Speech.SpokenLanguage.CutArguments(synthetic.Path, 2, TimeSpan.Zero, piece)));
+                var clipSeconds = Core.Speech.SpokenLanguage.SpeechClip(piece, Path.Combine(timing, "clip.wav"), Core.Speech.SpokenLanguage.ClipSeconds) ?? 6;
+                var run = await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Whisper,
+                    ["-m", accurateModel, "-f", "clip.wav", "-l", "cs", "-ac", Core.Speech.SpokenLanguage.AudioContext(clipSeconds).ToString(CultureInfo.InvariantCulture),
+                     "-bs", "1", "-bo", "1", "-nf", "-nt", "-t", Math.Clamp(Environment.ProcessorCount, 1, 8).ToString(CultureInfo.InvariantCulture)])
+                    { WorkingDirectory = timing, Background = true });
+                Write($"speech timing of the accurate model ({run.Elapsed.TotalSeconds:0.0} s, {Environment.ProcessorCount} processors): " +
+                      string.Join(" | ", run.StandardError.Split('\n').Where(l => l.Contains("time =", StringComparison.Ordinal) || l.Contains("system_info", StringComparison.Ordinal)).Select(l => l.Trim())));
+                Directory.Delete(timing, recursive: true);
             }
 
             // owner, 28. 10.: each film of a group on its own, or only the chosen films
@@ -3669,6 +3725,102 @@ internal static class SelfTest
         await Screenshot(window, "batch-new-groups.png");
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");
+    }
+
+    // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,
+    // with forced subtitles told by the file's name (invented speech and text)
+    private static async Task TestMuxRecognitionAsync(MainViewModel model, MainWindow window, string work)
+    {
+        var mux = model.Mux;
+        var speech = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "speech-und.mkv");
+        var srt = Path.Combine(work, "Vymyslený film.forced.srt");
+        File.WriteAllText(srt, string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
+            $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nAko sa máš? Som tu, čo ešte chceš, keď je teraz všetko také, ako má byť.")) + "\n");
+        var czechSrt = Path.Combine(work, "Vymyslený film.srt");
+        File.WriteAllText(czechSrt, string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
+            $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nŘekl jsem ti, že tady budu. Co ještě chceš, když je teď všechno takové, jaké to má být?")) + "\n");
+        var previous = mux.AskHowToAdd;
+        mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent);
+        try
+        {
+            mux.NewSettingsCommand.Execute(null);
+            await mux.AddFilesAsync([speech, srt, czechSrt]);
+            var set = mux.Current;
+            var audio = set.Tracks.Where(t => t.Kind == TrackType.Audio).ToList();
+            Check(audio.Count == 3 && audio.All(a => a.Language.Tag.IsUndetermined) && set.DetectAudioCommand.CanExecute(null),
+                $"mux recognition: three audio tracks without a language, the button offered ({audio.Count})");
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            await set.DetectAudioAsync();
+            Write($"mux recognition: audio ({watch.Elapsed.TotalSeconds:0.0} s): {set.Result} | {string.Join(", ", audio.Select(a => a.Language.Display))}");
+            Check(audio[1].Language.Tag.Primary == "en" && new[] { audio[0], audio[2] }.All(a => a.Language.Tag.Primary is "cs" or "sk"),
+                "mux recognition: the languages of the speech written into the tracks – " + string.Join(", ", audio.Select(a => a.Language.Display)));
+            await set.DetectSubtitlesAsync();
+            var subtitles = set.Tracks.Single(t => t.Kind == TrackType.Subtitles && t.Input.File.Path == srt);
+            Write("mux recognition: subtitles: " + set.Result);
+            Check(subtitles.Language.Tag.Primary == "sk" && subtitles.IsForced, $"mux recognition: Slovak subtitles, forced by the file's name – {subtitles.Language.Display}, forced {subtitles.IsForced}");
+
+            // owner, 1. 11. 2026: the order follows the languages (CZ at the top, SK under it) and is changed by hand
+            var czech = set.Tracks.Single(t => t.Kind == TrackType.Subtitles && t.Input.File.Path == czechSrt);
+            int At(MuxTrackRow row) => set.Tracks.IndexOf(row);
+            var english = audio.FirstOrDefault(a => a.Language.Tag.Primary == "en");
+            Check(czech.Language.Tag.Primary == "cs" && At(czech) < At(subtitles) && english is not null && audio.Where(a => a != english).All(a => At(a) < At(english)),
+                $"mux order: Czech subtitles above the Slovak ones, Czech and Slovak audio above the English – {string.Join(", ", set.Tracks.Select(t => t.Language.Tag.Primary))}");
+            set.MoveRowUpCommand.Execute(subtitles);
+            var byHand = At(subtitles) < At(czech);
+            set.MoveTrackTo(subtitles, czech);
+            Check(byHand && At(czech) < At(subtitles), "mux order: a track moved by its arrow and dragged back");
+            set.MoveRowUpCommand.Execute(subtitles);
+            subtitles.Language = subtitles.LanguageChoices.First(c => c.Tag.Primary == "en");
+            var english2 = At(czech) < At(subtitles);
+            subtitles.Language = subtitles.LanguageChoices.First(c => c.Tag.Primary == "sk");
+            Check(english2 && At(czech) < At(subtitles), "mux order: a language set by hand puts the track in its place");
+
+            // owner, 1. 11. 2026: the order follows only after a pause – the track does not jump away from under the mouse
+            ArrangeLater.Delay = TimeSpan.FromMilliseconds(400);
+            czech.Language = czech.LanguageChoices.First(c => c.Tag.Primary == "sk");
+            var stayed = At(czech) < At(subtitles);
+            await Task.Delay(1200);
+            var arranged = At(subtitles) < At(czech);
+            ArrangeLater.Delay = TimeSpan.Zero;
+            czech.Language = czech.LanguageChoices.First(c => c.Tag.Primary == "cs");
+            Check(stayed && arranged && At(czech) < At(subtitles), $"mux order: arranged after the pause, not at once (stayed {stayed}, arranged {arranged})");
+
+            // owner, 1. 11. 2026: the drop-down of the languages (thousands) opens at once – only the items seen are made
+            model.Open(mux);
+            set.SelectedTrack = czech;
+            await Settle();
+            if (FindVisual<System.Windows.Controls.ComboBox>(window, c => c.ItemsSource is IReadOnlyList<LanguageChoice> { Count: > 50 } && c.IsVisible) is { } combo)
+            {
+                var opening = System.Diagnostics.Stopwatch.StartNew();
+                combo.IsDropDownOpen = true;
+                await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var opened = opening.Elapsed.TotalMilliseconds;
+                await Settle();
+                var made = Enumerable.Range(0, combo.Items.Count).Count(i => combo.ItemContainerGenerator.ContainerFromIndex(i) is not null);
+                var scroller = QuickDropDowns.Scroller(combo);
+                var panel = scroller is null ? null : FindVisual<System.Windows.Controls.Panel>(scroller, p => p.IsItemsHost);
+                Write($"mux languages drop-down: {combo.Items.Count} languages, {made} items made, opened in {opened:0} ms; list scrolls by items " +
+                      $"{scroller?.CanContentScroll}, drop-down {System.Windows.Controls.ScrollViewer.GetCanContentScroll(combo)}, panel {panel?.GetType().Name}, " +
+                      $"virtualizing {System.Windows.Controls.VirtualizingPanel.GetIsVirtualizing(combo)}, scroller {scroller?.GetType().Name} {scroller?.ActualHeight:0} px");
+                combo.IsDropDownOpen = false;
+                Check(made > 0 && (made < 200 || combo.Items.Count < 300), $"mux languages drop-down: only the items seen are made ({made} of {combo.Items.Count})");
+            }
+            else
+            {
+                Write($"mux languages drop-down: not shown – the track's {czech.LanguageChoices.Count} languages, track shown {set.ShowsTrack}");
+                Fail("mux languages drop-down: not found");
+            }
+
+            await Screenshot(window, "mux-recognition.png");
+            var confirm = mux.Confirm;
+            mux.Confirm = _ => true;
+            mux.CloseSettingsCommand.Execute(set);
+            mux.Confirm = confirm;
+        }
+        finally
+        {
+            mux.AskHowToAdd = previous;
+        }
     }
 
     // owner, 1. 11. 2026 (bezchybné preklady): the window drawn in English and in Czech; what is still Slovak on the pages

@@ -278,6 +278,41 @@ public partial class MainWindow : Window
         }
     }
 
+    // Zlučovanie: a track dragged by its grip onto another track of its type (owner, 1. 11. 2026: as in Hromadné spracovanie)
+    private void OnMuxGripDown(object sender, MouseButtonEventArgs e) => _listDragStart = e.GetPosition(this);
+
+    private void OnMuxGripMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && sender is FrameworkElement { DataContext: MuxTrackRow row } grip &&
+            (e.GetPosition(this) - _listDragStart).Length > SystemParameters.MinimumVerticalDragDistance)
+        {
+            DragDrop.DoDragDrop(grip, new DataObject(typeof(MuxTrackRow), row), DragDropEffects.Move);
+        }
+    }
+
+    private void OnMuxTrackDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(MuxTrackRow)))
+        {
+            return;
+        }
+
+        e.Effects = e.Data.GetData(typeof(MuxTrackRow)) is MuxTrackRow dragged && RowUnder<MuxTrackRow>(e) is { } target && target.Kind == dragged.Kind
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnMuxTrackDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(MuxTrackRow)) is MuxTrackRow dragged && RowUnder<MuxTrackRow>(e) is { } target && target.Kind == dragged.Kind &&
+            sender is FrameworkElement { DataContext: MuxSettingsViewModel settings })
+        {
+            settings.MoveTrackTo(dragged, target);
+            e.Handled = true;
+        }
+    }
+
     // the item of the grid row under the mouse
     private static T? RowUnder<T>(DragEventArgs e)
         where T : class

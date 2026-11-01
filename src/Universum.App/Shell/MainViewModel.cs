@@ -115,39 +115,55 @@ public sealed class MainViewModel : ObservableObject
         var templates = new ToolGroup(Loc.T("ŠABLÓNY (TEMPLATE)"), Color.FromRgb(0x3E, 0xA8, 0x5F));
         var statistics = new ToolGroup(Loc.T("ŠTATISTIKA"), Color.FromRgb(0xD9, 0x8B, 0x2B));
         var notes = new ToolGroup(Loc.T("POZNÁMKY"), CalendarColors.Group);
+        // owner, 1. 11. 2026: the guides are not in each group – one group NÁPOVEDA at the end holds them all, in the order
+        // of the groups (the order of the groups is the one list below: change it there and the guides follow it)
+        var sections = new (ToolGroup Group, ToolItem[] Tools, string GuideTitle, GuidePageViewModel Guide)[]
+        {
+            (news, [
+                new(Loc.T("Premiéry"), "\uE8B2", Premieres, news),
+                new(Loc.T("Novinky – Seriály"), "\uE7F4", SeriesNews, news),
+                new(Loc.T("Listy z HISTRA"), "\uE8F1", HistraLists, news),
+                new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
+                new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
+            ], Loc.T("Novinky a obsah"), NewsGuide),
+
+            // owner, 31. 10. 2026: the group POZNÁMKY – the calendar, the tasks, the notes
+            (notes, [
+                new(Loc.T("Kalendár"), "\uE787", Calendar, notes, CalendarBadge),
+                new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes, TasksBadge),
+                new(Loc.T("Poznámky"), "\uE70B", AgendaNotes, notes, NotesBadge),
+            ], Loc.T("Poznámky"), NotesGuide),
+            (multiplexing, [
+                new(Loc.T("Zlučovanie"), "\uE71D", Mux, multiplexing),
+                new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
+                new(Loc.T("Kapitoly"), "\uE8FD", Chapters, multiplexing),
+                new(Loc.T("Informácie"), "\uE946", Info, multiplexing),
+            ], Loc.T("Multiplexing"), MultiplexingGuide),
+
+            // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
+            (studios, [
+                new(Loc.T("Úprava videostopy"), "\uE714", Video, studios),
+                new(Loc.T("Úprava audiostopy"), "\uE8D6", Audio, studios),
+                new(Loc.T("Úprava titulkostopy"), "\uE7F0", Subtitles, studios),
+            ], Loc.T("Editácia videostôp"), StudiosGuide),
+            (templates, [
+                new(Loc.T("Single spracovanie"), "\uE90F", Rules, templates),
+                new(Loc.T("Hromadné spracovanie"), "\uE8B7", Batch, templates),
+                new(Loc.T("MEGA spracovanie"), "\uE945", Mega, templates),
+            ], Loc.T("Šablóny (template)"), TemplatesGuide),
+            (statistics, [
+                new(Loc.T("Fronta úloh"), "\uE823", Queue, statistics),
+                new(Loc.T("Výstup úloh"), "\uE7C3", Output, statistics),
+                new(Loc.T("Záznamy spracovania"), "\uE81C", Logs, statistics),
+                new(Loc.T("Nastavenia"), "\uE713", Settings, statistics),
+            ], Loc.T("Štatistika"), StatisticsGuide),
+        };
+        var help = new ToolGroup(Loc.T("NÁPOVEDA"), Color.FromRgb(0x6E, 0x7F, 0x96));
         Tools =
         [
             new(Loc.T("Dashboard"), "\uE80F", Dashboard),
-            new(Loc.T("Premiéry"), "\uE8B2", Premieres, news),
-            new(Loc.T("Novinky – Seriály"), "\uE7F4", SeriesNews, news),
-            new(Loc.T("Listy z HISTRA"), "\uE8F1", HistraLists, news),
-            new(Loc.T("TMDB poster"), "\uE8B9", Posters, news),
-            new(Loc.T("Zaujímavosti"), "\uE734", Interests, news),
-            new(Loc.T("Návod"), "\uE897", NewsGuide, news),
-            // owner, 31. 10. 2026: the group POZNÁMKY – the calendar, the tasks, the notes and a guide
-            new(Loc.T("Kalendár"), "\uE787", Calendar, notes, CalendarBadge),
-            new(Loc.T("Plánované úlohy"), "\uE9D5", AgendaTasks, notes, TasksBadge),
-            new(Loc.T("Poznámky"), "\uE70B", AgendaNotes, notes, NotesBadge),
-            new(Loc.T("Návod"), "\uE897", NotesGuide, notes),
-            new(Loc.T("Zlučovanie"), "\uE71D", Mux, multiplexing),
-            new(Loc.T("Úprava hlavičky"), "\uE70F", HeaderEditor, multiplexing),
-            new(Loc.T("Kapitoly"), "\uE8FD", Chapters, multiplexing),
-            new(Loc.T("Informácie"), "\uE946", Info, multiplexing),
-            new(Loc.T("Návod"), "\uE897", MultiplexingGuide, multiplexing),
-            // owner, 30. 10. 2026: three studios with one player – the subtitles first (the top priority), sound and picture later
-            new(Loc.T("Úprava videostopy"), "\uE714", Video, studios),
-            new(Loc.T("Úprava audiostopy"), "\uE8D6", Audio, studios),
-            new(Loc.T("Úprava titulkostopy"), "\uE7F0", Subtitles, studios),
-            new(Loc.T("Návod"), "\uE897", StudiosGuide, studios),
-            new(Loc.T("Single spracovanie"), "\uE90F", Rules, templates),
-            new(Loc.T("Hromadné spracovanie"), "\uE8B7", Batch, templates),
-            new(Loc.T("MEGA spracovanie"), "\uE945", Mega, templates),
-            new(Loc.T("Návod"), "\uE897", TemplatesGuide, templates),
-            new(Loc.T("Fronta úloh"), "\uE823", Queue, statistics),
-            new(Loc.T("Výstup úloh"), "\uE7C3", Output, statistics),
-            new(Loc.T("Záznamy spracovania"), "\uE81C", Logs, statistics),
-            new(Loc.T("Nastavenia"), "\uE713", Settings, statistics),
-            new(Loc.T("Návod"), "\uE897", StatisticsGuide, statistics),
+            .. sections.SelectMany(section => section.Tools),
+            .. sections.Select(section => new ToolItem(section.GuideTitle, "\uE897", section.Guide, help)),
         ];
         var view = new ListCollectionView(Tools.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ToolItem.Group)));

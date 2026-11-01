@@ -696,6 +696,13 @@
                                       ToolTip="{loc:T 'Ťahaním zmeníte výšku zoznamov'}" />
                         <DockPanel Grid.Row="3" Margin="0,0,0,4">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <!-- owner, 1. 11. 2026: the languages also here – of the audio from its speech, of the subtitles from their text, with forced -->
+                                <Button Content="{loc:T 'Rozpoznať jazyk zvuku'}" Command="{Binding DetectAudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy'}" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="{loc:T 'Rozpoznať jazyk titulkov a Forced'}" Command="{Binding DetectSubtitlesCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope'}" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopRecognitionCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        Visibility="{Binding IsRecognising, Converter={StaticResource BoolToVisibility}}" />
                                 <Button Content="{loc:T 'Pravidlá UNIVERSUM'}" Command="{Binding ApplyRulesCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="{loc:T 'Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM'}" ToolTipService.ShowOnDisabled="True" />
                                 <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveUpCommand}" Padding="9,5" Margin="0,0,4,0" ToolTip="{loc:T 'Posunúť vyššie (Ctrl+↑)'}" />
@@ -703,9 +710,14 @@
                             </StackPanel>
                             <TextBlock Text="{loc:T 'Stopy vo výstupe'}" FontWeight="SemiBold" VerticalAlignment="Center"
                                        ToolTip="{loc:T 'V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú'}" />
+                            <StackPanel VerticalAlignment="Center" Margin="12,0,8,0" Visibility="{Binding IsRecognising, Converter={StaticResource BoolToVisibility}}">
+                                <ProgressBar Height="4" Maximum="1" Value="{Binding RecognitionProgress, Mode=OneWay}" />
+                                <TextBlock Text="{Binding RecognitionText}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
                         </DockPanel>
                         <DataGrid Grid.Row="4" ItemsSource="{Binding TrackRows}" SelectedItem="{Binding SelectedTrackItem}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single"
+                                  AllowDrop="True" DragOver="OnMuxTrackDragOver" Drop="OnMuxTrackDrop">
                             <DataGrid.InputBindings>
                                 <KeyBinding Key="Up" Modifiers="Control" Command="{Binding MoveUpCommand}" />
                                 <KeyBinding Key="Down" Modifiers="Control" Command="{Binding MoveDownCommand}" />
@@ -724,6 +736,27 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
+                                <!-- owner, 1. 11. 2026: moved by hand as in Hromadné spracovanie – the grip dragged (within the type) or the arrows -->
+                                <DataGridTemplateColumn Header="{loc:T 'Poradie'}" Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding IsMain, Converter={StaticResource BoolToVisibility}}">
+                                                <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="{loc:T 'Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)'}"
+                                                        PreviewMouseLeftButtonDown="OnMuxGripDown" MouseMove="OnMuxGripMove">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
+                                                </Border>
+                                                <Button Command="{Binding DataContext.MoveRowUpCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"
+                                                        Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu hore'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70E;" FontSize="10" />
+                                                </Button>
+                                                <Button Command="{Binding DataContext.MoveRowDownCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"
+                                                        Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu dole'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="10" />
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="{loc:T 'Vziať'}" Width="84" MinWidth="84">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -2371,8 +2404,8 @@
                                   ToolTip="{loc:T 'Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)'}" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Upratať zvyšky'}" Command="{Binding CleanupCommand}" Padding="10,3"
                             ToolTip="{loc:T 'Dočasné súbory po prerušenom spracovaní presunie do Koša'}" />
-                    <Button DockPanel.Dock="Right" Content="{loc:T 'Zastaviť analýzu'}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
-                            Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                    <Button DockPanel.Dock="Right" Content="{Binding StopText}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
+                            Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                         <!-- why nothing can be processed is said plainly, in the warning colour -->
                         <TextBlock Text="{Binding Summary}" TextWrapping="Wrap">
@@ -2388,7 +2421,10 @@
                             </TextBlock.Style>
                         </TextBlock>
                         <ProgressBar Height="4" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Margin="0,4,0,0" MaxWidth="420" HorizontalAlignment="Left" Width="420"
-                                     Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                                     Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
+                        <!-- owner, 1. 11. 2026: during the recognition of speech the gauge says how far (0–100 %) and what it does -->
+                        <TextBlock Text="{Binding RunState}" Style="{StaticResource Hint}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsListening, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </DockPanel>
 

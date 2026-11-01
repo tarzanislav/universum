@@ -1,4 +1,4 @@
-# Návod – STATISTIKA
+# Nápověda – STATISTIKA
 Skupina **STATISTIKA** ukazuje, co UNIVERSUM právě dělá a co už udělalo: **frontu úloh**, **výstup nástrojů** a
 **záznamy zpracování** slovy. Patří sem i **Nastavení** – knihovna, vstupní složka, klíče služeb, jazyk a aktualizace.
 

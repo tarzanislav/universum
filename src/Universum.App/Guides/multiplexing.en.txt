@@ -1,4 +1,4 @@
-# Guide – MULTIPLEXING
+# Help – MULTIPLEXING
 The **MULTIPLEXING** group is for putting together and editing MKV files: you **merge** tracks from several files into one,
 fix the **header** (track names, languages, flags), edit **chapters** and look at **information** about the tracks.
 The originals **never change** – the result is always a **new file** (next to the source or in the library).
@@ -25,7 +25,9 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
   (a VOB split into parts), *Set the output file name from the selected file*, *Select all tracks from the file*.
 ### Tracks in the output and Properties
 - Columns **Take**, **Type**, **Codec**, **Language**, **Name**, **Default**, **Forced**, **More**; the rows are in the order
-  they will have in the output. Change the order with the arrows (**Ctrl+↑** / **Ctrl+↓**).
+  they will have in the output. Change the order with the arrows (**Ctrl+↑** / **Ctrl+↓**), the arrows at a track or by dragging its grip in the
+  **Order** column (within audio or subtitles). When you change a track's language or Forced, the tracks arrange
+  themselves by the rules after **2 seconds**: CZ at the top, SK under it, then the others, commentary last.
 - After you select a track, you can change [Track name], [Language] and the flags in the **Properties** part on the right:
   [Default track (Default)], [Track enabled (Enabled)], [Forced display (Forced)].
 - [More flags and advanced properties]: SDH, audio description, commentary, delay (ms), FPS, aspect ratio, cropping,

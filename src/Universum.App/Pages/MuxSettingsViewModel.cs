@@ -373,7 +373,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             Inputs.Add(input);
             foreach (var track in file.Tracks)
             {
-                Tracks.Add(new MuxTrackRow(input, track, LanguageChoice.Common, Changed));
+                Tracks.Add(new MuxTrackRow(input, track, LanguageChoice.Common, Changed) { OrderChanged = FollowLanguage });
             }
         }
 
@@ -421,6 +421,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
     /// <summary>Fills names, languages, flags and the order in by the UNIVERSUM rules (for the tracks taken).</summary>
     public void ApplyRules()
     {
+        _arrangeLater.Cancel();
+        _sortLater.Clear();
         var taken = Tracks.Where(t => t.Include).ToList();
         if (taken.Count == 0)
         {
@@ -469,6 +471,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             return;
         }
 
+        _arrangeLater.Cancel();
+        _sortLater.Clear();
         var index = Tracks.IndexOf(row);
         Tracks.Move(index, index + step);
         SelectedTrack = row;
@@ -1016,7 +1020,10 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         SelectMainTrackCommand?.NotifyCanExecuteChanged();
         MoveUpCommand?.NotifyCanExecuteChanged();
         MoveDownCommand?.NotifyCanExecuteChanged();
+        RefreshMoves();
         ApplyRulesCommand?.NotifyCanExecuteChanged();
+        _detectAudioCommand?.NotifyCanExecuteChanged();
+        _detectSubtitlesCommand?.NotifyCanExecuteChanged();
         ClearChaptersCommand?.NotifyCanExecuteChanged();
         RemoveAttachmentCommand?.NotifyCanExecuteChanged();
         ChooseOutputCommand?.NotifyCanExecuteChanged();

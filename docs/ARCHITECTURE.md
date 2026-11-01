@@ -286,7 +286,7 @@ in next to it without changing the rules, planning or UI.
   difference in whisper's certainty, decide – otherwise the suggestion carries "čeština alebo slovenčina – overte".
   Always a suggestion (`EvidenceSource.Speech`, medium confidence).
 - `Speech/SpeechTools` – the `speech` folder installed with the program: FFmpeg (whole, LGPL, built from source at a
-  fixed commit by `tools/speech/build-ffmpeg.sh`), whisper.cpp and the model "base" (fixed SHA-256), prepared by
+  fixed commit by `tools/speech/build-ffmpeg.sh`), whisper.cpp and the models "base" (quick: the language of each piece) and "large-v3-turbo" q5_0 (accurate: Czech against Slovak on a few seconds of speech with a shortened encoder window, dictation) (fixed SHA-256), prepared by
   `tools/speech/prepare.sh` in the reusable workflow `speech-tools.yml` (cached); `manifest.json` lists the SHA-256 of
   every file and is checked before anything of it runs. The release attaches the complete FFmpeg source.
 - `Batch/BatchRunner` – processes the files that need work: files whose source or target drives meet one after

@@ -1,4 +1,4 @@
-# Guide – NEWS AND CONTENT
+# Help – NEWS AND CONTENT
 The **NEWS AND CONTENT** group shows you what is coming out: film and series **premieres**, **new episodes** of series,
 your **HISTRA lists**, **posters from TMDB** and **interesting news** from the film world. From here you send a title straight to
 processing, and the Dashboard also draws on your picks.

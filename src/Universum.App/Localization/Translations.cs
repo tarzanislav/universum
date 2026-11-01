@@ -2980,6 +2980,13 @@ internal static class Translations
         ["Chýba obrazová časť titulkov VobSub: {0}"] = "Chybí obrazová část titulků VobSub: {0}",
         ["{0}: nie sú to obrázkové titulky PGS ani VobSub."] = "{0}: nejsou to obrázkové titulky PGS ani VobSub.",
         ["Stopa {0} má obrázkové titulky {1} – tie prehrávač nezobrazí (PGS a VobSub áno); časy sa uložia správne."] = "Stopa {0} má obrázkové titulky {1} – ty přehrávač nezobrazí (PGS a VobSub ano); časy se uloží správně.",
+
+        // OCR: pairs of words, punctuation and spelling (1. 11. 2026)
+        ["slovo podľa susedných slov"] = "slovo podle sousedních slov",
+        ["slovo jazyka podľa susedných slov"] = "slovo jazyka podle sousedních slov",
+        ["interpunkcia"] = "interpunkce",
+        ["pravopis"] = "pravopis",
+        ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} slov, {2:N0} dvojic slov",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5956,5 +5963,12 @@ internal static class Translations
         ["Chýba obrazová časť titulkov VobSub: {0}"] = "The picture part of the VobSub subtitles is missing: {0}",
         ["{0}: nie sú to obrázkové titulky PGS ani VobSub."] = "{0}: these are neither PGS nor VobSub picture subtitles.",
         ["Stopa {0} má obrázkové titulky {1} – tie prehrávač nezobrazí (PGS a VobSub áno); časy sa uložia správne."] = "Track {0} has {1} picture subtitles – the player cannot show them (PGS and VobSub it can); the times are saved correctly.",
+
+        // OCR: pairs of words, punctuation and spelling (1. 11. 2026)
+        ["slovo podľa susedných slov"] = "word by its neighbors",
+        ["slovo jazyka podľa susedných slov"] = "word of the language by its neighbors",
+        ["interpunkcia"] = "punctuation",
+        ["pravopis"] = "spelling",
+        ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} words, {2:N0} word pairs",
     };
 }

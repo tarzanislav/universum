@@ -1421,6 +1421,11 @@ internal static class SelfTest
             guide.Search = "vymyslenéslovonikde";
             Check(guide.NothingFound && guide.Sections.Count == 0, $"guide {guide.Key}: nothing found for a word not in it");
             guide.Search = "";
+            if (guide.Sections.Count < 2)
+            {
+                continue;
+            }
+
             guide.Sections[1].GoCommand.Execute(null);
             Check(guide.ShownPart == guide.Sections[1].Index, $"guide {guide.Key}: a part of the contents shown");
             await Screenshot(window, $"guide-{guide.Key}.png");

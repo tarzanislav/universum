@@ -32,8 +32,9 @@
   <ItemGroup>
     <!-- Návody: the guides in UNIVERSUM's own markup (SK, CZ, EN) and their pictures, cut from the self-test's screenshots
          (invented titles and files only) -->
-    <EmbeddedResource Include="Guides\*.txt" LogicalName="Guides.%(Filename)%(Extension)" />
-    <EmbeddedResource Include="Guides\obrazky\*.jpg" LogicalName="Guides.obrazky.%(Filename)%(Extension)" />
+    <!-- WithCulture="false": "poznamky.sk.txt" is not a Slovak satellite resource, the language is part of its name -->
+    <EmbeddedResource Include="Guides\*.txt" LogicalName="Guides.%(Filename)%(Extension)" WithCulture="false" />
+    <EmbeddedResource Include="Guides\obrazky\*.jpg" LogicalName="Guides.obrazky.%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Universum.Core\Universum.Core.csproj" />

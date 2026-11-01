@@ -2790,6 +2790,21 @@ internal static class Translations
         ["rozlišujem češtinu a slovenčinu (presný model)"] = "rozlišuji češtinu a slovenštinu (přesný model)",
         ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0} %",
         ["Pripravujem stopy na počúvanie…"] = "Připravuji stopy k poslechu…",
+
+        // Zlučovanie: languages of audio and subtitles, forced (1. 11. 2026)
+        ["Rozpoznať jazyk zvuku"] = "Rozpoznat jazyk zvuku",
+        ["Rozpoznať jazyk titulkov a Forced"] = "Rozpoznat jazyk titulků a Forced",
+        ["Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy"] = "Poslechne si zvukové stopy bez jazyka (když ho mají všechny, všechny): rychlý model, čeština × slovenština přesným modelem; jazyk se zapíše do stopy",
+        ["Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope"] = "Jazyk textových titulků podle jejich textu; forced podle názvu stopy nebo souboru a podle počtu titulků oproti nejplnější stopě",
+        ["stopa {0} ({1})"] = "stopa {0} ({1})",
+        ["zastavené"] = "zastaveno",
+        ["Jazyk zvuku z reči: {0} z {1} stôp."] = "Jazyk zvuku z řeči: {0} z {1} stop.",
+        ["Čítam titulky {0}/{1}: {2} – {3:0} %"] = "Čtu titulky {0}/{1}: {2} – {3:0} %",
+        ["{0}: text sa nedal prečítať"] = "{0}: text se nepodařilo přečíst",
+        ["{0}: obrázkové titulky – jazyk z textu až po OCR v Úprave titulkostopy"] = "{0}: obrázkové titulky – jazyk z textu až po OCR v Úpravě titulkové stopy",
+        ["Titulky: jazyk určený pri {0} stopách, forced pri {1}."] = "Titulky: jazyk určen u {0} stop, forced u {1}.",
+        ["podľa názvu stopy"] = "podle názvu stopy",
+        ["podľa názvu súboru"] = "podle názvu souboru",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5576,5 +5591,20 @@ internal static class Translations
         ["rozlišujem češtinu a slovenčinu (presný model)"] = "telling Czech from Slovak (accurate model)",
         ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0}%",
         ["Pripravujem stopy na počúvanie…"] = "Preparing the tracks for listening…",
+
+        // Zlučovanie: languages of audio and subtitles, forced (1. 11. 2026)
+        ["Rozpoznať jazyk zvuku"] = "Recognize the audio language",
+        ["Rozpoznať jazyk titulkov a Forced"] = "Recognize the subtitle language and Forced",
+        ["Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy"] = "Listens to the audio tracks without a language (all of them when each has one): the quick model, Czech × Slovak by the accurate model; the language is written into the track",
+        ["Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope"] = "The language of text subtitles by their text; forced by the name of the track or file and by the number of subtitles against the fullest track",
+        ["stopa {0} ({1})"] = "track {0} ({1})",
+        ["zastavené"] = "stopped",
+        ["Jazyk zvuku z reči: {0} z {1} stôp."] = "Audio language from speech: {0} of {1} tracks.",
+        ["Čítam titulky {0}/{1}: {2} – {3:0} %"] = "Reading subtitles {0}/{1}: {2} – {3:0}%",
+        ["{0}: text sa nedal prečítať"] = "{0}: the text could not be read",
+        ["{0}: obrázkové titulky – jazyk z textu až po OCR v Úprave titulkostopy"] = "{0}: picture subtitles – the language from the text only after OCR in Subtitle track editing",
+        ["Titulky: jazyk určený pri {0} stopách, forced pri {1}."] = "Subtitles: language set for {0} tracks, forced for {1}.",
+        ["podľa názvu stopy"] = "by the track name",
+        ["podľa názvu súboru"] = "by the file name",
     };
 }

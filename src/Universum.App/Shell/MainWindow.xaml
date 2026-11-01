@@ -696,6 +696,13 @@
                                       ToolTip="{loc:T 'Ťahaním zmeníte výšku zoznamov'}" />
                         <DockPanel Grid.Row="3" Margin="0,0,0,4">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <!-- owner, 1. 11. 2026: the languages also here – of the audio from its speech, of the subtitles from their text, with forced -->
+                                <Button Content="{loc:T 'Rozpoznať jazyk zvuku'}" Command="{Binding DetectAudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Vypočuje zvukové stopy bez jazyka (keď ho majú všetky, všetky): rýchly model, čeština × slovenčina presným modelom; jazyk sa zapíše do stopy'}" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="{loc:T 'Rozpoznať jazyk titulkov a Forced'}" Command="{Binding DetectSubtitlesCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Jazyk textových titulkov podľa ich textu; forced podľa názvu stopy alebo súboru a podľa počtu titulkov oproti najplnšej stope'}" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopRecognitionCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        Visibility="{Binding IsRecognising, Converter={StaticResource BoolToVisibility}}" />
                                 <Button Content="{loc:T 'Pravidlá UNIVERSUM'}" Command="{Binding ApplyRulesCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM" ToolTipService.ShowOnDisabled="True" />
                                 <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveUpCommand}" Padding="9,5" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑)" />
@@ -703,6 +710,10 @@
                             </StackPanel>
                             <TextBlock Text="{loc:T 'Stopy vo výstupe'}" FontWeight="SemiBold" VerticalAlignment="Center"
                                        ToolTip="V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú" />
+                            <StackPanel VerticalAlignment="Center" Margin="12,0,8,0" Visibility="{Binding IsRecognising, Converter={StaticResource BoolToVisibility}}">
+                                <ProgressBar Height="4" Maximum="1" Value="{Binding RecognitionProgress, Mode=OneWay}" />
+                                <TextBlock Text="{Binding RecognitionText}" Style="{StaticResource Hint}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
                         </DockPanel>
                         <DataGrid Grid.Row="4" ItemsSource="{Binding TrackRows}" SelectedItem="{Binding SelectedTrackItem}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">

@@ -255,6 +255,7 @@ internal static class SelfTest
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
         await TestMegaSourcesAsync(model, window, services, work);
+        await TestMuxRecognitionAsync(model, window, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -3697,6 +3698,46 @@ internal static class SelfTest
         await Screenshot(window, "batch-new-groups.png");
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");
+    }
+
+    // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,
+    // with forced subtitles told by the file's name (invented speech and text)
+    private static async Task TestMuxRecognitionAsync(MainViewModel model, MainWindow window, string work)
+    {
+        var mux = model.Mux;
+        var speech = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "speech-und.mkv");
+        var srt = Path.Combine(work, "Vymyslený film.forced.srt");
+        File.WriteAllText(srt, string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
+            $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nAko sa máš? Som tu, čo ešte chceš, keď je teraz všetko také, ako má byť.")) + "\n");
+        var previous = mux.AskHowToAdd;
+        mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent);
+        try
+        {
+            mux.NewSettingsCommand.Execute(null);
+            await mux.AddFilesAsync([speech, srt]);
+            var set = mux.Current;
+            var audio = set.Tracks.Where(t => t.Kind == TrackType.Audio).ToList();
+            Check(audio.Count == 3 && audio.All(a => a.Language.Tag.IsUndetermined) && set.DetectAudioCommand.CanExecute(null),
+                $"mux recognition: three audio tracks without a language, the button offered ({audio.Count})");
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            await set.DetectAudioAsync();
+            Write($"mux recognition: audio ({watch.Elapsed.TotalSeconds:0.0} s): {set.Result} | {string.Join(", ", audio.Select(a => a.Language.Display))}");
+            Check(audio[1].Language.Tag.Primary == "en" && new[] { audio[0], audio[2] }.All(a => a.Language.Tag.Primary is "cs" or "sk"),
+                "mux recognition: the languages of the speech written into the tracks – " + string.Join(", ", audio.Select(a => a.Language.Display)));
+            await set.DetectSubtitlesAsync();
+            var subtitles = set.Tracks.Single(t => t.Kind == TrackType.Subtitles && t.Input.File.Path == srt);
+            Write("mux recognition: subtitles: " + set.Result);
+            Check(subtitles.Language.Tag.Primary == "sk" && subtitles.IsForced, $"mux recognition: Slovak subtitles, forced by the file's name – {subtitles.Language.Display}, forced {subtitles.IsForced}");
+            await Screenshot(window, "mux-recognition.png");
+            var confirm = mux.Confirm;
+            mux.Confirm = _ => true;
+            mux.CloseSettingsCommand.Execute(set);
+            mux.Confirm = confirm;
+        }
+        finally
+        {
+            mux.AskHowToAdd = previous;
+        }
     }
 
     // owner, 1. 11. 2026 (bezchybné preklady): the window drawn in English and in Czech; what is still Slovak on the pages

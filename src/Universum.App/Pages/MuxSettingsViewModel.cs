@@ -1017,6 +1017,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         MoveUpCommand?.NotifyCanExecuteChanged();
         MoveDownCommand?.NotifyCanExecuteChanged();
         ApplyRulesCommand?.NotifyCanExecuteChanged();
+        _detectAudioCommand?.NotifyCanExecuteChanged();
+        _detectSubtitlesCommand?.NotifyCanExecuteChanged();
         ClearChaptersCommand?.NotifyCanExecuteChanged();
         RemoveAttachmentCommand?.NotifyCanExecuteChanged();
         ChooseOutputCommand?.NotifyCanExecuteChanged();

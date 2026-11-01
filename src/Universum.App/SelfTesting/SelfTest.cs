@@ -3296,8 +3296,12 @@ internal static class SelfTest
             var synthetic = batch.Analysis!.Groups[0].Files[0];
             foreach (var (ordinal, spoken) in new[] { (0, "cs"), (1, "en"), (2, "sk") })
             {
-                var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
-                Write($"speech detail: audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
+                var timed = System.Diagnostics.Stopwatch.StartNew();
+                var stages = new List<string>();
+                var result = await Core.Speech.SpokenLanguage.DetectAsync(tools, services.Runner, synthetic.Path, ordinal, synthetic.Duration,
+                    new Progress<Core.Speech.SpeechProgress>(p => stages.Add($"{p.Stage}@{timed.Elapsed.TotalSeconds:0.0}s")));
+                Write($"speech detail ({timed.Elapsed.TotalSeconds:0.0} s; accurate model {(tools.Accurate is null ? "not installed" : "installed")}; " +
+                      $"{string.Join(" ", stages.Distinct().Where((_, i) => i % 4 == 0).Take(12))}): audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
                       $"written in {result.Comparison?.TextLanguage ?? (result.Comparison?.TextLeaning is { } lean ? lean + "?" : "–")}, pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, " +
                       $"doubt: {result.Doubt} | as cs: {result.Comparison?.CzechText} | as sk: {result.Comparison?.SlovakText}");
             }

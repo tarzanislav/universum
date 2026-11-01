@@ -1248,6 +1248,15 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>The folder is being read: groups appear as files are read, a progress bar shows how far.</summary>
     public bool IsAnalyzing => _analysisCancellation is not null;
 
+    /// <summary>The speech of audio tracks is being recognised (owner, 1. 11. 2026: a gauge 0–100 % that moves).</summary>
+    public bool IsListening => _speechCancellation is not null;
+
+    /// <summary>The gauge under the summary: while the folder is read or the speech recognised.</summary>
+    public bool ShowsProgress => IsAnalyzing || IsListening;
+
+    /// <summary>What the stop button at the top stops.</summary>
+    public string StopText => IsListening ? Loc.T("Zastaviť rozpoznávanie reči") : Loc.T("Zastaviť analýzu");
+
     /// <summary>The summary says why nothing can be processed (no MKV, only results…): shown in the warning colour.</summary>
     public bool SummaryIsWarning { get => _summaryIsWarning; private set => SetProperty(ref _summaryIsWarning, value); }
 
@@ -2520,6 +2529,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
         Busy = true;
         var cancellation = _speechCancellation = new CancellationTokenSource();
+        OnPropertyChanged(nameof(IsListening));
+        OnPropertyChanged(nameof(ShowsProgress));
+        OnPropertyChanged(nameof(StopText));
         StopCommand.NotifyCanExecuteChanged();
         int recognised = 0, failed = 0, done = 0;
         var notes = new List<string>();
@@ -2533,11 +2545,18 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     var name = $"{Path.GetFileName(target.File.Path)} – {Texts.Slot(target.Key)}";
                     var where = Loc.F("Počúvam {0}/{1}: {2}", done + 1, targets.Count, name);
-                    RunState = where + "…";
-                    Progress = (double)done / targets.Count;
-                    var pieces = new Progress<int>(n => RunState = Loc.F("{0} (úsekov: {1})…", where, n));
+                    var finished = done;
+                    void Show(SpeechProgress step)
+                    {
+                        // the whole recognition: the tracks done and the part of this one
+                        Progress = (finished + step.Fraction) / targets.Count;
+                        RunState = Loc.F("{0} – {1} – {2:0} %", where, Stage(step.Stage), Progress * 100);
+                    }
+
+                    Show(new SpeechProgress(0, SpeechStage.Cutting));
+                    var gauge = new Progress<SpeechProgress>(Show);
                     var ordinal = await _services.AudioOrdinalAsync(target.File.Path, target.Track, target.Key.Ordinal, cancellation.Token);
-                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, ordinal, target.File.Duration, pieces, cancellation.Token);
+                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, ordinal, target.File.Duration, gauge, cancellation.Token);
                     if (result.Language is { } code)
                     {
                         SpeechTargets.Keep(target, new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
@@ -2578,11 +2597,23 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             Progress = 0;
             _speechCancellation = null;
+            OnPropertyChanged(nameof(IsListening));
+            OnPropertyChanged(nameof(ShowsProgress));
+            OnPropertyChanged(nameof(StopText));
             cancellation.Dispose();
             Busy = false;
             StopCommand.NotifyCanExecuteChanged();
         }
     }
+
+    // what the recognition of a track does now, for the gauge
+    private static string Stage(SpeechStage stage) => stage switch
+    {
+        SpeechStage.Cutting => Loc.T("vyberám úseky zvuku"),
+        SpeechStage.Listening => Loc.T("počúvam úseky (rýchly model)"),
+        SpeechStage.CzechOrSlovak => Loc.T("rozlišujem češtinu a slovenčinu (presný model)"),
+        _ => Loc.T("hotovo"),
+    };
 
     private IReadOnlyList<FileRow> _selectedFiles = [];
 

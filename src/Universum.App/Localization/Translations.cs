@@ -2782,6 +2782,13 @@ internal static class Translations
         ["Skupina Seriál"] = "Skupina Seriál",
         ["Skupina Film"] = "Skupina Film",
         ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Tažením změníte výšku seznamů seriálů a filmů",
+
+        // speech recognition: the gauge (1. 11. 2026)
+        ["Zastaviť rozpoznávanie reči"] = "Zastavit rozpoznávání řeči",
+        ["vyberám úseky zvuku"] = "vybírám úseky zvuku",
+        ["počúvam úseky (rýchly model)"] = "poslouchám úseky (rychlý model)",
+        ["rozlišujem češtinu a slovenčinu (presný model)"] = "rozlišuji češtinu a slovenštinu (přesný model)",
+        ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0} %",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5560,5 +5567,12 @@ internal static class Translations
         ["Skupina Seriál"] = "Series groups",
         ["Skupina Film"] = "Film groups",
         ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Drag to change the height of the series and film lists",
+
+        // speech recognition: the gauge (1. 11. 2026)
+        ["Zastaviť rozpoznávanie reči"] = "Stop the speech recognition",
+        ["vyberám úseky zvuku"] = "picking parts of the audio",
+        ["počúvam úseky (rýchly model)"] = "listening to the parts (quick model)",
+        ["rozlišujem češtinu a slovenčinu (presný model)"] = "telling Czech from Slovak (accurate model)",
+        ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0}%",
     };
 }

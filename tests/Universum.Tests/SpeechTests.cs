@@ -94,12 +94,14 @@ public sealed class SpeechTests
             Assert.Equal("cs", result.Language);
             Assert.Equal(1, result.Pieces.Count(p => p.Silent), "the silent piece");
             Assert.Equal(2, runner.Heard, "silence is not given to whisper; after three pieces two that agree are enough");
+            Assert.True(runner.Runs == 1 && runner.Cuts.Count == 1, $"the three pieces cut in one run of FFmpeg and heard in one run of whisper ({runner.Cuts.Count}, {runner.Runs})");
             Assert.True(runner.Cuts.All(c => c.Contains("0:a:1", StringComparison.Ordinal)), "the second audio track");
 
             var unsure = new StandIn(tools, _ => 0.3, "sk", 0.55);
             var slovak = await SpokenLanguage.DetectAsync(tools, unsure, "film.mkv", 0, TimeSpan.FromMinutes(100));
             Assert.Equal("sk", slovak.Language);
             Assert.Equal(5, unsure.Heard, "not sure enough: all five pieces");
+            Assert.True(unsure.Runs == 2 && unsure.Cuts.Count == 2, "two more pieces in a second run");
             Assert.True(!Directory.EnumerateDirectories(Path.GetTempPath(), "UNIVERSUM-speech-*").Any(), "the folder of the pieces is deleted");
 
             // Slovak heard as Czech: the Slovak transcription is surer of its words – Slovak, with a note
@@ -127,6 +129,83 @@ public sealed class SpeechTests
         {
             Directory.Delete(folder, true);
         }
+    }
+
+    [Test]
+    public async Task TheAccurateModelTellsCzechFromSlovakOnAFewSeconds()
+    {
+        var folder = NewFolder();
+        try
+        {
+            var tools = FakeTools(folder, accurate: true);
+            Assert.True(tools.Accurate is not null && tools.Writer == tools.Accurate, "the accurate model installed – it also writes down dictation");
+            var dubbed = new StandIn(tools, _ => 0.3, "cs", 0.62, l => l == "sk" ? 0.8 : 0.6);
+            var steps = new List<SpeechProgress>();
+            var result = await SpokenLanguage.DetectAsync(tools, dubbed, "film.mkv", 0, TimeSpan.FromMinutes(100), new Gauge(steps.Add));
+            Assert.Equal("sk", result.Language);
+            Assert.True(dubbed.Accurate == 2 && dubbed.Transcribed.SequenceEqual(["cs", "sk"]), "the clip transcribed by the accurate model in both languages");
+            Assert.True(steps.Count > 3 && steps.Zip(steps.Skip(1)).All(p => p.Second.Fraction >= p.First.Fraction - 1e-9) && steps[^1] is { Fraction: 1, Stage: SpeechStage.Done },
+                "the gauge only goes forward, up to 100 %: " + string.Join(" ", steps.Select(p => $"{p.Fraction:0.00}{p.Stage.ToString()[0]}")));
+            Assert.True(steps.Any(p => p.Stage == SpeechStage.CzechOrSlovak), "the Czech-or-Slovak stage reported");
+            Assert.True(!Directory.EnumerateDirectories(Path.GetTempPath(), "UNIVERSUM-speech-*").Any(), "the pieces and the clip deleted");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    [Test]
+    public void TheClipOfSpeechAndTheEncodersWindow()
+    {
+        var folder = NewFolder();
+        try
+        {
+            // 12 s of silence, 6 s of loud sound, 12 s of silence: the clip of 9 s holds all the sound
+            var wave = Path.Combine(folder, "piece.wav");
+            var samples = new short[16000 * 30];
+            for (var i = 16000 * 12; i < 16000 * 18; i++)
+            {
+                samples[i] = (short)(Math.Sin(i * 0.05) * 9000);
+            }
+
+            var bytes = new byte[44 + (samples.Length * 2)];
+            "RIFF"u8.CopyTo(bytes);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(4), bytes.Length - 8);
+            "WAVEfmt "u8.CopyTo(bytes.AsSpan(8));
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(16), 16);
+            BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(20), 1);
+            BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(22), 1);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(24), 16000);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(28), 32000);
+            BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(32), 2);
+            BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(34), 16);
+            "data"u8.CopyTo(bytes.AsSpan(36));
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(40), samples.Length * 2);
+            Buffer.BlockCopy(samples, 0, bytes, 44, samples.Length * 2);
+            File.WriteAllBytes(wave, bytes);
+
+            var clip = Path.Combine(folder, "clip.wav");
+            Assert.Equal<double?>(9, SpokenLanguage.SpeechClip(wave, clip, 9), "nine seconds");
+            var loudness = SpokenLanguage.Loudness(clip);
+            Assert.True(loudness > -20, $"the clip is the sound, not the silence ({loudness:0.0} dB)");
+            Assert.True(new FileInfo(clip).Length == 44 + (9 * 32000), "a WAV of nine seconds");
+
+            Assert.Equal(474, SpokenLanguage.AudioContext(9), "50 positions a second and an edge");
+            Assert.Equal(1500, SpokenLanguage.AudioContext(40), "never more than the whole window");
+            var listen = SpokenLanguage.ListenRequest(new SpeechTools(folder, "ffmpeg", "whisper", "/models/ggml-base.bin"), folder, ["piece-1.wav", "piece-2.wav"]);
+            Assert.True(string.Join(' ', listen.Arguments).EndsWith("-f piece-1.wav -f piece-2.wav", StringComparison.Ordinal) && listen.Arguments.Contains("-dl") &&
+                        listen.WorkingDirectory == folder && listen.Background, string.Join(' ', listen.Arguments));
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    private sealed class Gauge(Action<SpeechProgress> report) : IProgress<SpeechProgress>
+    {
+        public void Report(SpeechProgress value) => report(value);
     }
 
     [Test]
@@ -256,10 +335,16 @@ public sealed class SpeechTests
 
     private static string NewFolder() => Directory.CreateTempSubdirectory("universum-tools-test-").FullName;
 
-    private static SpeechTools FakeTools(string folder)
+    private static SpeechTools FakeTools(string folder, bool accurate = false)
     {
         var exe = OperatingSystem.IsWindows() ? ".exe" : "";
-        foreach (var (path, text) in new[] { ($"ffmpeg/ffmpeg{exe}", "ffmpeg"), ($"whisper/whisper-cli{exe}", "whisper"), ($"models/{SpeechTools.ModelName}", "model") })
+        var files = new List<(string, string)> { ($"ffmpeg/ffmpeg{exe}", "ffmpeg"), ($"whisper/whisper-cli{exe}", "whisper"), ($"models/{SpeechTools.ModelName}", "model") };
+        if (accurate)
+        {
+            files.Add(($"models/{SpeechTools.AccurateName}", "accurate model"));
+        }
+
+        foreach (var (path, text) in files)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(folder, path))!);
             File.WriteAllText(Path.Combine(folder, path), text);
@@ -287,11 +372,21 @@ public sealed class SpeechTests
 
         public Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
         {
+            Assert.True(request.Background, "speech runs below normal priority");
             if (request.FileName == tools.Ffmpeg)
             {
+                // several pieces in one run: the positions in the order of the inputs, the waves after each "-y"
                 Cuts.Add(string.Join(' ', request.Arguments));
-                var at = double.Parse(request.Arguments[request.Arguments.ToList().IndexOf("-ss") + 1], System.Globalization.CultureInfo.InvariantCulture);
-                WriteWave(request.Arguments[^1], amplitudeAt(at));
+                var arguments_ = request.Arguments.ToList();
+                var positions = arguments_.Select((a, i) => (a, i)).Where(x => x.a == "-ss")
+                    .Select(x => double.Parse(arguments_[x.i + 1], System.Globalization.CultureInfo.InvariantCulture)).ToList();
+                var waves = arguments_.Select((a, i) => (a, i)).Where(x => x.a == "-y").Select(x => arguments_[x.i + 1]).ToList();
+                Assert.True(positions.Count == waves.Count, "a wave for every position");
+                for (var i = 0; i < waves.Count; i++)
+                {
+                    WriteWave(waves[i], amplitudeAt(positions[i]));
+                }
+
                 return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));
             }
 
@@ -300,7 +395,13 @@ public sealed class SpeechTests
             {
                 var as_ = arguments[arguments.IndexOf("-l") + 1];
                 Transcribed.Add(as_);
-                Assert.True(File.Exists(request.StandardInputFile) && request.WorkingDirectory == Path.GetDirectoryName(request.StandardInputFile), "the piece is still there, the output next to it");
+                var input = arguments[arguments.IndexOf("-f") + 1] == "-" ? request.StandardInputFile : Path.Combine(request.WorkingDirectory!, arguments[arguments.IndexOf("-f") + 1]);
+                Assert.True(File.Exists(input) && request.WorkingDirectory == Path.GetDirectoryName(input), "the piece is still there, the output next to it");
+                Assert.True(arguments.Contains("-bs") && arguments.Contains("-nf"), "the surest words one by one, no second try");
+                if (arguments.Contains("-ac"))
+                {
+                    Accurate++;
+                }
                 if (sureOf is not null)
                 {
                     var p = sureOf(as_).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -312,11 +413,34 @@ public sealed class SpeechTests
                 return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));
             }
 
-            Heard++;
-            var (heardLanguage, p2) = Languages is { } each ? (each[(Heard - 1) % each.Length], 0.9) : (language, probability);
-            var output = heardLanguage is null ? "error: failed to process audio" : $"whisper_full_with_state: auto-detected language: {heardLanguage} (p = {p2:0.000000})";
-            return Task.FromResult(new ProcessResult(0, "", output.Replace(',', '.'), TimeSpan.Zero));
+            // the language of each piece – several in one run, each reported on its own line as whisper.cpp writes it
+            var files = arguments.Select((a, i) => (a, i)).Where(x => x.a == "-f").Select(x => arguments[x.i + 1]).ToList();
+            var error = new System.Text.StringBuilder();
+            foreach (var file in files)
+            {
+                Heard++;
+                var (heardLanguage, p2) = Languages is { } each ? (each[(Heard - 1) % each.Length], 0.9) : (language, probability);
+                var name = file == "-" ? "-" : file;
+                foreach (var line in new[]
+                         {
+                             $"main: processing '{name}' (480000 samples, 30.0 sec), 4 threads, 1 processors, 5 beams + best of 5, lang = auto, task = transcribe, timestamps = 1 ...",
+                             heardLanguage is null ? "error: failed to process audio" : $"whisper_full_with_state: auto-detected language: {heardLanguage} (p = {p2.ToString("0.000000", System.Globalization.CultureInfo.InvariantCulture)})",
+                         })
+                {
+                    error.AppendLine(line);
+                    request.OnErrorLine?.Invoke(line);
+                }
+            }
+
+            Runs++;
+            return Task.FromResult(new ProcessResult(0, "", error.ToString(), TimeSpan.Zero));
         }
+
+        /// <summary>How many times whisper ran to hear languages.</summary>
+        public int Runs { get; private set; }
+
+        /// <summary>Transcriptions by the accurate model (the encoder on a few seconds).</summary>
+        public int Accurate { get; private set; }
 
         private static void WriteWave(string path, double amplitude)
         {

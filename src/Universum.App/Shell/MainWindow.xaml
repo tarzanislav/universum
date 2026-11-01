@@ -2371,8 +2371,8 @@
                                   ToolTip="Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Upratať zvyšky'}" Command="{Binding CleanupCommand}" Padding="10,3"
                             ToolTip="Dočasné súbory po prerušenom spracovaní presunie do Koša" />
-                    <Button DockPanel.Dock="Right" Content="{loc:T 'Zastaviť analýzu'}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
-                            Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                    <Button DockPanel.Dock="Right" Content="{Binding StopText}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
+                            Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                         <!-- why nothing can be processed is said plainly, in the warning colour -->
                         <TextBlock Text="{Binding Summary}" TextWrapping="Wrap">
@@ -2388,7 +2388,10 @@
                             </TextBlock.Style>
                         </TextBlock>
                         <ProgressBar Height="4" Maximum="1" Value="{Binding Progress, Mode=OneWay}" Margin="0,4,0,0" MaxWidth="420" HorizontalAlignment="Left" Width="420"
-                                     Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
+                                     Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
+                        <!-- owner, 1. 11. 2026: during the recognition of speech the gauge says how far (0–100 %) and what it does -->
+                        <TextBlock Text="{Binding RunState}" Style="{StaticResource Hint}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsListening, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </DockPanel>
 

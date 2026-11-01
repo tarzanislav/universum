@@ -54,6 +54,18 @@ public sealed class ProcessRunner : IProcessRunner
             throw new ProcessStartException(request.FileName, ex);
         }
 
+        if (request.Background)
+        {
+            try
+            {
+                process.PriorityClass = ProcessPriorityClass.BelowNormal;
+            }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+            {
+                // it may have ended already, or the system does not allow it: it runs at the usual priority
+            }
+        }
+
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (request.Timeout is { } timeout)
         {
@@ -63,7 +75,7 @@ public sealed class ProcessRunner : IProcessRunner
         var output = new StringBuilder();
         var error = new StringBuilder();
         var readOutput = ReadLinesAsync(process.StandardOutput, output, request.OnOutputLine);
-        var readError = ReadLinesAsync(process.StandardError, error, null);
+        var readError = ReadLinesAsync(process.StandardError, error, request.OnErrorLine);
         var writeInput = request.StandardInputFile is { } input ? WriteInputAsync(process, input, limit.Token) : Task.CompletedTask;
         try
         {

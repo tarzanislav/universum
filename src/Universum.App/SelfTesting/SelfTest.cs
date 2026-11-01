@@ -1443,7 +1443,8 @@ internal static class SelfTest
 
         store.EmptyBin();
         model.Open(dashboard);
-        Check(agenda.NoCalendar && agenda.NoTasks && !agenda.HasNotes, "dashboard: nothing left when the records are gone");
+        Check(!agenda.Calendar.Any(r => r.Title.StartsWith("Vymysl", StringComparison.Ordinal)) && agenda.NoTasks && !agenda.HasNotes,
+            "dashboard: no record left when the records are gone (the holidays stay) – " + string.Join(", ", agenda.Calendar.Select(r => r.Title)));
     }
 
     /// <summary>

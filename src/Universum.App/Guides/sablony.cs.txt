@@ -22,6 +22,8 @@ Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu
 
 !pozor V Single zpracování je volba **Originál: vymazať** vypnutá – originál se tu vždy zachová.
 
+- [Odeslat do MEGA] – soubor se se všemi rozhodnutími zapíše **později** v MEGA zpracování (do nové nebo čekající dávky). Originál zůstane.
+
 @otvorit Rules Otevřít Single zpracování
 
 ## Hromadné zpracování
@@ -66,7 +68,7 @@ Pokud zvuková stopa nemá jazyk, klikněte na [Rozpoznat jazyk audiostop ▾] a
 @otvorit Batch Otevřít Hromadné zpracování
 
 ## MEGA zpracování
-Dávky připravené v Hromadném zpracování, které se zapíšou **později** – například v noci.
+Dávky připravené v Hromadném zpracování, v Single zpracování nebo ve Slučování, které se zapíšou **později** – například v noci.
 
 1. V Hromadném zpracování připravte soubory a v nabídce vedle tlačítka zvolte *novou dávku* nebo doplnění čekající dávky.
 2. Klikněte na [Odoslať do MEGA]. Soubory se uloží do dávky se všemi rozhodnutími, se šablonou i s volbou pro originály.
@@ -86,6 +88,12 @@ Dávky připravené v Hromadném zpracování, které se zapíšou **později** 
 !pozor Dávka nastavená na čas se spustí **jen tehdy, když UNIVERSUM běží** a počítač nespí. Jinak dostane stav *ZMEŠKANÉ* – spusťte ji ručně nebo nastavte nový čas.
 
 !info Před zápisem se každý soubor znovu zkontroluje. Chybějící nebo změněný soubor či soubor, který už je v knihovně, se **přeskočí** a nic se nepokazí.
+
+### Odkud soubory přicházejí
+Do dávky pošlete soubory z **Hromadného zpracování**, **Single zpracování** i výsledky **Slučování** – sloupec **Odkiaľ** to ukáže.
+- Soubor ze Single zpracování a výsledek Slučování si **originály vždy ponechají**, ať má dávka zvoleno cokoli.
+- Výsledek Slučování se zapíše celý podle svých nastavení; když se některý jeho soubor mezitím změní, **přeskočí se**.
+- [Upraviť v Hromadnom spracovaní] otevře jen soubory, které přišly z Hromadného zpracování.
 
 @otvorit Mega Otevřít MEGA zpracování
 

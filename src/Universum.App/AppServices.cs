@@ -106,6 +106,29 @@ public sealed class AppServices
     /// Owner, 29. 10. 2026: the input folder holds MOVIES and TVSHOWS – the user sorts films and series into them, so
     /// Hromadné spracovanie tells them apart for certain (nothing is moved by the program). Created when missing.
     /// </summary>
+    /// <summary>Where Zlučovanie writes its previews (the folder chosen in Nastavenia, else UNIVERSUM's own).</summary>
+    public string PreviewFolder => Settings.MuxPreviewFolder is { Length: > 0 } chosen ? chosen : AppSettings.PreviewDirectory;
+
+    /// <summary>The previews older than a week are deleted (only UNIVERSUM's own: "… – náhľad …"); how many.</summary>
+    public int ClearOldPreviews(TimeSpan? age = null)
+    {
+        var cleared = 0;
+        foreach (var file in Universum.Core.Muxing.MuxPreview.Old(PreviewFolder, age ?? TimeSpan.FromDays(7), DateTime.Now))
+        {
+            try
+            {
+                File.Delete(file);
+                cleared++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // a preview still open in a player is left for the next time
+            }
+        }
+
+        return cleared;
+    }
+
     public void EnsureSortingFolders()
     {
         if (InputDirectory is not { } folder || !Directory.Exists(folder))
@@ -1044,6 +1067,15 @@ public sealed class AppSettings
     /// <summary>Kalendár: the panel of the layers open (closed it leaves the days more room).</summary>
     public bool CalendarLayersShown { get; set; } = true;
 
+    /// <summary>
+    /// Zlučovanie: the folder of previews (owner, 1. 11. 2026: never the output folders); null: UNIVERSUM's own folder in
+    /// the local application data.
+    /// </summary>
+    public string? MuxPreviewFolder { get; set; }
+
+    /// <summary>Zlučovanie: how much a preview writes – "Samples" (three pieces of two minutes) or "Whole".</summary>
+    public string MuxPreviewRange { get; set; } = "Samples";
+
     /// <summary>Kalendár: the view last chosen.</summary>
     public string CalendarView { get; set; } = "Month";
 
@@ -1064,6 +1096,12 @@ public sealed class AppSettings
 
     /// <summary>The sources of news (Premiéry, Novinky); null = the defaults (TVmaze, TMDB). Web pages are added by the user.</summary>
     public List<Universum.Core.News.NewsSource>? NewsSources { get; set; }
+
+    /// <summary>The default folder of the previews of Zlučovanie (UNIVERSUM's own, never an output folder).</summary>
+    public static string PreviewDirectory =>
+        Environment.GetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR") is { Length: > 0 } custom
+            ? Path.Combine(custom, "nahlady")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UNIVERSUM", "Nahlady");
 
     /// <summary>Folder with undo records of in-place edits.</summary>
     public static string JournalDirectory =>

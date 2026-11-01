@@ -140,7 +140,8 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
                 return;
             }
 
-            var needed = spec.Sources.SelectMany(s => s.AllPaths).Sum(p => new FileInfo(p).Length) + (64L << 20);
+            // a preview of parts is a small piece of the film
+            var needed = (spec.PreviewParts is null ? spec.Sources.SelectMany(s => s.AllPaths).Sum(p => new FileInfo(p).Length) : 0) + (64L << 20);
             var free = new DriveInfo(root).AvailableFreeSpace;
             if (free < needed)
             {

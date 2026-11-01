@@ -40,7 +40,11 @@ public static class MuxVerifier
         }
 
         var chaptersExpected = !string.IsNullOrEmpty(spec.ChaptersFile) || spec.Sources.Any(s => s.KeepChapters && (s.File.HasChapters || s.Appended.Any(a => a.HasChapters)));
-        Check(problems, chaptersExpected == result.HasChapters, chaptersExpected ? "chapters are missing" : "unexpected chapters");
+        // a preview of parts keeps only the chapters inside them
+        if (spec.PreviewParts is null)
+        {
+            Check(problems, chaptersExpected == result.HasChapters, chaptersExpected ? "chapters are missing" : "unexpected chapters");
+        }
         var attachments = spec.Sources.Where(s => s.KeepAttachments).Sum(s => s.File.AttachmentCount) + spec.Attachments.Count;
         Check(problems, result.AttachmentCount == attachments, $"attachments {result.AttachmentCount}, expected {attachments}");
         return problems;

@@ -253,6 +253,7 @@ internal static class SelfTest
         await TestTitleSyncAsync(model, window, services);
         await TestHeaderEditorAsync(model, window, services, work);
         await TestMultiplexerAsync(model, window, services, work);
+        await TestMegaSourcesAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -429,6 +430,108 @@ internal static class SelfTest
     /// beside the source by default, then into the library as a queue job. Then tabs: new settings for each file,
     /// an appended file, closing with a question, and the Information page with the files in work.
     /// </summary>
+    /// <summary>
+    /// MEGA spracovanie from Zlučovanie and Single spracovanie (owner, 1. 11. 2026): a merged result previewed in the folder
+    /// of previews (never the output), played in UNIVERSUM's player, sent to MEGA; a file of Single spracovanie added to
+    /// the same batch; MEGA writes both – the original of Single kept – and the preview goes with its tab. Invented names.
+    /// </summary>
+    private static async Task TestMegaSourcesAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var film = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv");
+        var srt = Path.Combine(work, "mega-titulky.srt");
+        File.WriteAllText(srt, "1\n00:00:00,500 --> 00:00:01,500\nVymyslený titulok pre MEGA.\n\n");
+        var mux = model.Mux;
+        model.Open(mux);
+        mux.NewSettingsCommand.Execute(null);
+        var set = mux.Current;
+        mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent, null, false);
+        await mux.AddFilesAsync([film, srt]);
+        set.Tracks[2].Language = set.Tracks[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
+        set.Tracks[3].Language = set.Tracks[3].LanguageChoices.First(c => c.Tag.Primary == "cs");
+        set.Tracks[^1].Language = set.Tracks[^1].LanguageChoices.First(c => c.Tag.Primary == "sk");
+        set.ApplyRules();
+        set.Library.IsMovie = true;
+        set.Library.TitleText = "Zlúčený pre MEGA (2026)";
+        set.UseLibrary = true;
+        Check(set.PreviewCommand.CanExecute(null) && set.SendToMegaCommand.CanExecute(null) && !set.HasPreview, "mega/mux: a preview and MEGA offered – " + set.Problems);
+
+        // the test film is short: the whole film (the parts are tried by the core tests)
+        set.PreviewRange = MuxSettingsViewModel.PreviewRanges.First(r => r.Value == Core.Muxing.PreviewRange.Whole);
+        await set.PreviewAsync();
+        var preview = set.PreviewPath;
+        Check(preview is not null && string.Equals(Path.GetDirectoryName(preview), Path.GetFullPath(services.PreviewFolder), StringComparison.OrdinalIgnoreCase) &&
+              !preview.StartsWith(services.Library!.Root, StringComparison.OrdinalIgnoreCase) && !set.PreviewIsOld && !File.Exists(set.OutputPath),
+            $"mega/mux: the preview in the folder of previews, nothing in the output – {preview} · {set.PreviewText}");
+        string? played = null;
+        set.PlayRequested = path => played = path;
+        set.PlayPreviewCommand.Execute(null);
+        Check(played == preview, "mega/mux: Prehrať náhľad opens the preview");
+        var player = new PreviewViewModel(services, preview!);
+        var playerWindow = new PreviewWindow(player) { Owner = window, Width = 1000, Height = 680 };
+        playerWindow.Show();
+        await WaitFor(() => player.Subtitles.Count > 1);
+        Check(player.Subtitles.Count >= 2 && player.Subtitles.Any(s => s.Label.Contains("(sk)", StringComparison.Ordinal)),
+            "mega/mux: the preview in UNIVERSUM's player with the subtitles of the result – " + string.Join(" | ", player.Subtitles.Select(s => s.Label)));
+        await Screenshot(playerWindow, "mux-preview.png");
+        playerWindow.Close();
+        set.Title = "Zmenený vymyslený názov";
+        Check(set.PreviewIsOld, "mega/mux: the settings changed since the preview");
+        set.Title = "";
+        Check(!set.PreviewIsOld, "mega/mux: the same again");
+        await Screenshot(window, "mux-mega.png");
+
+        var before = services.Mega.Batches.Count;
+        set.Mega.Selected = set.Mega.Targets[0];
+        set.SendToMegaCommand.Execute(null);
+        var batch = set.Mega.Last;
+        Check(batch is not null && services.Mega.Batches.Count == before + 1 && batch.Files.Single() is { Source: Core.Mega.MegaSource.Mux, KeepOriginal: true, Mux.Inputs.Count: 2 } &&
+              set.Result.Contains(batch.Label, StringComparison.Ordinal), "mega/mux: the result sent to a new batch – " + set.Result);
+
+        // Single spracovanie: a file with its decisions added to the same batch
+        var single = Path.Combine(work, "Vymyslený film pre MEGA.mkv");
+        File.Copy(film, single, overwrite: true);
+        model.Open(model.Rules);
+        await model.Rules.LoadAsync(single);
+        for (var wait = 0; wait < 600 && model.Rules.IsReadingSubtitles; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        model.Rules.ChooseLanguage(2, "cs");
+        model.Rules.ChooseLanguage(3, "cs");
+        model.Rules.IsMovie = true;
+        model.Rules.TitleText = "Vymyslený film pre MEGA (2026)";
+        model.Rules.Mega.Selected = model.Rules.Mega.Targets.First(t => t.Batch == batch);
+        Check(model.Rules.SendToMegaCommand.CanExecute(null), "mega/single: Odoslať do MEGA offered – " + model.Rules.Target);
+        model.Rules.SendToMegaCommand.Execute(null);
+        var singleFile = batch!.Files.FirstOrDefault(f => f.Source == Core.Mega.MegaSource.Single);
+        Check(batch.Files.Count == 2 && singleFile is { KeepOriginal: true } && singleFile.Languages.TryGetValue(2, out var chosen) && chosen.Primary == "cs" && singleFile.Title.Name == "Vymyslený film pre MEGA",
+            "mega/single: the file added to the batch with its decisions – " + model.Rules.Result);
+        model.Open(model.Mega);
+        model.Mega.Selected = model.Mega.Rows.First(r => r.Batch == batch);
+        Check(model.Mega.Files.Select(f => f.Source).Order().SequenceEqual(["Single spracovanie", "Zlučovanie"]) && !model.Mega.EditCommand.CanExecute(null),
+            "mega: where the files came from; nothing to open in Hromadné spracovanie");
+        await Screenshot(window, "mega-sources.png");
+
+        // MEGA writes both
+        await model.Mega.StartAsync(batch);
+        for (var wait = 0; wait < 600 && model.Mega.LastJob is { IsFinished: false }; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(batch.Files.All(f => f.State == Core.Mega.MegaFileState.Done && f.ResultPath is { } result && File.Exists(result) && result.StartsWith(services.Library!.Root, StringComparison.OrdinalIgnoreCase)) &&
+              File.Exists(single) && File.Exists(film),
+            "mega: the result of Zlučovanie and the file of Single written into the library, originals kept – " + string.Join(" | ", batch.Files.Select(f => $"{f.State}: {f.Note}")));
+
+        // the tab closed: its preview is deleted (UNIVERSUM's own temporary file)
+        mux.Confirm = _ => true;
+        mux.CloseSettingsCommand.Execute(set);
+        Check(!File.Exists(preview), "mega/mux: the preview went with its tab");
+        services.Mega.Remove(batch);
+        services.NotifyMegaChanged();
+    }
+
     private static async Task TestMultiplexerAsync(MainViewModel model, MainWindow window, AppServices services, string work)
     {
         var srt = Path.Combine(work, "titulky-sk.srt");

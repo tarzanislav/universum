@@ -5,6 +5,7 @@ using Universum.Core.Execution;
 using Universum.Core.IO;
 using Universum.Core.Library;
 using Universum.Core.Media;
+using Universum.Core.Muxing;
 using Universum.Core.Rules;
 
 namespace Universum.Core.Mega;
@@ -61,6 +62,49 @@ public enum MegaFileState
 /// last change, its tracks) and every decision about it – the track decisions (by track ID), the title, the episode.
 /// Before the run the file is read again; it is written only when it is still the same file.
 /// </summary>
+/// <summary>Which page a file of a batch came from (owner, 1. 11. 2026: MEGA takes Hromadné, Single and Zlučovanie).</summary>
+public enum MegaSource
+{
+    Batch,
+    Single,
+    Mux,
+}
+
+/// <summary>A file read by a result kept for later, as it was then (a changed or missing one stops the result).</summary>
+public sealed record MegaStamp(string Path, long Size, DateTime ModifiedUtc)
+{
+    public static MegaStamp Of(string path)
+    {
+        var info = new FileInfo(path);
+        return new MegaStamp(path, info.Exists ? info.Length : -1, info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue);
+    }
+
+    [JsonIgnore]
+    public bool Unchanged
+    {
+        get
+        {
+            var info = new FileInfo(Path);
+            return info.Exists && info.Length == Size && info.LastWriteTimeUtc == ModifiedUtc;
+        }
+    }
+}
+
+/// <summary>
+/// A result of Zlučovanie kept for MEGA spracovanie (owner, 1. 11. 2026): its whole recipe – the inputs, the tracks taken
+/// with their names, languages, flags and options, chapters, attachments, the title and where it is written – and every
+/// file it reads as it was when it was sent.
+/// </summary>
+public sealed record MegaMux(MuxSpec Spec, IReadOnlyList<MegaStamp> Inputs)
+{
+    /// <summary>The recipe of the whole result (never a preview) with the files it reads now.</summary>
+    public static MegaMux Of(MuxSpec spec) =>
+        new(spec with { PreviewParts = null }, [.. spec.InputPaths().Distinct(Paths.Comparer).Select(MegaStamp.Of)]);
+
+    /// <summary>The first file that changed or is missing; null when all are as they were.</summary>
+    public string? Changed() => Inputs.FirstOrDefault(i => !i.Unchanged)?.Path;
+}
+
 public sealed class MegaFile
 {
     public required string Path { get; init; }
@@ -122,6 +166,19 @@ public sealed class MegaFile
     /// <summary>Where the result was planned when the batch was made (shown on the page).</summary>
     public string PlannedPath { get; init; } = "";
 
+    /// <summary>The page it came from (older batches: Hromadné spracovanie).</summary>
+    public MegaSource Source { get; init; }
+
+    /// <summary>The original is kept whatever the batch does with its originals (Single spracovanie, Zlučovanie).</summary>
+    public bool KeepOriginal { get; init; }
+
+    /// <summary>A result of Zlučovanie: written by the multiplexer from its recipe; null: a file written by the rules.</summary>
+    public MegaMux? Mux { get; init; }
+
+    /// <summary>A file of Hromadné spracovanie (it can be opened there again).</summary>
+    [JsonIgnore]
+    public bool FromBatch => Source == MegaSource.Batch && Mux is null;
+
     public MegaFileState State { get; set; }
 
     /// <summary>Why it was skipped, the tool's message, or where the result is.</summary>
@@ -144,6 +201,59 @@ public sealed class MegaFile
         Timings = Timings,
         Names = Names,
     };
+
+    /// <summary>
+    /// A file of Single spracovanie (owner, 1. 11. 2026): the decisions made on the page, its title and place; the
+    /// original is always kept.
+    /// </summary>
+    public static MegaFile FromSingle(MediaFile file, TrackDecisions decisions, TitleInfo title, EpisodeNumber? episode, string? addition, bool revision,
+        RuleProfile profile, string plannedPath)
+    {
+        var info = new FileInfo(file.Path);
+        return new MegaFile
+        {
+            Path = file.Path,
+            Size = info.Length,
+            ModifiedUtc = info.LastWriteTimeUtc,
+            Structure = FileProcessor.StructureOf(file),
+            Title = title,
+            Episode = episode,
+            Languages = decisions.Languages.ToDictionary(),
+            Forced = decisions.Forced.ToDictionary(),
+            Removed = [.. decisions.Removed],
+            Kept = [.. decisions.Kept],
+            Order = [.. decisions.Order],
+            Timings = decisions.Timings.ToDictionary(),
+            Names = decisions.Names.ToDictionary(),
+            PlannedPath = plannedPath,
+            Addition = addition,
+            Revision = revision,
+            Profile = profile,
+            Externals = file.Tracks.Where(t => t.ExternalFile is not null).Select(MegaExternal.Of).ToList(),
+            Source = MegaSource.Single,
+            KeepOriginal = true,
+        };
+    }
+
+    /// <summary>A result of Zlučovanie (owner, 1. 11. 2026): its recipe; the files it reads are never deleted.</summary>
+    public static MegaFile FromMux(MuxSpec spec, TitleInfo title, EpisodeNumber? episode, string plannedPath)
+    {
+        var first = spec.Sources[0].File.Path;
+        var info = new FileInfo(first);
+        return new MegaFile
+        {
+            Path = first,
+            Size = info.Exists ? info.Length : -1,
+            ModifiedUtc = info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue,
+            Structure = "",
+            Title = title,
+            Episode = episode,
+            PlannedPath = plannedPath,
+            Source = MegaSource.Mux,
+            KeepOriginal = true,
+            Mux = MegaMux.Of(spec),
+        };
+    }
 
     /// <summary>A prepared file of Hromadné spracovanie (it has its place in the library and something to do).</summary>
     public static MegaFile From(BatchItem item, RuleProfile? profile = null)
@@ -298,7 +408,8 @@ public sealed class MegaStore
         var reserved = new Dictionary<string, MegaBatch>(Paths.Comparer);
         foreach (var batch in _batches.Where(b => b.IsOpen && b != except))
         {
-            foreach (var file in batch.Files.Where(f => f.State == MegaFileState.Waiting))
+            // a result of Zlučovanie only reads its files: one source may give several results
+            foreach (var file in batch.Files.Where(f => f.State == MegaFileState.Waiting && f.Mux is null))
             {
                 reserved.TryAdd(System.IO.Path.GetFullPath(file.Path), batch);
             }
@@ -353,7 +464,7 @@ public sealed class MegaStore
         foreach (var item in items.Where(i => i.NeedsWork && i.Title is not null && !reserved.ContainsKey(System.IO.Path.GetFullPath(i.File.Path))))
         {
             var file = MegaFile.From(item, profile);
-            var at = batch.Files.FindIndex(f => Paths.Same(f.Path, file.Path));
+            var at = batch.Files.FindIndex(f => f.FromBatch && Paths.Same(f.Path, file.Path));
             if (at >= 0)
             {
                 batch.Files[at] = file;
@@ -367,6 +478,78 @@ public sealed class MegaStore
         }
 
         batch.TemplateJson = templateJson;
+        Save();
+        return (added, changed);
+    }
+
+    /// <summary>
+    /// A new batch of files of Single spracovanie or results of Zlučovanie (owner, 1. 11. 2026); a file of Single already
+    /// in an open batch is left out (null when nothing is left).
+    /// </summary>
+    public MegaBatch? Add(string name, string libraryRoot, RuleProfile profile, OriginalsMode originals, IEnumerable<MegaFile> files)
+    {
+        var reserved = Reserved();
+        var taken = files.Where(f => f.Mux is not null || !reserved.ContainsKey(System.IO.Path.GetFullPath(f.Path))).ToList();
+        if (taken.Count == 0)
+        {
+            return null;
+        }
+
+        var batch = new MegaBatch
+        {
+            Number = _batches.Count == 0 ? 1 : _batches.Max(b => b.Number) + 1,
+            Name = name,
+            LibraryRoot = libraryRoot,
+            Profile = profile,
+            Originals = originals,
+            Files = taken,
+        };
+        _batches.Add(batch);
+        Save();
+        return batch;
+    }
+
+    /// <summary>
+    /// Files of Single spracovanie or results of Zlučovanie added to a waiting batch: a file of Single the batch has is
+    /// replaced with its new decisions; a result of Zlučovanie is always added. Returns the files added and changed;
+    /// a file of Single in another open batch stays out.
+    /// </summary>
+    public (int Added, int Changed) Put(MegaBatch batch, IEnumerable<MegaFile> files)
+    {
+        if (!batch.IsOpen || batch.State == MegaBatchState.Queued || batch.IsBeingEdited)
+        {
+            throw new InvalidOperationException("Only a waiting batch can be changed.");
+        }
+
+        var reserved = Reserved(batch);
+        var (added, changed) = (0, 0);
+        foreach (var file in files)
+        {
+            if (file.Mux is not null)
+            {
+                batch.Files.Add(file);
+                added++;
+                continue;
+            }
+
+            if (reserved.ContainsKey(System.IO.Path.GetFullPath(file.Path)))
+            {
+                continue;
+            }
+
+            var at = batch.Files.FindIndex(f => f.Mux is null && Paths.Same(f.Path, file.Path));
+            if (at >= 0)
+            {
+                batch.Files[at] = file;
+                changed++;
+            }
+            else
+            {
+                batch.Files.Add(file);
+                added++;
+            }
+        }
+
         Save();
         return (added, changed);
     }

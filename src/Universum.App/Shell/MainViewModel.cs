@@ -282,6 +282,8 @@ public sealed class MainViewModel : ObservableObject
         await handling;
         _ = DailyUpdateAsync();
         _services.EnsureSortingFolders();
+        // previews of Zlučovanie older than a week (UNIVERSUM's own temporary files)
+        _ = Task.Run(() => _services.ClearOldPreviews());
         _ = _services.InputWatch.ScanAsync();
 
         try

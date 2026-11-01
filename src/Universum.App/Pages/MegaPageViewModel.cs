@@ -40,7 +40,7 @@ public sealed class MegaPageViewModel : ObservableObject
                                                                                    !batch.IsOpen && Originals(batch).Count > 0);
         EditCommand = new RelayCommand(() => EditRequested?.Invoke(_selected!.Batch),
             () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } batch &&
-                  batch.Files.Any(f => f.State == MegaFileState.Waiting));
+                  batch.Files.Any(f => f.State == MegaFileState.Waiting && f.FromBatch));
         services.MegaChanged += Load;
         Load();
         _message = services.MegaProblem;
@@ -114,7 +114,7 @@ public sealed class MegaPageViewModel : ObservableObject
     public AsyncRelayCommand DeleteOriginalsCommand { get; private set; } = null!;
 
     private static IReadOnlyList<WrittenOriginal> Originals(MegaBatch batch) =>
-        batch.Files.Where(f => !f.OriginalRemoved && f.ResultPath is not null && f.State is MegaFileState.Done or MegaFileState.AlreadyInLibrary && File.Exists(f.Path))
+        batch.Files.Where(f => !f.KeepOriginal && !f.OriginalRemoved && f.ResultPath is not null && f.State is MegaFileState.Done or MegaFileState.AlreadyInLibrary && File.Exists(f.Path))
             .Select(f => new WrittenOriginal(f.Path, f.Size, f.ModifiedUtc, f.ResultPath!)).ToList();
 
     private async Task DeleteOriginalsAsync()
@@ -184,7 +184,9 @@ public sealed class MegaPageViewModel : ObservableObject
         }
 
         var inspector = _services.Inspector(installation);
-        var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals == OriginalsMode.DeleteAutomatically), (path, token) => inspector.InspectAsync(path, token), b => JobRow.OnUi(() => Saved(b)));
+        // files of Single spracovanie keep their originals; results of Zlučovanie are written by the multiplexer (owner, 1. 11. 2026)
+        var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals == OriginalsMode.DeleteAutomatically), (path, token) => inspector.InspectAsync(path, token),
+            b => JobRow.OnUi(() => Saved(b)), keeping: _services.Processor(installation, deleteOriginals: false), mux: new Core.Muxing.Multiplexer(installation, _services.Runner).MuxAsync);
         job.Changed += j =>
         {
             if (j.IsFinished)
@@ -294,7 +296,8 @@ public sealed class MegaPageViewModel : ObservableObject
         // also files a cancelled run did not reach: they were free meanwhile
         foreach (var file in batch.Files.Where(f => f.State is MegaFileState.Skipped or MegaFileState.Failed or MegaFileState.Cancelled or MegaFileState.Waiting))
         {
-            if (taken.Contains(Path.GetFullPath(file.Path)))
+            // a result of Zlučovanie only reads its files
+            if (file.Mux is null && taken.Contains(Path.GetFullPath(file.Path)))
             {
                 file.State = MegaFileState.Skipped;
                 file.Note = "medzičasom v inej dávke alebo úlohe – vynechaný";
@@ -565,9 +568,17 @@ public sealed class MegaFileRow(MegaFile file) : ObservableObject
 {
     public MegaFile File { get; } = file;
 
-    public string Name => Path.GetFileName(File.Path);
+    public string Name => File.Mux is { } mux ? $"{File.Title.Name} – zlúčené z {Texts.Count(mux.Spec.Sources.Count, "súboru", "súborov", "súborov")}" : Path.GetFileName(File.Path);
 
     public string Folder => Path.GetDirectoryName(File.Path) ?? "";
+
+    /// <summary>The page it came from: Hromadné spracovanie, Single spracovanie, Zlučovanie.</summary>
+    public string Source => File.Source switch
+    {
+        MegaSource.Single => "Single spracovanie",
+        MegaSource.Mux => "Zlučovanie",
+        _ => "Hromadné spracovanie",
+    };
 
     public string Target => File.PlannedPath;
 

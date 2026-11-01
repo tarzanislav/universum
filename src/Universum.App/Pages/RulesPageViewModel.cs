@@ -62,6 +62,8 @@ public sealed class RulesPageViewModel : ObservableObject
         ReviseCommand = new AsyncRelayCommand(() => ApplyAsync(revision: true), () => CanRevise && CanApply());
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
         QueueCommand = new RelayCommand(Enqueue, CanApply);
+        Mega = new MegaSender(services);
+        SendToMegaCommand = new RelayCommand(SendToMega, CanSendToMega);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
         Tmdb.ConfirmationChanged += UpdateTarget;
@@ -149,6 +151,11 @@ public sealed class RulesPageViewModel : ObservableObject
 
     /// <summary>Adds the file to the job queue instead of processing it now.</summary>
     public RelayCommand QueueCommand { get; }
+
+    /// <summary>Where Odoslať do MEGA sends the file (owner, 1. 11. 2026): a new batch or a waiting one.</summary>
+    public MegaSender Mega { get; }
+
+    public RelayCommand SendToMegaCommand { get; }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
@@ -728,6 +735,41 @@ public sealed class RulesPageViewModel : ObservableObject
         UpdateTarget();
     }
 
+    // MEGA keeps the original of a file of Single spracovanie: the choice of the originals is not needed
+    private bool CanSendToMega() =>
+        !Busy && _subtitleReading is null && _file is not null && _plan is not null && !_plan.Target.IsBlocked && _placement is not null && _services.Library is not null &&
+        File.Exists(_plan.Target.Source.Path) && !(_plan.Method == WriteMethod.None && _placement.Holds(_plan.Target.Source.Path, SourceSize())) &&
+        _placement.EstimatedPathLength(SourceSize()) <= LibraryNames.MaxPathLength;
+
+    /// <summary>
+    /// Odoslať do MEGA (owner, 1. 11. 2026): the file with every decision of the page – languages, kept and ordered tracks,
+    /// forced, names, title, episode and addition – is written later by MEGA spracovanie; its original is kept.
+    /// </summary>
+    private void SendToMega()
+    {
+        if (!CanSendToMega() || TitleGuess.Typed(_kind, TitleText) is not { Problem: null } title || _services.Library is not { } library)
+        {
+            return;
+        }
+
+        var file = Core.Mega.MegaFile.FromSingle(_file!, Decisions(), title, EpisodeNumber.TryParse(EpisodeText), _addition.Length > 0 ? _addition : null, revision: false,
+            _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())));
+        Result = Mega.Send([file], "Single spracovanie: " + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), library.Root, _services.Profile);
+        _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
+    }
+
+    // the decisions of the page: the languages read from the subtitles, then the user's choices over them
+    private TrackDecisions Decisions()
+    {
+        var languages = _detected.ToDictionary(d => d.Key, d => LanguageTag.FromCode(d.Value.Language));
+        foreach (var (id, chosen) in _languages)
+        {
+            languages[id] = chosen;
+        }
+
+        return new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names };
+    }
+
     private bool CanApply() =>
         !Busy && _subtitleReading is null && _plan is not null && !_plan.Target.IsBlocked && _services.Settings.OriginalHandling is not null && _placement is not null &&
         File.Exists(_plan.Target.Source.Path) &&
@@ -898,6 +940,7 @@ public sealed class RulesPageViewModel : ObservableObject
         ApplyCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
         QueueCommand?.NotifyCanExecuteChanged();
+        SendToMegaCommand?.NotifyCanExecuteChanged();
         ReviseCommand?.NotifyCanExecuteChanged();
         ChooseOutputDirectoryCommand.NotifyCanExecuteChanged();
     }

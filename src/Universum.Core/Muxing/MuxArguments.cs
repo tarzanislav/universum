@@ -11,6 +11,10 @@ public static class MuxArguments
     {
         // owner, 29. 10. 2026: no segment title unless the user typed one – mkvmerge would take it from the first file
         var arguments = new List<string> { "--gui-mode", "--output", outputPath, "--title", spec.Title ?? "" };
+        if (spec.PreviewParts is { Length: > 0 } parts)
+        {
+            arguments.AddRange(["--split", parts]);
+        }
 
         var fileIds = spec.FileIds();
         for (var index = 0; index < spec.Sources.Count; index++)

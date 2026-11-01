@@ -1,4 +1,4 @@
-# Návod – EDITACE VIDEOSTOP
+# Nápověda – EDITACE VIDEOSTOP
 Skupina **EDITACE VIDEOSTOP (video, audio, titulky)** slouží k úpravě jednotlivých stop filmu: střih a otočení obrazu,
 napasování dabingu, posun a opravu titulků. Vše si nejprve **prohlédnete a poslechnete v přehrávači** a teprve potom uložíte.
 Originál se **nikdy nemění** – výsledek je vždy **nový soubor** (video v knihovně, titulky vedle původních).

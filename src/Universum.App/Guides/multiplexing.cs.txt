@@ -1,4 +1,4 @@
-# Návod – MULTIPLEXING
+# Nápověda – MULTIPLEXING
 Skupina **MULTIPLEXING** slouží ke skládání a úpravě souborů MKV: **sloučíte** stopy z více souborů do jednoho,
 opravíte **hlavičku** (názvy, jazyky, příznaky stop), upravíte **kapitoly** a prohlédnete si **informace** o stopách.
 Originály se **nikdy nemění** – výsledek je vždy **nový soubor** (vedle zdroje nebo v knihovně).

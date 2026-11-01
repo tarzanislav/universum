@@ -1,4 +1,4 @@
-# Návod – NOVINKY A OBSAH
+# Nápověda – NOVINKY A OBSAH
 Skupina **NOVINKY A OBSAH** vám ukáže, co nového vychází: **premiéry** filmů a seriálů, **nové epizody** seriálů,
 vaše **seznamy z HISTRA**, **plakáty z TMDB** a **zajímavosti** ze světa filmu. Odsud pošlete titul rovnou ke
 zpracování a z vašich výběrů čerpá i Přehled.

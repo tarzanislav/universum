@@ -1,4 +1,4 @@
-# Guide – TRACK EDITING
+# Help – TRACK EDITING
 The **TRACK EDITING (video, audio, subtitles)** group is for editing the individual tracks of a film: cutting and rotating the picture,
 fitting a dub, shifting and fixing subtitles. You **watch and listen to everything in the player** first and only then save.
 The original **never changes** – the result is always a **new file** (the video in the library, subtitles next to the original ones).

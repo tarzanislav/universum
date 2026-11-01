@@ -1,4 +1,4 @@
-# Návod – ŠTATISTIKA
+# Nápoveda – ŠTATISTIKA
 Skupina **ŠTATISTIKA** ukazuje, čo UNIVERSUM práve robí a čo už urobilo: **frontu úloh**, **výstup nástrojov** a
 **záznamy spracovania** slovami. Patria sem aj **Nastavenia** – knižnica, vstupný priečinok, kľúče služieb, jazyk a aktualizácie.
 

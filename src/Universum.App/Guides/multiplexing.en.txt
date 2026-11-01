@@ -1,4 +1,4 @@
-# Guide – MULTIPLEXING
+# Help – MULTIPLEXING
 The **MULTIPLEXING** group is for putting together and editing MKV files: you **merge** tracks from several files into one,
 fix the **header** (track names, languages, flags), edit **chapters** and look at **information** about the tracks.
 The originals **never change** – the result is always a **new file** (next to the source or in the library).

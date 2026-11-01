@@ -1,4 +1,4 @@
-# Guide – TEMPLATES
+# Help – TEMPLATES
 The **TEMPLATES** group adjusts a video according to the *UNIVERSUM rules* – languages and track order, flags, track names, the file name and its place in the library. You can process a single file, a whole folder at once, or prepare batches for later.
 
 !info The original **never changes** – the result is always a **new file** in the library. Originals can be deleted only in Batch and MEGA processing, only if you choose so yourself, and always only **to the Windows Recycle Bin**.

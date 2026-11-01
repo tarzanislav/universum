@@ -1,4 +1,4 @@
-# Guide – NOTES
+# Help – NOTES
 The **NOTES** group brings the calendar, tasks and notes together. It is all **one store** – a task with a due date is
 automatically in the Calendar too, and a note of a day in Notes too. Nothing is sent anywhere; the data stays on your computer.
 

@@ -3010,6 +3010,13 @@ internal static class Translations
         ["interpunkcia"] = "interpunkce",
         ["pravopis"] = "pravopis",
         ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} slov, {2:N0} dvojic slov",
+        // NÁPOVEDA: one group of the guides (1. 11. 2026)
+        ["NÁPOVEDA"] = "NÁPOVĚDA",
+        ["Novinky a obsah"] = "Novinky a obsah",
+        ["Multiplexing"] = "Multiplexing",
+        ["Editácia videostôp"] = "Editace videostop",
+        ["Šablóny (template)"] = "Šablony (template)",
+        ["Štatistika"] = "Statistika",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6016,5 +6023,12 @@ internal static class Translations
         ["interpunkcia"] = "punctuation",
         ["pravopis"] = "spelling",
         ["{0} {1:N0} slov, {2:N0} dvojíc slov"] = "{0} {1:N0} words, {2:N0} word pairs",
+        // NÁPOVEDA: one group of the guides (1. 11. 2026)
+        ["NÁPOVEDA"] = "HELP",
+        ["Novinky a obsah"] = "News and content",
+        ["Multiplexing"] = "Multiplexing",
+        ["Editácia videostôp"] = "Track editing",
+        ["Šablóny (template)"] = "Templates",
+        ["Štatistika"] = "Statistics",
     };
 }

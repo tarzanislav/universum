@@ -164,11 +164,12 @@ internal static class SelfTest
         model.Settings.UiLanguage = "sk";
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti, Návod | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky, Návod | " +
-              "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie, Návod | " +
-              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy, Návod | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie, Návod | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia, Návod",
-            "left rail: Dashboard, then the groups Novinky a obsah, Poznámky, Multiplexing, Šablóny and Štatistika, each with its guide last");
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky | " +
+              "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
+              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia | " +
+              "NÁPOVEDA: Novinky a obsah, Poznámky, Multiplexing, Editácia videostôp, Šablóny (template), Štatistika",
+            "left rail: Dashboard, the groups, then NÁPOVEDA with the guides in the order of the groups (owner, 1. 11. 2026)");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 

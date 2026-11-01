@@ -1,4 +1,4 @@
-# Návod – POZNÁMKY
+# Nápoveda – POZNÁMKY
 Skupina **POZNÁMKY** spája kalendár, úlohy a poznámky do jedného celku. Všetko je **jedno úložisko** – úloha s termínom je
 automaticky aj v Kalendári, poznámka k dňu aj v Poznámkach. Nič sa nikam neposiela, údaje sú len vo vašom počítači.
 

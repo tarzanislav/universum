@@ -2533,47 +2533,64 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowsProgress));
         OnPropertyChanged(nameof(StopText));
         StopCommand.NotifyCanExecuteChanged();
-        int recognised = 0, failed = 0, done = 0;
+        int recognised = 0, failed = 0;
         var notes = new List<string>();
+
+        // the results as they come (also the ones decided before a stop) – kept on the window's thread at the end
+        var heard = new System.Collections.Concurrent.ConcurrentDictionary<int, SpokenLanguageResult>();
+        var applied = new HashSet<int>();
+        void Apply()
+        {
+            foreach (var (index, result) in heard.OrderBy(h => h.Key))
+            {
+                if (!applied.Add(index))
+                {
+                    continue;
+                }
+
+                var target = targets[index];
+                if (result.Language is { } code)
+                {
+                    SpeechTargets.Keep(target, new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
+                    {
+                        Detail = result.Doubt,
+                        NeedsOwnConfirmation = result.NeedsOwnConfirmation,
+                    });
+                    recognised++;
+                }
+                else
+                {
+                    failed++;
+                    notes.Add($"{Path.GetFileName(target.File.Path)} – {Texts.Slot(target.Key)}: {result.Doubt}");
+                }
+            }
+        }
+
         try
         {
             if (targets.Count > 0)
             {
                 RunState = Loc.T("Overujem nástroje rozpoznávania reči…");
                 var tools = await _services.SpeechAsync(cancellation.Token);
+                RunState = Loc.T("Pripravujem stopy na počúvanie…");
+                var tracks = new List<SpeechTrack>(targets.Count);
                 foreach (var target in targets)
                 {
-                    var name = $"{Path.GetFileName(target.File.Path)} – {Texts.Slot(target.Key)}";
-                    var where = Loc.F("Počúvam {0}/{1}: {2}", done + 1, targets.Count, name);
-                    var finished = done;
-                    void Show(SpeechProgress step)
-                    {
-                        // the whole recognition: the tracks done and the part of this one
-                        Progress = (finished + step.Fraction) / targets.Count;
-                        RunState = Loc.F("{0} – {1} – {2:0} %", where, Stage(step.Stage), Progress * 100);
-                    }
-
-                    Show(new SpeechProgress(0, SpeechStage.Cutting));
-                    var gauge = new Progress<SpeechProgress>(Show);
                     var ordinal = await _services.AudioOrdinalAsync(target.File.Path, target.Track, target.Key.Ordinal, cancellation.Token);
-                    var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, ordinal, target.File.Duration, gauge, cancellation.Token);
-                    if (result.Language is { } code)
-                    {
-                        SpeechTargets.Keep(target, new LanguageEvidence(LanguageTag.FromCode(code), Confidence.Medium, EvidenceSource.Speech)
-                        {
-                            Detail = result.Doubt,
-                            NeedsOwnConfirmation = result.NeedsOwnConfirmation,
-                        });
-                        recognised++;
-                    }
-                    else
-                    {
-                        failed++;
-                        notes.Add($"{name}: {result.Doubt}");
-                    }
-
-                    done++;
+                    tracks.Add(new SpeechTrack(target.File.Path, ordinal, target.File.Duration));
                 }
+
+                // owner, 1. 11. 2026: as fast as possible – all tracks at once (the next one is cut while one is heard, Czech
+                // against Slovak for all of them by one run of the accurate model); a gauge 0–100 % with what it does
+                var names = targets.Select(t => $"{Path.GetFileName(t.File.Path)} – {Texts.Slot(t.Key)}").ToList();
+                var gauge = new Progress<(int Track, SpeechProgress Step)>(p =>
+                {
+                    Progress = p.Step.Fraction;
+                    RunState = Loc.F("{0} – {1} – {2:0} %", Loc.F("Počúvam {0}/{1}: {2}", p.Track + 1, targets.Count, names[Math.Clamp(p.Track, 0, names.Count - 1)]),
+                        Stage(p.Step.Stage), p.Step.Fraction * 100);
+                });
+                await SpokenLanguage.DetectManyAsync(tools, _services.Runner, tracks, (track, result) => heard[track] = result, gauge, cancellation.Token);
+                Apply();
             }
 
             Replan();
@@ -2585,11 +2602,13 @@ public sealed class BatchPageViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            Apply();
             Replan();
             RunState = Loc.F("Rozpoznávanie reči zastavené – rozpoznané doteraz: {0} z {1}.", recognised, targets.Count);
         }
         catch (SpeechException ex)
         {
+            Apply();
             Replan();
             RunState = ex.Message + (recognised > 0 ? Loc.F(" (rozpoznané doteraz: {0})", recognised) : "");
         }

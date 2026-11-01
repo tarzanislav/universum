@@ -145,7 +145,7 @@ public sealed class SpeechTests
             var steps = new List<SpeechProgress>();
             var result = await SpokenLanguage.DetectAsync(tools, dubbed, "film.mkv", 0, TimeSpan.FromMinutes(100), new Gauge(steps.Add));
             Assert.Equal("sk", result.Language);
-            Assert.True(dubbed.Accurate == 1 && dubbed.Transcribed.SequenceEqual(["cs"]), "the clip written down once by the accurate model: " + string.Join(",", dubbed.Transcribed));
+            Assert.True(dubbed.Accurate == 1 && dubbed.AccurateRuns == 1 && dubbed.Transcribed.SequenceEqual(["cs"]), "the clip written down once by the accurate model: " + string.Join(",", dubbed.Transcribed));
             Assert.True(result.Doubt?.StartsWith("podľa prepisu slovenčina, nie čeština", StringComparison.Ordinal) == true && !result.NeedsOwnConfirmation, "decided, the change noted: " + result.Doubt);
             var czech = new StandIn(tools, _ => 0.3, "sk", 0.6, _ => 0.7) { Said = "Malá vesnice pod horami se probouzí. Starý mlynář otevírá dveře a říká, že jsme doma." };
             Assert.Equal("cs", (await SpokenLanguage.DetectAsync(tools, czech, "film.mkv", 0, TimeSpan.FromMinutes(100))).Language, "Czech words, ř: Czech");
@@ -158,6 +158,42 @@ public sealed class SpeechTests
         {
             Directory.Delete(folder, true);
         }
+    }
+
+    [Test]
+    public async Task ManyTracksAtOnce()
+    {
+        var folder = NewFolder();
+        try
+        {
+            // an English track and two Slovak ones the quick model hears as Czech: the accurate model runs once for both
+            var tools = FakeTools(folder, accurate: true);
+            var runner = new StandIn(tools, _ => 0.3, null, 0, _ => 0.7)
+            {
+                Languages = ["en", "en", "en", "cs", "cs", "cs", "cs", "cs", "cs"],
+                Said = "Vitajte pri dnešnom vymyslenom príbehu, dedina sa prebúdza.",
+            };
+            var tracks = new[] { new SpeechTrack("a.mkv", 0, TimeSpan.FromMinutes(90)), new SpeechTrack("b.mkv", 1, TimeSpan.FromMinutes(95)), new SpeechTrack("c.mkv", 0, TimeSpan.FromMinutes(100)) };
+            var decided = new List<(int, string?)>();
+            var steps = new List<double>();
+            var results = await SpokenLanguage.DetectManyAsync(tools, runner, tracks, (t, r) => decided.Add((t, r.Language)),
+                new ManyGauge(p => steps.Add(p.Step.Fraction)));
+            Assert.True(results.Select(r => r.Language).SequenceEqual(["en", "sk", "sk"]), string.Join(", ", results.Select(r => r.Language)));
+            Assert.True(runner.AccurateRuns == 1 && runner.Accurate == 2, $"the accurate model loaded once for both ({runner.AccurateRuns} runs, {runner.Accurate} clips)");
+            Assert.True(decided.First() == (0, "en") && decided.Count == 3, "English decided at once, the others at the end: " + string.Join(" ", decided));
+            Assert.True(runner.Cuts.Count == 3 && runner.Cuts.All(c => c.Contains(" -y ", StringComparison.Ordinal)), "each track cut once (three pieces a run)");
+            Assert.True(steps.Count > 5 && steps.Zip(steps.Skip(1)).All(p => p.Second >= p.First - 1e-9) && Math.Abs(steps[^1] - 1) < 1e-9, "the gauge only goes forward, to 100 %");
+            Assert.True(!Directory.EnumerateDirectories(Path.GetTempPath(), "UNIVERSUM-speech-*").Any(), "everything deleted");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
+    }
+
+    private sealed class ManyGauge(Action<(int Track, SpeechProgress Step)> report) : IProgress<(int Track, SpeechProgress Step)>
+    {
+        public void Report((int Track, SpeechProgress Step) value) => report(value);
     }
 
     [Test]
@@ -411,21 +447,33 @@ public sealed class SpeechTests
             var arguments = request.Arguments.ToList();
             if (arguments.Contains("-ojf"))
             {
+                // one piece, or many (the accurate model: "-f" and "-of" for each)
                 var as_ = arguments[arguments.IndexOf("-l") + 1];
-                Transcribed.Add(as_);
-                var input = arguments[arguments.IndexOf("-f") + 1] == "-" ? request.StandardInputFile : Path.Combine(request.WorkingDirectory!, arguments[arguments.IndexOf("-f") + 1]);
-                Assert.True(File.Exists(input) && request.WorkingDirectory == Path.GetDirectoryName(input), "the piece is still there, the output next to it");
+                var inputs = arguments.Select((a, i) => (a, i)).Where(x => x.a == "-f").Select(x => arguments[x.i + 1]).ToList();
+                var outputs = arguments.Select((a, i) => (a, i)).Where(x => x.a == "-of").Select(x => arguments[x.i + 1]).ToList();
                 Assert.True(arguments.Contains("-bs") && arguments.Contains("-nf"), "the surest words one by one, no second try");
                 if (arguments.Contains("-ac"))
                 {
-                    Accurate++;
+                    AccurateRuns++;
                 }
-                if (sureOf is not null)
+
+                for (var k = 0; k < inputs.Count; k++)
                 {
-                    var p = sureOf(as_).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    var tokens = string.Join(",", Enumerable.Range(0, 8).Select(i => $$"""{"text":" slovo{{i}}","id":{{100 + i}},"p":{{p}}}""").Prepend("""{"text":"[_BEG_]","id":50365,"p":0.01}"""));
-                    File.WriteAllText(Path.Combine(request.WorkingDirectory!, arguments[arguments.IndexOf("-of") + 1] + ".json"),
-                        $$"""{"result":{"language":"{{as_}}"},"transcription":[{"text":" {{Said ?? "..."}}","tokens":[{{tokens}}]}]}""");
+                    Transcribed.Add(as_);
+                    var input = inputs[k] == "-" ? request.StandardInputFile : Path.Combine(request.WorkingDirectory!, inputs[k]);
+                    Assert.True(File.Exists(input) && request.WorkingDirectory == Path.GetDirectoryName(input), "the piece is still there, the output next to it");
+                    if (arguments.Contains("-ac"))
+                    {
+                        Accurate++;
+                    }
+
+                    if (sureOf is not null)
+                    {
+                        var p = sureOf(as_).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        var tokens = string.Join(",", Enumerable.Range(0, 8).Select(i => $$"""{"text":" slovo{{i}}","id":{{100 + i}},"p":{{p}}}""").Prepend("""{"text":"[_BEG_]","id":50365,"p":0.01}"""));
+                        File.WriteAllText(Path.Combine(request.WorkingDirectory!, outputs[k] + ".json"),
+                            $$"""{"result":{"language":"{{as_}}"},"transcription":[{"text":" {{Said ?? "..."}}","tokens":[{{tokens}}]}]}""");
+                    }
                 }
 
                 return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));
@@ -459,6 +507,9 @@ public sealed class SpeechTests
 
         /// <summary>Transcriptions by the accurate model (the encoder on a few seconds).</summary>
         public int Accurate { get; private set; }
+
+        /// <summary>Runs of the accurate model (it is loaded once a run).</summary>
+        public int AccurateRuns { get; private set; }
 
         private static void WriteWave(string path, double amplitude)
         {

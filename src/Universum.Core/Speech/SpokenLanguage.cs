@@ -66,6 +66,9 @@ public enum SpeechStage
 /// <summary>How far the recognition of one track is: 0–1 and what it does now (owner, 1. 11. 2026: a gauge 0–100 %).</summary>
 public readonly record struct SpeechProgress(double Fraction, SpeechStage Stage);
 
+/// <summary>An audio track to be heard: the file, the number of the track among its audio tracks (0 = the first), its length.</summary>
+public sealed record SpeechTrack(string Path, int AudioOrdinal, TimeSpan? Duration);
+
 /// <summary>
 /// Recognises the spoken language of an audio track: FFmpeg cuts short pieces from several places of the film (not
 /// only the beginning, where music often plays) as 16 kHz mono WAV, silent pieces are left out, whisper.cpp tells the
@@ -179,15 +182,179 @@ public static partial class SpokenLanguage
         }
     }
 
-    // the share of the gauge each part takes: the first three pieces cut and heard, the two more when they do not agree,
-    // Czech against Slovak by the accurate model (the rest of the gauge when it is not needed)
-    private static readonly (double Cut, double Hear)[] Rounds = [(0.08, 0.32), (0.04, 0.16)];
+    // the share of the listening each part takes: the first three pieces cut and heard, the two more when they do not
+    // agree (all of it when they do)
+    private static readonly (double Cut, double Hear)[] Rounds = [(0.2, 0.6), (0.05, 0.15)];
+
+    // the part of the gauge of one track the listening takes; the rest is Czech against Slovak when it is needed
+    private const double ListeningShare = 0.3;
+
+    // the accurate model weighs about this many times more than the listening of a track (for the gauge of many tracks)
+    private const double AccurateWeight = 2.5;
 
     private static async Task<SpokenLanguageResult> DetectInAsync(
         string folder, SpeechTools tools, IProcessRunner runner, string path, int audioOrdinal, TimeSpan? duration,
         IProgress<SpeechProgress>? progress, CancellationToken cancellationToken)
     {
-        var positions = Positions(duration);
+        var heard = await ListenAsync(folder, "", tools, runner, new SpeechTrack(path, audioOrdinal, duration), null,
+            (fraction, stage) => progress?.Report(new SpeechProgress(ListeningShare * fraction, stage)), cancellationToken).ConfigureAwait(false);
+        var decided = Settle(heard);
+        if (NeedsComparison(heard, decided) is not { } wave)
+        {
+            return decided;
+        }
+
+        // Czech or Slovak – also when the pieces split between them – is compared by transcription: by the accurate model
+        // (a few seconds of the clearest speech), by the quick one when the accurate one is not installed
+        progress?.Report(new SpeechProgress(ListeningShare, SpeechStage.CzechOrSlovak));
+        var comparison = tools.Accurate is not null
+            ? await CompareAccurateAsync(tools, runner, wave, f => progress?.Report(new SpeechProgress(ListeningShare + ((1 - ListeningShare) * f), SpeechStage.CzechOrSlovak)), cancellationToken).ConfigureAwait(false)
+            : await CompareCzechSlovakAsync(tools, runner, wave, cancellationToken).ConfigureAwait(false);
+        return comparison is null ? decided : WithComparison(decided, comparison);
+    }
+
+    /// <summary>
+    /// The languages of many audio tracks (owner, 1. 11. 2026: as fast as possible): the next track is cut while the
+    /// last one is heard, and Czech against Slovak is told for all of them in one run of the accurate model at the end (it
+    /// is loaded once). <paramref name="decided"/> gets each track's result as soon as it is final (the Czech or Slovak
+    /// ones at the end); a track that cannot be heard gets a result without a language and with the reason.
+    /// </summary>
+    /// <param name="progress">The track worked on and how far the whole is (0–1), reported often.</param>
+    /// <exception cref="SpeechException">A tool is missing, cannot start or does not finish in time.</exception>
+    public static async Task<IReadOnlyList<SpokenLanguageResult>> DetectManyAsync(
+        SpeechTools tools, IProcessRunner runner, IReadOnlyList<SpeechTrack> tracks, Action<int, SpokenLanguageResult>? decided = null,
+        IProgress<(int Track, SpeechProgress Step)>? progress = null, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(tools.Ffmpeg) || !File.Exists(tools.Whisper))
+        {
+            throw new SpeechException(CoreText.T("Nástroje rozpoznávania reči chýbajú – preinštalujte UNIVERSUM."));
+        }
+
+        string folder;
+        try
+        {
+            folder = Directory.CreateTempSubdirectory("UNIVERSUM-speech-").FullName;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new SpeechException(CoreText.T("Dočasný priečinok pre úseky zvuku sa nedá vytvoriť: ") + ex.Message, ex);
+        }
+
+        var results = new SpokenLanguageResult[tracks.Count];
+        Task<(string?[] Waves, string? Problem)>? next = null;
+        try
+        {
+            // the gauge: every track's listening, then the accurate model for each track that needs it (at first counted
+            // for every track; the second part shrinks to the tracks that need it)
+            var units = tracks.Count * (1 + AccurateWeight);
+            void Report(int track, double done, SpeechStage stage) => progress?.Report((track, new SpeechProgress(Math.Min(1, done / units), stage)));
+
+            var waiting = new List<(int Track, string Wave, SpokenLanguageResult Vote)>();
+            next = tracks.Count > 0 ? FirstCut(folder, tools, runner, tracks[0], 0, cancellationToken) : null;
+            for (var t = 0; t < tracks.Count; t++)
+            {
+                var cut = next!;
+                next = t + 1 < tracks.Count ? FirstCut(folder, tools, runner, tracks[t + 1], t + 1, cancellationToken) : null;
+                var track = t;
+                SpokenLanguageResult result;
+                try
+                {
+                    var heard = await ListenAsync(folder, Prefix(t), tools, runner, tracks[t], cut,
+                        (fraction, stage) => Report(track, track + fraction, stage), cancellationToken).ConfigureAwait(false);
+                    result = Settle(heard);
+                    if (NeedsComparison(heard, result) is { } wave)
+                    {
+                        if (tools.Accurate is not null)
+                        {
+                            // told with the others at the end
+                            waiting.Add((t, wave, result));
+                            continue;
+                        }
+
+                        Report(t, t + 1, SpeechStage.CzechOrSlovak);
+                        if (await CompareCzechSlovakAsync(tools, runner, wave, cancellationToken).ConfigureAwait(false) is { } comparison)
+                        {
+                            result = WithComparison(result, comparison);
+                        }
+                    }
+                }
+                catch (SpeechException ex)
+                {
+                    result = new SpokenLanguageResult(null, 0, [], ex.Message);
+                }
+
+                results[t] = result;
+                decided?.Invoke(t, result);
+            }
+
+            if (waiting.Count > 0)
+            {
+                var start = (double)tracks.Count;
+                units = tracks.Count + (waiting.Count * AccurateWeight);
+                Report(waiting[0].Track, start, SpeechStage.CzechOrSlovak);
+                var heard = await HearAccuratelyAsync(tools, runner, folder, waiting.Select(w => w.Wave).ToList(),
+                    (index, fraction) => Report(waiting[Math.Min(index, waiting.Count - 1)].Track, start + (AccurateWeight * fraction), SpeechStage.CzechOrSlovak),
+                    cancellationToken).ConfigureAwait(false);
+                for (var w = 0; w < waiting.Count; w++)
+                {
+                    var (track, _, vote) = waiting[w];
+                    var result = heard[w] is { } text ? WithComparison(vote, new CzechSlovakComparison(0, text, text) { Heard = text }) : vote;
+                    results[track] = result;
+                    decided?.Invoke(track, result);
+                }
+            }
+
+            progress?.Report((Math.Max(0, tracks.Count - 1), new SpeechProgress(1, SpeechStage.Done)));
+            return results;
+        }
+        catch (ProcessStartException ex)
+        {
+            throw new SpeechException(CoreText.T("Nástroj rozpoznávania reči sa nedá spustiť: ") + ex.Message, ex);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new SpeechException(CoreText.T("Nástroj rozpoznávania reči neskončil včas (súbor je možno na pomalom disku alebo v sieti) – skúste to znova."), ex);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new SpeechException(CoreText.T("Úsek zvuku sa nedá zapísať alebo prečítať: ") + ex.Message, ex);
+        }
+        finally
+        {
+            // a cut started ahead finishes (or stops) before its folder goes
+            if (next is not null)
+            {
+                try
+                {
+                    await next.ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or ProcessStartException or TimeoutException or IOException or UnauthorizedAccessException)
+                {
+                    // the track was not going to be heard
+                }
+            }
+
+            await DeleteFolderAsync(folder).ConfigureAwait(false);
+        }
+    }
+
+    // the pieces of a track named apart from the others in the one folder
+    private static string Prefix(int track) => $"t{track + 1}-";
+
+    // the first three pieces of a track, cut ahead (while the track before is heard)
+    private static Task<(string?[] Waves, string? Problem)> FirstCut(string folder, SpeechTools tools, IProcessRunner runner, SpeechTrack track, int index, CancellationToken cancellationToken) =>
+        CutAsync(folder, Prefix(index), tools, runner, track.Path, track.AudioOrdinal, Positions(track.Duration).Take(3).ToList(), 0, cancellationToken);
+
+    // what the pieces of a track heard: the pieces, the first complaint of a tool, the clearest Czech or Slovak piece
+    private sealed record Heard(List<SpeechPiece> Pieces, string? Problem, string? Clearest);
+
+    // the pieces of one track cut (the first three may be cut already) and heard by the quick model; the fraction of the
+    // listening reported (0–1)
+    private static async Task<Heard> ListenAsync(
+        string folder, string prefix, SpeechTools tools, IProcessRunner runner, SpeechTrack track, Task<(string?[] Waves, string? Problem)>? firstCut,
+        Action<double, SpeechStage> report, CancellationToken cancellationToken)
+    {
+        var positions = Positions(track.Duration);
         var pieces = new List<SpeechPiece>();
         string? problem = null;
         (string Wave, double Probability)? clearest = null; // the surest Czech or Slovak piece, kept for the comparison
@@ -202,12 +369,13 @@ public static partial class SpokenLanguage
             }
 
             var (cutShare, hearShare) = Rounds[round];
-            progress?.Report(new SpeechProgress(gauge, SpeechStage.Cutting));
-            var first = pieces.Count;
-            var (waves, cutProblem) = await CutAsync(folder, tools, runner, path, audioOrdinal, batch, first, cancellationToken).ConfigureAwait(false);
+            report(gauge, SpeechStage.Cutting);
+            var (waves, cutProblem) = round == 0 && firstCut is not null
+                ? await firstCut.ConfigureAwait(false)
+                : await CutAsync(folder, prefix, tools, runner, track.Path, track.AudioOrdinal, batch, pieces.Count, cancellationToken).ConfigureAwait(false);
             problem ??= cutProblem;
             gauge += cutShare;
-            progress?.Report(new SpeechProgress(gauge, SpeechStage.Listening));
+            report(gauge, SpeechStage.Listening);
 
             // silence (or nothing after the end of a shorter film) is not given to whisper
             var loud = new List<string>();
@@ -226,7 +394,7 @@ public static partial class SpokenLanguage
 
             var start = gauge;
             var (heard, hearProblem) = await HearAsync(tools, runner, folder, loud,
-                count => progress?.Report(new SpeechProgress(start + (hearShare * count / Math.Max(1, loud.Count)), SpeechStage.Listening)), cancellationToken).ConfigureAwait(false);
+                count => report(start + (hearShare * count / Math.Max(1, loud.Count)), SpeechStage.Listening), cancellationToken).ConfigureAwait(false);
             problem ??= hearProblem;
             gauge = start + hearShare;
             for (var i = 0; i < batch.Count; i++)
@@ -254,32 +422,96 @@ public static partial class SpokenLanguage
                 }
             }
 
-            progress?.Report(new SpeechProgress(gauge, SpeechStage.Listening));
+            report(gauge, SpeechStage.Listening);
         }
 
-        if (pieces.All(p => p is { Language: null, Silent: false }) && problem is not null)
-        {
-            throw new SpeechException(CoreText.T("Reč sa nepodarilo spracovať: ") + problem);
-        }
+        report(1, SpeechStage.Listening);
+        return new Heard(pieces, problem, clearest?.Wave);
+    }
 
-        // Czech or Slovak – also when the pieces split between them – is compared by transcription: by the accurate model
-        // (a few seconds of the clearest speech), by the quick one when the accurate one is not installed
-        var decided = Decide(pieces);
-        if (clearest is { } piece && (decided.Language is "cs" or "sk" || CzechAndSlovakShare(pieces) > 0.5))
+    // the vote of the pieces; nothing heard because of a tool: its complaint
+    private static SpokenLanguageResult Settle(Heard heard) =>
+        heard.Pieces.All(p => p is { Language: null, Silent: false }) && heard.Problem is not null
+            ? throw new SpeechException(CoreText.T("Reč sa nepodarilo spracovať: ") + heard.Problem)
+            : Decide(heard.Pieces);
+
+    // Czech or Slovak – also when the pieces split between them: the piece to compare them on
+    private static string? NeedsComparison(Heard heard, SpokenLanguageResult decided) =>
+        heard.Clearest is { } wave && (decided.Language is "cs" or "sk" || CzechAndSlovakShare(heard.Pieces) > 0.5) ? wave : null;
+
+    /// <summary>
+    /// The accurate model writes down the clearest seconds of speech of many pieces in one run (loaded once), as Czech
+    /// with the encoder looking only at those seconds: the transcription of each piece (null when it could not be done).
+    /// </summary>
+    private static async Task<string?[]> HearAccuratelyAsync(
+        SpeechTools tools, IProcessRunner runner, string folder, IReadOnlyList<string> waves, Action<int, double> report, CancellationToken cancellationToken)
+    {
+        var texts = new string?[waves.Count];
+        if (tools.Accurate is not { } model || !model.All(char.IsAscii))
         {
-            var from = gauge;
-            var share = Math.Max(0, 1 - from);
-            progress?.Report(new SpeechProgress(from, SpeechStage.CzechOrSlovak));
-            var comparison = tools.Accurate is not null
-                ? await CompareAccurateAsync(tools, runner, piece.Wave, f => progress?.Report(new SpeechProgress(from + (share * f), SpeechStage.CzechOrSlovak)), cancellationToken).ConfigureAwait(false)
-                : await CompareCzechSlovakAsync(tools, runner, piece.Wave, cancellationToken).ConfigureAwait(false);
-            if (comparison is not null)
+            // the model's path cannot be given to whisper: one by one by the quick model
+            for (var i = 0; i < waves.Count; i++)
             {
-                decided = WithComparison(decided, comparison);
+                report(i, (double)i / waves.Count);
+                texts[i] = await CompareCzechSlovakAsync(tools, runner, waves[i], cancellationToken).ConfigureAwait(false) is { } comparison
+                    ? comparison.CzechText + " " + comparison.SlovakText
+                    : null;
+            }
+
+            return texts;
+        }
+
+        var clips = new List<(int Index, string Clip, double Seconds)>();
+        for (var i = 0; i < waves.Count; i++)
+        {
+            var clip = Path.Combine(folder, Path.GetFileNameWithoutExtension(waves[i]) + "-speech.wav");
+            if (SpeechClip(waves[i], clip, ClipSeconds) is { } seconds)
+            {
+                clips.Add((i, clip, seconds));
             }
         }
 
-        return decided;
+        if (clips.Count == 0)
+        {
+            return texts;
+        }
+
+        var arguments = new List<string>
+        {
+            "-m", model, "-l", "cs", "-ac", AudioContext(clips.Max(c => c.Seconds)).ToString(CultureInfo.InvariantCulture),
+            "-bs", "1", "-bo", "1", "-nf", "-nt", "-ojf", "-t", Threads.ToString(CultureInfo.InvariantCulture),
+        };
+        foreach (var (_, clip, _) in clips)
+        {
+            arguments.AddRange(["-f", Path.GetFileName(clip), "-of", Path.GetFileNameWithoutExtension(clip) + "-heard"]);
+        }
+
+        // each clip reported as whisper starts it; between them by the time one takes
+        var current = 0;
+        var request = new ProcessRequest(tools.Whisper, arguments)
+        {
+            WorkingDirectory = folder,
+            Timeout = TimeSpan.FromMinutes(2) * clips.Count,
+            Background = true,
+            OnErrorLine = line =>
+            {
+                if (Processing().Match(line) is { Success: true } file && clips.FindIndex(c => Path.GetFileName(c.Clip) == file.Groups["file"].Value) is var at and >= 0)
+                {
+                    current = at;
+                }
+            },
+        };
+        await Timed(runner, request, f => report(clips[Math.Min(current, clips.Count - 1)].Index, Math.Min(f, (current + 1.0) / clips.Count)), cancellationToken, clips.Count).ConfigureAwait(false);
+        foreach (var (index, clip, _) in clips)
+        {
+            var json = Path.Combine(folder, Path.GetFileNameWithoutExtension(clip) + "-heard.json");
+            if (File.Exists(json) && Transcript(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false)) is { } transcript)
+            {
+                texts[index] = transcript.Text;
+            }
+        }
+
+        return texts;
     }
 
     /// <summary>
@@ -287,10 +519,10 @@ public static partial class SpokenLanguage
     /// waves in the order of the positions, null for a piece that was not written, and FFmpeg's complaint.
     /// </summary>
     private static async Task<(string?[] Waves, string? Problem)> CutAsync(
-        string folder, SpeechTools tools, IProcessRunner runner, string path, int audioOrdinal, IReadOnlyList<TimeSpan> positions, int first,
+        string folder, string prefix, SpeechTools tools, IProcessRunner runner, string path, int audioOrdinal, IReadOnlyList<TimeSpan> positions, int first,
         CancellationToken cancellationToken)
     {
-        var waves = positions.Select((_, i) => Path.Combine(folder, $"piece-{first + i + 1}.wav")).ToList();
+        var waves = positions.Select((_, i) => Path.Combine(folder, $"{prefix}piece-{first + i + 1}.wav")).ToList();
         var cut = await runner.RunAsync(new ProcessRequest(tools.Ffmpeg, CutArguments(path, audioOrdinal, positions, waves))
         {
             Timeout = TimeSpan.FromMinutes(3) * positions.Count,
@@ -429,7 +661,7 @@ public static partial class SpokenLanguage
     private static double _accurateSeconds = 6;
 
     // a run reported on the gauge while it lasts: by the time the last run took, never past 95 % before it ends
-    private static async Task<ProcessResult> Timed(IProcessRunner runner, ProcessRequest request, Action<double> fraction, CancellationToken cancellationToken)
+    private static async Task<ProcessResult> Timed(IProcessRunner runner, ProcessRequest request, Action<double> fraction, CancellationToken cancellationToken, int clips = 1)
     {
         var watch = System.Diagnostics.Stopwatch.StartNew();
         using var stop = new CancellationTokenSource();
@@ -439,7 +671,7 @@ public static partial class SpokenLanguage
             {
                 while (!stop.Token.IsCancellationRequested)
                 {
-                    fraction(Math.Min(0.95, watch.Elapsed.TotalSeconds / Math.Max(0.5, _accurateSeconds)));
+                    fraction(Math.Min(0.95, watch.Elapsed.TotalSeconds / Math.Max(0.5, _accurateSeconds * clips)));
                     await Task.Delay(200, stop.Token).ConfigureAwait(false);
                 }
             }
@@ -453,7 +685,7 @@ public static partial class SpokenLanguage
             var result = await runner.RunAsync(request, cancellationToken).ConfigureAwait(false);
             if (result.ExitCode == 0)
             {
-                _accurateSeconds = (0.5 * _accurateSeconds) + (0.5 * watch.Elapsed.TotalSeconds);
+                _accurateSeconds = (0.5 * _accurateSeconds) + (0.5 * watch.Elapsed.TotalSeconds / clips);
             }
 
             return result;

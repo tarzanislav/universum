@@ -3313,6 +3313,23 @@ internal static class SelfTest
                 }
             }
 
+            // where the accurate model spends its time (load, encoder, decoder) on 6 s of speech – for tuning the speed
+            if (tools.Accurate is { } accurateModel)
+            {
+                var timing = Path.Combine(_outputDirectory, "rec-timing");
+                Directory.CreateDirectory(timing);
+                var piece = Path.Combine(timing, "piece.wav");
+                await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Ffmpeg, Core.Speech.SpokenLanguage.CutArguments(synthetic.Path, 2, TimeSpan.Zero, piece)));
+                var clipSeconds = Core.Speech.SpokenLanguage.SpeechClip(piece, Path.Combine(timing, "clip.wav"), Core.Speech.SpokenLanguage.ClipSeconds) ?? 6;
+                var run = await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Whisper,
+                    ["-m", accurateModel, "-f", "clip.wav", "-l", "cs", "-ac", Core.Speech.SpokenLanguage.AudioContext(clipSeconds).ToString(CultureInfo.InvariantCulture),
+                     "-bs", "1", "-bo", "1", "-nf", "-nt", "-t", Math.Clamp(Environment.ProcessorCount, 1, 8).ToString(CultureInfo.InvariantCulture)])
+                    { WorkingDirectory = timing, Background = true });
+                Write($"speech timing of the accurate model ({run.Elapsed.TotalSeconds:0.0} s, {Environment.ProcessorCount} processors): " +
+                      string.Join(" | ", run.StandardError.Split('\n').Where(l => l.Contains("time =", StringComparison.Ordinal) || l.Contains("system_info", StringComparison.Ordinal)).Select(l => l.Trim())));
+                Directory.Delete(timing, recursive: true);
+            }
+
             // owner, 28. 10.: each film of a group on its own, or only the chosen films
             File.Copy(Path.Combine(media, "speech-und.mkv"), Path.Combine(speech, "Iný kapor 2019 WEB-DL CZ 1080p.mkv"), overwrite: true);
             await batch.AnalyzeAsync();

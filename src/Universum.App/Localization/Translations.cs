@@ -2789,6 +2789,7 @@ internal static class Translations
         ["počúvam úseky (rýchly model)"] = "poslouchám úseky (rychlý model)",
         ["rozlišujem češtinu a slovenčinu (presný model)"] = "rozlišuji češtinu a slovenštinu (přesný model)",
         ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0} %",
+        ["Pripravujem stopy na počúvanie…"] = "Připravuji stopy k poslechu…",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5574,5 +5575,6 @@ internal static class Translations
         ["počúvam úseky (rýchly model)"] = "listening to the parts (quick model)",
         ["rozlišujem češtinu a slovenčinu (presný model)"] = "telling Czech from Slovak (accurate model)",
         ["{0} – {1} – {2:0} %"] = "{0} – {1} – {2:0}%",
+        ["Pripravujem stopy na počúvanie…"] = "Preparing the tracks for listening…",
     };
 }

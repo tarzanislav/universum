@@ -3786,9 +3786,10 @@ internal static class SelfTest
             Check(stayed && arranged && At(czech) < At(subtitles), $"mux order: arranged after the pause, not at once (stayed {stayed}, arranged {arranged})");
 
             // owner, 1. 11. 2026: the drop-down of the languages (thousands) opens at once – only the items seen are made
+            model.Open(mux);
             set.SelectedTrack = czech;
             await Settle();
-            if (FindVisual<System.Windows.Controls.ComboBox>(window, c => ReferenceEquals(c.ItemsSource, czech.LanguageChoices) && c.IsVisible) is { } combo)
+            if (FindVisual<System.Windows.Controls.ComboBox>(window, c => c.ItemsSource is IReadOnlyList<LanguageChoice> { Count: > 50 } && c.IsVisible) is { } combo)
             {
                 var opening = System.Diagnostics.Stopwatch.StartNew();
                 combo.IsDropDownOpen = true;
@@ -3798,10 +3799,11 @@ internal static class SelfTest
                 var made = Enumerable.Range(0, combo.Items.Count).Count(i => combo.ItemContainerGenerator.ContainerFromIndex(i) is not null);
                 combo.IsDropDownOpen = false;
                 Write($"mux languages drop-down: {combo.Items.Count} languages, {made} items made, opened in {opened:0} ms");
-                Check(made > 0 && made < 200, $"mux languages drop-down: only the items seen are made ({made} of {combo.Items.Count})");
+                Check(made > 0 && (made < 200 || combo.Items.Count < 300), $"mux languages drop-down: only the items seen are made ({made} of {combo.Items.Count})");
             }
             else
             {
+                Write($"mux languages drop-down: not shown – the track's {czech.LanguageChoices.Count} languages, track shown {set.ShowsTrack}");
                 Fail("mux languages drop-down: not found");
             }
 

@@ -114,6 +114,15 @@ public sealed class SubtitleLanguageTests
     }
 
     [Test]
+    public void SimpleSlovakLinesWithoutLAndOAreSlovak()
+    {
+        // owner, 1. 11. 2026: no ľ, ô, ä in the whole file – ď, ť and the long vowels say Czech or Slovak, the short words which
+        var line = "Ako sa máš? Som tu, čo ešte chceš, keď je teraz všetko také, ako má byť.";
+        var result = SubtitleLanguage.Detect(string.Join("\n", Enumerable.Repeat(line, 12)));
+        Assert.True(result is { Language: "sk", Certain: false }, "Slovak, to be checked: " + result);
+    }
+
+    [Test]
     public async Task ASubtitleFileOnItsOwnIsReadWhole()
     {
         // owner, 1. 11. 2026: an SRT added in Zlučovanie (in Windows-1250, as old Czech files are) – its language from its text

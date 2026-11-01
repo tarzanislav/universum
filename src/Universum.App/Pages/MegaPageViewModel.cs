@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Jobs;
+using Universum.App.Localization;
 using Universum.Core.Execution;
 using Universum.Core.Jobs;
 using Universum.Core.Mega;
@@ -88,9 +89,9 @@ public sealed class MegaPageViewModel : ObservableObject
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
     public string Summary => Rows.Count == 0
-        ? "Žiadna dávka. V Hromadnom spracovaní pripravte súbory a dajte Odoslať do MEGA."
-        : $"{Texts.Count(Rows.Count, "dávka", "dávky", "dávok")} · čaká {Rows.Count(r => r.Batch.IsOpen)} · " +
-          "dávka v nastavenom čase sa spustí len vtedy, keď UNIVERSUM beží.";
+        ? Loc.T("Žiadna dávka. V Hromadnom spracovaní pripravte súbory a dajte Odoslať do MEGA.")
+        : Loc.F("{0} · čaká {1} · dávka v nastavenom čase sa spustí len vtedy, keď UNIVERSUM beží.",
+            Texts.Count(Rows.Count, Loc.T("dávka"), Loc.T("dávky"), Loc.T("dávok")), Rows.Count(r => r.Batch.IsOpen));
 
     public AsyncRelayCommand StartCommand { get; }
 
@@ -120,9 +121,8 @@ public sealed class MegaPageViewModel : ObservableObject
     private async Task DeleteOriginalsAsync()
     {
         if (_selected?.Batch is not { } batch || Originals(batch) is not { Count: > 0 } originals ||
-            !Confirm($"Zmazať {Texts.Count(originals.Count, "originál", "originály", "originálov")} dávky {batch.Label}?\n\n" +
-                     "Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od prípravy dávky nezmenil; " +
-                     "súbory v knižnici sa nikdy nemažú."))
+            !Confirm(Loc.F("Zmazať {0} dávky {1}?\n\nIdú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od prípravy dávky nezmenil; súbory v knižnici sa nikdy nemažú.",
+                     Texts.Count(originals.Count, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov")), batch.Label)))
         {
             return;
         }
@@ -135,11 +135,11 @@ public sealed class MegaPageViewModel : ObservableObject
         foreach (var file in batch.Files.Where(f => removed.Contains(f.Path, Core.IO.Paths.Comparer)))
         {
             file.OriginalRemoved = true;
-            file.Note = (file.ResultPath ?? file.Note) + " · originál v Koši";
+            file.Note = (file.ResultPath ?? file.Note) + Loc.T(" · originál v Koši");
         }
 
-        Message = $"{batch.Label}: do Koša {Texts.Count(removed.Count, "originál", "originály", "originálov")}" +
-                  (kept.Count > 0 ? $" · ostalo {kept.Count}: " + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "");
+        Message = Loc.F("{0}: do Koša {1}", batch.Label, Texts.Count(removed.Count, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) +
+                  (kept.Count > 0 ? Loc.F(" · ostalo {0}: ", kept.Count) + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "");
         Saved(batch);
         _services.NotifyMegaChanged();
     }
@@ -167,7 +167,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
         if (batch.IsBeingEdited)
         {
-            Message = $"{batch.Label} sa práve upravuje v Hromadnom spracovaní – spustí sa po uložení.";
+            Message = Loc.F("{0} sa práve upravuje v Hromadnom spracovaní – spustí sa po uložení.", batch.Label);
             return;
         }
 
@@ -178,7 +178,7 @@ public sealed class MegaPageViewModel : ObservableObject
         if (installation is null)
         {
             batch.State = before;
-            Message = $"{batch.Label} sa nespustila: MKVToolNix nie je k dispozícii.";
+            Message = Loc.F("{0} sa nespustila: MKVToolNix nie je k dispozícii.", batch.Label);
             Load();
             return;
         }
@@ -198,7 +198,7 @@ public sealed class MegaPageViewModel : ObservableObject
         Save();
         LastJob = job;
         _services.Jobs.Add(job, start: true);
-        Message = $"{batch.Label} je vo Fronte úloh (úloha {job.Id}).";
+        Message = Loc.F("{0} je vo Fronte úloh (úloha {1}).", batch.Label, job.Id);
         Load();
     }
 
@@ -215,13 +215,13 @@ public sealed class MegaPageViewModel : ObservableObject
 
             if (_services.Mega.Batches.Count(b => b.State == MegaBatchState.Missed) != missed)
             {
-                Message = "Dávka nespustená v čase – UNIVERSUM vtedy nebežalo alebo počítač spal. Spustite ju ručne alebo nastavte nový čas.";
+                Message = Loc.T("Dávka nespustená v čase – UNIVERSUM vtedy nebežalo alebo počítač spal. Spustite ju ručne alebo nastavte nový čas.");
                 Load();
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Message = "Zoznam dávok sa nepodarilo uložiť: " + ex.Message;
+            Message = Loc.T("Zoznam dávok sa nepodarilo uložiť: ") + ex.Message;
         }
     }
 
@@ -239,7 +239,7 @@ public sealed class MegaPageViewModel : ObservableObject
         }
 
         Message = row.Batch is { Start: MegaStart.At, StartAt: { } at } && at <= DateTime.Now
-            ? $"Čas {row.Batch.Label} je v minulosti – sama sa nespustí; nastavte budúci dátum a čas."
+            ? Loc.F("Čas {0} je v minulosti – sama sa nespustí; nastavte budúci dátum a čas.", row.Batch.Label)
             : "";
         Save();
         row.Refresh();
@@ -249,7 +249,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
     internal void InvalidTime(MegaBatchRow row, string text)
     {
-        Message = $"Čas „{text}“ sa nedá použiť – zadajte ho ako 2:00 alebo 23:30.";
+        Message = Loc.F("Čas „{0}“ sa nedá použiť – zadajte ho ako 2:00 alebo 23:30.", text);
         row.Refresh();
     }
 
@@ -300,7 +300,7 @@ public sealed class MegaPageViewModel : ObservableObject
             if (file.Mux is null && taken.Contains(Path.GetFullPath(file.Path)))
             {
                 file.State = MegaFileState.Skipped;
-                file.Note = "medzičasom v inej dávke alebo úlohe – vynechaný";
+                file.Note = Loc.T("medzičasom v inej dávke alebo úlohe – vynechaný");
                 continue;
             }
 
@@ -311,7 +311,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
         if (again == 0 && !batch.Files.Any(f => f.State == MegaFileState.Waiting))
         {
-            Message = "Nie je čo spustiť znova – súbory sú medzičasom v inej dávke alebo úlohe.";
+            Message = Loc.T("Nie je čo spustiť znova – súbory sú medzičasom v inej dávke alebo úlohe.");
             Saved(batch);
             return;
         }
@@ -337,7 +337,7 @@ public sealed class MegaPageViewModel : ObservableObject
     private void Remove()
     {
         if (_selected?.Batch is not { } batch ||
-            !Confirm($"Odstrániť {batch.Label} z MEGA spracovania?\n\n{batch.Name}\n\nSúbory sa nemenia; tie, čo sa ešte nezapísali, sa v Hromadnom spracovaní znova ukážu ako voľné."))
+            !Confirm(Loc.F("Odstrániť {0} z MEGA spracovania?\n\n{1}\n\nSúbory sa nemenia; tie, čo sa ešte nezapísali, sa v Hromadnom spracovaní znova ukážu ako voľné.", batch.Label, batch.Name)))
         {
             return;
         }
@@ -349,7 +349,7 @@ public sealed class MegaPageViewModel : ObservableObject
     private void RemoveFile()
     {
         if (_selected?.Batch is not { } batch || _selectedFile?.File is not { } file ||
-            !Confirm($"Vybrať súbor z dávky?\n\n{Path.GetFileName(file.Path)}\n\nSúbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný."))
+            !Confirm(Loc.F("Vybrať súbor z dávky?\n\n{0}\n\nSúbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný.", Path.GetFileName(file.Path))))
         {
             return;
         }
@@ -399,7 +399,7 @@ public sealed class MegaPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Message = "Zoznam dávok sa nepodarilo uložiť: " + ex.Message;
+            Message = Loc.T("Zoznam dávok sa nepodarilo uložiť: ") + ex.Message;
         }
     }
 
@@ -448,9 +448,9 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
 {
     private static readonly IReadOnlyList<KeyValuePair<MegaStart, string>> Choices =
     [
-        new(MegaStart.Manual, "keď ju spustím"),
-        new(MegaStart.AfterPrevious, "po predchádzajúcej dávke"),
-        new(MegaStart.At, "v dátum a čas"),
+        new(MegaStart.Manual, Loc.T("keď ju spustím")),
+        new(MegaStart.AfterPrevious, Loc.T("po predchádzajúcej dávke")),
+        new(MegaStart.At, Loc.T("v dátum a čas")),
     ];
 
     /// <summary>The ways a batch starts (an instance property: bindings do not reach static ones).</summary>
@@ -467,24 +467,24 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
         get
         {
             var done = Batch.Files.Count(f => f.State is MegaFileState.Done or MegaFileState.AlreadyInLibrary);
-            return Texts.Count(Batch.Files.Count, "súbor", "súbory", "súborov") + (done > 0 ? $" ({done} hotových)" : "");
+            return Texts.Count(Batch.Files.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")) + (done > 0 ? Loc.F(" ({0} hotových)", done) : "");
         }
     }
 
     public string State => Batch.State switch
     {
-        MegaBatchState.Waiting when Batch.IsBeingEdited => "upravuje sa v Hromadnom spracovaní",
+        MegaBatchState.Waiting when Batch.IsBeingEdited => Loc.T("upravuje sa v Hromadnom spracovaní"),
         MegaBatchState.Waiting => Batch.Start switch
         {
-            MegaStart.At when Batch.StartAt is { } at => "čaká na " + at.ToString("d. M. yyyy H:mm", CultureInfo.GetCultureInfo("sk-SK")),
-            MegaStart.AfterPrevious => "čaká na predchádzajúcu",
-            _ => "čaká na spustenie",
+            MegaStart.At when Batch.StartAt is { } at => Loc.F("čaká na {0}", at.ToString("d. M. yyyy H:mm", CultureInfo.GetCultureInfo("sk-SK"))),
+            MegaStart.AfterPrevious => Loc.T("čaká na predchádzajúcu"),
+            _ => Loc.T("čaká na spustenie"),
         },
-        MegaBatchState.Queued => "vo Fronte úloh",
-        MegaBatchState.Done => "HOTOVO",
-        MegaBatchState.DoneWithProblems => "hotovo s problémami",
-        MegaBatchState.Cancelled => "zrušené",
-        MegaBatchState.Missed => "ZMEŠKANÉ – UNIVERSUM v tom čase nebežalo",
+        MegaBatchState.Queued => Loc.T("vo Fronte úloh"),
+        MegaBatchState.Done => Loc.T("HOTOVO"),
+        MegaBatchState.DoneWithProblems => Loc.T("hotovo s problémami"),
+        MegaBatchState.Cancelled => Loc.T("zrušené"),
+        MegaBatchState.Missed => Loc.T("ZMEŠKANÉ – UNIVERSUM v tom čase nebežalo"),
         _ => "",
     };
 
@@ -493,9 +493,9 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
     /// <summary>What happens with the originals, as chosen in Hromadné spracovanie when the batch was sent.</summary>
     public string Originals => Batch.Originals switch
     {
-        OriginalsMode.DeleteAutomatically => "mazať automaticky",
-        OriginalsMode.DeleteManually => "mazať ručne",
-        _ => "zachovať",
+        OriginalsMode.DeleteAutomatically => Loc.T("mazať automaticky"),
+        OriginalsMode.DeleteManually => Loc.T("mazať ručne"),
+        _ => Loc.T("zachovať"),
     };
 
     /// <summary>The start can be changed while the batch waits.</summary>
@@ -568,28 +568,30 @@ public sealed class MegaFileRow(MegaFile file) : ObservableObject
 {
     public MegaFile File { get; } = file;
 
-    public string Name => File.Mux is { } mux ? $"{File.Title.Name} – zlúčené z {Texts.Count(mux.Spec.Sources.Count, "súboru", "súborov", "súborov")}" : Path.GetFileName(File.Path);
+    public string Name => File.Mux is { } mux
+        ? Loc.F("{0} – zlúčené z {1}", File.Title.Name, Texts.Count(mux.Spec.Sources.Count, Loc.T("súboru"), Loc.T("súborov"), Loc.T("súborov")))
+        : Path.GetFileName(File.Path);
 
     public string Folder => Path.GetDirectoryName(File.Path) ?? "";
 
     /// <summary>The page it came from: Hromadné spracovanie, Single spracovanie, Zlučovanie.</summary>
     public string Source => File.Source switch
     {
-        MegaSource.Single => "Single spracovanie",
-        MegaSource.Mux => "Zlučovanie",
-        _ => "Hromadné spracovanie",
+        MegaSource.Single => Loc.T("Single spracovanie"),
+        MegaSource.Mux => Loc.T("Zlučovanie"),
+        _ => Loc.T("Hromadné spracovanie"),
     };
 
     public string Target => File.PlannedPath;
 
     public string State => File.State switch
     {
-        MegaFileState.Waiting => "čaká",
-        MegaFileState.Done => "hotovo",
-        MegaFileState.AlreadyInLibrary => "už v knižnici",
-        MegaFileState.Skipped => "PRESKOČENÝ",
-        MegaFileState.Failed => "CHYBA",
-        MegaFileState.Cancelled => "zrušený",
+        MegaFileState.Waiting => Loc.T("čaká"),
+        MegaFileState.Done => Loc.T("hotovo"),
+        MegaFileState.AlreadyInLibrary => Loc.T("už v knižnici"),
+        MegaFileState.Skipped => Loc.T("PRESKOČENÝ"),
+        MegaFileState.Failed => Loc.T("CHYBA"),
+        MegaFileState.Cancelled => Loc.T("zrušený"),
         _ => "",
     };
 

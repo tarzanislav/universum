@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.App.Jobs;
+using Universum.App.Localization;
 using Universum.Core.Jobs;
 using Universum.Core.Library;
 using Universum.Core.Media;
@@ -303,17 +304,17 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
 
     /// <summary>How the output name came about.</summary>
     public string OutputNote =>
-        _useLibrary ? "Do knižnice, názov podľa pravidiel (veľkosť sa doplní po zápise)."
-        : _outputEdited ? "Zadané ručne."
-        : AutoPlacement() is not null ? "Vedľa zdroja, názov podľa pravidiel z titulu (veľkosť sa doplní po zápise)."
-        : Inputs.Count > 0 ? "Vedľa prvého zdroja. Zadajte titul alebo ho nájdite na TMDB – názov sa urobí podľa pravidiel."
+        _useLibrary ? Loc.T("Do knižnice, názov podľa pravidiel (veľkosť sa doplní po zápise).")
+        : _outputEdited ? Loc.T("Zadané ručne.")
+        : AutoPlacement() is not null ? Loc.T("Vedľa zdroja, názov podľa pravidiel z titulu (veľkosť sa doplní po zápise).")
+        : Inputs.Count > 0 ? Loc.T("Vedľa prvého zdroja. Zadajte titul alebo ho nájdite na TMDB – názov sa urobí podľa pravidiel.")
         : "";
 
     /// <summary>Name of the output (as the tab shows it): the output file, the first source or "Bez názvu".</summary>
     public string DisplayName =>
         OutputPath.Length > 0 ? Path.GetFileName(OutputPath)
         : Inputs.Count > 0 ? Inputs[0].FileName
-        : $"Bez názvu {Number}";
+        : Loc.F("Bez názvu {0}", Number);
 
     /// <summary>The beginning of the name for the tab (the whole name is in the tooltip).</summary>
     public string ShortName => DisplayName.Length <= 30 ? DisplayName : DisplayName[..28].TrimEnd() + "…";
@@ -342,8 +343,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
     public bool HasProgress => _progressText.Length > 0;
 
     public string Summary => Inputs.Count == 0
-        ? "Pridajte súbory (MKV, MP4, AVI, zvuk, titulky SRT/ASS…) tlačidlom alebo ich sem pretiahnite myšou."
-        : $"Zdroje: {Inputs.Count}, vybrané stopy: {Tracks.Count(t => t.Include)} z {Tracks.Count}.";
+        ? Loc.T("Pridajte súbory (MKV, MP4, AVI, zvuk, titulky SRT/ASS…) tlačidlom alebo ich sem pretiahnite myšou.")
+        : Loc.F("Zdroje: {0}, vybrané stopy: {1} z {2}.", Inputs.Count, Tracks.Count(t => t.Include), Tracks.Count);
 
     /// <summary>All files this settings reads (for the Information page).</summary>
     public IEnumerable<string> Files => Inputs.SelectMany(i => i.ToSource().AllPaths);
@@ -456,8 +457,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
 
         Changed();
         Result = taken.Any(t => t.Language.Tag.IsUndetermined && t.Track.Type is TrackType.Audio or TrackType.Subtitles)
-            ? "Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova."
-            : "Pravidlá UNIVERSUM sú použité – skontrolujte a spustite.";
+            ? Loc.T("Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova.")
+            : Loc.T("Pravidlá UNIVERSUM sú použité – skontrolujte a spustite.");
     }
 
     /// <summary>Moves the selected track in the output order (also Ctrl+↑/↓).</summary>
@@ -541,7 +542,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         // a title HISTRA did not confirm (or found nowhere) waits for the user before anything is named by it
         if (Library.Tmdb.NeedsConfirmation)
         {
-            problems.Add(Library.Tmdb.Warning + " Potvrďte ho tlačidlom Potvrdiť titul.");
+            problems.Add(Library.Tmdb.Warning + Loc.T(" Potvrďte ho tlačidlom Potvrdiť titul."));
         }
 
         if (_useLibrary && Library.Placement is null)
@@ -555,7 +556,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         }
 
         problems.AddRange(Tracks.Where(t => t.Include && t.HasInvalidDelay)
-            .Select(t => $"Stopa {t.Position}: oneskorenie zadajte v celých milisekundách, napr. -120."));
+            .Select(t => Loc.F("Stopa {0}: oneskorenie zadajte v celých milisekundách, napr. -120.", t.Position)));
         return problems.Where(p => p.Length > 0).ToList();
     }
 
@@ -687,7 +688,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
     {
         var dialog = new SaveFileDialog
         {
-            Filter = "Matroska (*.mkv)|*.mkv|Matroska zvuk (*.mka)|*.mka|WebM (*.webm)|*.webm",
+            Filter = $"Matroska (*.mkv)|*.mkv|{Loc.T("Matroska zvuk (*.mka)")}|*.mka|WebM (*.webm)|*.webm",
             FileName = Path.GetFileName(OutputPath),
             InitialDirectory = Path.GetDirectoryName(OutputPath) is { Length: > 0 } folder && Directory.Exists(folder) ? folder : "",
             OverwritePrompt = false,
@@ -889,22 +890,22 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
 
     private static string Describe(CheckFinding finding)
     {
-        var where = finding.TrackId is { } index ? $"Stopa {index + 1}: " : "";
+        var where = finding.TrackId is { } index ? Loc.F("Stopa {0}: ", index + 1) : "";
         var kind = finding.Type switch
         {
-            TrackType.Video => "videa",
-            TrackType.Audio => "zvuku",
-            TrackType.Subtitles => "titulkov",
-            _ => "stôp",
+            TrackType.Video => Loc.T("videa"),
+            TrackType.Audio => Loc.T("zvuku"),
+            TrackType.Subtitles => Loc.T("titulkov"),
+            _ => Loc.T("iných typov"),
         };
         return finding.Kind switch
         {
-            CheckKind.UndeterminedLanguage => where + "neurčený jazyk (und).",
-            CheckKind.SeveralDefaults => $"Viac stôp {kind} má Default – prehrávač vyberie ktorúkoľvek.",
-            CheckKind.NoneEnabled => $"Žiadna stopa {kind} nie je zapnutá (Enabled).",
-            CheckKind.ForcedWithoutDefault => where + "forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí.",
-            CheckKind.TagsRemain => "Výsledok si ponechá tagy zo vstupov.",
-            CheckKind.OrderNotPreferred => $"Poradie {kind} nie je CZ → SK → ostatné (komentáre na koniec).",
+            CheckKind.UndeterminedLanguage => where + Loc.T("neurčený jazyk (und)."),
+            CheckKind.SeveralDefaults => Loc.F("Viac stôp {0} má Default – prehrávač vyberie ktorúkoľvek.", kind),
+            CheckKind.NoneEnabled => Loc.F("Žiadna stopa {0} nie je zapnutá (Enabled).", kind),
+            CheckKind.ForcedWithoutDefault => where + Loc.T("forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí."),
+            CheckKind.TagsRemain => Loc.T("Výsledok si ponechá tagy zo vstupov."),
+            CheckKind.OrderNotPreferred => Loc.F("Poradie {0} nie je CZ → SK → ostatné (komentáre na koniec).", kind),
             _ => finding.Kind.ToString(),
         };
     }
@@ -939,19 +940,19 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             return;
         }
 
-        var job = new MuxJob($"Zlučovanie: {DisplayName} ({spec.Tracks.Count} stôp)", new Multiplexer(installation, _services.Runner), spec);
+        var job = new MuxJob(Loc.F("Zlučovanie: {0} ({1} stôp)", DisplayName, spec.Tracks.Count), new Multiplexer(installation, _services.Runner), spec);
         job.Changed += changed => JobRow.OnUi(() =>
         {
             Progress = changed.Progress;
             ProgressText = changed.Status switch
             {
-                JobStatus.Waiting => "čaká vo fronte",
-                JobStatus.Running => $"beží {changed.Progress:P0}",
+                JobStatus.Waiting => Loc.T("čaká vo fronte"),
+                JobStatus.Running => Loc.F("beží {0:P0}", changed.Progress),
                 _ => changed.Outcome,
             };
             if (changed.IsFinished)
             {
-                Result = $"Úloha {changed.Id}: {changed.Outcome}";
+                Result = Loc.F("Úloha {0}: {1}", changed.Id, changed.Outcome);
                 Recalculate();
             }
         });
@@ -959,16 +960,18 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
 
         // shown before the job is added: a job that starts (or fails) at once reports over it
         Progress = 0;
-        ProgressText = "čaká vo fronte";
+        ProgressText = Loc.T("čaká vo fronte");
         IsModified = false;
         OnPropertyChanged(nameof(IsUnprocessed));
-        Result = $"Pridané do fronty ako úloha {job.Id}" + (starts ? "." : " – frontu spustíte na stránke Fronta úloh.");
+        Result = starts
+            ? Loc.F("Pridané do fronty ako úloha {0}.", job.Id)
+            : Loc.F("Pridané do fronty ako úloha {0} – frontu spustíte na stránke Fronta úloh.", job.Id);
         _services.Jobs.Add(job, starts);
     }
 
     private void ChooseChapters()
     {
-        var dialog = new OpenFileDialog { Filter = "Kapitoly (*.xml;*.txt;*.cue)|*.xml;*.txt;*.cue|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = $"{Loc.T("Kapitoly")} (*.xml;*.txt;*.cue)|*.xml;*.txt;*.cue|{Loc.T("Všetky súbory")}|*.*" };
         if (dialog.ShowDialog() == true)
         {
             ChaptersFile = dialog.FileName;
@@ -977,7 +980,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
 
     private void AddAttachments()
     {
-        var dialog = new OpenFileDialog { Multiselect = true, Filter = "Písma a obrázky|*.ttf;*.otf;*.ttc;*.jpg;*.jpeg;*.png|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Multiselect = true, Filter = $"{Loc.T("Písma a obrázky")}|*.ttf;*.otf;*.ttc;*.jpg;*.jpeg;*.png|{Loc.T("Všetky súbory")}|*.*" };
         if (dialog.ShowDialog() == true)
         {
             foreach (var file in dialog.FileNames.Where(f => !Attachments.Contains(f)))

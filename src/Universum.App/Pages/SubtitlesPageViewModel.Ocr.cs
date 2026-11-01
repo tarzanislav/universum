@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Subtitles;
 using Universum.Core.Subtitles.Download;
@@ -23,7 +24,7 @@ public sealed class OcrQuestion(OcrCluster cluster, BitmapSource shape, BitmapSo
 
     public BitmapSource Line { get; } = line;
 
-    public string Title => $"Neznámy tvar {number} z {total} – vo filme {Cluster.Count}×";
+    public string Title => Loc.F("Neznámy tvar {0} z {1} – vo filme {2}×", number, total, Cluster.Count);
 }
 
 /// <summary>A word the checking of the text changed, shown after saving; Vrátiť puts the word as read back.</summary>
@@ -193,17 +194,17 @@ public sealed partial class SubtitlesPageViewModel
             {
                 if (row.ExternalPath is { } external)
                 {
-                    OcrStatus = "Čítam obrázkové titulky súboru…";
+                    OcrStatus = Loc.T("Čítam obrázkové titulky súboru…");
                     cues = await PgsReader.ReadFileAsync(external, stop);
                 }
                 else if (file is not null && _services.CurrentMkvToolNix is { } installation)
                 {
-                    OcrStatus = $"Čítam obrázkové titulky stopy {row.Track.Id} (číta sa celý súbor)…";
+                    OcrStatus = Loc.F("Čítam obrázkové titulky stopy {0} (číta sa celý súbor)…", row.Track.Id);
                     cues = await PictureSubtitles.ExtractAsync(installation, _services.Runner, file, row.Track, stop);
                 }
                 else
                 {
-                    OcrStatus = "Na čítanie stopy videa treba MKVToolNix.";
+                    OcrStatus = Loc.T("Na čítanie stopy videa treba MKVToolNix.");
                     return;
                 }
 
@@ -215,15 +216,15 @@ public sealed partial class SubtitlesPageViewModel
 
             if (cues.Count == 0)
             {
-                OcrStatus = "Obrázkové titulky sa nepodarilo prečítať (žiadne titulky).";
+                OcrStatus = Loc.T("Obrázkové titulky sa nepodarilo prečítať (žiadne titulky).");
                 return;
             }
 
-            OcrStatus = "Pripravujem písma Windows na porovnanie…";
+            OcrStatus = Loc.T("Pripravujem písma Windows na porovnanie…");
             var letters = await templates;
             if (letters.Count == 0)
             {
-                OcrStatus = "Vo Windows sa nenašlo žiadne z písiem na porovnanie (Arial, Verdana, Tahoma, Segoe UI …).";
+                OcrStatus = Loc.T("Vo Windows sa nenašlo žiadne z písiem na porovnanie (Arial, Verdana, Tahoma, Segoe UI …).");
                 return;
             }
 
@@ -231,7 +232,7 @@ public sealed partial class SubtitlesPageViewModel
             var memory = _ocrMemory ??= new OcrMemory(OcrMemoryFile);
             var check = OcrCheckText;
             var lexicon = check && language is not null ? Lexicon(language) : null;
-            var progress = new Progress<double>(p => OcrStatus = $"Rozpoznávam text {cues.Count} titulkov… {p:P0}");
+            var progress = new Progress<double>(p => OcrStatus = Loc.F("Rozpoznávam text {0} titulkov… {1:P0}", cues.Count, p));
             var run = await Task.Run(() =>
             {
                 var read = new SubtitleOcr(letters, memory, language).Read(OcrPicture.Of(cues, stop), progress, stop);
@@ -264,18 +265,18 @@ public sealed partial class SubtitlesPageViewModel
             save = _ocrTotal == 0;
             if (!save)
             {
-                OcrStatus = $"Prečítaných {known} z {all} písmen ({run.Clusters.Count} rôznych tvarov). {_ocrTotal} tvarov UNIVERSUM nepozná – povedzte, čo sú: " +
-                            "pýta sa raz za film a zapamätá si ich aj pre ďalšie filmy.";
+                OcrStatus = Loc.F("Prečítaných {0} z {1} písmen ({2} rôznych tvarov). {3} tvarov UNIVERSUM nepozná – povedzte, čo sú: pýta sa raz za film a zapamätá si ich aj pre ďalšie filmy.",
+                    known, all, run.Clusters.Count, _ocrTotal);
                 Ask();
             }
         }
         catch (OperationCanceledException)
         {
-            OcrStatus = "Rozpoznávanie je zastavené.";
+            OcrStatus = Loc.T("Rozpoznávanie je zastavené.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
         {
-            OcrStatus = "Obrázkové titulky sa nepodarilo prečítať: " + ex.Message;
+            OcrStatus = Loc.T("Obrázkové titulky sa nepodarilo prečítať: ") + ex.Message;
         }
         finally
         {
@@ -324,7 +325,7 @@ public sealed partial class SubtitlesPageViewModel
             var told = run.Teach(question.Cluster, text);
             if (told > 1)
             {
-                OcrStatus = $"„{(text.Length > 0 ? text : "nie je písmeno")}“ – platí aj pre {told - 1} podobných tvarov.";
+                OcrStatus = Loc.F("„{0}“ – platí aj pre {1} podobných tvarov.", text.Length > 0 ? text : Loc.T("nie je písmeno"), told - 1);
             }
         }
 
@@ -377,7 +378,7 @@ public sealed partial class SubtitlesPageViewModel
             });
             if (document.Cues.Count == 0)
             {
-                OcrStatus = "V obrázkoch sa nenašiel žiadny text.";
+                OcrStatus = Loc.T("V obrázkoch sa nenašiel žiadny text.");
                 return;
             }
 
@@ -386,16 +387,16 @@ public sealed partial class SubtitlesPageViewModel
             _taken.Add(saved);
             if (!ReferenceEquals(_file, file) || !Rows.Contains(row))
             {
-                OcrStatus = $"Text je uložený vedľa videa ako {Path.GetFileName(saved)}; medzitým sa otvorilo iné video, stopa sa nepridala.";
+                OcrStatus = Loc.F("Text je uložený vedľa videa ako {0}; medzitým sa otvorilo iné video, stopa sa nepridala.", Path.GetFileName(saved));
                 return;
             }
 
             var unknown = document.Cues.Sum(c => c.Text.Count(ch => ch == '�'));
             var corrections = run.Corrections;
-            OcrStatus = $"Text rozpoznaný ({document.Cues.Count} titulkov) a uložený vedľa videa ako {Path.GetFileName(saved)}; pridaný ako nová titulková stopa." +
-                        (corrections.Count > 0 ? $" Opravené podľa jazyka: {corrections.Count} (zoznam nižšie)." : "") +
-                        (unknown > 0 ? $" Neznámych písmen: {unknown} – sú ako „�“, opravíte ich v Časoch titulkov." : "") +
-                        " Skontrolujte ho prehraním.";
+            OcrStatus = Loc.F("Text rozpoznaný ({0} titulkov) a uložený vedľa videa ako {1}; pridaný ako nová titulková stopa.", document.Cues.Count, Path.GetFileName(saved)) +
+                        (corrections.Count > 0 ? Loc.F(" Opravené podľa jazyka: {0} (zoznam nižšie).", corrections.Count) : "") +
+                        (unknown > 0 ? Loc.F(" Neznámych písmen: {0} – sú ako „�“, opravíte ich v Časoch titulkov.", unknown) : "") +
+                        Loc.T(" Skontrolujte ho prehraním.");
             _busy = false;
             await AddFilesAsync([saved]);
             _ocrSaved = saved;
@@ -409,7 +410,7 @@ public sealed partial class SubtitlesPageViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            OcrStatus = "Rozpoznaný text sa nepodarilo uložiť: " + ex.Message;
+            OcrStatus = Loc.T("Rozpoznaný text sa nepodarilo uložiť: ") + ex.Message;
         }
         finally
         {
@@ -472,7 +473,7 @@ public sealed partial class SubtitlesPageViewModel
     // the subtitle files of a folder read (each once), the language of each from its text, its words into that language's lexicon
     private async Task LearnLexiconAsync()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok s vašimi titulkami (napr. knižnica) – UNIVERSUM sa z nich naučí slová" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Priečinok s vašimi titulkami (napr. knižnica) – UNIVERSUM sa z nich naučí slová") };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -487,18 +488,18 @@ public sealed partial class SubtitlesPageViewModel
             IProgress<string> progress = new Progress<string>(s => OcrStatus = s);
             var (files, words, languages) = await Task.Run(() => LearnFolderAsync(folder, progress, stop), stop);
             OcrStatus = files == 0
-                ? "Nenašli sa žiadne nové súbory titulkov (SRT, ASS, VTT, SUB), z ktorých by sa UNIVERSUM ešte neučil."
-                : $"Naučené: {files} súborov titulkov, {words:N0} slov ({string.Join(", ", languages)}). Slovník je len v tomto počítači.";
+                ? Loc.T("Nenašli sa žiadne nové súbory titulkov (SRT, ASS, VTT, SUB), z ktorých by sa UNIVERSUM ešte neučil.")
+                : Loc.F("Naučené: {0} súborov titulkov, {1:N0} slov ({2}). Slovník je len v tomto počítači.", files, words, string.Join(", ", languages));
             LexiconSummary = SummaryOfLexicons();
         }
         catch (OperationCanceledException)
         {
-            OcrStatus = "Učenie slovníka je zastavené – čo sa naučilo, ostáva uložené.";
+            OcrStatus = Loc.T("Učenie slovníka je zastavené – čo sa naučilo, ostáva uložené.");
             LexiconSummary = SummaryOfLexicons();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            OcrStatus = "Slovník sa nepodarilo naučiť: " + ex.Message;
+            OcrStatus = Loc.T("Slovník sa nepodarilo naučiť: ") + ex.Message;
         }
         finally
         {
@@ -548,7 +549,7 @@ public sealed partial class SubtitlesPageViewModel
 
                     touched.Add(language.Language);
                     files++;
-                    progress.Report($"Učím sa slová z vašich titulkov… {files} súborov, {words:N0} slov");
+                    progress.Report(Loc.F("Učím sa slová z vašich titulkov… {0} súborov, {1:N0} slov", files, words));
                 }
                 catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or System.Xml.XmlException or InvalidDataException or ArgumentException)
                 {
@@ -604,9 +605,9 @@ public sealed partial class SubtitlesPageViewModel
                     .Where(l => l.Length is >= 2 and <= 3 && l.All(char.IsAsciiLetterLower)).Order(StringComparer.Ordinal).ToList()
                 : [];
             return languages.Count == 0
-                ? "Slovník je zatiaľ prázdny – oprava podľa jazyka použije len slová, ktoré UNIVERSUM vo filme prečíta isto. Naučte ho z priečinka s vašimi titulkami."
-                : "Slovník z vašich titulkov: " + string.Join(", ", languages.Select(l => _lexicons.TryGetValue(l, out var lexicon) ? $"{l} {lexicon.Count:N0} slov" : l)) +
-                  " (len v tomto počítači).";
+                ? Loc.T("Slovník je zatiaľ prázdny – oprava podľa jazyka použije len slová, ktoré UNIVERSUM vo filme prečíta isto. Naučte ho z priečinka s vašimi titulkami.")
+                : Loc.T("Slovník z vašich titulkov: ") + string.Join(", ", languages.Select(l => _lexicons.TryGetValue(l, out var lexicon) ? Loc.F("{0} {1:N0} slov", l, lexicon.Count) : l)) +
+                  Loc.T(" (len v tomto počítači).");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

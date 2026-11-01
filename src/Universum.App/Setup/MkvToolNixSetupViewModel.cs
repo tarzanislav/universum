@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.Core.MkvToolNix;
+using Universum.App.Localization;
 
 namespace Universum.App.Setup;
 
@@ -10,7 +11,7 @@ namespace Universum.App.Setup;
 public sealed class MkvToolNixSetupViewModel : ObservableObject
 {
     private readonly AppServices _services;
-    private string _status = "Hľadám MKVToolNix…";
+    private string _status = Loc.T("Hľadám MKVToolNix…");
     private string _details = "";
     private double _progress;
     private bool _busy;
@@ -53,7 +54,7 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
 
     public bool IsReady => _services.CurrentMkvToolNix is { IsSupportedVersion: true };
 
-    public string InstallButtonText => _latest is null ? "Stiahnuť a nainštalovať" : $"Stiahnuť a nainštalovať {MkvToolNixDownloads.Format(_latest)}";
+    public string InstallButtonText => _latest is null ? Loc.T("Stiahnuť a nainštalovať") : Loc.F("Stiahnuť a nainštalovať {0}", MkvToolNixDownloads.Format(_latest));
 
     public async Task RefreshAsync()
     {
@@ -63,9 +64,9 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
             var installation = await _services.FindMkvToolNixAsync();
             Status = installation switch
             {
-                null => "MKVToolNix nie je nainštalovaný. UNIVERSUM ho potrebuje na všetku prácu so súbormi MKV.",
-                { IsSupportedVersion: false } => $"Nainštalovaný MKVToolNix {installation.Version} je starší ako podporovaná verzia {MkvToolNixVersion.Minimum}.",
-                _ => $"MKVToolNix {installation.Version} je pripravený.",
+                null => Loc.T("MKVToolNix nie je nainštalovaný. UNIVERSUM ho potrebuje na všetku prácu so súbormi MKV."),
+                { IsSupportedVersion: false } => Loc.F("Nainštalovaný MKVToolNix {0} je starší ako podporovaná verzia {1}.", installation.Version, MkvToolNixVersion.Minimum),
+                _ => Loc.F("MKVToolNix {0} je pripravený.", installation.Version),
             };
             Details = installation?.Directory ?? "";
             OnPropertyChanged(nameof(IsReady));
@@ -75,7 +76,7 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
                 OnPropertyChanged(nameof(InstallButtonText));
                 if (installation is not null && _latest > installation.Version)
                 {
-                    Details += $"\nNajnovšia verzia na oficiálnej stránke: {MkvToolNixDownloads.Format(_latest)}";
+                    Details += Loc.F("\nNajnovšia verzia na oficiálnej stránke: {0}", MkvToolNixDownloads.Format(_latest));
                 }
             }
             catch (SetupException ex)
@@ -94,14 +95,14 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
         Busy = true;
         try
         {
-            Status = "Zisťujem najnovšiu verziu MKVToolNix…";
+            Status = Loc.T("Zisťujem najnovšiu verziu MKVToolNix…");
             var version = _latest ?? await MkvToolNixInstaller.GetLatestVersionAsync();
-            Status = $"Sťahujem a overujem MKVToolNix {MkvToolNixDownloads.Format(version)}…";
+            Status = Loc.F("Sťahujem a overujem MKVToolNix {0}…", MkvToolNixDownloads.Format(version));
             var installer = await MkvToolNixInstaller.DownloadAsync(version, new Progress<double>(p => Progress = p));
-            Status = "Inštalátor je overený (SHA-256 a podpis LINET Services GmbH). Spúšťam ho…";
+            Status = Loc.T("Inštalátor je overený (SHA-256 a podpis LINET Services GmbH). Spúšťam ho…");
             if (!await MkvToolNixInstaller.RunAsync(installer, silent: false))
             {
-                Status = "Inštalácia bola zrušená v okne Windows.";
+                Status = Loc.T("Inštalácia bola zrušená v okne Windows.");
                 return;
             }
 
@@ -122,7 +123,7 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
 
     private async Task ChooseFolderAsync()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok s MKVToolNix (obsahuje mkvmerge.exe)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Priečinok s MKVToolNix (obsahuje mkvmerge.exe)") };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -133,8 +134,8 @@ public sealed class MkvToolNixSetupViewModel : ObservableObject
         {
             var installation = await _services.UseMkvToolNixDirectoryAsync(dialog.FolderName);
             Status = installation is null
-                ? "Vo vybranom priečinku nie sú funkčné nástroje MKVToolNix (mkvmerge.exe, mkvpropedit.exe)."
-                : $"MKVToolNix {installation.Version} je pripravený.";
+                ? Loc.T("Vo vybranom priečinku nie sú funkčné nástroje MKVToolNix (mkvmerge.exe, mkvpropedit.exe).")
+                : Loc.F("MKVToolNix {0} je pripravený.", installation.Version);
             Details = installation?.Directory ?? dialog.FolderName;
             OnPropertyChanged(nameof(IsReady));
         }

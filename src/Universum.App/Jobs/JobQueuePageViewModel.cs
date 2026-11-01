@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Jobs;
+using Universum.App.Localization;
 
 namespace Universum.App.Jobs;
 
@@ -99,21 +100,21 @@ public sealed class JobQueuePageViewModel : ObservableObject
             var jobs = Queue.Jobs;
             if (jobs.Count == 0)
             {
-                return "Fronta je prázdna. Úlohy pridáte tlačidlom Do fronty (Single spracovanie, Úprava hlavičky, Zlučovanie); Hromadné spracovanie sem pridá svoj beh tlačidlom Spustiť.";
+                return Loc.T("Fronta je prázdna. Úlohy pridáte tlačidlom Do fronty (Single spracovanie, Úprava hlavičky, Zlučovanie); Hromadné spracovanie sem pridá svoj beh tlačidlom Spustiť.");
             }
 
             var waiting = jobs.Count(j => j.Status == JobStatus.Waiting);
             var failed = jobs.Count(j => j.Status == JobStatus.Failed);
             var done = jobs.Count(j => j.Status is JobStatus.Done or JobStatus.DoneWithWarnings);
-            return (Queue.Running is { } running ? $"Beží: {running.Description}. " : Queue.IsStarted || waiting == 0 ? "" : "Fronta je zastavená. ") +
-                   $"Čaká: {waiting}, hotovo: {done}" + (failed > 0 ? $", s chybou: {failed}" : "") + ".";
+            return (Queue.Running is { } running ? Loc.F("Beží: {0}. ", running.Description) : Queue.IsStarted || waiting == 0 ? "" : Loc.T("Fronta je zastavená. ")) +
+                   Loc.F("Čaká: {0}, hotovo: {1}", waiting, done) + (failed > 0 ? Loc.F(", s chybou: {0}", failed) : "") + ".";
         }
     }
 
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
     /// <summary>Short text for the navigation ("2 čakajú"); empty when nothing waits or runs.</summary>
-    public string Badge => Queue.Running is not null ? $"beží, čaká {Queue.WaitingCount}" : Queue.WaitingCount > 0 ? $"čaká {Queue.WaitingCount}" : "";
+    public string Badge => Queue.Running is not null ? Loc.F("beží, čaká {0}", Queue.WaitingCount) : Queue.WaitingCount > 0 ? Loc.F("čaká {0}", Queue.WaitingCount) : "";
 
     private void Sync()
     {
@@ -159,8 +160,8 @@ public sealed class JobQueuePageViewModel : ObservableObject
         var problems = await _services.Processor(installation).UndoAsync(record);
         _services.Inspector(installation).Invalidate(job.Plan.Target.Source.Path);
         Message = problems.Count == 0
-            ? $"Úloha {job.Id} je vrátená späť – pôvodná hlavička je obnovená."
-            : "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
+            ? Loc.F("Úloha {0} je vrátená späť – pôvodná hlavička je obnovená.", job.Id)
+            : Loc.T("Vrátenie sa nepodarilo:\n") + string.Join("\n", problems);
         RefreshCommands();
     }
 

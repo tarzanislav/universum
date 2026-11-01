@@ -46,10 +46,10 @@ Tady z filmu, zvuků a titulků složíte **jeden nový soubor MKV** – vyberet
 !pozor Pokud je titul nejistý, objeví se [Potvrdit titul] – dokud ho nepotvrdíte, zápis do knihovny nezačne.
 ### Náhled a MEGA zpracování
 Výsledek si můžete nejdřív **prohlédnout** a teprve hotový, bezchybný tvar poslat do **MEGA zpracování** – zapíše se později, například v noci.
-1. U **Náhľad:** zvolte *úseky: začiatok, stred, koniec (3 × 2 min)* – je hotový za chvíli – nebo *celý film*.
+1. U **Náhľad:** zvolte *úseky: začátek, střed, konec (3 × 2 min)* – je hotový za chvíli – nebo *celý film*.
 2. Klikněte na [Vytvořit náhled]. Náhled se zapíše do **složky náhledů UNIVERSUM**, nikdy ne do výstupní složky.
 3. [Přehrát náhled] ho pustí v přehrávači UNIVERSUM – zvuk přepnete pod obrazem, titulky vpravo nahoře. [V jiném přehrávači] ho otevře v přehrávači Windows.
-4. Když je vše v pořádku, zvolte *do novej dávky* nebo čekající dávku a klikněte na [Odeslat do MEGA].
+4. Když je vše v pořádku, zvolte *do nové dávky* nebo čekající dávku a klikněte na [Odeslat do MEGA].
 - Každá záložka má **vlastní náhled** – můžete připravit a porovnat víc výsledků najednou.
 - Když nastavení po náhledu změníte, UNIVERSUM upozorní, že náhled už výsledku neodpovídá.
 !info Náhled se smaže se svou záložkou nebo po týdnu. Složku náhledů změníte v Nastaveních.

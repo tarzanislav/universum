@@ -1,3 +1,5 @@
+using Universum.App.Localization;
+
 namespace Universum.App.Pages;
 
 /// <summary>
@@ -8,41 +10,41 @@ public static class ServiceLinks
 {
     public static IReadOnlyList<TitleLink> Tmdb { get; } =
     [
-        new("1. Registrácia (zadarmo)…", new Uri("https://www.themoviedb.org/signup")),
-        new("2. Získať kľúč API…", new Uri("https://www.themoviedb.org/settings/api")),
+        new(Loc.T("1. Registrácia (zadarmo)…"), new Uri("https://www.themoviedb.org/signup")),
+        new(Loc.T("2. Získať kľúč API…"), new Uri("https://www.themoviedb.org/settings/api")),
     ];
 
     public static IReadOnlyList<TitleLink> OpenSubtitles { get; } =
     [
-        new("OpenSubtitles: registrácia (zadarmo)…", new Uri("https://www.opensubtitles.com/en/users/sign_up")),
-        new("OpenSubtitles: API kľúč…", new Uri("https://www.opensubtitles.com/en/consumers")),
+        new(Loc.T("OpenSubtitles: registrácia (zadarmo)…"), new Uri("https://www.opensubtitles.com/en/users/sign_up")),
+        new(Loc.T("OpenSubtitles: API kľúč…"), new Uri("https://www.opensubtitles.com/en/consumers")),
     ];
 
     public static IReadOnlyList<TitleLink> SvSub { get; } =
     [
-        new("svsub.net: účet a token…", new Uri("https://svsub.net/")),
+        new(Loc.T("svsub.net: účet a token…"), new Uri("https://svsub.net/")),
     ];
 
     public static IReadOnlyList<TitleLink> DeepL { get; } =
     [
-        new("1. Registrácia DeepL API Free (zadarmo)…", new Uri("https://www.deepl.com/pro-api")),
-        new("2. Získať kľúč…", new Uri("https://www.deepl.com/your-account/keys")),
+        new(Loc.T("1. Registrácia DeepL API Free (zadarmo)…"), new Uri("https://www.deepl.com/pro-api")),
+        new(Loc.T("2. Získať kľúč…"), new Uri("https://www.deepl.com/your-account/keys")),
     ];
 
     public static IReadOnlyList<TitleLink> Cloudflare { get; } =
     [
-        new("1. Registrácia (zadarmo)…", new Uri("https://dash.cloudflare.com/sign-up")),
+        new(Loc.T("1. Registrácia (zadarmo)…"), new Uri("https://dash.cloudflare.com/sign-up")),
         new("2. Account ID (Workers AI)…", new Uri("https://dash.cloudflare.com/?to=/:account/ai/workers-ai")),
-        new("3. Vytvoriť API token…", new Uri("https://dash.cloudflare.com/profile/api-tokens")),
+        new(Loc.T("3. Vytvoriť API token…"), new Uri("https://dash.cloudflare.com/profile/api-tokens")),
     ];
 
     public static IReadOnlyList<TitleLink> OpenAi { get; } =
     [
-        new("Získať kľúč (platené)…", new Uri("https://platform.openai.com/api-keys")),
+        new(Loc.T("Získať kľúč (platené)…"), new Uri("https://platform.openai.com/api-keys")),
     ];
 
     public static IReadOnlyList<TitleLink> Omdb { get; } =
     [
-        new("Získať kľúč (zadarmo)…", new Uri("https://www.omdbapi.com/apikey.aspx")),
+        new(Loc.T("Získať kľúč (zadarmo)…"), new Uri("https://www.omdbapi.com/apikey.aspx")),
     ];
 }

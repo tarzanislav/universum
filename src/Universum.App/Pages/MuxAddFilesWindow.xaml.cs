@@ -1,5 +1,6 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 
 namespace Universum.App.Pages;
 
@@ -37,8 +38,8 @@ public sealed class MuxAddFilesModel : ObservableObject
     {
         Sources = request.Sources;
         Heading = request.Files.Count == 1
-            ? $"Pridávanie súboru {System.IO.Path.GetFileName(request.Files[0])}"
-            : $"Pridávanie {request.Files.Count} súborov";
+            ? Loc.F("Pridávanie súboru {0}", System.IO.Path.GetFileName(request.Files[0]))
+            : Loc.F("Pridávanie {0} súborov", request.Files.Count);
         // as MKVToolNix: into the current settings when it has sources, otherwise new settings for each file
         _action = request.Sources.Count > 0 ? MuxAddAction.AddToCurrent : MuxAddAction.NewSettingsForEach;
         _target = request.Sources.LastOrDefault();

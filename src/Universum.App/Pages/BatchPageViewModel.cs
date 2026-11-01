@@ -4,6 +4,7 @@ using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.App.Templates;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
@@ -47,7 +48,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private readonly Dictionary<string, string> _unverifiedNotes = new(Universum.Core.IO.Paths.Comparer);
     private string _seriesNote = "";
     private BatchTemplate _template = BatchTemplate.RulesOnly;
-    private string _summary = "Vyberte priečinok s video súbormi (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…) a dajte Analyzovať – čo nie je MKV, uloží sa ako nový MKV.";
+    private string _summary = Loc.T("Vyberte priečinok s video súbormi (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…) a dajte Analyzovať – čo nie je MKV, uloží sa ako nový MKV.");
     private string _simulation = "";
     private string _runState = "";
     private double _progress;
@@ -141,7 +142,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 if (_analysis.Groups.SelectMany(g => g.Files).Any(f => layout.HoldsResult(f.Path)))
                 {
                     _needsAnalysis = true;
-                    Summary = "V MOVIES alebo TVSHOWS nového výstupného priečinka sú analyzované súbory – analyzujte priečinok znova (tie sa vynechajú).";
+                    Summary = Loc.T("V MOVIES alebo TVSHOWS nového výstupného priečinka sú analyzované súbory – analyzujte priečinok znova (tie sa vynechajú).");
                     RunCommand.NotifyCanExecuteChanged();
                     return;
                 }
@@ -175,9 +176,9 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>"návrh – potvrďte" while the kind is only guessed from the names (specification 13.5).</summary>
     public string KindNote => _library is { Mixed: true } library
         ? SelectedFirst is not { } first ? ""
-            : library.Unsorted.Contains(first) ? "⚠ súbor nie je v MOVIES ani v TVSHOWS – presuňte ho a dajte Analyzovať"
-            : library.KindFor(first) == MediaKind.Series ? "(podľa priečinka TVSHOWS)" : "(podľa priečinka MOVIES)"
-        : _library is { KindConfirmed: false } ? "(návrh podľa mien súborov – potvrďte)" : "";
+            : library.Unsorted.Contains(first) ? Loc.T("⚠ súbor nie je v MOVIES ani v TVSHOWS – presuňte ho a dajte Analyzovať")
+            : library.KindFor(first) == MediaKind.Series ? Loc.T("(podľa priečinka TVSHOWS)") : Loc.T("(podľa priečinka MOVIES)")
+        : _library is { KindConfirmed: false } ? Loc.T("(návrh podľa mien súborov – potvrďte)") : "";
 
     public bool KindNeedsConfirmation => _library is { KindConfirmed: false, Mixed: false };
 
@@ -198,7 +199,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Clear()
     {
-        if (Busy || IsRunning || !Confirm("Vymazať frontu Hromadného spracovania?\n\nZabudnú sa analyzované súbory a rozhodnutia o nich (aj súbory poslané z Noviniek). Na disku sa nič nezmení."))
+        if (Busy || IsRunning || !Confirm(Loc.T("Vymazať frontu Hromadného spracovania?\n\nZabudnú sa analyzované súbory a rozhodnutia o nich (aj súbory poslané z Noviniek). Na disku sa nič nezmení.")))
         {
             return;
         }
@@ -225,7 +226,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Groups.Clear();
         Simulation = "";
         SummaryIsWarning = false;
-        Summary = "Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.";
+        Summary = Loc.T("Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.");
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
         OnPropertyChanged(nameof(SeriesSuggestion));
@@ -350,13 +351,13 @@ public sealed class BatchPageViewModel : ObservableObject
         if (IsRunning || _ranSinceAnalysis || _needsAnalysis)
         {
             return IsRunning
-                ? "Hromadné spracovanie práve beží – úpravu uložte do úlohy po jeho skončení a novej analýze."
-                : "Hromadné spracovanie už prebehlo (alebo čaká na novú analýzu) – analyzujte priečinok znova a úpravu uložte potom.";
+                ? Loc.T("Hromadné spracovanie práve beží – úpravu uložte do úlohy po jeho skončení a novej analýze.")
+                : Loc.T("Hromadné spracovanie už prebehlo (alebo čaká na novú analýzu) – analyzujte priečinok znova a úpravu uložte potom.");
         }
 
         if (_analysis?.Groups.FirstOrDefault(g => g.Files.Any(f => Paths.Same(f.Path, path))) is not { } group)
         {
-            return "Súbor už nie je v Hromadnom spracovaní – analyzujte priečinok znova.";
+            return Loc.T("Súbor už nie je v Hromadnom spracovaní – analyzujte priečinok znova.");
         }
 
         var key = group.Files.First(f => Paths.Same(f.Path, path)).Path;
@@ -372,7 +373,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         Replan();
-        RunState = $"{Path.GetFileName(path)}: úprava titulkostopy v úlohe – {edits.Describe()}.";
+        RunState = Loc.F("{0}: úprava titulkostopy v úlohe – {1}.", Path.GetFileName(path), edits.Describe());
         return null;
     }
 
@@ -452,8 +453,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
         Replan();
         RunState = revision
-            ? $"{Path.GetFileName(path)}: revízia – spracuje sa znova; nová verzia sa zapíše a overí, až potom ide doterajší výsledok do Koša."
-            : $"{Path.GetFileName(path)}: bez revízie.";
+            ? Loc.F("{0}: revízia – spracuje sa znova; nová verzia sa zapíše a overí, až potom ide doterajší výsledok do Koša.", Path.GetFileName(path))
+            : Loc.F("{0}: bez revízie.", Path.GetFileName(path));
     }
 
     private void ApplyStudioEdits()
@@ -516,12 +517,12 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         Replan();
-        RunState = addition is null ? $"{Path.GetFileName(path)}: bez doplnku k názvu." : $"{Path.GetFileName(path)}: doplnok k názvu „{addition}“ – nová verzia titulu v knižnici.";
+        RunState = addition is null ? Loc.F("{0}: bez doplnku k názvu.", Path.GetFileName(path)) : Loc.F("{0}: doplnok k názvu „{1}“ – nová verzia titulu v knižnici.", Path.GetFileName(path), addition);
     }
 
     /// <summary>The analysed files, by group (for the Information page).</summary>
     public IEnumerable<KnownFile> KnownFiles =>
-        _items.Select(i => new KnownFile($"Hromadné spracovanie – skupina {i.Group.Label}", System.IO.Path.GetFileName(i.File.Path), i.File.Path));
+        _items.Select(i => new KnownFile(Loc.F("Hromadné spracovanie – skupina {0}", i.Group.Label), System.IO.Path.GetFileName(i.File.Path), i.File.Path));
 
     public IReadOnlyList<BatchItem> Items => _items;
 
@@ -567,7 +568,7 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>"Skryť nastavenia ▴" / "Zobraziť nastavenia ▾".</summary>
-    public string PanelsText => ShowPanels ? "Skryť nastavenia ▴" : "Zobraziť nastavenia ▾";
+    public string PanelsText => ShowPanels ? Loc.T("Skryť nastavenia ▴") : Loc.T("Zobraziť nastavenia ▾");
 
     private BatchFinish? _finish;
 
@@ -639,9 +640,9 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     public string TemplateDescription => Template.Slots.Count == 0
-        ? "bez šablóny – len pravidlá UNIVERSUM"
+        ? Loc.T("bez šablóny – len pravidlá UNIVERSUM")
         : $"{Template.Name}: " + string.Join(", ", Template.Slots.Select(s =>
-            $"{Texts.Type(s.Type)} {s.Language}{(s.Role == TrackRole.Main ? "" : " " + Texts.Role(s.Role))}{(s.Required ? " (povinná)" : "")}"));
+            $"{Texts.Type(s.Type)} {s.Language}{(s.Role == TrackRole.Main ? "" : " " + Texts.Role(s.Role))}{(s.Required ? Loc.T(" (povinná)") : "")}"));
 
     public bool RemoveUnlisted
     {
@@ -680,7 +681,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>The choice of the originals can change only between runs.</summary>
     public bool IsIdle => !_running;
 
-    public string DeleteOriginalsText => PendingOriginals().Count is var count and > 0 ? $"Zmazať originály ({count})" : "Zmazať originály";
+    public string DeleteOriginalsText => PendingOriginals().Count is var count and > 0 ? Loc.F("Zmazať originály ({0})", count) : Loc.T("Zmazať originály");
 
     // the originals of results in the library: written by the runs of this page, and found already in the library at
     // the analysis – each one only while it is still in its place
@@ -707,10 +708,10 @@ public sealed class BatchPageViewModel : ObservableObject
         var pending = PendingOriginals();
         var folders = pending.Select(o => Path.GetDirectoryName(o.Source) ?? "").Distinct(Paths.Comparer).ToList();
         if (pending.Count == 0 ||
-            !Confirm($"Zmazať {Texts.Count(pending.Count, "originál", "originály", "originálov")}?\n\n" +
-                     $"Z priečinkov: {string.Join(", ", folders.Take(3))}{(folders.Count > 3 ? $" + {folders.Count - 3} ďalšie" : "")}\n\n" +
-                     "Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od spracovania nezmenil; " +
-                     "súbory v knižnici (MOVIES, TVSHOWS) sa nikdy nemažú."))
+            !Confirm(Loc.F("Zmazať {0}?", Texts.Count(pending.Count, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) + "\n\n" +
+                     Loc.F("Z priečinkov: {0}{1}", string.Join(", ", folders.Take(3)), folders.Count > 3 ? Loc.F(" + {0} ďalšie", folders.Count - 3) : "") + "\n\n" +
+                     Loc.T("Idú do Koša Windows (dajú sa z neho obnoviť). Zmaže sa len originál, ktorého výsledok je v knižnici a ktorý sa od spracovania nezmenil; " +
+                     "súbory v knižnici (MOVIES, TVSHOWS) sa nikdy nemažú.")))
         {
             return;
         }
@@ -723,9 +724,9 @@ public sealed class BatchPageViewModel : ObservableObject
             var index = _services.LibraryIndex;
             var (removed, kept) = await Task.Run(() => OriginalCleanup.RemoveAsync(pending, index, new WindowsRecycleBin(), path => library?.HoldsResult(path) == true));
             _written.RemoveAll(o => removed.Contains(o.Source, Paths.Comparer));
-            RunState = $"Do Koša: {Texts.Count(removed.Count, "originál", "originály", "originálov")}" +
-                       (kept.Count > 0 ? $" · ostalo {kept.Count}: " + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "") +
-                       (removed.Count > 0 ? " · Pre ďalšiu prácu s priečinkom dajte Analyzovať." : "");
+            RunState = Loc.F("Do Koša: {0}", Texts.Count(removed.Count, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) +
+                       (kept.Count > 0 ? Loc.F(" · ostalo {0}: ", kept.Count) + string.Join("; ", kept.Take(5)) + (kept.Count > 5 ? " …" : "") : "") +
+                       (removed.Count > 0 ? Loc.T(" · Pre ďalšiu prácu s priečinkom dajte Analyzovať.") : "");
             LastCleanup = (removed, kept);
             if (removed.Count > 0)
             {
@@ -760,7 +761,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RefreshCommands();
     }
 
-    public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
+    public string OutputDescription => _services.Library?.Root ?? Loc.T("nie je nastavený – zvoľte ho tlačidlom Priečinok…");
 
     /// <summary>Naming decisions for the analysed folder; null without an output folder.</summary>
     public LibraryJob? Library => _library;
@@ -787,7 +788,7 @@ public sealed class BatchPageViewModel : ObservableObject
     public bool CanFindTitles => IsMovies || IsMixed;
 
     /// <summary>"Obsah:" – of the selected group in a sorted folder.</summary>
-    public string KindLabel => IsMixed ? "Obsah skupiny:" : "Obsah:";
+    public string KindLabel => IsMixed ? Loc.T("Obsah skupiny:") : Loc.T("Obsah:");
 
     // the files of the selected group
     private IReadOnlyList<string> SelectedFiles => SelectedGroup?.Group.Files.Select(f => f.Path).ToList() ?? [];
@@ -822,7 +823,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 {
                     if (address.Kind == MediaKind.Movie)
                     {
-                        RunState = "Toto je adresa filmu – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.";
+                        RunState = Loc.T("Toto je adresa filmu – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.");
                         OnPropertyChanged();
                         return;
                     }
@@ -892,8 +893,8 @@ public sealed class BatchPageViewModel : ObservableObject
     public bool CanNameFilm => FilmFiles.Count > 0;
 
     public string FilmHint => CanNameFilm
-        ? FilmFiles.Count > 1 ? $"pre {FilmFiles.Count} súbory (verzie jedného filmu)" : ""
-        : "skupina má viac filmov – vyberte súbory v zozname (Ctrl / Shift) alebo zadajte názov pri súbore";
+        ? FilmFiles.Count > 1 ? Loc.F("pre {0} súbory (verzie jedného filmu)", FilmFiles.Count) : ""
+        : Loc.T("skupina má viac filmov – vyberte súbory v zozname (Ctrl / Shift) alebo zadajte názov pri súbore");
 
     /// <summary>
     /// The film of the selected files (owner, 30. 10. 2026: as the row Seriál) – "Názov (rok)", for a title in another
@@ -945,7 +946,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>The suggested film of the selected files, waiting for confirmation.</summary>
     public string FilmSuggestion => _library is { } library && FilmTitle.Length == 0 &&
                                     FilmFiles.Select(p => library.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) is { } suggestion
-        ? "návrh: " + suggestion
+        ? Loc.T("návrh: ") + suggestion
         : "";
 
     /// <summary>A TMDB ID or address for the selected files' film (the field clears after it is applied).</summary>
@@ -962,7 +963,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
                 else
                 {
-                    RunState = "TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….";
+                    RunState = Loc.T("TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….");
                 }
             }
 
@@ -984,7 +985,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
                 else
                 {
-                    RunState = "TMDB ID je číslo seriálu (napr. 12345) alebo adresa z themoviedb.org (…/tv/…).";
+                    RunState = Loc.T("TMDB ID je číslo seriálu (napr. 12345) alebo adresa z themoviedb.org (…/tv/…).");
                 }
             }
 
@@ -997,13 +998,13 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
         {
-            RunState = "TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok) [tmdbid-ID].";
+            RunState = Loc.T("TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok) [tmdbid-ID].");
             return;
         }
 
         if (reference.Kind == MediaKind.Movie)
         {
-            RunState = "Toto je adresa filmu (/movie/) – seriál má adresu …/tv/….";
+            RunState = Loc.T("Toto je adresa filmu (/movie/) – seriál má adresu …/tv/….");
             return;
         }
 
@@ -1016,7 +1017,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
             else
             {
-                RunState = $"TMDB nepozná seriál s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
+                RunState = Loc.F("TMDB nepozná seriál s ID {0} – skontrolujte číslo alebo vložte adresu z themoviedb.org.", reference.Id);
             }
         }
         catch (TitleServiceException ex)
@@ -1030,7 +1031,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         if ((_services.Titles?.Tmdb ?? _services.Tmdb) is not { } tmdb)
         {
-            RunState = "TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
+            RunState = Loc.T("TMDB ID: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).");
             return;
         }
 
@@ -1043,7 +1044,9 @@ public sealed class BatchPageViewModel : ObservableObject
             }
             else
             {
-                RunState = $"TMDB nepozná {(reference.Kind == MediaKind.Series ? "seriál" : "film")} s ID {reference.Id} – skontrolujte číslo alebo vložte adresu z themoviedb.org.";
+                RunState = reference.Kind == MediaKind.Series
+                    ? Loc.F("TMDB nepozná seriál s ID {0} – skontrolujte číslo alebo vložte adresu z themoviedb.org.", reference.Id)
+                    : Loc.F("TMDB nepozná film s ID {0} – skontrolujte číslo alebo vložte adresu z themoviedb.org.", reference.Id);
             }
         }
         catch (TitleServiceException ex)
@@ -1054,10 +1057,10 @@ public sealed class BatchPageViewModel : ObservableObject
 
     public string SeriesSuggestion => _library is { Mixed: true } mixed
         ? SeriesTitle.Length == 0 && SuggestedSeries is { } groupSuggestion
-            ? "návrh: " + groupSuggestion.FolderName + (groupSuggestion.Problem is { } problem ? $" ⚠ {problem} – nájdite ho cez TMDB alebo Spresniť názvy" : "")
+            ? Loc.T("návrh: ") + groupSuggestion.FolderName + (groupSuggestion.Problem is { } problem ? Loc.F(" ⚠ {0} – nájdite ho cez TMDB alebo Spresniť názvy", problem) : "")
             : ""
         : _library is { Series: null, SeriesSuggestion: { } suggestion } library
-            ? "návrh: " + suggestion.FolderName + (library.SeriesUnverified ? " ⚠ " + _seriesNote : "")
+            ? Loc.T("návrh: ") + suggestion.FolderName + (library.SeriesUnverified ? " ⚠ " + _seriesNote : "")
             : "";
 
     /// <summary>The suggested series waits for its own confirmation (HISTRA did not confirm it; in a sorted folder any suggestion).</summary>
@@ -1088,8 +1091,8 @@ public sealed class BatchPageViewModel : ObservableObject
         ConfirmSuggestions();
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(SeriesSuggestion));
-        RunState = $"Skupina {SelectedGroup.Label} ({SelectedGroup.Title}): návrhy prijaté." +
-                   (_library.SeasonQuestions.Any(SelectedFiles.Contains) ? " Otázky Season 00 / bežná sezóna ostali na vás." : "");
+        RunState = Loc.F("Skupina {0} ({1}): návrhy prijaté.", SelectedGroup.Label, SelectedGroup.Title) +
+                   (_library.SeasonQuestions.Any(SelectedFiles.Contains) ? Loc.T(" Otázky Season 00 / bežná sezóna ostali na vás.") : "");
     }
 
     /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
@@ -1109,7 +1112,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
         else
         {
-            RunState = "TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….";
+            RunState = Loc.T("TMDB ID je číslo filmu (napr. 12345) alebo adresa z themoviedb.org – minisériál vložte ako adresu …/tv/….");
         }
     }
 
@@ -1180,7 +1183,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>A run is in progress (updates wait for it).</summary>
     public bool IsRunning => _running;
 
-    public string PauseText => _control?.IsPaused == true ? "Pokračovať" : "Pozastaviť";
+    public string PauseText => _control?.IsPaused == true ? Loc.T("Pokračovať") : Loc.T("Pozastaviť");
 
     public async Task AnalyzeAsync()
     {
@@ -1193,7 +1196,7 @@ public sealed class BatchPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -1230,7 +1233,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Groups.Clear();
         SelectedGroup = null;
         SummaryIsWarning = false;
-        Summary = "Hľadám video súbory…";
+        Summary = Loc.T("Hľadám video súbory…");
         Progress = 0;
         OnPropertyChanged(nameof(IsAnalyzing));
         RefreshCommands();
@@ -1244,7 +1247,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     // reports still on their way after the end are dropped (they would overwrite the result)
                     if (ReferenceEquals(_analysisCancellation, cancellation))
                     {
-                        Summary = $"Analyzujem {p.Done} / {p.Total}…";
+                        Summary = Loc.F("Analyzujem {0} / {1}…", p.Done, p.Total);
                         Progress = p.Total == 0 ? 0 : (double)p.Done / p.Total;
                     }
                 }),
@@ -1260,7 +1263,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     var signature = StructureSignature.Of(file);
                     if (!live.TryGetValue(signature, out var row))
                     {
-                        live[signature] = row = new GroupRow(new BatchGroup(signature, live.Count)) { State = "číta sa…" };
+                        live[signature] = row = new GroupRow(new BatchGroup(signature, live.Count)) { State = Loc.T("číta sa…") };
                         Groups.Add(row);
                     }
 
@@ -1274,7 +1277,7 @@ public sealed class BatchPageViewModel : ObservableObject
             string? why = null;
             if (_analysis.FileCount == 0 && _analysis.Failed.Count == 0)
             {
-                Summary = "Zisťujem, prečo sa nič nenašlo…";
+                Summary = Loc.T("Zisťujem, prečo sa nič nenašlo…");
                 why = await Task.Run(() => BatchAnalyzer.WhyEmpty(folder, recursive, skipped, cancellation.Token), cancellation.Token);
             }
 
@@ -1303,14 +1306,14 @@ public sealed class BatchPageViewModel : ObservableObject
                 Groups.Add(row);
             }
 
-            Summary = $"{_analysis.FileCount} súborov v {_analysis.Groups.Count} skupinách" +
-                      (_analysis.Failed.Count > 0 ? $", {_analysis.Failed.Count} sa nedalo prečítať ({string.Join(", ", _analysis.Failed.Select(f => Path.GetFileName(f.Path)))})" : "") +
-                      (_leftovers.Count > 0 ? $", {_leftovers.Count} zvyšok po prerušenom spracovaní" : "") +
+            Summary = Loc.F("{0} súborov v {1} skupinách", _analysis.FileCount, _analysis.Groups.Count) +
+                      (_analysis.Failed.Count > 0 ? Loc.F(", {0} sa nedalo prečítať ({1})", _analysis.Failed.Count, string.Join(", ", _analysis.Failed.Select(f => Path.GetFileName(f.Path)))) : "") +
+                      (_leftovers.Count > 0 ? Loc.F(", {0} zvyšok po prerušenom spracovaní", _leftovers.Count) : "") +
                       (_interrupted.Count > 0
-                          ? $", POZOR: {_interrupted.Count} nedokončený presun v knižnici (možno jediná kópia, nemažte): " +
-                            string.Join("; ", _interrupted.Select(f => f + (FileProcessor.OriginalPlaceOf(AppSettings.JournalDirectory, f) is { } home ? " → patrí do " + home : "")))
+                          ? Loc.F(", POZOR: {0} nedokončený presun v knižnici (možno jediná kópia, nemažte): ", _interrupted.Count) +
+                            string.Join("; ", _interrupted.Select(f => f + (FileProcessor.OriginalPlaceOf(AppSettings.JournalDirectory, f) is { } home ? Loc.T(" → patrí do ") + home : "")))
                           : "") + "." +
-                      (_library is null ? " Na spracovanie nastavte výstupný priečinok (knižnicu)." : "") + hint;
+                      (_library is null ? Loc.T(" Na spracovanie nastavte výstupný priečinok (knižnicu).") : "") + hint;
             OnLibraryChanged();
             SelectedGroup = Groups.FirstOrDefault();
 
@@ -1324,12 +1327,12 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 var own = edited.Files.Where(f => f.FromBatch).ToList();
                 var missing = own.Count(f => !File.Exists(f.Path));
-                Summary = $"Upravujete {edited.Label} MEGA spracovania ({Texts.Count(own.Count, "súbor", "súbory", "súborov")}" +
-                          (missing > 0 ? $", {missing} chýba" : "") + $") – po úprave dajte Uložiť do {edited.Label}. · " + Summary;
+                Summary = Loc.F("Upravujete {0} MEGA spracovania ({1}{2}) – po úprave dajte Uložiť do {0}.", edited.Label,
+                              Texts.Count(own.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")), missing > 0 ? Loc.F(", {0} chýba", missing) : "") + " · " + Summary;
             }
             else if (only is not null)
             {
-                Summary = $"Súbory poslané z Noviniek ({only.Count}) · " + Summary + " Celý priečinok spracujete po jeho výbere tlačidlom Priečinok….";
+                Summary = Loc.F("Súbory poslané z Noviniek ({0})", only.Count) + " · " + Summary + Loc.T(" Celý priečinok spracujete po jeho výbere tlačidlom Priečinok….");
             }
 
             // owner, 29. 10. 2026: what is already in the library is known at the analysis (in the background)
@@ -1343,7 +1346,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (_services.Library?.Root != libraryAtStart)
             {
                 _needsAnalysis = true;
-                Summary += " Výstupný priečinok sa počas analýzy zmenil – analyzujte priečinok znova.";
+                Summary += Loc.T(" Výstupný priečinok sa počas analýzy zmenil – analyzujte priečinok znova.");
                 RefreshCommands();
             }
 
@@ -1354,7 +1357,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _analysis = null;
             _items = [];
             Groups.Clear();
-            Summary = "Analýza bola zastavená – dajte Analyzovať znova.";
+            Summary = Loc.T("Analýza bola zastavená – dajte Analyzovať znova.");
             SummaryIsWarning = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1413,7 +1416,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>The further series of the batch beside the field Seriál ("Ďalšie seriály: Sľub (2025)"), or empty.</summary>
     public string OtherSeries => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
-        ? (library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1 ? "+ ďalší seriál: " : $"+ ďalšie seriály ({count}): ") +
+        ? (library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1 ? Loc.T("+ ďalší seriál: ") : Loc.F("+ ďalšie seriály ({0}): ", count)) +
           string.Join(", ", library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
         : "";
 
@@ -1498,7 +1501,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var given = _library.ApplyMemory(_services.SeriesMemory, _analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).ToList());
         return given.Count == 0 ? ""
-            : $" Napovedkyňa: {string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))} – seriál, ktorý už spracúvate, názov bez hľadania (zmeniť ho môžete).";
+            : Loc.F(" Napovedkyňa: {0} – seriál, ktorý už spracúvate, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
     }
 
     // the remembered series a title typed in Novinky names (original title and year), or null
@@ -1558,7 +1561,7 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             var items = _items.Where(i => i.Group == row.Group).ToList();
             var review = items.Count(i => i.Status == BatchStatus.NeedsReview);
-            row.State = review == 0 ? "pripravené" : $"na kontrolu: {review}";
+            row.State = review == 0 ? Loc.T("pripravené") : Loc.F("na kontrolu: {0}", review);
             row.Title = GroupTitle(row.Group);
         }
 
@@ -1577,8 +1580,8 @@ public sealed class BatchPageViewModel : ObservableObject
         var remux = _items.Count(i => i.Status == BatchStatus.Remux);
         var header = _items.Count(i => i.Status == BatchStatus.HeaderEdit);
         var place = _items.Count(i => i.Status == BatchStatus.Place);
-        Simulation = (_library is null ? "Bez výstupného priečinka – len simulácia pravidiel · " : $"Do knižnice {remux + header + place} súborov ({remux} nový súbor, {header} len hlavička, {place} bez zmeny obsahu) · ") +
-                     $"už v knižnici {_items.Count(i => i.Status == BatchStatus.Unchanged)} · na kontrolu {_items.Count(i => i.Status == BatchStatus.NeedsReview)}";
+        Simulation = (_library is null ? Loc.T("Bez výstupného priečinka – len simulácia pravidiel · ") : Loc.F("Do knižnice {0} súborov ({1} nový súbor, {2} len hlavička, {3} bez zmeny obsahu) · ", remux + header + place, remux, header, place)) +
+                     Loc.F("už v knižnici {0} · na kontrolu {1}", _items.Count(i => i.Status == BatchStatus.Unchanged), _items.Count(i => i.Status == BatchStatus.NeedsReview));
         OnFilmChanged();
         OnPropertyChanged(nameof(DeleteOriginalsText));
         OnPropertyChanged(nameof(SeriesTitle));
@@ -1620,9 +1623,9 @@ public sealed class BatchPageViewModel : ObservableObject
             : others switch
             {
                 0 => first,
-                1 => $"{first} + 1 ďalší",
-                < 5 => $"{first} + {others} ďalšie",
-                _ => $"{first} + {others} ďalších",
+                1 => Loc.F("{0} + 1 ďalší", first),
+                < 5 => Loc.F("{0} + {1} ďalšie", first, others),
+                _ => Loc.F("{0} + {1} ďalších", first, others),
             };
     }
 
@@ -1768,7 +1771,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
         catch (TmdbException ex)
         {
-            RunState = "TMDB: epizódy sa nedajú overiť – " + ex.Message;
+            RunState = Loc.T("TMDB: epizódy sa nedajú overiť – ") + ex.Message;
         }
     }
 
@@ -1776,7 +1779,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         if (_library is not null)
         {
-            RunState = $"Do Season 00: {_library.AnswerSpecials()} súborov.";
+            RunState = Loc.F("Do Season 00: {0} súborov.", _library.AnswerSpecials());
             Replan();
         }
     }
@@ -1817,8 +1820,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
         if (_services.Tmdb is null)
         {
-            RunState = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok)" +
-                       (reference.Kind == MediaKind.Movie ? " pri súboroch." : $" [tmdbid-{reference.Id}].");
+            RunState = reference.Kind == MediaKind.Movie
+                ? Loc.T("Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok) pri súboroch.")
+                : Loc.F("Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok) [tmdbid-{0}].", reference.Id);
             return;
         }
 
@@ -1846,9 +1850,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
     // owner, 29. 10. 2026: the user is told it is a miniseries, the name has no season and episode, it cannot be a series
     private static string MiniseriesNote(TmdbTitle show, TitleInfo asFilm) =>
-        $"POZOR: {show.Display} je na TMDB minisériál alebo TV seriál (TMDB {show.Id}), nie film. V mene súboru nie je číslo série a epizódy, " +
-        $"preto sa nedá spracovať ako seriál – uloží sa medzi filmy ako „{asFilm.FolderName}“ bez TMDB ID. Ak súhlasíte, potvrďte ho pri súbore; " +
-        "inak zvoľte druh seriál a doplňte čísla epizód.";
+        Loc.F("POZOR: {0} je na TMDB minisériál alebo TV seriál (TMDB {1}), nie film. V mene súboru nie je číslo série a epizódy, " +
+              "preto sa nedá spracovať ako seriál – uloží sa medzi filmy ako „{2}“ bez TMDB ID. Ak súhlasíte, potvrďte ho pri súbore; " +
+              "inak zvoľte druh seriál a doplňte čísla epizód.", show.Display, show.Id, asFilm.FolderName);
 
     /// <summary>A film chosen by the user for a file (its TMDB address, or one of the titles found for it).</summary>
     public async Task ChooseCandidateAsync(string path, TmdbTitle film)
@@ -1927,7 +1931,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         }
 
-        RunState = note.Length > 0 ? note : $"{(paths.Count == 1 ? Path.GetFileName(paths[0]) : $"{paths.Count} súbory")}: {film.Display}";
+        RunState = note.Length > 0 ? note : $"{(paths.Count == 1 ? Path.GetFileName(paths[0]) : Loc.F("{0} súbory", paths.Count))}: {film.Display}";
         Replan();
         OnPropertyChanged(nameof(FilmTitle));
         OnPropertyChanged(nameof(FilmSuggestion));
@@ -1949,10 +1953,10 @@ public sealed class BatchPageViewModel : ObservableObject
         if (title.ToLibraryTitle(path is null ? null : TitleGuess.ForFile(path).Title?.Name) is not { } fallback ||
             TitleGuess.Typed(title.Kind, fallback.FolderName) is not { } named)
         {
-            return (null, "TMDB nemá názov latinkou – napíšte ho pred rok, napr. Anglický názov " + text + ".");
+            return (null, Loc.F("TMDB nemá názov latinkou – napíšte ho pred rok, napr. Anglický názov {0}.", text));
         }
 
-        return (named, $"TMDB nemá anglický názov – použitý je „{named.Name}“ s TMDB ID {title.Id}; ak treba, opravte názov (ID ostane).");
+        return (named, Loc.F("TMDB nemá anglický názov – použitý je „{0}“ s TMDB ID {1}; ak treba, opravte názov (ID ostane).", named.Name, title.Id));
     }
 
     private void ChooseTmdbSeries(TmdbTitle title)
@@ -1973,11 +1977,11 @@ public sealed class BatchPageViewModel : ObservableObject
                     _library.SeriesOfFile[path] = groupSeries;
                 }
 
-                RunState = seriesNote.Length > 0 ? seriesNote : $"Skupina {SelectedGroup?.Label}: {title.Display}";
+                RunState = seriesNote.Length > 0 ? seriesNote : Loc.F("Skupina {0}: {1}", SelectedGroup?.Label, title.Display);
             }
             else
             {
-                RunState = "Toto je film – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.";
+                RunState = Loc.T("Toto je film – v priečinku TVSHOWS má byť seriál; film presuňte do MOVIES.");
             }
 
             OnPropertyChanged(nameof(SeriesTitle));
@@ -2012,7 +2016,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
 
             RunState = (note.Length > 0 ? note + " " : "") + (Tmdb.NeedsConfirmation ? "⚠ " + Tmdb.Warning + " " : "") +
-                       "Adresa TMDB je film (/movie/): druh je filmy a všetky súbory dostali tento názov (verzie jedného filmu) – pri súboroch ho môžete zmeniť.";
+                       Loc.T("Adresa TMDB je film (/movie/): druh je filmy a všetky súbory dostali tento názov (verzie jedného filmu) – pri súboroch ho môžete zmeniť.");
             OnLibraryChanged();
             return;
         }
@@ -2032,7 +2036,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _library.SeriesUnverified = true;
             _seriesNote = Tmdb.Warning;
             _library.SeriesOnTmdb = title.Seasons.Count > 0 ? (chosen, title.Seasons) : null;
-            RunState = (note.Length > 0 ? note + " " : "") + "⚠ " + Tmdb.Warning + " Ak je správny, dajte Potvrdiť seriál.";
+            RunState = (note.Length > 0 ? note + " " : "") + "⚠ " + Tmdb.Warning + Loc.T(" Ak je správny, dajte Potvrdiť seriál.");
             OnLibraryChanged();
             return;
         }
@@ -2070,7 +2074,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Busy = true;
         _tmdbCancellation = new CancellationTokenSource();
         StopCommand.NotifyCanExecuteChanged();
-        void OnWaiting(TimeSpan delay) => RunState = $"{service} žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s a pokračujem…";
+        void OnWaiting(TimeSpan delay) => RunState = Loc.F("{0} žiada spomaliť – čakám {1:0} s a pokračujem…", service, Math.Ceiling(delay.TotalSeconds));
         titles.Waiting += OnWaiting;
         int asked = 0, found = 0, unverified = 0, ambiguous = 0, nowhere = 0;
         var problem = "";
@@ -2079,7 +2083,7 @@ public sealed class BatchPageViewModel : ObservableObject
             foreach (var (path, guess) in pending)
             {
                 asked++;
-                RunState = $"{service} {asked} / {pending.Count} ({questions} rôznych názvov)…";
+                RunState = Loc.F("{0} {1} / {2} ({3} rôznych názvov)…", service, asked, pending.Count, questions);
                 // the name of a file may be wrong (owner, 28. 10.): searched also without the year or shortened, matched
                 // also by a similar name; whatever is not the name and year as read waits for confirmation at the file
                 var results = await titles.SearchTolerantAsync(MediaKind.Movie, guess.Name, guess.Year, _tmdbCancellation.Token);
@@ -2110,18 +2114,18 @@ public sealed class BatchPageViewModel : ObservableObject
                 if (match is null && results.Similar(guess.Name) is { } similar)
                 {
                     match = similar.Title;
-                    doubts.Add($"názov v mene súboru sa líši (zhoda {similar.Similarity * 100:0} %)");
+                    doubts.Add(Loc.F("názov v mene súboru sa líši (zhoda {0:0} %)", similar.Similarity * 100));
                 }
 
                 if (match is null && results.OnlyOne(year) is { } only)
                 {
                     match = only;
-                    doubts.Add("jediný nájdený titul, jeho názov sa s menom súboru nezhoduje");
+                    doubts.Add(Loc.T("jediný nájdený titul, jeho názov sa s menom súboru nezhoduje"));
                 }
 
                 if (match is { Year: { } foundYear } && guess.Year is { } fileYear && Math.Abs(foundYear - fileYear) > 1)
                 {
-                    doubts.Add($"rok v mene súboru {fileYear}, na {results.Source} {foundYear}");
+                    doubts.Add(Loc.F("rok v mene súboru {0}, na {1} {2}", fileYear, results.Source, foundYear));
                 }
 
                 if (match?.ToTitleInfo() is { } info)
@@ -2140,7 +2144,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
                         _library.UnverifiedTitles.Add(path);
                         _unverifiedNotes[path] = (doubts.Count > 0
-                                                     ? $"{results.Source} navrhuje {match.Display}: {string.Join("; ", doubts)} – skontrolujte a potvrďte, alebo vyberte iný titul. "
+                                                     ? Loc.F("{0} navrhuje {1}: {2} – skontrolujte a potvrďte, alebo vyberte iný titul. ", results.Source, match.Display, string.Join("; ", doubts))
                                                      : "") + TmdbPicker.Describe(results, match);
                         unverified++;
                     }
@@ -2156,9 +2160,9 @@ public sealed class BatchPageViewModel : ObservableObject
                     _library.UnverifiedTitles.Add(path);
                     var listed = string.Join(", ", results.Titles.Take(3).Select(t => t.Display)) + (results.Titles.Count > 3 ? ", …" : "");
                     _unverifiedNotes[path] = (results.Titles.Count == 1
-                                                 ? $"{results.Source} našlo len {listed} – iný rok, než má súbor"
-                                                 : $"{results.Source} našlo viac titulov ({listed}) a žiadny sa nevolá ako súbor") +
-                                             " – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok), vložte TMDB ID (číslo alebo adresu z themoviedb.org) alebo potvrďte návrh z mena súboru.";
+                                                 ? Loc.F("{0} našlo len {1} – iný rok, než má súbor", results.Source, listed)
+                                                 : Loc.F("{0} našlo viac titulov ({1}) a žiadny sa nevolá ako súbor", results.Source, listed)) +
+                                             Loc.T(" – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok), vložte TMDB ID (číslo alebo adresu z themoviedb.org) alebo potvrďte návrh z mena súboru.");
                     ambiguous++;
                 }
                 else if (results.FoundNowhere)
@@ -2166,8 +2170,8 @@ public sealed class BatchPageViewModel : ObservableObject
                     // found nowhere: the suggestion from the file's name stays and waits at the file for confirmation
                     _library.UnverifiedTitles.Add(path);
                     _unverifiedNotes[path] = (results.TmdbProblem is { } refused ? refused + " " : "") +
-                                             (titles.Tmdb is null ? "Katalóg HISTRA titul nenašiel" : "TMDB ani HISTRA titul nenašli") +
-                                             " – návrh je z mena súboru. Ak poznáte TMDB ID, vložte ho do poľa s názvom pri súbore (číslo alebo adresu z themoviedb.org).";
+                                             (titles.Tmdb is null ? Loc.T("Katalóg HISTRA titul nenašiel") : Loc.T("TMDB ani HISTRA titul nenašli")) +
+                                             Loc.T(" – návrh je z mena súboru. Ak poznáte TMDB ID, vložte ho do poľa s názvom pri súbore (číslo alebo adresu z themoviedb.org).");
                     nowhere++;
                 }
             }
@@ -2179,7 +2183,7 @@ public sealed class BatchPageViewModel : ObservableObject
                                                             !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? [])
             {
                 seriesAsked++;
-                RunState = $"{service}: seriál {unit.Name!.Name}…";
+                RunState = Loc.F("{0}: seriál {1}…", service, unit.Name!.Name);
                 var results = await titles.SearchTolerantAsync(MediaKind.Series, unit.Name.Name, unit.Name.Year, _tmdbCancellation.Token);
                 if ((results.Best(unit.Name.Name, results.Loosened is null ? unit.Name.Year : null) ?? results.OnlyOne(unit.Name.Year)) is { } show &&
                     TitleGuess.Typed(MediaKind.Series, TmdbPicker.TitleText(show).Text) is { } info)
@@ -2193,20 +2197,20 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
             }
 
-            RunState = (seriesAsked > 0 ? $"Seriály: nájdené {seriesFound} z {seriesAsked} – návrh potvrďte pri skupine (Potvrdiť seriál alebo Prijať všetko v skupine). " : "") +
-                       $"Spresnené názvy ({service}): {found} z {pending.Count} navrhnutých" +
-                       (unverified > 0 ? $", {unverified} čaká na potvrdenie (⚠ pri súbore – názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila)" : "") +
-                       (ambiguous > 0 ? $", {ambiguous} majú viac možných titulov (⚠ pri súbore – vyberte správny)" : "") +
-                       (nowhere > 0 ? $", {nowhere} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)" : "") +
-                       " – skontrolujte ich a dajte Prijať návrhy názvov." + (problem.Length > 0 ? " " + problem : "");
+            RunState = (seriesAsked > 0 ? Loc.F("Seriály: nájdené {0} z {1} – návrh potvrďte pri skupine (Potvrdiť seriál alebo Prijať všetko v skupine). ", seriesFound, seriesAsked) : "") +
+                       Loc.F("Spresnené názvy ({0}): {1} z {2} navrhnutých", service, found, pending.Count) +
+                       (unverified > 0 ? Loc.F(", {0} čaká na potvrdenie (⚠ pri súbore – názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila)", unverified) : "") +
+                       (ambiguous > 0 ? Loc.F(", {0} majú viac možných titulov (⚠ pri súbore – vyberte správny)", ambiguous) : "") +
+                       (nowhere > 0 ? Loc.F(", {0} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)", nowhere) : "") +
+                       Loc.T(" – skontrolujte ich a dajte Prijať návrhy názvov.") + (problem.Length > 0 ? " " + problem : "");
         }
         catch (OperationCanceledException)
         {
-            RunState = $"Zastavené – spresnené {found} z {asked} doteraz prejdených názvov.";
+            RunState = Loc.F("Zastavené – spresnené {0} z {1} doteraz prejdených názvov.", found, asked);
         }
         catch (TitleServiceException ex)
         {
-            RunState = ex.Message + $" (spresnené doteraz: {found})";
+            RunState = ex.Message + Loc.F(" (spresnené doteraz: {0})", found);
         }
         finally
         {
@@ -2234,7 +2238,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     /// <summary>Why HISTRA did not confirm a file's suggested title; null when it did (or was not asked).</summary>
     public string? UnverifiedNote(string path) =>
-        _library?.UnverifiedTitles.Contains(path) == true ? _unverifiedNotes.GetValueOrDefault(path) ?? "HISTRA titul nepotvrdila." : null;
+        _library?.UnverifiedTitles.Contains(path) == true ? _unverifiedNotes.GetValueOrDefault(path) ?? Loc.T("HISTRA titul nepotvrdila.") : null;
 
     private void ConfirmTitles()
     {
@@ -2262,7 +2266,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Replan();
         if (own.Count > 0)
         {
-            RunState = $"Návrhy s upozornením ostali na vašu voľbu ({string.Join(", ", own)}) – jazyk vyberte pri stope.";
+            RunState = Loc.F("Návrhy s upozornením ostali na vašu voľbu ({0}) – jazyk vyberte pri stope.", string.Join(", ", own));
         }
     }
 
@@ -2331,7 +2335,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 var key = FileKey(file.Path);
                 if (again || !_subtitleLanguages.TryGetValue(key, out var found))
                 {
-                    RunState = $"Čítam titulky {++read} / {groups.Count}: {Path.GetFileName(file.Path)}…";
+                    RunState = Loc.F("Čítam titulky {0} / {1}: {2}…", ++read, groups.Count, Path.GetFileName(file.Path));
                     found = await SubtitleText.DetectAsync(installation, _services.Runner, ffmpeg, file, cancellation.Token);
                     _subtitleLanguages[key] = found;
                 }
@@ -2357,16 +2361,16 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
             }
 
-            RunState = $"Titulky prečítané: jazyk {Texts.Count(certain + probable, "stopy", "stôp", "stôp")} je návrh UNIVERSUM" +
-                       (probable > 0 ? $" ({probable} len najpravdepodobnejší – overte)" : "") + " – iný jazyk vyberiete pri stope.";
+            RunState = Loc.F("Titulky prečítané: jazyk {0} je návrh UNIVERSUM", Texts.Count(certain + probable, Loc.T("stopy"), Loc.T("stôp"), Loc.T("stôp"))) +
+                       (probable > 0 ? Loc.F(" ({0} len najpravdepodobnejší – overte)", probable) : "") + Loc.T(" – iný jazyk vyberiete pri stope.");
         }
         catch (OperationCanceledException)
         {
-            RunState = "Čítanie titulkov zastavené – jazyky ostávajú, ako ich má súbor.";
+            RunState = Loc.T("Čítanie titulkov zastavené – jazyky ostávajú, ako ich má súbor.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Core.Processes.ProcessStartException or TimeoutException or MkvToolNixException)
         {
-            RunState = "Titulky sa nepodarilo prečítať – jazyky ostávajú, ako ich má súbor: " + ex.Message;
+            RunState = Loc.T("Titulky sa nepodarilo prečítať – jazyky ostávajú, ako ich má súbor: ") + ex.Message;
         }
         finally
         {
@@ -2439,15 +2443,15 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             if (targets.Count > 0)
             {
-                RunState = "Overujem nástroje rozpoznávania reči…";
+                RunState = Loc.T("Overujem nástroje rozpoznávania reči…");
                 var tools = await _services.SpeechAsync(cancellation.Token);
                 foreach (var target in targets)
                 {
                     var name = $"{Path.GetFileName(target.File.Path)} – {Texts.Slot(target.Key)}";
-                    var where = $"Počúvam {done + 1}/{targets.Count}: {name}";
+                    var where = Loc.F("Počúvam {0}/{1}: {2}", done + 1, targets.Count, name);
                     RunState = where + "…";
                     Progress = (double)done / targets.Count;
-                    var pieces = new Progress<int>(n => RunState = $"{where} (úsekov: {n})…");
+                    var pieces = new Progress<int>(n => RunState = Loc.F("{0} (úsekov: {1})…", where, n));
                     var ordinal = await _services.AudioOrdinalAsync(target.File.Path, target.Track, target.Key.Ordinal, cancellation.Token);
                     var result = await SpokenLanguage.DetectAsync(tools, _services.Runner, target.File.Path, ordinal, target.File.Duration, pieces, cancellation.Token);
                     if (result.Language is { } code)
@@ -2471,20 +2475,20 @@ public sealed class BatchPageViewModel : ObservableObject
 
             Replan();
             RunState = (targets.Count == 0 && known == 0
-                           ? scope == SpeechScope.Selected ? "Vyberte v zozname súbory, ktoré sa majú vypočuť." : "Audio: žiadne stopy bez jazyka."
-                           : Texts.Detection("Audio", recognised, failed, 0,
-                               known > 0 ? $"{known} už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania)" : null)) +
-                       (notes.Count > 0 ? " " + string.Join("; ", notes.Take(3)) + (notes.Count > 3 ? $" (a ďalšie: {notes.Count - 3})" : "") + "." : "");
+                           ? scope == SpeechScope.Selected ? Loc.T("Vyberte v zozname súbory, ktoré sa majú vypočuť.") : Loc.T("Audio: žiadne stopy bez jazyka.")
+                           : Texts.Detection(Loc.T("Audio"), recognised, failed, 0,
+                               known > 0 ? Loc.F("{0} už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania)", known) : null)) +
+                       (notes.Count > 0 ? " " + string.Join("; ", notes.Take(3)) + (notes.Count > 3 ? Loc.F(" (a ďalšie: {0})", notes.Count - 3) : "") + "." : "");
         }
         catch (OperationCanceledException)
         {
             Replan();
-            RunState = $"Rozpoznávanie reči zastavené – rozpoznané doteraz: {recognised} z {targets.Count}.";
+            RunState = Loc.F("Rozpoznávanie reči zastavené – rozpoznané doteraz: {0} z {1}.", recognised, targets.Count);
         }
         catch (SpeechException ex)
         {
             Replan();
-            RunState = ex.Message + (recognised > 0 ? $" (rozpoznané doteraz: {recognised})" : "");
+            RunState = ex.Message + (recognised > 0 ? Loc.F(" (rozpoznané doteraz: {0})", recognised) : "");
         }
         finally
         {
@@ -2527,8 +2531,8 @@ public sealed class BatchPageViewModel : ObservableObject
         // the choice is kept between starts, so each run with it is confirmed
         var originals = Originals;
         if (originals == OriginalsMode.DeleteAutomatically &&
-            !Confirm($"Spustiť so ZMAZANÍM ORIGINÁLOV?\n\nKaždý originál pôjde do Koša Windows hneď po zapísaní a overení nového súboru v knižnici " +
-                     $"({Texts.Count(_items.Count(i => i.NeedsWork), "súbor", "súbory", "súborov")}). Ak ich chcete ponechať, zvoľte Originál: zachovať."))
+            !Confirm(Loc.T("Spustiť so ZMAZANÍM ORIGINÁLOV?") + "\n\n" + Loc.F("Každý originál pôjde do Koša Windows hneď po zapísaní a overení nového súboru v knižnici " +
+                     "({0}). Ak ich chcete ponechať, zvoľte Originál: zachovať.", Texts.Count(_items.Count(i => i.NeedsWork), Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")))))
         {
             return;
         }
@@ -2549,7 +2553,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
             // owner, 29. 10. 2026: the run is a job of the job queue – seen in Fronta úloh and Výstup úloh
             var job = new Core.Jobs.BatchJob(
-                $"Hromadné spracovanie: {Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))} → knižnica",
+                Loc.F("Hromadné spracovanie: {0} → knižnica", Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))),
                 _items, processor, new OutputOptions(handling, MoveIntoLibrary: false),
                 new Progress<BatchProgress>(p =>
                 {
@@ -2569,7 +2573,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _services.Jobs.Add(job, start: true);
             if (job.Status == Core.Jobs.JobStatus.Waiting && _services.Jobs.Running is { } other)
             {
-                RunState = $"Čaká vo fronte úloh – najprv sa dokončí úloha {other.Id} ({other.Description}).";
+                RunState = Loc.F("Čaká vo fronte úloh – najprv sa dokončí úloha {0} ({1}).", other.Id, other.Description);
             }
 
             await finished.Task;
@@ -2596,10 +2600,10 @@ public sealed class BatchPageViewModel : ObservableObject
             var cancelled = job.Status == Core.Jobs.JobStatus.Cancelled;
             var broken = job.Status == Core.Jobs.JobStatus.Failed && _results.Count == 0;
             var stopped = cancelled || _control.StopAfterCurrent;
-            RunState = broken ? $"Spracovanie sa nepodarilo spustiť – pozri Výstup úloh (úloha {job.Id})."
-                : $"Hotovo: {done} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
-                  (failed > 0 ? $", {failed} s chybou (pozri správu)" : "") +
-                  (cancelled ? " – zrušené vo fronte úloh." : stopped ? " – zastavené na požiadanie." : ".") + " Pre ďalší beh dajte Analyzovať.";
+            RunState = broken ? Loc.F("Spracovanie sa nepodarilo spustiť – pozri Výstup úloh (úloha {0}).", job.Id)
+                : Loc.F("Hotovo: {0} súborov v knižnici", done) + (present > 0 ? Loc.F(", {0} tam už bolo", present) : "") +
+                  (failed > 0 ? Loc.F(", {0} s chybou (pozri správu)", failed) : "") +
+                  (cancelled ? Loc.T(" – zrušené vo fronte úloh.") : stopped ? Loc.T(" – zastavené na požiadanie.") : ".") + Loc.T(" Pre ďalší beh dajte Analyzovať.");
             _ranSinceAnalysis = true;
 
             // a group processed is no longer new
@@ -2612,13 +2616,13 @@ public sealed class BatchPageViewModel : ObservableObject
             var time = took.TotalMinutes >= 1 ? $"{(int)took.TotalHours}:{took.Minutes:00}:{took.Seconds:00}" : $"{Math.Max(1, (int)took.TotalSeconds)} s";
             Finish = new BatchFinish(
                 failed > 0 || broken ? BatchFinishKind.Errors : stopped ? BatchFinishKind.Stopped : BatchFinishKind.Done,
-                (broken ? "CHYBA" : failed > 0 ? "HOTOVO S CHYBAMI" : cancelled ? "ZRUŠENÉ" : stopped ? "ZASTAVENÉ" : "HOTOVO") + $" – spracovanie skončilo o {DateTime.Now:H:mm}",
-                $"{Texts.Count(done, "súbor", "súbory", "súborov")} v knižnici" + (present > 0 ? $" · {present} tam už bolo" : "") +
-                (failed > 0 ? $" · {failed} s chybou – podrobnosti v Uložiť správu…" : "") +
-                (recycled > 0 ? $" · {Texts.Count(recycled, "originál", "originály", "originálov")} v Koši" : "") +
-                (stayed > 0 ? $" · {stayed} originálov ostalo (Kôš nie je k dispozícii – pozri Výstup úloh)" : "") +
-                (originals == OriginalsMode.DeleteManually && PendingOriginals().Count > 0 ? " · originály zmažete tlačidlom Zmazať originály" : "") +
-                $" · trvanie {time} · úloha {job.Id} vo Fronte úloh");
+                (broken ? Loc.T("CHYBA") : failed > 0 ? Loc.T("HOTOVO S CHYBAMI") : cancelled ? Loc.T("ZRUŠENÉ") : stopped ? Loc.T("ZASTAVENÉ") : Loc.T("HOTOVO")) + Loc.F(" – spracovanie skončilo o {0:H:mm}", DateTime.Now),
+                Loc.F("{0} v knižnici", Texts.Count(done, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov"))) + (present > 0 ? Loc.F(" · {0} tam už bolo", present) : "") +
+                (failed > 0 ? Loc.F(" · {0} s chybou – podrobnosti v Uložiť správu…", failed) : "") +
+                (recycled > 0 ? Loc.F(" · {0} v Koši", Texts.Count(recycled, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) : "") +
+                (stayed > 0 ? Loc.F(" · {0} originálov ostalo (Kôš nie je k dispozícii – pozri Výstup úloh)", stayed) : "") +
+                (originals == OriginalsMode.DeleteManually && PendingOriginals().Count > 0 ? Loc.T(" · originály zmažete tlačidlom Zmazať originály") : "") +
+                Loc.F(" · trvanie {0} · úloha {1} vo Fronte úloh", time, job.Id));
         }
         finally
         {
@@ -2643,7 +2647,7 @@ public sealed class BatchPageViewModel : ObservableObject
         var profile = Template.Apply(_services.Profile);
         var template = Template.Slots.Count == 0 ? null : Template.ToJson();
         var target = _editing ?? SelectedMegaTarget?.Batch;
-        var left = waiting > 0 ? $"\n\n{Texts.Count(waiting, "súbor čaká", "súbory čakajú", "súborov čaká")} na kontrolu – tie ostanú tu." : "";
+        var left = waiting > 0 ? "\n\n" + Loc.F("{0} na kontrolu – tie ostanú tu.", Texts.Count(waiting, Loc.T("súbor čaká"), Loc.T("súbory čakajú"), Loc.T("súborov čaká"))) : "";
         try
         {
             if (target is not null)
@@ -2651,44 +2655,44 @@ public sealed class BatchPageViewModel : ObservableObject
                 // owner, 29. 10. 2026: a batch completed with new files or corrected – the same library only
                 if (!Paths.Same(Path.TrimEndingDirectorySeparator(target.LibraryRoot), Path.TrimEndingDirectorySeparator(_library.Layout.Root)))
                 {
-                    RunState = $"{target.Label} zapisuje do inej knižnice ({target.LibraryRoot}) – pošlite súbory do novej dávky.";
+                    RunState = Loc.F("{0} zapisuje do inej knižnice ({1}) – pošlite súbory do novej dávky.", target.Label, target.LibraryRoot);
                     return;
                 }
 
                 if (target.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed))
                 {
-                    RunState = $"{target.Label} už nečaká – pošlite súbory do novej dávky.";
+                    RunState = Loc.F("{0} už nečaká – pošlite súbory do novej dávky.", target.Label);
                     return;
                 }
 
                 // the batch deletes (or keeps) the originals as it was sent – the page has to say the same
                 if (target.Originals != Originals)
                 {
-                    RunState = $"{target.Label} má originály: {OriginalsText(target.Originals)}; tu je zvolené: {OriginalsText(Originals)}. " +
-                               "Zvoľte rovnako, alebo pošlite súbory do novej dávky.";
+                    RunState = Loc.F("{0} má originály: {1}; tu je zvolené: {2}. " +
+                               "Zvoľte rovnako, alebo pošlite súbory do novej dávky.", target.Label, OriginalsText(target.Originals), OriginalsText(Originals));
                     return;
                 }
 
-                if (!Confirm($"Uložiť do {target.Label} {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                             "Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú." +
-                             $"\n\nOriginály: {OriginalsText(target.Originals)}." + left))
+                if (!Confirm(Loc.F("Uložiť do {0} {1}?", target.Label, Texts.Count(ready.Count, Loc.T("pripravený súbor"), Loc.T("pripravené súbory"), Loc.T("pripravených súborov"))) + "\n\n" +
+                             Loc.T("Súbory, ktoré dávka už má, dostanú nové rozhodnutia; ostatné sa pridajú.") +
+                             "\n\n" + Loc.F("Originály: {0}.", OriginalsText(target.Originals)) + left))
                 {
                     return;
                 }
 
                 var (added, changed) = _services.Mega.Put(target, ready, profile, template);
                 StopEditing();
-                RunState = $"{target.Label}: {Texts.Count(added, "pridaný súbor", "pridané súbory", "pridaných súborov")}, " +
-                           $"{Texts.Count(changed, "upravený", "upravené", "upravených")}.";
+                RunState = $"{target.Label}: {Texts.Count(added, Loc.T("pridaný súbor"), Loc.T("pridané súbory"), Loc.T("pridaných súborov"))}, " +
+                           $"{Texts.Count(changed, Loc.T("upravený"), Loc.T("upravené"), Loc.T("upravených"))}.";
             }
             else
             {
                 var titles = ready.Select(i => i.Title?.Name).OfType<string>().Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
                 var name = $"{Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))}: " +
-                           string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? $" + {titles.Count - 3} ďalšie" : "");
-                if (!Confirm($"Odoslať do MEGA spracovania {Texts.Count(ready.Count, "pripravený súbor", "pripravené súbory", "pripravených súborov")}?\n\n" +
-                             "Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“." +
-                             $"\n\nOriginály: {OriginalsText(Originals)} (dávka si to zapamätá)." + left))
+                           string.Join(", ", titles.Take(3)) + (titles.Count > 3 ? Loc.F(" + {0} ďalšie", titles.Count - 3) : "");
+                if (!Confirm(Loc.F("Odoslať do MEGA spracovania {0}?", Texts.Count(ready.Count, Loc.T("pripravený súbor"), Loc.T("pripravené súbory"), Loc.T("pripravených súborov"))) + "\n\n" +
+                             Loc.T("Zapíšu sa neskôr – keď dávku spustíte alebo v nastavenom čase. Tu sa ukážu ako „v dávke“.") +
+                             "\n\n" + Loc.F("Originály: {0} (dávka si to zapamätá).", OriginalsText(Originals)) + left))
                 {
                     return;
                 }
@@ -2696,11 +2700,11 @@ public sealed class BatchPageViewModel : ObservableObject
                 // the batch takes over what happens with the originals (owner, 30. 10. 2026)
                 if (_services.Mega.Add(name, _library.Layout.Root, profile, Originals, ready, template) is not { } batch)
                 {
-                    RunState = "Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.";
+                    RunState = Loc.T("Všetky pripravené súbory už sú v niektorej dávke MEGA spracovania.");
                     return;
                 }
 
-                RunState = $"Odoslané do MEGA spracovania ako {batch.Label} ({Texts.Count(batch.Files.Count, "súbor", "súbory", "súborov")}).";
+                RunState = Loc.F("Odoslané do MEGA spracovania ako {0} ({1}).", batch.Label, Texts.Count(batch.Files.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")));
             }
 
             RememberSeries(ready);
@@ -2711,15 +2715,15 @@ public sealed class BatchPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            RunState = "Dávku sa nepodarilo uložiť: " + ex.Message;
+            RunState = Loc.T("Dávku sa nepodarilo uložiť: ") + ex.Message;
         }
     }
 
     internal static string OriginalsText(OriginalsMode mode) => mode switch
     {
-        OriginalsMode.DeleteAutomatically => "zmažú sa automaticky (do Koša hneď po overení výsledku)",
-        OriginalsMode.DeleteManually => "zmažete ich ručne po dokončení dávky (do Koša)",
-        _ => "zachovajú sa",
+        OriginalsMode.DeleteAutomatically => Loc.T("zmažú sa automaticky (do Koša hneď po overení výsledku)"),
+        OriginalsMode.DeleteManually => Loc.T("zmažete ich ručne po dokončení dávky (do Koša)"),
+        _ => Loc.T("zachovajú sa"),
     };
 
     /// <summary>Where Odoslať do MEGA puts the prepared files: a new batch, or a waiting one to be completed.</summary>
@@ -2732,7 +2736,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>A MEGA batch is open here to be corrected: the button saves it back.</summary>
     public bool IsEditingMega => _editing is not null;
 
-    public string SendToMegaText => _editing is { } batch ? $"Uložiť do {batch.Label}" : "Odoslať do MEGA";
+    public string SendToMegaText => _editing is { } batch ? Loc.F("Uložiť do {0}", batch.Label) : Loc.T("Odoslať do MEGA");
 
     // the batch of MEGA spracovanie opened here to be corrected (it does not start meanwhile)
     private Core.Mega.MegaBatch? _editing;
@@ -2919,10 +2923,10 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         var chosen = _megaTarget?.Batch;
         MegaTargets.Clear();
-        MegaTargets.Add(new MegaTarget("do novej dávky", null));
+        MegaTargets.Add(new MegaTarget(Loc.T("do novej dávky"), null));
         foreach (var batch in _services.Mega.Batches.Where(b => b.State is Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed && !b.IsBeingEdited))
         {
-            MegaTargets.Add(new MegaTarget($"doplniť {batch.Label}: {batch.Name}", batch));
+            MegaTargets.Add(new MegaTarget(Loc.F("doplniť {0}: {1}", batch.Label, batch.Name), batch));
         }
 
         SelectedMegaTarget = MegaTargets.FirstOrDefault(t => t.Batch == chosen) ?? MegaTargets[0];
@@ -3039,7 +3043,7 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             _control.StopAfterCurrent = true;
             _control.Resume();
-            RunState = "Zastavím po dokončení rozpracovaných súborov…";
+            RunState = Loc.T("Zastavím po dokončení rozpracovaných súborov…");
 
             // a run still waiting in the job queue is taken out of it
             if (_job is { Status: Core.Jobs.JobStatus.Waiting } waiting)
@@ -3077,7 +3081,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void SaveReport()
     {
-        var dialog = new SaveFileDialog { Filter = "Stránka HTML (*.html)|*.html|Tabuľka CSV (*.csv)|*.csv", FileName = "UNIVERSUM – správa.html" };
+        var dialog = new SaveFileDialog { Filter = Loc.T("Stránka HTML (*.html)|*.html|Tabuľka CSV (*.csv)|*.csv"), FileName = "UNIVERSUM – správa.html" };
         if (dialog.ShowDialog() == true)
         {
             var content = dialog.FileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase)
@@ -3089,7 +3093,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
         if (dialog.ShowDialog() == true)
         {
             _services.SetOutputDirectory(dialog.FolderName);
@@ -3098,7 +3102,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void ChooseFolder()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok so súbormi MKV" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Priečinok so súbormi MKV") };
         if ((Folder is { } last && Directory.Exists(last) ? last : _services.Settings.InputDirectory) is { } start && Directory.Exists(start))
         {
             dialog.InitialDirectory = start;
@@ -3112,7 +3116,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void EditTemplate()
     {
-        var model = new TemplateEditorViewModel(Template.Slots.Count == 0 ? Template with { Name = "Moja šablóna" } : Template);
+        var model = new TemplateEditorViewModel(Template.Slots.Count == 0 ? Template with { Name = Loc.T("Moja šablóna") } : Template);
         if (new TemplateEditorWindow(model) { Owner = System.Windows.Application.Current.MainWindow }.ShowDialog() == true)
         {
             Template = model.ToTemplate();
@@ -3136,7 +3140,7 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             SelectedGroup = group;
             TemplateFromGroup();
-            RunState = $"Šablóna je zo súboru {Path.GetFileName(path)} (skupina {group.Label}) – súbory ako on sa spracujú rovnako.";
+            RunState = Loc.F("Šablóna je zo súboru {0} (skupina {1}) – súbory ako on sa spracujú rovnako.", Path.GetFileName(path), group.Label);
         }
     }
 
@@ -3145,14 +3149,14 @@ public sealed class BatchPageViewModel : ObservableObject
         var item = _items.FirstOrDefault(i => i.Group == SelectedGroup?.Group);
         if (item is not null)
         {
-            Template = BatchTemplate.FromTarget($"Podľa skupiny {item.Group.Label}", item.Target);
+            Template = BatchTemplate.FromTarget(Loc.F("Podľa skupiny {0}", item.Group.Label), item.Target);
         }
     }
 
     private void LoadTemplate()
     {
         Directory.CreateDirectory(AppSettings.TemplateDirectory);
-        var dialog = new OpenFileDialog { Filter = "Šablóny UNIVERSUM (*.json)|*.json", InitialDirectory = AppSettings.TemplateDirectory };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Šablóny UNIVERSUM (*.json)|*.json"), InitialDirectory = AppSettings.TemplateDirectory };
         if (dialog.ShowDialog() == true)
         {
             try
@@ -3161,7 +3165,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
             catch (Exception ex) when (ex is JsonException or IOException)
             {
-                RunState = "Šablónu sa nepodarilo načítať: " + ex.Message;
+                RunState = Loc.T("Šablónu sa nepodarilo načítať: ") + ex.Message;
             }
         }
     }
@@ -3171,7 +3175,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Directory.CreateDirectory(AppSettings.TemplateDirectory);
         var dialog = new SaveFileDialog
         {
-            Filter = "Šablóny UNIVERSUM (*.json)|*.json",
+            Filter = Loc.T("Šablóny UNIVERSUM (*.json)|*.json"),
             InitialDirectory = AppSettings.TemplateDirectory,
             FileName = string.Concat(Template.Name.Split(Path.GetInvalidFileNameChars())) + ".json",
         };

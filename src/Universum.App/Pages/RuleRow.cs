@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 
@@ -90,8 +91,8 @@ public sealed class RuleRow : ObservableObject
         }
     }
 
-    public string ResultNote => IsRemovedByLanguage ? "odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)"
-        : Kept ? "ponechané – jazyk mimo zoznamu titulkov"
+    public string ResultNote => IsRemovedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
+        : Kept ? Loc.T("ponechané – jazyk mimo zoznamu titulkov")
         : "";
 
     /// <summary>Audio and subtitles can be moved within their type (owner, 29. 10. 2026: dragged up or down).</summary>
@@ -119,28 +120,28 @@ public sealed class RuleRow : ObservableObject
                 }
             }
 
-            Add("pre nepočujúcich", before.HearingImpaired, after.HearingImpaired);
-            Add("pre nevidiacich", before.VisualImpaired, after.VisualImpaired);
-            Add("textový opis", before.TextDescriptions, after.TextDescriptions);
+            Add(Loc.T("pre nepočujúcich"), before.HearingImpaired, after.HearingImpaired);
+            Add(Loc.T("pre nevidiacich"), before.VisualImpaired, after.VisualImpaired);
+            Add(Loc.T("textový opis"), before.TextDescriptions, after.TextDescriptions);
             Add("original", before.Original, after.Original);
-            Add("komentár", before.Commentary, after.Commentary);
+            Add(Loc.T("komentár"), before.Commentary, after.Commentary);
             return string.Join("\n", changes);
         }
     }
 
     public string Type => Target.Type switch
     {
-        TrackType.Video => "Video",
-        TrackType.Audio => "Zvuk",
-        TrackType.Subtitles => "Titulky",
-        _ => "Iné",
+        TrackType.Video => Loc.T("Video"),
+        TrackType.Audio => Loc.T("Zvuk"),
+        TrackType.Subtitles => Loc.T("Titulky"),
+        _ => Loc.T("Iné"),
     };
 
     public string Role => Target.Role switch
     {
         TrackRole.Forced => "forced",
-        TrackRole.HearingImpaired => "pre nepočujúcich",
-        TrackRole.Commentary => "komentár",
+        TrackRole.HearingImpaired => Loc.T("pre nepočujúcich"),
+        TrackRole.Commentary => Loc.T("komentár"),
         _ => "",
     };
 
@@ -203,13 +204,13 @@ public sealed class RuleRow : ObservableObject
     public bool FlagsChanged => Target.FlagsChanged;
 
     private static string Flag(bool before, bool after) =>
-        before == after ? (after ? "áno" : "nie") : (after ? "nie → ÁNO" : "áno → NIE");
+        before == after ? (after ? Loc.T("áno") : Loc.T("nie")) : (after ? Loc.T("nie → ÁNO") : Loc.T("áno → NIE"));
 
     private static string Describe(LanguageTag tag)
     {
         if (tag.IsUndetermined)
         {
-            return "neurčený (und)";
+            return Loc.T("neurčený (und)");
         }
 
         var language = Languages.Find(tag.Primary);

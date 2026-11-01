@@ -4,6 +4,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Execution;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -61,7 +62,7 @@ public sealed class VideoPageViewModel : ObservableObject
     private VideoChoice<VideoCodec> _codec;
     private int _quality = 75;
     private string _fileName = "";
-    private string _summary = "Otvorte video – prehrá sa tu; úseky, ktoré ostanú, označíte počas pozerania.";
+    private string _summary = Loc.T("Otvorte video – prehrá sa tu; úseky, ktoré ostanú, označíte počas pozerania.");
     private string _result = "";
     private string _status = "";
     private double _progress;
@@ -82,7 +83,7 @@ public sealed class VideoPageViewModel : ObservableObject
         MarkStartCommand = new RelayCommand(() =>
         {
             _pendingStart = Player.Now;
-            Status = $"Začiatok úseku: {CutRow.Clock(Player.Now)} – nájdite koniec a stlačte Koniec úseku.";
+            Status = Loc.F("Začiatok úseku: {0} – nájdite koniec a stlačte Koniec úseku.", CutRow.Clock(Player.Now));
             RefreshCommands();
         }, () => !_busy && Player.IsOpen);
         MarkEndCommand = new RelayCommand(MarkEnd, () => !_busy && Player.IsOpen && _pendingStart is not null);
@@ -98,7 +99,7 @@ public sealed class VideoPageViewModel : ObservableObject
         {
             _parts.Clear();
             _pendingStart = null;
-            Status = "Celý film – nič sa nevystrihne.";
+            Status = Loc.T("Celý film – nič sa nevystrihne.");
             Changed();
         }, () => !_busy && _parts.Count > 0);
         SeekToPartCommand = new AsyncRelayCommand<CutRow>(row => row is null ? Task.CompletedTask : Player.SeekAsync(row.Part.Start));
@@ -108,7 +109,7 @@ public sealed class VideoPageViewModel : ObservableObject
         {
             Clear();
             FileName = "";
-            Summary = "Otvorte video – prehrá sa tu; úseky, ktoré ostanú, označíte počas pozerania.";
+            Summary = Loc.T("Otvorte video – prehrá sa tu; úseky, ktoré ostanú, označíte počas pozerania.");
         }, () => !_busy && _file is not null);
         Player.PropertyChanged += (_, e) =>
         {
@@ -152,16 +153,16 @@ public sealed class VideoPageViewModel : ObservableObject
 
     public IReadOnlyList<VideoChoice<string?>> Aspects { get; } =
     [
-        new(null, "Ponechať"), new("16/9", "16:9"), new("4/3", "4:3"), new("37/20", "1,85:1"), new("47/20", "2,35:1"), new("12/5", "2,40:1"), new("64/27", "21:9"), new("1/1", "1:1"),
+        new(null, Loc.T("Ponechať")), new("16/9", "16:9"), new("4/3", "4:3"), new("37/20", "1,85:1"), new("47/20", "2,35:1"), new("12/5", "2,40:1"), new("64/27", "21:9"), new("1/1", "1:1"),
     ];
 
-    public IReadOnlyList<VideoChoice<int>> Rotations { get; } = [new(0, "neotáčať"), new(90, "o 90° doprava"), new(180, "o 180°"), new(270, "o 90° doľava")];
+    public IReadOnlyList<VideoChoice<int>> Rotations { get; } = [new(0, Loc.T("neotáčať")), new(90, Loc.T("o 90° doprava")), new(180, Loc.T("o 180°")), new(270, Loc.T("o 90° doľava"))];
 
     public IReadOnlyList<VideoChoice<int?>> Heights { get; } =
-        [new(null, "Ponechať"), new(2160, "2160 (4K)"), new(1080, "1080"), new(720, "720"), new(576, "576"), new(480, "480")];
+        [new(null, Loc.T("Ponechať")), new(2160, "2160 (4K)"), new(1080, "1080"), new(720, "720"), new(576, "576"), new(480, "480")];
 
     public IReadOnlyList<VideoChoice<VideoCodec>> Codecs { get; } =
-        [new(VideoCodec.Keep, "Ponechať (pri zápise H.264 alebo H.265 ako má)"), new(VideoCodec.H264, "H.264"), new(VideoCodec.Hevc, "H.265 (HEVC)")];
+        [new(VideoCodec.Keep, Loc.T("Ponechať (pri zápise H.264 alebo H.265 ako má)")), new(VideoCodec.H264, "H.264"), new(VideoCodec.Hevc, "H.265 (HEVC)")];
 
     /// <summary>The proportions the picture is shown at (without writing it anew).</summary>
     public VideoChoice<string?> Aspect { get => _aspect; set { if (SetProperty(ref _aspect, value)) { Changed(); } } }
@@ -221,20 +222,20 @@ public sealed class VideoPageViewModel : ObservableObject
             if (_parts.Count > 0)
             {
                 var kept = WrittenParts().Aggregate(TimeSpan.Zero, (sum, p) => sum + p.Length);
-                parts.Add($"strih: {_parts.Count} {(_parts.Count == 1 ? "úsek" : _parts.Count < 5 ? "úseky" : "úsekov")}, ostane {CutRow.Clock(kept)}{(WritesPicture ? " (presne)" : " (na kľúčových snímkach)")}");
+                parts.Add(Loc.F("strih: {0} {1}, ostane {2}{3}", _parts.Count, _parts.Count == 1 ? Loc.T("úsek") : _parts.Count < 5 ? Loc.T("úseky") : Loc.T("úsekov"), CutRow.Clock(kept), WritesPicture ? Loc.T(" (presne)") : Loc.T(" (na kľúčových snímkach)")));
             }
 
             if (Aspect.Value is not null)
             {
-                parts.Add($"pomer strán {Aspect.Label}" + (Turned ? " (obraz otočený na výšku)" : ""));
+                parts.Add(Loc.F("pomer strán {0}", Aspect.Label) + (Turned ? Loc.T(" (obraz otočený na výšku)") : ""));
             }
 
             if (WritesPicture)
             {
-                parts.Add((Recipe.Describe(video) is var described && described != "bez zmeny" ? described : $"{Recipe.Encoder(video).Name} kvalita {Quality}") + " – obraz sa zapíše znova");
+                parts.Add((Recipe.Describe(video) is var described && described != "bez zmeny" ? described : Loc.F("{0} kvalita {1}", Recipe.Encoder(video).Name, Quality)) + Loc.T(" – obraz sa zapíše znova"));
             }
 
-            return parts.Count == 0 ? "Bez zmeny." : string.Join("; ", parts) + ".";
+            return parts.Count == 0 ? Loc.T("Bez zmeny.") : string.Join("; ", parts) + ".";
         }
     }
 
@@ -257,19 +258,19 @@ public sealed class VideoPageViewModel : ObservableObject
         if (_frames is null)
         {
             return _framesProblem is { } failed
-                ? $"Kľúčové snímky sa nedajú prečítať ({failed}) – strih bez prekódovania nevie, kde úseky začnú; zapnite Presný strih."
-                : "Kľúčové snímky sa ešte čítajú – strih bez prekódovania počká na ne (alebo zapnite Presný strih).";
+                ? Loc.F("Kľúčové snímky sa nedajú prečítať ({0}) – strih bez prekódovania nevie, kde úseky začnú; zapnite Presný strih.", failed)
+                : Loc.T("Kľúčové snímky sa ešte čítajú – strih bez prekódovania počká na ne (alebo zapnite Presný strih).");
         }
 
         var keyframes = _frames.Times;
         if (keyframes.Count == 0 || FilmEnd is not { } end)
         {
-            return "Video nemá označené kľúčové snímky – strih bez prekódovania nie je možný; zapnite Presný strih.";
+            return Loc.T("Video nemá označené kľúčové snímky – strih bez prekódovania nie je možný; zapnite Presný strih.");
         }
 
         var lost = _parts.FindIndex(p => Cut.Snap([p], keyframes, end).Count == 0);
         return lost < 0 ? null
-            : $"Úsek {lost + 1} je kratší ako vzdialenosť kľúčových snímok – nezostalo by z neho nič; predĺžte ho alebo zapnite Presný strih.";
+            : Loc.F("Úsek {0} je kratší ako vzdialenosť kľúčových snímok – nezostalo by z neho nič; predĺžte ho alebo zapnite Presný strih.", lost + 1);
     }
 
     /// <summary>Something of the picture changes (a cut, the proportions, the picture) – the rules alone are not saved here.</summary>
@@ -277,13 +278,13 @@ public sealed class VideoPageViewModel : ObservableObject
 
     /// <summary>Why the video cannot be written by the rules; empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
-        : "Pravidlá UNIVERSUM: " + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
+        : Loc.T("Pravidlá UNIVERSUM: ") + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
         {
-            RuleIssueKind.UndeterminedLanguage => $"stopa {i.TrackId} má neurčený jazyk.",
-            RuleIssueKind.MultipleVideoTracks => "súbor má viac video stôp.",
-            RuleIssueKind.NoAudio => "súbor nemá zvukovú stopu.",
+            RuleIssueKind.UndeterminedLanguage => Loc.F("stopa {0} má neurčený jazyk.", i.TrackId),
+            RuleIssueKind.MultipleVideoTracks => Loc.T("súbor má viac video stôp."),
+            RuleIssueKind.NoAudio => Loc.T("súbor nemá zvukovú stopu."),
             _ => i.Kind.ToString(),
-        }).Distinct()) + " Určte jazyk v Úprave hlavičky – alebo vypnite pravidlá (stopy ostanú, ako sú).";
+        }).Distinct()) + Loc.T(" Určte jazyk v Úprave hlavičky – alebo vypnite pravidlá (stopy ostanú, ako sú).");
 
     /// <summary>A video (drag and drop).</summary>
     public async Task LoadAsync(IReadOnlyList<string> paths)
@@ -302,7 +303,7 @@ public sealed class VideoPageViewModel : ObservableObject
     {
         if (end <= start)
         {
-            Status = "Koniec úseku musí byť po jeho začiatku.";
+            Status = Loc.T("Koniec úseku musí byť po jeho začiatku.");
             return;
         }
 
@@ -311,7 +312,7 @@ public sealed class VideoPageViewModel : ObservableObject
         var normalized = Cut.Normalized(_parts);
         _parts.Clear();
         _parts.AddRange(normalized);
-        Status = _frames is null && !WritesPicture ? "Úsek pridaný (kľúčové snímky sa ešte čítajú – potom sa ukáže, kam sa úsek posunie)." : "Úsek pridaný.";
+        Status = _frames is null && !WritesPicture ? Loc.T("Úsek pridaný (kľúčové snímky sa ešte čítajú – potom sa ukáže, kam sa úsek posunie).") : Loc.T("Úsek pridaný.");
         Changed();
     }
 
@@ -325,7 +326,7 @@ public sealed class VideoPageViewModel : ObservableObject
 
     private async Task OpenVideoAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadVideoAsync(dialog.FileName);
@@ -339,7 +340,7 @@ public sealed class VideoPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -350,7 +351,7 @@ public sealed class VideoPageViewModel : ObservableObject
             var file = await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path);
             if (file.TracksOf(TrackType.Video).FirstOrDefault() is not { } video)
             {
-                Summary = "Súbor nemá video stopu.";
+                Summary = Loc.T("Súbor nemá video stopu.");
                 return;
             }
 
@@ -378,15 +379,15 @@ public sealed class VideoPageViewModel : ObservableObject
     {
         try
         {
-            Status = "Čítam kľúčové snímky videa…";
+            Status = Loc.T("Čítam kľúčové snímky videa…");
             var ffmpeg = (await _services.SpeechAsync(cancellationToken)).Ffmpeg;
             var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
             var frames = await Cut.KeyframesAsync(_services.Runner, ffprobe, file.Path, file.IsMatroska, cancellationToken);
             if (ReferenceEquals(_file, file))
             {
                 _frames = frames;
-                Status = frames.Times.Count == 0 ? "Video nemá označené kľúčové snímky – strihať sa dá len presne (obraz sa zapíše znova)."
-                    : $"Kľúčové snímky: {frames.Times.Count} (strih bez prekódovania sa posunie na najbližšiu nasledujúcu).";
+                Status = frames.Times.Count == 0 ? Loc.T("Video nemá označené kľúčové snímky – strihať sa dá len presne (obraz sa zapíše znova).")
+                    : Loc.F("Kľúčové snímky: {0} (strih bez prekódovania sa posunie na najbližšiu nasledujúcu).", frames.Times.Count);
                 Changed();
             }
         }
@@ -399,7 +400,7 @@ public sealed class VideoPageViewModel : ObservableObject
             if (ReferenceEquals(_file, file))
             {
                 _framesProblem = ex.Message;
-                Status = "Kľúčové snímky sa nedajú prečítať (" + ex.Message + ") – strihať sa dá len presne.";
+                Status = Loc.F("Kľúčové snímky sa nedajú prečítať ({0}) – strihať sa dá len presne.", ex.Message);
                 Changed();
             }
         }
@@ -429,10 +430,10 @@ public sealed class VideoPageViewModel : ObservableObject
         Parts.Clear();
         foreach (var part in _parts)
         {
-            Parts.Add(new CutRow(part, WritesPicture ? "presne"
+            Parts.Add(new CutRow(part, WritesPicture ? Loc.T("presne")
                 : _frames is not { Times.Count: > 0 } frames || FilmEnd is not { } end ? ""
                 : Cut.Snap([part], frames.Times, end) is [var moved] ? $"{CutRow.Clock(moved.Start)} – {CutRow.Clock(moved.End)}"
-                : "nič – kratší ako vzdialenosť kľúčových snímok"));
+                : Loc.T("nič – kratší ako vzdialenosť kľúčových snímok")));
         }
 
         OnPropertyChanged(nameof(Changes));
@@ -505,7 +506,7 @@ public sealed class VideoPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            Result = WritesPicture ? "Zapisujem obraz znova a potom nový súbor (môže to trvať dlho)…" : "Zapisujem nový súbor…";
+            Result = WritesPicture ? Loc.T("Zapisujem obraz znova a potom nový súbor (môže to trvať dlho)…") : Loc.T("Zapisujem nový súbor…");
             var plan = EditPlan.For(Build(file));
             var started = DateTime.UtcNow;
             var result = await _services.Processor(installation).ProcessAsync(plan, placement,
@@ -514,18 +515,18 @@ public sealed class VideoPageViewModel : ObservableObject
             Progress = 1;
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Uložené do knižnice: {result.OutputPath}. Originál ostal nezmenený.",
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký výsledok už v knižnici je: {result.OutputPath}. Nič sa nezapísalo.",
-                _ => "Nepodarilo sa – nič sa nezmenilo.\n" + string.Join("\n", result.Messages),
+                ProcessingStatus.Done => Loc.F("Uložené do knižnice: {0}. Originál ostal nezmenený.", result.OutputPath),
+                ProcessingStatus.AlreadyInLibrary => Loc.F("Rovnaký výsledok už v knižnici je: {0}. Nič sa nezapísalo.", result.OutputPath),
+                _ => Loc.T("Nepodarilo sa – nič sa nezmenilo.") + "\n" + string.Join("\n", result.Messages),
             };
         }
         catch (OperationCanceledException)
         {
-            Result = "Zastavené – nič sa nezapísalo.";
+            Result = Loc.T("Zastavené – nič sa nezapísalo.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException or Core.Speech.SpeechException)
         {
-            Result = "Nepodarilo sa: " + ex.Message;
+            Result = Loc.T("Nepodarilo sa: ") + ex.Message;
         }
         finally
         {

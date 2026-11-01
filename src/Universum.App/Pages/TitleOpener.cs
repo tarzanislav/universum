@@ -1,3 +1,4 @@
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
@@ -66,7 +67,7 @@ public sealed class TitleOpener(AppServices services)
     {
         if (services.Histra is not { } histra)
         {
-            return "Odkaz na HISTRA potrebuje token HISTRA v Nastaveniach (a zapnuté pripájanie).";
+            return Loc.T("Odkaz na HISTRA potrebuje token HISTRA v Nastaveniach (a zapnuté pripájanie).");
         }
 
         try
@@ -80,7 +81,7 @@ public sealed class TitleOpener(AppServices services)
                 return null;
             }
 
-            return $"HISTRA titul „{name}“ vo svojom katalógu nemá.";
+            return Loc.F("HISTRA titul „{0}“ vo svojom katalógu nemá.", name);
         }
         catch (TitleServiceException ex)
         {

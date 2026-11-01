@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.App.Jobs;
+using Universum.App.Localization;
 using Universum.Core.Execution;
 using Universum.Core.Jobs;
 using Universum.Core.Library;
@@ -29,7 +30,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
     private MediaFile? _file;
     private HeaderRow? _selected;
     private string _fileName = "";
-    private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+    private string _summary = Loc.T("Otvorte súbor MKV alebo ho sem pretiahnite myšou.");
     private string _title = "";
     private bool _removeTags;
     private string _method = "";
@@ -186,7 +187,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             _services.CurrentMkvToolNix is { } installation)
         {
             Busy = true;
-            Result = "Čítam titulky – jazyk každej titulkovej stopy z jej textu…";
+            Result = Loc.T("Čítam titulky – jazyk každej titulkovej stopy z jej textu…");
             try
             {
                 string? ffmpeg;
@@ -275,12 +276,12 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
         Recalculate();
         var read = detected.Count == 0 ? ""
-            : $" Jazyk {detected.Count} titulkových stôp je návrh UNIVERSUM podľa ich textu" +
-              (detected.Values.Count(r => !r.Certain) is > 0 and var probable ? $" ({probable} len najpravdepodobnejší – overte)" : "") + ".";
-        var empty = target.RemovedEmpty.Count == 0 ? "" : $" Prázdne titulkové stopy ({target.RemovedEmpty.Count}) sú označené na odstránenie.";
+            : Loc.F(" Jazyk {0} titulkových stôp je návrh UNIVERSUM podľa ich textu", detected.Count) +
+              (detected.Values.Count(r => !r.Certain) is > 0 and var probable ? Loc.F(" ({0} len najpravdepodobnejší – overte)", probable) : "") + ".";
+        var empty = target.RemovedEmpty.Count == 0 ? "" : Loc.F(" Prázdne titulkové stopy ({0}) sú označené na odstránenie.", target.RemovedEmpty.Count);
         Result = (target.Issues.Any(i => i.Kind == RuleIssueKind.UndeterminedLanguage)
-            ? "Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova."
-            : "Pravidlá UNIVERSUM sú použité – skontrolujte a uložte.") + read + empty;
+            ? Loc.T("Pravidlá sú použité. Stopám s neurčeným jazykom ho vyberte a pravidlá použite znova.")
+            : Loc.T("Pravidlá UNIVERSUM sú použité – skontrolujte a uložte.")) + read + empty;
     }
 
     private async Task ReadAsync(string path)
@@ -291,7 +292,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             Recalculate();
             return;
         }
@@ -361,9 +362,9 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             var plan = EditPlan.For(target);
             Method = plan.Method switch
             {
-                WriteMethod.None => "Bez zmien.",
-                WriteMethod.HeaderEdit => $"Kópia v knižnici so zmenenou hlavičkou ({Count(plan.Changes.Count)}) – trvá to sekundy až minúty (kopírovanie). Originál ostane nezmenený.",
-                _ => $"Zapíše sa nový súbor do knižnice ({Count(plan.Changes.Count)}; poradie alebo vynechané stopy) – trvá to minúty. Originál ostane nezmenený.",
+                WriteMethod.None => Loc.T("Bez zmien."),
+                WriteMethod.HeaderEdit => Loc.F("Kópia v knižnici so zmenenou hlavičkou ({0}) – trvá to sekundy až minúty (kopírovanie). Originál ostane nezmenený.", Count(plan.Changes.Count)),
+                _ => Loc.F("Zapíše sa nový súbor do knižnice ({0}; poradie alebo vynechané stopy) – trvá to minúty. Originál ostane nezmenený.", Count(plan.Changes.Count)),
             };
             foreach (var finding in TargetChecks.Review(target, _services.Profile))
             {
@@ -382,30 +383,30 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     private static string Count(int changes) => changes switch
     {
-        1 => "1 zmena",
-        >= 2 and <= 4 => $"{changes} zmeny",
-        _ => $"{changes} zmien",
+        1 => Loc.T("1 zmena"),
+        >= 2 and <= 4 => Loc.F("{0} zmeny", changes),
+        _ => Loc.F("{0} zmien", changes),
     };
 
     private string Describe(CheckFinding finding)
     {
         var track = finding.TrackId is { } id ? Rows.FirstOrDefault(r => r.TrackId == id) : null;
-        var where = track is null ? "" : $"Stopa {track.Position} ({track.Type.ToLowerInvariant()}): ";
+        var where = track is null ? "" : Loc.F("Stopa {0} ({1}): ", track.Position, track.Type.ToLowerInvariant());
         var kind = finding.Type switch
         {
-            TrackType.Video => "videa",
-            TrackType.Audio => "zvuku",
-            TrackType.Subtitles => "titulkov",
-            _ => "stôp",
+            TrackType.Video => Loc.T("videa"),
+            TrackType.Audio => Loc.T("zvuku"),
+            TrackType.Subtitles => Loc.T("titulkov"),
+            _ => Loc.T("iných typov"),
         };
         return finding.Kind switch
         {
-            CheckKind.UndeterminedLanguage => where + "neurčený jazyk (und).",
-            CheckKind.SeveralDefaults => $"Viac stôp {kind} má Default – prehrávač vyberie ktorúkoľvek.",
-            CheckKind.NoneEnabled => $"Žiadna stopa {kind} nie je zapnutá (Enabled).",
-            CheckKind.ForcedWithoutDefault => where + "forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí.",
-            CheckKind.TagsRemain => "Súbor si ponechá tagy (názvy, štatistiky, údaje o kódovaní).",
-            CheckKind.OrderNotPreferred => $"Poradie {kind} nie je CZ → SK → ostatné (komentáre na koniec).",
+            CheckKind.UndeterminedLanguage => where + Loc.T("neurčený jazyk (und)."),
+            CheckKind.SeveralDefaults => Loc.F("Viac stôp {0} má Default – prehrávač vyberie ktorúkoľvek.", kind),
+            CheckKind.NoneEnabled => Loc.F("Žiadna stopa {0} nie je zapnutá (Enabled).", kind),
+            CheckKind.ForcedWithoutDefault => where + Loc.T("forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí."),
+            CheckKind.TagsRemain => Loc.T("Súbor si ponechá tagy (názvy, štatistiky, údaje o kódovaní)."),
+            CheckKind.OrderNotPreferred => Loc.F("Poradie {0} nie je CZ → SK → ostatné (komentáre na koniec).", kind),
             _ => finding.Kind.ToString(),
         };
     }
@@ -450,7 +451,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         }
 
         Busy = true;
-        Result = "Ukladám…";
+        Result = Loc.T("Ukladám…");
         Progress = 0;
         try
         {
@@ -463,15 +464,15 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             _undoRecord = result.UndoRecordPath;
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Uložené do knižnice: {LibraryPath(result.OutputPath)}." +
-                                         (_undoRecord is null ? " Originál ostal nezmenený." : " Zmenu súboru v knižnici je možné vrátiť späť."),
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký výsledok už v knižnici je: {LibraryPath(result.OutputPath)}. Nič sa nezapísalo.",
-                ProcessingStatus.Unchanged => "Bez zmien.",
-                ProcessingStatus.Cancelled => "Zrušené.",
+                ProcessingStatus.Done => Loc.F("Uložené do knižnice: {0}.", LibraryPath(result.OutputPath)) +
+                                         (_undoRecord is null ? Loc.T(" Originál ostal nezmenený.") : Loc.T(" Zmenu súboru v knižnici je možné vrátiť späť.")),
+                ProcessingStatus.AlreadyInLibrary => Loc.F("Rovnaký výsledok už v knižnici je: {0}. Nič sa nezapísalo.", LibraryPath(result.OutputPath)),
+                ProcessingStatus.Unchanged => Loc.T("Bez zmien."),
+                ProcessingStatus.Cancelled => Loc.T("Zrušené."),
                 _ when FileProcessor.NeedsAttention(result) =>
-                    "POZOR: nepodarilo sa a súbor sa nepodarilo úplne vrátiť – záznam na vrátenie: " + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
-                _ when result.Messages.Contains(FileProcessor.RestoredMessage) => "Nepodarilo sa – súbor je vrátený do pôvodného stavu.\n" + string.Join("\n", result.Messages),
-                _ => "Nepodarilo sa – súbor ostal nezmenený.\n" + string.Join("\n", result.Messages),
+                    Loc.T("POZOR: nepodarilo sa a súbor sa nepodarilo úplne vrátiť – záznam na vrátenie: ") + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
+                _ when result.Messages.Contains(FileProcessor.RestoredMessage) => Loc.T("Nepodarilo sa – súbor je vrátený do pôvodného stavu.") + "\n" + string.Join("\n", result.Messages),
+                _ => Loc.T("Nepodarilo sa – súbor ostal nezmenený.") + "\n" + string.Join("\n", result.Messages),
             };
             if (result.Status == ProcessingStatus.Done && result.Messages.Count > 0)
             {
@@ -504,7 +505,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             placement, new OutputOptions(OriginalHandling.Keep));
         job.Finished += (finished, result) => JobRow.OnUi(() => _ = AfterJobAsync(finished, result, installation));
         _services.Enqueue(job);
-        Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
+        Result = _services.Settings.AutoStartQueue ? Loc.F("Pridané do fronty ako úloha {0}.", job.Id) : Loc.F("Pridané do fronty ako úloha {0} – frontu spustíte na stránke Fronta úloh.", job.Id);
     }
 
     /// <summary>A queued change finished: the editor shows the file as it is now (when it still shows that file).</summary>
@@ -523,7 +524,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             await ReadAsync(result.OutputPath ?? path);
         }
 
-        Result = $"Úloha {job.Id}: {job.Outcome}";
+        Result = Loc.F("Úloha {0}: {1}", job.Id, job.Outcome);
         RefreshCommands();
     }
 
@@ -544,11 +545,11 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             {
                 _undoRecord = null;
                 await ReadAsync(path);
-                Result = "Pôvodná hlavička je obnovená.";
+                Result = Loc.T("Pôvodná hlavička je obnovená.");
             }
             else
             {
-                Result = "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
+                Result = Loc.T("Vrátenie sa nepodarilo:") + "\n" + string.Join("\n", problems);
             }
         }
         finally
@@ -559,7 +560,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     private async Task OpenAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Súbory Matroska (*.mkv;*.mka;*.mks)|*.mkv;*.mka;*.mks|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Súbory Matroska") + " (*.mkv;*.mka;*.mks)|*.mkv;*.mka;*.mks|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

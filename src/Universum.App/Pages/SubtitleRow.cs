@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.Subtitles;
 
@@ -126,7 +127,7 @@ public sealed class SubtitleRow : ObservableObject
     public bool IsText => Track.IsTextSubtitles;
 
     /// <summary>What it is: "stopa 3 vo videu" or the name of the external file.</summary>
-    public string Source => IsExternal ? "externý súbor: " + Path.GetFileName(ExternalPath) : $"stopa {Track.Id} vo videu";
+    public string Source => IsExternal ? Loc.T("externý súbor: ") + Path.GetFileName(ExternalPath) : Loc.F("stopa {0} vo videu", Track.Id);
 
     public string Format => Document?.Format ?? (Track.Codec.Length > 0 ? Track.Codec : Track.CodecId ?? "");
 
@@ -371,10 +372,10 @@ public sealed class SubtitleRow : ObservableObject
 
     /// <summary>What is wrong with the values typed (null when nothing).</summary>
     public string? Problem =>
-        Number(SpeedText) is not { } speed ? "Rýchlosť: zadajte číslo v percentách (napr. 4,271 alebo -2,5)."
-        : speed <= -100 || speed > 100 ? "Rýchlosť: od −99 do +100 % (pri −100 % by titulky stáli)."
-        : !long.TryParse(DelayText.Trim().Replace(" ", "", StringComparison.Ordinal).Replace('−', '-'), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _) ? "Posun: zadajte celé milisekundy (1000 = 1 sekunda)."
-        : (FpsFrom is null) != (FpsTo is null) ? "Zmena FPS: vyberte pôvodné aj nové FPS."
+        Number(SpeedText) is not { } speed ? Loc.T("Rýchlosť: zadajte číslo v percentách (napr. 4,271 alebo -2,5).")
+        : speed <= -100 || speed > 100 ? Loc.T("Rýchlosť: od −99 do +100 % (pri −100 % by titulky stáli).")
+        : !long.TryParse(DelayText.Trim().Replace(" ", "", StringComparison.Ordinal).Replace('−', '-'), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _) ? Loc.T("Posun: zadajte celé milisekundy (1000 = 1 sekunda).")
+        : (FpsFrom is null) != (FpsTo is null) ? Loc.T("Zmena FPS: vyberte pôvodné aj nové FPS.")
         : null;
 
     /// <summary>The new times: FPS, then speed, then delay (mkvmerge: --sync).</summary>
@@ -399,7 +400,7 @@ public sealed class SubtitleRow : ObservableObject
         {
             if (!Include)
             {
-                return "vynechá sa";
+                return Loc.T("vynechá sa");
             }
 
             var parts = new List<string>();
@@ -410,12 +411,12 @@ public sealed class SubtitleRow : ObservableObject
 
             if (Number(SpeedText) is { } speed && speed != 0)
             {
-                parts.Add($"rýchlosť {(speed > 0 ? "+" : "")}{speed.ToString("0.###", Slovak)} %");
+                parts.Add(Loc.F("rýchlosť {0}{1} %", speed > 0 ? "+" : "", speed.ToString("0.###", Slovak)));
             }
 
             if (DelayMilliseconds != 0)
             {
-                parts.Add($"posun {(DelayMilliseconds > 0 ? "+" : "")}{DelayMilliseconds.ToString("#,0", Slovak)} ms");
+                parts.Add(Loc.F("posun {0}{1} ms", DelayMilliseconds > 0 ? "+" : "", DelayMilliseconds.ToString("#,0", Slovak)));
             }
 
             // a track of the video whose text is written anew becomes SRT (its styles, ASS or WebVTT, are left)
@@ -426,30 +427,30 @@ public sealed class SubtitleRow : ObservableObject
 
             if (TextEdited)
             {
-                parts.Add($"upravené titulky ({_cueEdits.Count})");
+                parts.Add(Loc.F("upravené titulky ({0})", _cueEdits.Count));
             }
 
             if (_droppedEdits > 0)
             {
-                parts.Add($"{_droppedEdits} uložených úprav textu sa nehodí k titulkom – vynechané");
+                parts.Add(Loc.F("{0} uložených úprav textu sa nehodí k titulkom – vynechané", _droppedEdits));
             }
 
             if (RemoveHearingImpaired)
             {
-                parts.Add("bez prvkov pre nepočujúcich");
+                parts.Add(Loc.T("bez prvkov pre nepočujúcich"));
             }
 
             if (RemoveFormatting)
             {
-                parts.Add("bez formátovania");
+                parts.Add(Loc.T("bez formátovania"));
             }
 
             if (FixTimes)
             {
-                parts.Add("opravené časy");
+                parts.Add(Loc.T("opravené časy"));
             }
 
-            return parts.Count == 0 ? IsExternal ? "pridá sa" : "" : (IsExternal ? "pridá sa, " : "") + string.Join(", ", parts);
+            return parts.Count == 0 ? IsExternal ? Loc.T("pridá sa") : "" : (IsExternal ? Loc.T("pridá sa") + ", " : "") + string.Join(", ", parts);
         }
     }
 
@@ -461,11 +462,11 @@ public sealed class SubtitleRow : ObservableObject
             var timing = Timing;
             if (timing.IsNone)
             {
-                return "Časy titulkov sa nemenia.";
+                return Loc.T("Časy titulkov sa nemenia.");
             }
 
             var samples = new[] { TimeSpan.FromMinutes(10), TimeSpan.FromHours(1) };
-            return timing.Describe() + ". Titulok " + string.Join(" · ", samples.Select(s => $"v {Clock(s)} sa zobrazí v {Clock(timing.Apply(s))}")) + ".";
+            return Loc.F("{0}. Titulok {1}.", timing.Describe(), string.Join(" · ", samples.Select(s => Loc.F("v {0} sa zobrazí v {1}", Clock(s), Clock(timing.Apply(s))))));
         }
     }
 
@@ -624,13 +625,13 @@ public sealed class SubtitleRow : ObservableObject
         if (ParseClock(FirstNow) is not { } first || ParseClock(FirstTarget) is not { } firstTarget ||
             ParseClock(SecondNow) is not { } second || ParseClock(SecondTarget) is not { } secondTarget)
         {
-            SyncNote = "Zadajte štyri časy v tvare h:mm:ss,fff (napr. 0:01:02,500).";
+            SyncNote = Loc.T("Zadajte štyri časy v tvare h:mm:ss,fff (napr. 0:01:02,500).");
             return;
         }
 
         if (SubtitleTiming.TwoPoints(first, firstTarget, second, secondTarget) is not { } sync)
         {
-            SyncNote = "Druhý titulok musí byť neskôr ako prvý (teraz aj po zmene).";
+            SyncNote = Loc.T("Druhý titulok musí byť neskôr ako prvý (teraz aj po zmene).");
             return;
         }
 
@@ -640,7 +641,7 @@ public sealed class SubtitleRow : ObservableObject
         // the exact speed of the two points (millionths of a per cent), not the slider's rounding
         SpeedText = (((decimal)sync.Denominator / sync.Numerator - 1) * 100).ToString("0.######", Slovak);
         DelayText = sync.DelayMilliseconds.ToString(CultureInfo.InvariantCulture);
-        SyncNote = $"Vypočítané: rýchlosť {SpeedText} %, posun {DelayText} ms.";
+        SyncNote = Loc.F("Vypočítané: rýchlosť {0} %, posun {1} ms.", SpeedText, DelayText);
     }
 
     private static decimal? Number(string text) =>

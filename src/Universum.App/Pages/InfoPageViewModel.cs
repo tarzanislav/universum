@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 
@@ -23,7 +24,7 @@ public sealed class InfoPageViewModel : ObservableObject
     private bool _selecting;
     private int _load;
     private string _fileName = "";
-    private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+    private string _summary = Loc.T("Otvorte súbor MKV alebo ho sem pretiahnite myšou.");
     private string _error = "";
 
     public InfoPageViewModel(AppServices services)
@@ -84,7 +85,7 @@ public sealed class InfoPageViewModel : ObservableObject
         // a later choice wins: an earlier file that is read more slowly does not show over it
         var load = ++_load;
         Error = "";
-        Summary = "Načítavam…";
+        Summary = Loc.T("Načítavam…");
         Tracks.Clear();
         File = null;
         FileName = Path.GetFileName(path);
@@ -97,7 +98,7 @@ public sealed class InfoPageViewModel : ObservableObject
 
         if (installation is null)
         {
-            Error = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Error = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -116,10 +117,9 @@ public sealed class InfoPageViewModel : ObservableObject
                 Tracks.Add(new TrackRow(track));
             }
 
-            Summary = $"{file.ContainerType}, trvanie {file.Duration:hh\\:mm\\:ss}, " +
-                      $"stopy: {file.Tracks.Count}, kapitoly: {file.ChapterEntries}, " +
-                      $"tagy: {file.GlobalTagEntries + file.Tracks.Sum(t => t.TagEntries)}, prílohy: {file.AttachmentCount}" +
-                      (file.Title is null ? "" : $"\nTitul: {file.Title}");
+            Summary = Loc.F("{0}, trvanie {1:hh\\:mm\\:ss}, stopy: {2}, kapitoly: {3}, tagy: {4}, prílohy: {5}", file.ContainerType, file.Duration,
+                          file.Tracks.Count, file.ChapterEntries, file.GlobalTagEntries + file.Tracks.Sum(t => t.TagEntries), file.AttachmentCount) +
+                      (file.Title is null ? "" : "\n" + Loc.F("Titul: {0}", file.Title));
             if (file.Errors.Count > 0 || file.Warnings.Count > 0)
             {
                 Error = string.Join("\n", file.Errors.Concat(file.Warnings));
@@ -151,7 +151,7 @@ public sealed class InfoPageViewModel : ObservableObject
     private async Task OpenAsync()
     {
         var patterns = string.Join(";", Universum.Core.Batch.BatchAnalyzer.VideoExtensions.Concat([".mka", ".mks"]).Select(e => "*" + e));
-        var dialog = new OpenFileDialog { Filter = $"Video a Matroska (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Video a Matroska") + $" (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

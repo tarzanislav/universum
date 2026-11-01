@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Batch;
 using Universum.Core.IO;
 using Universum.Core.Media;
@@ -41,9 +42,8 @@ public sealed partial class SubtitlesPageViewModel
     public bool IsTask => _task is not null;
 
     public string TaskText => _task is { } task
-        ? $"Úloha Hromadného spracovania: {System.IO.Path.GetFileName(task.Path)}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, " +
-          "ich jazyk, Forced a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Názov stopy a príznak pre nepočujúcich dajú " +
-          "pravidlá, opravy textu sa v úlohe nepoužijú."
+        ? Loc.F("Úloha Hromadného spracovania: {0}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa v úlohe nepoužijú.",
+            System.IO.Path.GetFileName(task.Path))
         : "";
 
     /// <summary>Uložiť do úlohy: the edits go back to Hromadné spracovanie.</summary>
@@ -143,7 +143,7 @@ public sealed partial class SubtitlesPageViewModel
             }
 
             HasWork = false;
-            WorkNote = "Uložená práca je zahodená – hodnoty na stránke ostali.";
+            WorkNote = Loc.T("Uložená práca je zahodená – hodnoty na stránke ostali.");
             RefreshCommands();
         }, () => HasWork);
     }
@@ -160,7 +160,7 @@ public sealed partial class SubtitlesPageViewModel
     {
         if (_busy)
         {
-            LiveStatus = "Štúdio práve pracuje (ukladá, napasováva alebo sťahuje) – skúste Upraviť v štúdiu o chvíľu.";
+            LiveStatus = Loc.T("Štúdio práve pracuje (ukladá, napasováva alebo sťahuje) – skúste Upraviť v štúdiu o chvíľu.");
             return false;
         }
 
@@ -292,7 +292,7 @@ public sealed partial class SubtitlesPageViewModel
 
         if (_file is null || !Paths.Same(_file.Path, task.Path))
         {
-            LiveStatus = "V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Upraviť v štúdiu.";
+            LiveStatus = Loc.T("V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Upraviť v štúdiu.");
             EndTask();
             return;
         }
@@ -305,8 +305,7 @@ public sealed partial class SubtitlesPageViewModel
 
         if (Rows.Any(r => r.Include && (r.RemoveHearingImpaired || r.RemoveFormatting || r.FixTimes || r.TextEdited || (!r.IsExternal && r.ToSrt))))
         {
-            LiveStatus = "Opravy textu (zmenené titulky, konverzia stopy, prvky pre nepočujúcich, formátovanie, prekrývanie) sa v úlohe nepoužijú – zrušte ich, " +
-                         "alebo uložte video hneď tlačidlom Uložiť.";
+            LiveStatus = Loc.T("Opravy textu (zmenené titulky, konverzia stopy, prvky pre nepočujúcich, formátovanie, prekrývanie) sa v úlohe nepoužijú – zrušte ich, alebo uložte video hneď tlačidlom Uložiť.");
             return;
         }
 
@@ -411,11 +410,11 @@ public sealed partial class SubtitlesPageViewModel
         {
             var work = _services.StudioWork.Save(_file.Path, Rows.Select(r => r.State()).ToList(), DateTime.UtcNow);
             HasWork = true;
-            WorkNote = $"Práca je uložená ({work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.";
+            WorkNote = Loc.F("Práca je uložená ({0:d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.", work.SavedUtc.ToLocalTime());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            WorkNote = "Prácu sa nepodarilo uložiť: " + ex.Message;
+            WorkNote = Loc.T("Prácu sa nepodarilo uložiť: ") + ex.Message;
         }
 
         RefreshCommands();
@@ -454,7 +453,7 @@ public sealed partial class SubtitlesPageViewModel
         }
 
         HasWork = true;
-        WorkNote = $"Obnovená uložená práca z {work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}.";
+        WorkNote = Loc.F("Obnovená uložená práca z {0:d. M. yyyy H:mm}.", work.SavedUtc.ToLocalTime());
         RefreshCommands();
     }
 
@@ -511,7 +510,7 @@ public sealed partial class SubtitlesPageViewModel
     {
         if (!row.IsText && !PictureSubtitles.CanShow(row.Track))
         {
-            LiveStatus = $"Stopa {row.Track.Id} má obrázkové titulky {row.Format} – tie prehrávač zatiaľ nezobrazí (PGS áno); časy sa uložia správne.";
+            LiveStatus = Loc.F("Stopa {0} má obrázkové titulky {1} – tie prehrávač zatiaľ nezobrazí (PGS áno); časy sa uložia správne.", row.Track.Id, row.Format);
             return;
         }
 
@@ -520,7 +519,7 @@ public sealed partial class SubtitlesPageViewModel
             return;
         }
 
-        LiveStatus = $"Načítavam titulky {(row.IsExternal ? "súboru" : $"stopy {row.Track.Id}")} pre prehrávač{(row.IsExternal ? "" : " (číta sa celý súbor)")}…";
+        LiveStatus = row.IsExternal ? Loc.T("Načítavam titulky súboru pre prehrávač…") : Loc.F("Načítavam titulky stopy {0} pre prehrávač (číta sa celý súbor)…", row.Track.Id);
         _ = row.IsText ? ReadTrackAsync(row, file, installation) : ReadPicturesAsync(row, file, installation);
     }
 
@@ -538,8 +537,8 @@ public sealed partial class SubtitlesPageViewModel
             }
 
             _pictures[row] = pictures;
-            LiveStatus = pictures.Count == 0 ? $"Obrázkové titulky {row.Source} sa nepodarilo prečítať (žiadne titulky)."
-                : $"Obrázkové titulky {row.Source} sú načítané ({pictures.Count}).";
+            LiveStatus = pictures.Count == 0 ? Loc.F("Obrázkové titulky {0} sa nepodarilo prečítať (žiadne titulky).", row.Source)
+                : Loc.F("Obrázkové titulky {0} sú načítané ({1}).", row.Source, pictures.Count);
             UpdatePreview();
             RefreshPlayer();
         }
@@ -552,7 +551,7 @@ public sealed partial class SubtitlesPageViewModel
             if (ReferenceEquals(_file, file))
             {
                 _pictures[row] = [];
-                LiveStatus = $"Obrázkové titulky {row.Source} sa nepodarilo prečítať: {ex.Message}";
+                LiveStatus = Loc.F("Obrázkové titulky {0} sa nepodarilo prečítať: {1}", row.Source, ex.Message);
             }
         }
     }
@@ -565,19 +564,19 @@ public sealed partial class SubtitlesPageViewModel
             if (ReferenceEquals(_file, file) && document is not null)
             {
                 row.Document ??= document;
-                LiveStatus = $"Titulky stopy {row.Track.Id} sú načítané ({document.Cues.Count}).";
+                LiveStatus = Loc.F("Titulky stopy {0} sú načítané ({1}).", row.Track.Id, document.Cues.Count);
                 UpdatePreview();
                 RefreshPlayer();
             }
             else if (document is null)
             {
                 // not read again for every change (the whole file is read): when the video is opened again
-                LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať.";
+                LiveStatus = Loc.F("Titulky stopy {0} sa nepodarilo prečítať.", row.Track.Id);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or Core.Processes.ProcessStartException or TimeoutException)
         {
-            LiveStatus = $"Titulky stopy {row.Track.Id} sa nepodarilo prečítať: {ex.Message}";
+            LiveStatus = Loc.F("Titulky stopy {0} sa nepodarilo prečítať: {1}", row.Track.Id, ex.Message);
         }
     }
 
@@ -595,7 +594,7 @@ public sealed partial class SubtitlesPageViewModel
         if (!row.IsText && _pictures.TryGetValue(row, out var pictures) &&
             pictures.MinBy(p => (timing.Apply(p.Start) - now).Duration()) is { } picture)
         {
-            return (timing.Apply(picture.Start), picture.Start, $"obrázok z {SubtitleRow.Clock(picture.Start)}");
+            return (timing.Apply(picture.Start), picture.Start, Loc.F("obrázok z {0}", SubtitleRow.Clock(picture.Start)));
         }
 
         return null;
@@ -605,22 +604,22 @@ public sealed partial class SubtitlesPageViewModel
     {
         if (_selected is not { } row || NearestCue(row) is not { } cue)
         {
-            LiveStatus = "Pri prehrávači nie je žiadny titulok vybraných titulkov.";
+            LiveStatus = Loc.T("Pri prehrávači nie je žiadny titulok vybraných titulkov.");
             return;
         }
 
         var now = Player.Now;
         var by = (long)Math.Round((now - cue.Shown).TotalMilliseconds);
         row.DelayText = (row.DelayMilliseconds + by).ToString(CultureInfo.InvariantCulture);
-        LiveStatus = $"Posun {(by >= 0 ? "+" : "−")}{Math.Abs(by).ToString("#,0", CultureInfo.GetCultureInfo("sk-SK"))} ms: „{cue.Label}“ začína v {SubtitleRow.Clock(now)} " +
-                     $"(posun spolu {row.DelayMilliseconds.ToString("#,0", CultureInfo.GetCultureInfo("sk-SK"))} ms).";
+        LiveStatus = Loc.F("Posun {0}{1} ms: „{2}“ začína v {3} (posun spolu {4} ms).", by >= 0 ? "+" : "−", Math.Abs(by).ToString("#,0", CultureInfo.GetCultureInfo("sk-SK")),
+            cue.Label, SubtitleRow.Clock(now), row.DelayMilliseconds.ToString("#,0", CultureInfo.GetCultureInfo("sk-SK")));
     }
 
     private void MarkPoint(bool first)
     {
         if (_selected is not { } row || NearestCue(row) is not { } cue)
         {
-            LiveStatus = "Pri prehrávači nie je žiadny titulok vybraných titulkov.";
+            LiveStatus = Loc.T("Pri prehrávači nie je žiadny titulok vybraných titulkov.");
             return;
         }
 
@@ -629,14 +628,14 @@ public sealed partial class SubtitlesPageViewModel
         {
             row.FirstNow = SubtitleRow.Clock(cue.Read);
             row.FirstTarget = now;
-            LiveStatus = $"1. bod: „{cue.Label}“ ({row.FirstNow}) patrí do {now}. Pustite film ďalej a pri titulku ku koncu dajte 2. bod.";
+            LiveStatus = Loc.F("1. bod: „{0}“ ({1}) patrí do {2}. Pustite film ďalej a pri titulku ku koncu dajte 2. bod.", cue.Label, row.FirstNow, now);
         }
         else
         {
             row.SecondNow = SubtitleRow.Clock(cue.Read);
             row.SecondTarget = now;
             row.TwoPointsCommand.Execute(null);
-            LiveStatus = $"2. bod: „{cue.Label}“ ({row.SecondNow}) patrí do {now}. {row.SyncNote}";
+            LiveStatus = Loc.F("2. bod: „{0}“ ({1}) patrí do {2}. {3}", cue.Label, row.SecondNow, now, row.SyncNote);
         }
     }
 

@@ -13,7 +13,7 @@ The Calendar shows your records together with premieres, episodes, holidays, nam
 ### Layers
 Layers can be switched on **one by one or by group** – Premieres, New episodes, Mine, Almanac and UNIVERSUM
 (scheduled actions, MEGA batches, processed runs). UNIVERSUM remembers your choices.
-!tip Tick [only selected titles] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
+!tip Tick [only selected titles] and the calendar shows only the titles you have marked as *Selected* in Premieres and News – Series.
 ### New record
 1. Click a day.
 2. Choose [+ Event], [+ Task] or [+ Note].
@@ -33,7 +33,7 @@ Below the line you can see how UNIVERSUM understood it, before you add it.
 ![Planned tasks](tasks-list.jpg)
 ### List and board
 - **Zoznam** splits tasks into *Overdue* (red), *Today*, *Tomorrow*, *This week*, *Later* and *No due day*.
-- **Tabuľa** has the columns *Na urobenie*, *Rozpracované*, *Hotové* – move a task with the arrows.
+- **Tabuľa** has the columns *To do*, *In progress*, *Done* – move a task with the arrows.
 - A task can have a **checklist** of steps (in the editor).
 ### UNIVERSUM suggests
 At the top are suggestions that UNIVERSUM works out by itself (a chosen title in the input folder, a new episode, a premiere…).

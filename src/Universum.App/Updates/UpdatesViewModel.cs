@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using Universum.App.Setup;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Updates;
+using Universum.App.Localization;
 
 namespace Universum.App.Updates;
 
@@ -64,9 +65,9 @@ public sealed class UpdatesViewModel : ObservableObject
 
     public string MkvToolNixLine => _report?.MkvToolNix switch
     {
-        null => _report is null ? "Zisťujem…" : "Najnovšiu verziu sa nepodarilo zistiť.",
-        { IsAvailable: false } m => $"Máte najnovšiu verziu {MkvToolNixDownloads.Format(m.Latest)}.",
-        var m => $"Nainštalovaná {(m.Installed is { } i ? MkvToolNixDownloads.Format(i) : "žiadna")} → najnovšia {MkvToolNixDownloads.Format(m.Latest)} · {m.CompatibilityText}",
+        null => _report is null ? Loc.T("Zisťujem…") : Loc.T("Najnovšiu verziu sa nepodarilo zistiť."),
+        { IsAvailable: false } m => Loc.F("Máte najnovšiu verziu {0}.", MkvToolNixDownloads.Format(m.Latest)),
+        var m => Loc.F("Nainštalovaná {0} → najnovšia {1} · {2}", m.Installed is { } i ? MkvToolNixDownloads.Format(i) : Loc.T("žiadna"), MkvToolNixDownloads.Format(m.Latest), m.CompatibilityText),
     };
 
     public bool MkvSecurity => _report?.MkvToolNix is { IsAvailable: true, HasSecurityFixes: true };
@@ -79,16 +80,16 @@ public sealed class UpdatesViewModel : ObservableObject
 
     public string UniversumLine => _report switch
     {
-        null => "Zisťujem…",
-        { Universum: null } => $"Táto verzia {UpdateService.CurrentVersion.ToString(3)} · zatiaľ nie je vydaná novšia verzia.",
-        { Universum: { IsAvailable: false } } => $"Máte najnovšiu verziu {UpdateService.CurrentVersion.ToString(3)}.",
-        { Universum: var u } => $"Táto verzia {UpdateService.CurrentVersion.ToString(3)} → najnovšia {u!.Release.Version.ToString(3)}",
+        null => Loc.T("Zisťujem…"),
+        { Universum: null } => Loc.F("Táto verzia {0} · zatiaľ nie je vydaná novšia verzia.", UpdateService.CurrentVersion.ToString(3)),
+        { Universum: { IsAvailable: false } } => Loc.F("Máte najnovšiu verziu {0}.", UpdateService.CurrentVersion.ToString(3)),
+        { Universum: var u } => Loc.F("Táto verzia {0} → najnovšia {1}", UpdateService.CurrentVersion.ToString(3), u!.Release.Version.ToString(3)),
     };
 
     public string UniversumNotes => _report?.Universum is { IsAvailable: true } u ? u.Release.Notes : "";
 
     public string UniversumInstallHint => _report?.Universum is { IsAvailable: true, CanInstall: false }
-        ? "Toto vydanie nemá podpis kľúčom vydaní UNIVERSUM, preto sa neinštaluje. Vydania UNIVERSUM sú vždy podpísané – nepodpísané radšej neinštalujte."
+        ? Loc.T("Toto vydanie nemá podpis kľúčom vydaní UNIVERSUM, preto sa neinštaluje. Vydania UNIVERSUM sú vždy podpísané – nepodpísané radšej neinštalujte.")
         : "";
 
     public string Problems => _report is null ? "" : string.Join("\n", _report.Problems);
@@ -112,11 +113,11 @@ public sealed class UpdatesViewModel : ObservableObject
     public async Task CheckAsync()
     {
         Busy = true;
-        Status = "Zisťujem dostupné verzie…";
+        Status = Loc.T("Zisťujem dostupné verzie…");
         try
         {
             _report = await _updates.CheckAsync();
-            Status = _report.AnyAvailable ? "" : "Všetko je aktuálne.";
+            Status = _report.AnyAvailable ? "" : Loc.T("Všetko je aktuálne.");
         }
         finally
         {
@@ -135,7 +136,7 @@ public sealed class UpdatesViewModel : ObservableObject
 
         if (mkvToolNix && RunningMkvToolNix() is { } running)
         {
-            Status = $"Zatvorte najprv {running} – inak sa MKVToolNix nedá aktualizovať.";
+            Status = Loc.F("Zatvorte najprv {0} – inak sa MKVToolNix nedá aktualizovať.", running);
             return;
         }
 
@@ -152,13 +153,13 @@ public sealed class UpdatesViewModel : ObservableObject
                 if (!own.CanInstall)
                 {
                     OpenReleasePage();
-                    Status = "Stránka vydania UNIVERSUM je otvorená v prehliadači.";
+                    Status = Loc.T("Stránka vydania UNIVERSUM je otvorená v prehliadači.");
                     return;
                 }
 
-                Status = $"Sťahujem a overujem UNIVERSUM {own.Release.Version.ToString(3)}…";
+                Status = Loc.F("Sťahujem a overujem UNIVERSUM {0}…", own.Release.Version.ToString(3));
                 var installer = await UniversumInstaller.DownloadAsync(own.Release, new Progress<double>(p => Progress = p));
-                Status = "Spúšťam inštalátor UNIVERSUM – program sa zatvorí a po inštalácii sa spustí znova.";
+                Status = Loc.T("Spúšťam inštalátor UNIVERSUM – program sa zatvorí a po inštalácii sa spustí znova.");
                 if (UniversumInstaller.Start(installer))
                 {
                     CloseRequested?.Invoke();
@@ -166,7 +167,7 @@ public sealed class UpdatesViewModel : ObservableObject
                 }
                 else
                 {
-                    Status = "Inštalácia UNIVERSUM bola zrušená.";
+                    Status = Loc.T("Inštalácia UNIVERSUM bola zrušená.");
                 }
             }
         }
@@ -182,24 +183,24 @@ public sealed class UpdatesViewModel : ObservableObject
 
     private async Task<bool> UpdateMkvToolNixAsync(Version latest)
     {
-        Status = $"Sťahujem a overujem MKVToolNix {MkvToolNixDownloads.Format(latest)}…";
+        Status = Loc.F("Sťahujem a overujem MKVToolNix {0}…", MkvToolNixDownloads.Format(latest));
         Progress = 0;
         var installer = await MkvToolNixInstaller.DownloadAsync(latest, new Progress<double>(p => Progress = p));
-        Status = "Inštalujem MKVToolNix (Windows sa môže opýtať na povolenie)…";
+        Status = Loc.T("Inštalujem MKVToolNix (Windows sa môže opýtať na povolenie)…");
         if (!await MkvToolNixInstaller.RunAsync(installer, silent: true))
         {
-            Status = "Inštalácia MKVToolNix bola zrušená.";
+            Status = Loc.T("Inštalácia MKVToolNix bola zrušená.");
             return false;
         }
 
         var installation = await _services.FindMkvToolNixAsync();
         if (installation is null || installation.Version < latest)
         {
-            Status = $"MKVToolNix {MkvToolNixDownloads.Format(latest)} sa nenašiel ani po inštalácii – skontrolujte ho tlačidlom MKVToolNix dole.";
+            Status = Loc.F("MKVToolNix {0} sa nenašiel ani po inštalácii – skontrolujte ho tlačidlom MKVToolNix dole.", MkvToolNixDownloads.Format(latest));
             return false;
         }
 
-        Status = $"MKVToolNix {MkvToolNixDownloads.Format(installation.Version)} je nainštalovaný.";
+        Status = Loc.F("MKVToolNix {0} je nainštalovaný.", MkvToolNixDownloads.Format(installation.Version));
         _report = _report! with { MkvToolNix = _report.MkvToolNix! with { Installed = installation.Version } };
         Refresh();
         return true;
@@ -261,7 +262,7 @@ public sealed class UpdatesViewModel : ObservableObject
         var text = new StringBuilder();
         foreach (var version in news)
         {
-            text.Append(version.Heading).AppendLine(version.HasSecurityFixes ? "   ⚠ BEZPEČNOSTNÉ OPRAVY" : "");
+            text.Append(version.Heading).AppendLine(version.HasSecurityFixes ? Loc.T("   ⚠ BEZPEČNOSTNÉ OPRAVY") : "");
             foreach (var section in version.Sections)
             {
                 text.Append("  ").AppendLine(section.IsSecurity ? section.Title.ToUpperInvariant() : section.Title);

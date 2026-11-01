@@ -19,7 +19,7 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly AppServices _services;
     private ToolItem _selectedTool;
-    private string _mkvToolNixStatus = "Hľadám MKVToolNix…";
+    private string _mkvToolNixStatus = Loc.T("Hľadám MKVToolNix…");
     private string _updateBadge = "";
 
     public MainViewModel(AppServices services)
@@ -214,25 +214,25 @@ public sealed class MainViewModel : ObservableObject
     /// </summary>
     public string? CloseWarning()
     {
-        var lost = Mux.Unprocessed.Select(s => $"• Nastavenia zlučovania „{s.DisplayName}“ boli zmenené a nie sú vo fronte.").ToList();
+        var lost = Mux.Unprocessed.Select(s => Loc.F("• Nastavenia zlučovania „{0}“ boli zmenené a nie sú vo fronte.", s.DisplayName)).ToList();
         if (_services.Jobs.Running is { } running)
         {
-            lost.Add($"• Práve beží úloha {running.Id} ({running.Description}) – preruší sa.");
+            lost.Add(Loc.F("• Práve beží úloha {0} ({1}) – preruší sa.", running.Id, running.Description));
         }
 
         if (_services.Jobs.WaitingCount is > 0 and var waiting)
         {
-            lost.Add($"• Vo fronte čaká úloh: {waiting} – nespracujú sa.");
+            lost.Add(Loc.F("• Vo fronte čaká úloh: {0} – nespracujú sa.", waiting));
         }
 
         if (Batch.IsRunning)
         {
-            lost.Add("• Beží hromadné spracovanie – zastaví sa.");
+            lost.Add(Loc.T("• Beží hromadné spracovanie – zastaví sa."));
         }
 
         return lost.Count == 0
             ? null
-            : string.Join("\n", lost) + "\n\nNaozaj chcete UNIVERSUM zavrieť? Všetky zmeny sa stratia. Originálne súbory zostanú nedotknuté.";
+            : string.Join("\n", lost) + Loc.T("\n\nNaozaj chcete UNIVERSUM zavrieť? Všetky zmeny sa stratia. Originálne súbory zostanú nedotknuté.");
     }
 
     /// <summary>
@@ -379,7 +379,7 @@ public sealed class MainViewModel : ObservableObject
                 }
                 catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException or System.Net.Http.HttpRequestException)
                 {
-                    outcome = "nepodarilo sa – " + ex.Message;
+                    outcome = Loc.T("nepodarilo sa – ") + ex.Message;
                 }
 
                 action.LastRun = DateTimeOffset.Now;
@@ -389,7 +389,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             _reminderDay = DateOnly.FromDateTime(upTo);
-            ReminderText = "⚙ UNIVERSUM vykonal – " + string.Join("   ·   ", told);
+            ReminderText = Loc.T("⚙ UNIVERSUM vykonal – ") + string.Join("   ·   ", told);
         }
         finally
         {
@@ -404,16 +404,16 @@ public sealed class MainViewModel : ObservableObject
         {
             case Core.Agenda.AgendaActionKind.RefreshNews:
                 var parts = new List<string>();
-                foreach (var (refresh, name) in new[] { (Premieres.RefreshCommand, "Premiéry"), (SeriesNews.RefreshCommand, "Novinky") })
+                foreach (var (refresh, name) in new[] { (Premieres.RefreshCommand, Loc.T("Premiéry")), (SeriesNews.RefreshCommand, Loc.T("Novinky")) })
                 {
                     if (refresh.CanExecute(null))
                     {
                         await refresh.ExecuteAsync(null);
-                        parts.Add(name + " obnovené");
+                        parts.Add(Loc.F("{0} obnovené", name));
                     }
                     else
                     {
-                        parts.Add(name + " práve pracujú – vynechané");
+                        parts.Add(Loc.F("{0} práve pracujú – vynechané", name));
                     }
                 }
 
@@ -421,32 +421,32 @@ public sealed class MainViewModel : ObservableObject
             case Core.Agenda.AgendaActionKind.SyncHistra:
                 if (!HistraLists.SyncCommand.CanExecute(null))
                 {
-                    return "HISTRA nie je zapnutá, nemá listy alebo práve pracuje – vynechané";
+                    return Loc.T("HISTRA nie je zapnutá, nemá listy alebo práve pracuje – vynechané");
                 }
 
                 await HistraLists.SyncCommand.ExecuteAsync(null);
-                return HistraLists.Status.Length > 0 ? HistraLists.Status : "listy HISTRA synchronizované";
+                return HistraLists.Status.Length > 0 ? HistraLists.Status : Loc.T("listy HISTRA synchronizované");
             case Core.Agenda.AgendaActionKind.AnalyzeInput:
                 if (Batch.IsEditingMega || !Batch.AnalyzeCommand.CanExecute(null))
                 {
-                    return "Hromadné spracovanie práve pracuje alebo nemá priečinok – vynechané";
+                    return Loc.T("Hromadné spracovanie práve pracuje alebo nemá priečinok – vynechané");
                 }
 
                 await Batch.AnalyzeCommand.ExecuteAsync(null);
-                return Batch.Summary.Length > 0 ? Batch.Summary : "priečinok analyzovaný";
+                return Batch.Summary.Length > 0 ? Batch.Summary : Loc.T("priečinok analyzovaný");
             default:
                 if (_services.Mega.Batches.FirstOrDefault(b => b.Id == action.Batch) is not { } batch)
                 {
-                    return "MEGA dávka už neexistuje";
+                    return Loc.T("MEGA dávka už neexistuje");
                 }
 
                 if (batch.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed))
                 {
-                    return batch.Label + " už nečaká – vynechané";
+                    return Loc.F("{0} už nečaká – vynechané", batch.Label);
                 }
 
                 await Mega.StartAsync(batch);
-                return batch.State == Core.Mega.MegaBatchState.Queued ? batch.Label + " je vo fronte úloh" : batch.Label + ": " + Mega.Message;
+                return batch.State == Core.Mega.MegaBatchState.Queued ? Loc.F("{0} je vo fronte úloh", batch.Label) : batch.Label + ": " + Mega.Message;
         }
     }
     private string _reminderText = "";
@@ -491,7 +491,7 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>"Na vstupe pribudli nové súbory (3): Vymyslený.Film.mkv, …".</summary>
     public string ArrivalsText =>
-        $"Na vstupe pribudli nové súbory ({_services.Arrivals.Count}): " +
+        Loc.F("Na vstupe pribudli nové súbory ({0}): ", _services.Arrivals.Count) +
         string.Join(", ", _services.Arrivals.Take(3).Select(System.IO.Path.GetFileName)) + (_services.Arrivals.Count > 3 ? " …" : "");
 
     public AsyncRelayCommand ArrivalsToBatchCommand { get; }
@@ -515,7 +515,7 @@ public sealed class MainViewModel : ObservableObject
         }
         else
         {
-            System.Windows.MessageBox.Show("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení.", "UNIVERSUM");
+            System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení."), "UNIVERSUM");
         }
     }
 
@@ -765,7 +765,7 @@ public sealed class MainViewModel : ObservableObject
         };
         if (!sent)
         {
-            System.Windows.MessageBox.Show("Spracovanie práve pracuje – pošlite titul znova po jeho skončení.", "UNIVERSUM");
+            System.Windows.MessageBox.Show(Loc.T("Spracovanie práve pracuje – pošlite titul znova po jeho skončení."), "UNIVERSUM");
         }
     }
 
@@ -775,7 +775,7 @@ public sealed class MainViewModel : ObservableObject
         SelectedTool = Tools.First(t => t.Page == Batch);
         if (!await Batch.OpenMegaBatchAsync(batch))
         {
-            System.Windows.MessageBox.Show("Hromadné spracovanie práve pracuje (alebo dávka nemá čakajúce súbory) – skúste to po jeho skončení.", "UNIVERSUM");
+            System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje (alebo dávka nemá čakajúce súbory) – skúste to po jeho skončení."), "UNIVERSUM");
         }
     }
 
@@ -788,13 +788,13 @@ public sealed class MainViewModel : ObservableObject
     {
         if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
         {
-            return "Nastavte vstupný priečinok (Nastavenia) – titul sa hľadá v ňom.";
+            return Loc.T("Nastavte vstupný priečinok (Nastavenia) – titul sa hľadá v ňom.");
         }
 
         var found = await Task.Run(() => new Universum.Core.Posters.PosterPlaces(_services.Library ?? new Universum.Core.Library.LibraryLayout(input), input).InInput(kind, names, year));
         if (found is null)
         {
-            return $"{caption} sa vo vstupnom priečinku nenašiel – v Single spracovaní otvorte súbor sami.";
+            return Loc.F("{0} sa vo vstupnom priečinku nenašiel – v Single spracovaní otvorte súbor sami.", caption);
         }
 
         List<string> files = System.IO.File.Exists(found) ? [found]
@@ -802,7 +802,7 @@ public sealed class MainViewModel : ObservableObject
                 .Where(f => Universum.Core.Posters.PosterPlaces.IsVideo(f)).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList());
         if (files.Count == 0)
         {
-            return $"V priečinku {System.IO.Path.GetFileName(found)} nie je žiadne video.";
+            return Loc.F("V priečinku {0} nie je žiadne video.", System.IO.Path.GetFileName(found));
         }
 
         bool sent;
@@ -820,7 +820,7 @@ public sealed class MainViewModel : ObservableObject
             sent = await SendEpisodeToSingleAsync(files[0], caption, number is { } n ? $"S{n.Season:00}E{n.Episode:00}" : "");
         }
 
-        return sent ? null : "Spracovanie práve pracuje – pošlite titul znova po jeho skončení.";
+        return sent ? null : Loc.T("Spracovanie práve pracuje – pošlite titul znova po jeho skončení.");
     }
 
     /// <summary>A chosen film from the input folder into Single spracovanie with its title; false while it is busy.</summary>
@@ -847,17 +847,17 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand ShowUpdatesCommand { get; }
 
     /// <summary>Text of the update button in the status bar: "Aktualizácie…" or what is available.</summary>
-    public string UpdateBadge => _updateBadge.Length > 0 ? _updateBadge : "Aktualizácie…";
+    public string UpdateBadge => _updateBadge.Length > 0 ? _updateBadge : Loc.T("Aktualizácie…");
 
     public bool HasUpdate => _updateBadge.Length > 0;
 
     /// <summary>Why updating is not possible now (a batch or a file is being processed); null when it is.</summary>
     public string? UpdateBlocker() =>
-        Batch.IsRunning ? "Beží hromadné spracovanie – aktualizovať sa dá po jeho skončení."
-        : _services.Jobs.Running is not null ? "Beží fronta úloh – aktualizovať sa dá po jej dokončení (alebo ju zastavte)."
-        : Rules.Busy ? "Spracúva sa súbor – aktualizovať sa dá po jeho dokončení."
-        : _services.Jobs.WaitingCount > 0 ? "Vo fronte čakajú úlohy – aktualizovať sa dá, keď sa spracujú (alebo ich z fronty odstráňte)."
-        : Mux.Unprocessed.Count > 0 ? "V Zlučovaní sú zmenené nastavenia, ktoré nie sú vo fronte – pridajte ich do fronty alebo zavrite, potom aktualizujte."
+        Batch.IsRunning ? Loc.T("Beží hromadné spracovanie – aktualizovať sa dá po jeho skončení.")
+        : _services.Jobs.Running is not null ? Loc.T("Beží fronta úloh – aktualizovať sa dá po jej dokončení (alebo ju zastavte).")
+        : Rules.Busy ? Loc.T("Spracúva sa súbor – aktualizovať sa dá po jeho dokončení.")
+        : _services.Jobs.WaitingCount > 0 ? Loc.T("Vo fronte čakajú úlohy – aktualizovať sa dá, keď sa spracujú (alebo ich z fronty odstráňte).")
+        : Mux.Unprocessed.Count > 0 ? Loc.T("V Zlučovaní sú zmenené nastavenia, ktoré nie sú vo fronte – pridajte ich do fronty alebo zavrite, potom aktualizujte.")
         : null;
 
     /// <summary>Opens the update window (also used by the self-test).</summary>
@@ -871,8 +871,8 @@ public sealed class MainViewModel : ObservableObject
         var installation = await _services.FindMkvToolNixAsync();
         MkvToolNixStatus = installation switch
         {
-            null => "MKVToolNix nenájdený",
-            { IsSupportedVersion: false } => $"MKVToolNix {installation.Version} – zastaraný",
+            null => Loc.T("MKVToolNix nenájdený"),
+            { IsSupportedVersion: false } => Loc.F("MKVToolNix {0} – zastaraný", installation.Version),
             _ => $"MKVToolNix {installation.Version}",
         };
         OpenMkvToolNixGuiCommand.NotifyCanExecuteChanged();
@@ -922,7 +922,7 @@ public sealed class MainViewModel : ObservableObject
         var existing = paths.Where(p => System.IO.File.Exists(p) || System.IO.Directory.Exists(p)).ToList();
         if (existing.Count == 0)
         {
-            Notify("Súbor alebo priečinok z Prieskumníka už neexistuje:\n" + string.Join("\n", paths));
+            Notify(Loc.T("Súbor alebo priečinok z Prieskumníka už neexistuje:\n") + string.Join("\n", paths));
             return;
         }
 
@@ -961,7 +961,7 @@ public sealed class MainViewModel : ObservableObject
                 if (Rules.Busy)
                 {
                     Open(Rules);
-                    Notify("V Single spracovaní sa práve spracúva súbor – po jeho dokončení ho otvorte znova.\n\nNeotvorený: " +
+                    Notify(Loc.T("V Single spracovaní sa práve spracúva súbor – po jeho dokončení ho otvorte znova.\n\nNeotvorený: ") +
                            System.IO.Path.GetFileName(first));
                     return;
                 }
@@ -981,11 +981,11 @@ public sealed class MainViewModel : ObservableObject
             .ToList();
         if (left.Count > 0)
         {
-            Notify($"Otvorené: {System.IO.Path.GetFileName(first.TrimEnd('\\', '/'))}\n\n" +
-                   (action == ShellAction.Info ? "Informácie zobrazujú jeden súbor. " : batch
-                       ? "Hromadné spracovanie spracuje jeden priečinok naraz (súbory v ňom sa spracujú všetky). "
-                       : "Single spracovanie spracúva jeden súbor. Viac súborov naraz spracuje Hromadné spracovanie. ") +
-                   $"Neotvorené ({left.Count}):\n" + string.Join("\n", left.Take(10)) + (left.Count > 10 ? "\n…" : ""));
+            Notify(Loc.F("Otvorené: {0}\n\n", System.IO.Path.GetFileName(first.TrimEnd('\\', '/'))) +
+                   (action == ShellAction.Info ? Loc.T("Informácie zobrazujú jeden súbor. ") : batch
+                       ? Loc.T("Hromadné spracovanie spracuje jeden priečinok naraz (súbory v ňom sa spracujú všetky). ")
+                       : Loc.T("Single spracovanie spracúva jeden súbor. Viac súborov naraz spracuje Hromadné spracovanie. ")) +
+                   Loc.F("Neotvorené ({0}):\n", left.Count) + string.Join("\n", left.Take(10)) + (left.Count > 10 ? "\n…" : ""));
         }
     }
 
@@ -1002,7 +1002,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         Open(Batch);
-        Notify("Hromadné spracovanie práve pracuje – nový priečinok otvorte po jeho skončení (alebo ho zastavte).");
+        Notify(Loc.T("Hromadné spracovanie práve pracuje – nový priečinok otvorte po jeho skončení (alebo ho zastavte)."));
         return true;
     }
 
@@ -1063,9 +1063,9 @@ public sealed class MainViewModel : ObservableObject
             ? ""
             : string.Join(" · ", new[]
             {
-                report.MkvToolNix is { IsAvailable: true } m ? $"MKVToolNix {MkvToolNixDownloads.Format(m.Latest)}" + (m.HasSecurityFixes ? " (bezpečnostné opravy)" : "") : null,
+                report.MkvToolNix is { IsAvailable: true } m ? $"MKVToolNix {MkvToolNixDownloads.Format(m.Latest)}" + (m.HasSecurityFixes ? Loc.T(" (bezpečnostné opravy)") : "") : null,
                 report.Universum is { IsAvailable: true } u ? $"UNIVERSUM {u.Release.Version.ToString(3)}" : null,
-            }.OfType<string>()) is { Length: > 0 } text ? "Nová verzia: " + text : "";
+            }.OfType<string>()) is { Length: > 0 } text ? Loc.T("Nová verzia: ") + text : "";
         OnPropertyChanged(nameof(UpdateBadge));
         OnPropertyChanged(nameof(HasUpdate));
     }

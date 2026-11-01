@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Histra;
 using Universum.Core.Library.Tmdb;
@@ -113,7 +114,7 @@ public sealed class TitleCardViewModel : ObservableObject
     public bool HasGenre => Genre.Length > 0;
 
     /// <summary>"Réžia" of a film, "Tvorcovia" of a series.</summary>
-    public string DirectorsLabel => Kind == MediaKind.Movie ? "Réžia" : "Tvorcovia";
+    public string DirectorsLabel => Kind == MediaKind.Movie ? Loc.T("Réžia") : Loc.T("Tvorcovia");
 
     public string Directors { get; private set; } = "";
 
@@ -143,16 +144,16 @@ public sealed class TitleCardViewModel : ObservableObject
 
         if (_services.TitleDetails is not { } details)
         {
-            Status = _seed is null ? "Bez kľúča TMDB sa detail titulu nedá načítať (Nastavenia → TMDB)." : "";
+            Status = _seed is null ? Loc.T("Bez kľúča TMDB sa detail titulu nedá načítať (Nastavenia → TMDB).") : "";
             return;
         }
 
         IsLoading = true;
         try
         {
-            Status = "Načítavam z TMDB…";
+            Status = Loc.T("Načítavam z TMDB…");
             _details = await details.GetAsync(Kind, id);
-            Status = _details is null ? "TMDB titul s týmto ID nemá." : "";
+            Status = _details is null ? Loc.T("TMDB titul s týmto ID nemá.") : "";
             if (_details is not null)
             {
                 Poster.Reset();
@@ -215,7 +216,7 @@ public sealed class TitleCardViewModel : ObservableObject
             ("TMDB", TitleLinks.Tmdb(Kind, ids.Tmdb)),
             ("IMDb", TitleLinks.Imdb(ids.Imdb)),
             ("Trakt", TitleLinks.Trakt(Kind, ids.Tmdb)),
-            ("ČSFD (hľadať)", TitleLinks.CsfdSearch(searchName)),
+            (Loc.T("ČSFD (hľadať)"), TitleLinks.CsfdSearch(searchName)),
         }.Where(l => l.Item2 is not null).Select(l => new TitleLink(l.Item1, l.Item2!)).ToList();
         Ids = new[]
         {
@@ -233,15 +234,15 @@ public sealed class TitleCardViewModel : ObservableObject
         var runtime = d?.Runtime ?? _seed?.Runtime;
         Facts = string.Join(" · ", new[]
         {
-            Kind == MediaKind.Movie ? "Film" : "Seriál",
-            Kind == MediaKind.Series && d?.Seasons is { } seasons ? Count(seasons, "séria", "série", "sérií") : null,
-            Kind == MediaKind.Series && d?.Episodes is { } episodes ? Count(episodes, "epizóda", "epizódy", "epizód") : null,
-            runtime is { } minutes ? (Kind == MediaKind.Series ? "epizóda " : "") + Length(minutes) : null,
+            Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"),
+            Kind == MediaKind.Series && d?.Seasons is { } seasons ? Count(seasons, Loc.T("séria"), Loc.T("série"), Loc.T("sérií")) : null,
+            Kind == MediaKind.Series && d?.Episodes is { } episodes ? Count(episodes, Loc.T("epizóda"), Loc.T("epizódy"), Loc.T("epizód")) : null,
+            runtime is { } minutes ? (Kind == MediaKind.Series ? Loc.T("epizóda ") : "") + Length(minutes) : null,
         }.OfType<string>());
 
         Ratings = string.Join(" · ", new[]
         {
-            d?.Rating is { } tmdb ? $"TMDB {tmdb.ToString("0.0", Slovak)}" + (d.RatingVotes > 0 ? $" ({d.RatingVotes.ToString("N0", Slovak)} hlasov)" : "") : null,
+            d?.Rating is { } tmdb ? $"TMDB {tmdb.ToString("0.0", Slovak)}" + (d.RatingVotes > 0 ? Loc.F(" ({0} hlasov)", d.RatingVotes.ToString("N0", Slovak)) : "") : null,
             _other?.Imdb is { } imdb ? $"IMDb {imdb}" : null,
             _other?.RottenTomatoes is { } tomatoes ? $"Rotten Tomatoes {tomatoes}" : null,
             _other?.Metacritic is { } metacritic ? $"Metacritic {metacritic}" : null,

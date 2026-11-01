@@ -33,7 +33,7 @@ Pod řádkem vidíte, jak ho UNIVERSUM pochopilo, ještě před přidáním.
 ![Plánované úkoly](tasks-list.jpg)
 ### Seznam a tabule
 - **Zoznam** dělí úkoly na *Po termínu* (červeně), *Dnes*, *Zítra*, *Tento týden*, *Později* a *Bez termínu*.
-- **Tabuľa** má sloupce *Na urobenie*, *Rozpracované*, *Hotové* – úkol posunete šipkami.
+- **Tabuľa** má sloupce *K udělání*, *Rozpracované*, *Hotové* – úkol posunete šipkami.
 - Úkol může mít **kontrolní seznam** kroků (v editoru).
 ### UNIVERSUM navrhuje
 Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupní složce, nová epizoda, premiéra…).

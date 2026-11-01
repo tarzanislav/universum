@@ -1,4 +1,5 @@
 using System.IO;
+using Universum.App.Localization;
 using Universum.Core.Processes;
 using Universum.Core.Speech;
 
@@ -34,7 +35,7 @@ public sealed class VoiceRecorder(AppServices services)
             var microphones = VoiceNotes.Microphones(devices.StandardError + "\n" + devices.StandardOutput);
             if (microphones.Count == 0)
             {
-                return "Nenašiel sa žiadny mikrofón – pripojte ho alebo ho povoľte v nastaveniach súkromia Windows (Mikrofón).";
+                return Loc.T("Nenašiel sa žiadny mikrofón – pripojte ho alebo ho povoľte v nastaveniach súkromia Windows (Mikrofón).");
             }
 
             Directory.CreateDirectory(Folder);
@@ -46,7 +47,7 @@ public sealed class VoiceRecorder(AppServices services)
             {
                 var problem = _run.Result.StandardError.Trim();
                 Reset();
-                return "Mikrofón sa nedá otvoriť" + (problem.Length > 0 ? ": " + problem.Split('\n')[^1] : ".");
+                return Loc.T("Mikrofón sa nedá otvoriť") + (problem.Length > 0 ? ": " + problem.Split('\n')[^1] : ".");
             }
 
             return null;
@@ -80,7 +81,7 @@ public sealed class VoiceRecorder(AppServices services)
         if (!File.Exists(samples) || new FileInfo(samples).Length < VoiceNotes.SampleRate)
         {
             File.Delete(samples);
-            return (null, null, "Nahrávka je prázdna alebo kratšia ako pol sekundy.");
+            return (null, null, Loc.T("Nahrávka je prázdna alebo kratšia ako pol sekundy."));
         }
 
         var wave = Path.ChangeExtension(samples, ".wav");

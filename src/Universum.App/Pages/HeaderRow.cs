@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 
@@ -29,7 +30,7 @@ public sealed record LanguageChoice(LanguageTag Tag, string Display)
     {
         if (tag.IsUndetermined)
         {
-            return new LanguageChoice(LanguageTag.Undetermined, "neurčený (und)");
+            return new LanguageChoice(LanguageTag.Undetermined, Loc.T("neurčený (und)"));
         }
 
         var language = Languages.Find(tag.Primary);
@@ -74,10 +75,10 @@ public sealed class HeaderRow : ObservableObject
 
     public string Type => Source.Type switch
     {
-        TrackType.Video => "Video",
-        TrackType.Audio => "Zvuk",
-        TrackType.Subtitles => "Titulky",
-        _ => "Iné",
+        TrackType.Video => Loc.T("Video"),
+        TrackType.Audio => Loc.T("Zvuk"),
+        TrackType.Subtitles => Loc.T("Titulky"),
+        _ => Loc.T("Iné"),
     };
 
     public string Codec => Source.Codec;
@@ -106,18 +107,18 @@ public sealed class HeaderRow : ObservableObject
         {
             if (IsRemoved)
             {
-                return "vynechá sa";
+                return Loc.T("vynechá sa");
             }
 
             var changes = new List<string>();
             if (!string.Equals(Name, Source.Name ?? "", StringComparison.Ordinal))
             {
-                changes.Add("názov");
+                changes.Add(Loc.T("názov"));
             }
 
             if (!Language.Same(Source.Language))
             {
-                changes.Add("jazyk");
+                changes.Add(Loc.T("jazyk"));
             }
 
             if (IsDefault != Source.Flags.Default)
@@ -141,8 +142,8 @@ public sealed class HeaderRow : ObservableObject
 
     /// <summary>The file's values, shown as a tooltip.</summary>
     public string Before =>
-        $"V súbore: názov „{Source.Name}“, jazyk {LanguageChoice.Of(Source.Language).Display}, " +
-        $"default {YesNo(Source.Flags.Default)}, enabled {YesNo(Source.Flags.Enabled)}, forced {YesNo(Source.Flags.Forced)}";
+        Loc.F("V súbore: názov „{0}“, jazyk {1}, default {2}, enabled {3}, forced {4}", Source.Name, LanguageChoice.Of(Source.Language).Display,
+            YesNo(Source.Flags.Default), YesNo(Source.Flags.Enabled), YesNo(Source.Flags.Forced));
 
     public TrackEdit ToEdit() => new(TrackId, Name.Length == 0 ? null : Name, Language.Tag, (_ruleFlags ?? Source.Flags) with { Default = IsDefault, Enabled = IsEnabled, Forced = IsForced });
 
@@ -162,7 +163,7 @@ public sealed class HeaderRow : ObservableObject
         OnPropertyChanged(string.Empty);
     }
 
-    private static string YesNo(bool value) => value ? "áno" : "nie";
+    private static string YesNo(bool value) => value ? Loc.T("áno") : Loc.T("nie");
 
     private void Set<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string property = "")
     {

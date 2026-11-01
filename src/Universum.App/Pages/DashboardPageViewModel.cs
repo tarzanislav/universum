@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Calendar;
 using Universum.Core.Jobs;
 using Universum.Core.News;
@@ -67,12 +68,12 @@ public sealed class DashboardPageViewModel : ObservableObject
         SingleFileCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Rules, _main.Rules.OpenCommand));
         InfoFileCommand = new AsyncRelayCommand(() => OpenAndRunAsync(_main.Info, _main.Info.OpenCommand));
 
-        Queue = new("", "Fronta úloh", () => _main.Open(_main.Queue));
-        Mux = new("", "Zlučovanie", () => _main.Open(_main.Mux));
-        Batch = new("", "Hromadné spracovanie", () => _main.Open(_main.Batch));
-        Library = new("", "Knižnica", () => _main.Open(_main.Settings));
-        Titles = new("", "Názvy titulov", () => _main.Open(_main.Settings));
-        Tools = new("", "MKVToolNix a aktualizácie", () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
+        Queue = new("", Loc.T("Fronta úloh"), () => _main.Open(_main.Queue));
+        Mux = new("", Loc.T("Zlučovanie"), () => _main.Open(_main.Mux));
+        Batch = new("", Loc.T("Hromadné spracovanie"), () => _main.Open(_main.Batch));
+        Library = new("", Loc.T("Knižnica"), () => _main.Open(_main.Settings));
+        Titles = new("", Loc.T("Názvy titulov"), () => _main.Open(_main.Settings));
+        Tools = new("", Loc.T("MKVToolNix a aktualizácie"), () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
         Status = [Queue, Mux, Batch, Library, Titles, Tools];
         Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres), found => _main.ProcessFoundAsync(found));
         Agenda = new AgendaOverview(services, main);
@@ -107,11 +108,11 @@ public sealed class DashboardPageViewModel : ObservableObject
 
     public string Greeting => _now.Hour switch
     {
-        < 5 => "Dobrú noc",
-        < 10 => "Dobré ráno",
-        < 18 => "Dobrý deň",
-        < 22 => "Dobrý večer",
-        _ => "Dobrú noc",
+        < 5 => Loc.T("Dobrú noc"),
+        < 10 => Loc.T("Dobré ráno"),
+        < 18 => Loc.T("Dobrý deň"),
+        < 22 => Loc.T("Dobrý večer"),
+        _ => Loc.T("Dobrú noc"),
     };
 
     public string TimeText => _now.ToString("HH:mm", Slovak);
@@ -142,13 +143,13 @@ public sealed class DashboardPageViewModel : ObservableObject
     // the language of the names: the language of the interface
     private static string Language => Localization.Loc.Language;
 
-    public string DayInfo => $"{ISOWeek.GetWeekOfYear(_now)}. týždeň · {_now.DayOfYear}. deň roka · " +
+    public string DayInfo => Loc.F("{0}. týždeň · {1}. deň roka · ", ISOWeek.GetWeekOfYear(_now), _now.DayOfYear) +
                              (new DateTime(_now.Year, 12, 31) - _now.Date).Days switch
                              {
-                                 0 => "posledný deň roka",
-                                 1 => "do konca roka 1 deň",
-                                 var left and < 5 => $"do konca roka {left} dni",
-                                 var left => $"do konca roka {left} dní",
+                                 0 => Loc.T("posledný deň roka"),
+                                 1 => Loc.T("do konca roka 1 deň"),
+                                 var left and < 5 => Loc.F("do konca roka {0} dni", left),
+                                 var left => Loc.F("do konca roka {0} dní", left),
                              };
 
     private DateOnly Today => DateOnly.FromDateTime(_now);
@@ -173,8 +174,8 @@ public sealed class DashboardPageViewModel : ObservableObject
         ? ""
         : string.Join(" · ", new[]
         {
-            w.FeelsLike is { } feels ? "pocitovo " + Degrees(feels) : null,
-            w.Wind is { } wind ? $"vietor {Whole(wind)} km/h" : null,
+            w.FeelsLike is { } feels ? Loc.F("pocitovo {0}", Degrees(feels)) : null,
+            w.Wind is { } wind ? Loc.F("vietor {0} km/h", Whole(wind)) : null,
         }.OfType<string>());
 
     // days already over (a forecast read before midnight) are not shown
@@ -182,15 +183,15 @@ public sealed class DashboardPageViewModel : ObservableObject
         DayLabel(day.Date),
         OpenMeteo.Symbol(day.Code),
         $"{Whole(day.Max)}° / {Whole(day.Min)}°",
-        day.PrecipitationChance is { } chance ? $"zrážky {chance} %" : "",
+        day.PrecipitationChance is { } chance ? Loc.F("zrážky {0} %", chance) : "",
         OpenMeteo.Describe(day.Code))).ToList() ?? [];
 
     /// <summary>No town, loading, a problem, or when the weather was read.</summary>
     public string WeatherMessage => Place is null
-        ? "Zadajte mesto v Nastaveniach (karta Počasie) – bez neho sa počasie nezisťuje."
-        : _weatherLoading ? "Zisťujem počasie…"
+        ? Loc.T("Zadajte mesto v Nastaveniach (karta Počasie) – bez neho sa počasie nezisťuje.")
+        : _weatherLoading ? Loc.T("Zisťujem počasie…")
         : _weatherMessage.Length > 0 ? _weatherMessage
-        : _weather is { } w ? "Aktualizované o " + w.TakenUtc.ToLocalTime().ToString("HH:mm", Slovak)
+        : _weather is { } w ? Loc.F("Aktualizované o {0}", w.TakenUtc.ToLocalTime().ToString("HH:mm", Slovak))
         : "";
 
     public string WeatherAttribution => OpenMeteo.Attribution;
@@ -267,7 +268,7 @@ public sealed class DashboardPageViewModel : ObservableObject
             if (version == _weatherVersion)
             {
                 // the last weather stays shown with its time; the message says why it is not newer
-                _weatherMessage = ex.Message + (_weather is { } shown ? $" (zobrazené je počasie z {shown.TakenUtc.ToLocalTime():HH:mm})" : "");
+                _weatherMessage = ex.Message + (_weather is { } shown ? Loc.F(" (zobrazené je počasie z {0:HH:mm})", shown.TakenUtc.ToLocalTime()) : "");
             }
         }
         finally
@@ -286,34 +287,34 @@ public sealed class DashboardPageViewModel : ObservableObject
     {
         var jobs = _services.Jobs;
         var failed = jobs.Jobs.Count(j => j.Status == JobStatus.Failed);
-        Queue.Text = (jobs.Running is { } running ? $"Beží: {running.Description}" + (jobs.WaitingCount > 0 ? $" · čaká {jobs.WaitingCount}" : "")
-                      : jobs.WaitingCount > 0 ? $"Čaká úloh: {jobs.WaitingCount}"
-                      : "Prázdna") +
-                     (failed > 0 ? $" · zlyhalo: {failed}" : "");
+        Queue.Text = (jobs.Running is { } running ? Loc.F("Beží: {0}", running.Description) + (jobs.WaitingCount > 0 ? Loc.F(" · čaká {0}", jobs.WaitingCount) : "")
+                      : jobs.WaitingCount > 0 ? Loc.F("Čaká úloh: {0}", jobs.WaitingCount)
+                      : Loc.T("Prázdna")) +
+                     (failed > 0 ? Loc.F(" · zlyhalo: {0}", failed) : "");
         Queue.Attention = failed > 0;
 
         var open = _main.Mux.Settings.Count(s => s.SourceRows.Count > 0);
         var unprocessed = _main.Mux.Unprocessed.Count;
-        Mux.Text = open == 0 ? "Žiadne súbory" : $"Nastavenia so súbormi: {open}" + (unprocessed > 0 ? $" · nie sú vo fronte: {unprocessed}" : "");
+        Mux.Text = open == 0 ? Loc.T("Žiadne súbory") : Loc.F("Nastavenia so súbormi: {0}", open) + (unprocessed > 0 ? Loc.F(" · nie sú vo fronte: {0}", unprocessed) : "");
         Mux.Attention = false;
 
         var unverified = _main.Batch.FileRows.Count(f => f.IsUnverified);
-        Batch.Text = _main.Batch.IsRunning ? "Beží spracovanie priečinka"
-            : _main.Batch.FileRows.Count > 0 ? $"{Path.GetFileName(_main.Batch.Folder?.TrimEnd('\\', '/')) ?? ""}: súborov {_main.Batch.FileRows.Count}" +
-                                               (unverified > 0 ? $" · titulov na potvrdenie: {unverified}" : "")
-            : "Nie je otvorený žiadny priečinok";
+        Batch.Text = _main.Batch.IsRunning ? Loc.T("Beží spracovanie priečinka")
+            : _main.Batch.FileRows.Count > 0 ? Loc.F("{0}: súborov {1}", Path.GetFileName(_main.Batch.Folder?.TrimEnd('\\', '/')) ?? "", _main.Batch.FileRows.Count) +
+                                               (unverified > 0 ? Loc.F(" · titulov na potvrdenie: {0}", unverified) : "")
+            : Loc.T("Nie je otvorený žiadny priečinok");
         Batch.Attention = unverified > 0;
 
         Library.Text = _services.Library is { } library
-            ? library.Root + (_libraryCounts is { } counts ? $" · filmy: {counts.Movies} · seriály: {counts.Shows}" : "")
-            : "Nie je nastavená – výstupný priečinok zvolíte v Nastaveniach";
+            ? library.Root + (_libraryCounts is { } counts ? Loc.F(" · filmy: {0} · seriály: {1}", counts.Movies, counts.Shows) : "")
+            : Loc.T("Nie je nastavená – výstupný priečinok zvolíte v Nastaveniach");
         Library.Attention = _services.Library is null;
 
         Titles.Text = string.Join(" · ",
-            "TMDB: " + (_services.Tmdb is not null ? "zapnuté" : _services.TmdbKey is null ? "bez kľúča" : "vypnuté"),
-            "HISTRA: " + (_services.Histra is not null ? "zapnutá" : _services.HistraToken is null ? "bez tokenu" : "vypnutá"));
+            "TMDB: " + (_services.Tmdb is not null ? Loc.T("zapnuté") : _services.TmdbKey is null ? Loc.T("bez kľúča") : Loc.T("vypnuté")),
+            "HISTRA: " + (_services.Histra is not null ? Loc.T("zapnutá") : _services.HistraToken is null ? Loc.T("bez tokenu") : Loc.T("vypnutá")));
 
-        Tools.Text = _main.MkvToolNixStatus + " · " + (_main.HasUpdate ? _main.UpdateBadge : _services.Updates.LastReport is null ? "aktualizácie sa ešte nekontrolovali" : "všetko je aktuálne");
+        Tools.Text = _main.MkvToolNixStatus + " · " + (_main.HasUpdate ? _main.UpdateBadge : _services.Updates.LastReport is null ? Loc.T("aktualizácie sa ešte nekontrolovali") : Loc.T("všetko je aktuálne"));
         Tools.Attention = _main.HasUpdate || _services.CurrentMkvToolNix is not { IsSupportedVersion: true };
     }
 
@@ -426,7 +427,7 @@ public sealed class DashboardPageViewModel : ObservableObject
     }
 
     private string DayLabel(DateOnly date) =>
-        date == Today ? "Dnes" : date == Today.AddDays(1) ? "Zajtra" : Capitalized(date.ToString("dddd", Slovak));
+        date == Today ? Loc.T("Dnes") : date == Today.AddDays(1) ? Loc.T("Zajtra") : Capitalized(date.ToString("dddd", CalendarTexts.Culture(Loc.Language)));
 
     private static string Degrees(double value) => $"{Whole(value)} °C";
 
@@ -486,8 +487,8 @@ public sealed class WeekOverview : ObservableObject
         OpenPremieresCommand = new(openPremieres);
         CheckWatchCommand = new AsyncRelayCommand(async () =>
         {
-            WatchStatus = "Zisťujem, kde sa dajú vybrané tituly pozerať…";
-            WatchStatus = await _services.Watchlist.CheckAsync() ?? $"Skontrolované {DateTime.Now:H:mm}.";
+            WatchStatus = Loc.T("Zisťujem, kde sa dajú vybrané tituly pozerať…");
+            WatchStatus = await _services.Watchlist.CheckAsync() ?? Loc.F("Skontrolované {0:H:mm}.", DateTime.Now);
         });
         _services.Watchlist.Changed += ShowOffers;
         _services.InputWatch.Changed += ShowFound;
@@ -543,8 +544,8 @@ public sealed class WeekOverview : ObservableObject
             .Select(f => (Film: f, Chosen: marks.Get(Universum.Core.News.MarkStore.Film(f.TmdbId)).Chosen))
             .OrderBy(f => f.Film.Premiere).ThenByDescending(f => f.Chosen).ThenByDescending(f => f.Film.Popularity).Take(14)
             .Select(f => new WeekRow(Day(f.Film.Premiere), f.Film.Caption,
-                f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? "kino " + f.Film.PremiereNote
-                    : f.Film.PremiereNote.Length > 0 ? "svetová premiéra · " + f.Film.PremiereNote : "svetová premiéra", f.Chosen, f.Film.Premiere == today))
+                f.Film.Region == Universum.Core.News.NewsRegion.Domestic ? Loc.F("kino {0}", f.Film.PremiereNote)
+                    : f.Film.PremiereNote.Length > 0 ? Loc.F("svetová premiéra · {0}", f.Film.PremiereNote) : Loc.T("svetová premiéra"), f.Chosen, f.Film.Premiere == today))
             .ToList();
 
         var schedule = await _services.SeriesNews.ReadAsync(_services.NewsSources, today, offline: true);
@@ -555,8 +556,8 @@ public sealed class WeekOverview : ObservableObject
             .Select(e => new WeekRow(Day(e.Episode.AirDate), e.Episode.Caption,
                 string.Join(" · ", new[] { e.Episode.Code, e.Episode.Kind switch
                 {
-                    Universum.Core.News.EpisodeKind.SeriesPremiere => "nový seriál",
-                    Universum.Core.News.EpisodeKind.SeasonPremiere => "nová séria",
+                    Universum.Core.News.EpisodeKind.SeriesPremiere => Loc.T("nový seriál"),
+                    Universum.Core.News.EpisodeKind.SeasonPremiere => Loc.T("nová séria"),
                     _ => "",
                 }, e.Episode.Channel }.Where(t => t.Length > 0)), e.Chosen, e.Episode.AirDate == today))
             .ToList();
@@ -564,5 +565,8 @@ public sealed class WeekOverview : ObservableObject
         OnPropertyChanged(nameof(NoFilms));
     }
 
-    private static string Day(DateOnly day) => $"{Universum.Core.News.Periodicity.DayName(day)} {day.Day}. {day.Month}.";
+    // the week's films and episodes: "nedeľa 1. 11." in the language of the window
+    private static string Day(DateOnly day) => Loc.Language == "sk"
+        ? $"{Universum.Core.News.Periodicity.DayName(day)} {day.Day}. {day.Month}."
+        : day.ToString(Loc.Language == "en" ? "dddd d MMM" : "dddd d. M.", CalendarTexts.Culture(Loc.Language));
 }

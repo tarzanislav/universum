@@ -1,6 +1,7 @@
 using System.Net.Http;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Subtitles.Download;
 
 namespace Universum.App.Pages;
@@ -32,14 +33,14 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
         {
             _services.SetOpenSubtitlesAccount(null, null, null);
             OpenSubtitlesUser = "";
-            Status = "Účet OpenSubtitles je odstránený.";
+            Status = Loc.T("Účet OpenSubtitles je odstránený.");
             Refresh();
         }, () => _services.OpenSubtitlesAccount.Key is not null);
         SaveSvSubCommand = new RelayCommand(SaveSvSub, () => SvSubToken.Trim().Length > 0 || SvSubProvider.Trim() != _services.SvSubProvider || SvSubModel.Trim() != _services.SvSubModel);
         RemoveSvSubCommand = new RelayCommand(() =>
         {
             _services.SetSvSub(null, SvSubProvider, SvSubModel);
-            Status = "Token svsub.net je odstránený.";
+            Status = Loc.T("Token svsub.net je odstránený.");
             Refresh();
         }, () => _services.SvSubToken is not null);
     }
@@ -65,10 +66,10 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
     /// <summary>What is stored now (never the secrets themselves).</summary>
     public string Stored =>
         "OpenSubtitles: " + (_services.OpenSubtitlesAccount is { Key: not null } account
-            ? "kľúč uložený" + (account.User is { } user ? $", účet {user}" + (account.Password is null ? " (bez hesla – sťahovať sa nedá)" : "") : " (bez účtu – len hľadanie)")
-            : "nenastavené") +
-        " · svsub.net: " + (_services.SvSubToken is null ? "nenastavené"
-            : $"token uložený, poskytovateľ {_services.SvSubProvider}, model {(_services.SvSubModel.Length > 0 ? _services.SvSubModel : "predvolený služby")}");
+            ? Loc.T("kľúč uložený") + (account.User is { } user ? Loc.F(", účet {0}", user) + (account.Password is null ? Loc.T(" (bez hesla – sťahovať sa nedá)") : "") : Loc.T(" (bez účtu – len hľadanie)"))
+            : Loc.T("nenastavené")) +
+        " · svsub.net: " + (_services.SvSubToken is null ? Loc.T("nenastavené")
+            : Loc.F("token uložený, poskytovateľ {0}, model {1}", _services.SvSubProvider, _services.SvSubModel.Length > 0 ? _services.SvSubModel : Loc.T("predvolený služby")));
 
     public AsyncRelayCommand SaveOpenSubtitlesCommand { get; }
 
@@ -86,7 +87,7 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
         var password = OpenSubtitlesPassword.Length > 0 ? OpenSubtitlesPassword : stored.Password;
         if (key is null)
         {
-            Status = "Zadajte API kľúč (OpenSubtitles.com → profil → API Consumers).";
+            Status = Loc.T("Zadajte API kľúč (OpenSubtitles.com → profil → API Consumers).");
             return;
         }
 
@@ -103,11 +104,11 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
             _services.SetOpenSubtitlesAccount(key, OpenSubtitlesUser, password);
             OpenSubtitlesKey = "";
             OpenSubtitlesPassword = "";
-            Status = "OpenSubtitles: overené a uložené (šifrovane pre váš účet Windows).";
+            Status = Loc.T("OpenSubtitles: overené a uložené (šifrovane pre váš účet Windows).");
         }
         catch (SubtitleServiceException ex)
         {
-            Status = ex.Message + " – nič sa neuložilo.";
+            Status = ex.Message + Loc.T(" – nič sa neuložilo.");
         }
 
         Refresh();
@@ -118,13 +119,13 @@ public sealed class SubtitleAccountsViewModel : ObservableObject
         var token = SvSubToken.Trim().Length > 0 ? SvSubToken.Trim() : _services.SvSubToken;
         if (token is not null && !SvSubClient.IsValidToken(token))
         {
-            Status = "Toto nevyzerá ako token svsub.net (začína „svs_“).";
+            Status = Loc.T("Toto nevyzerá ako token svsub.net (začína „svs_“).");
             return;
         }
 
         _services.SetSvSub(token, SvSubProvider, SvSubModel);
         SvSubToken = "";
-        Status = "svsub.net: uložené (token šifrovane). Overí sa pri prvom preklade.";
+        Status = Loc.T("svsub.net: uložené (token šifrovane). Overí sa pri prvom preklade.");
         Refresh();
     }
 

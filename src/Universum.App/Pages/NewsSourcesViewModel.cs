@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.News;
 
 namespace Universum.App.Pages;
@@ -24,7 +25,7 @@ public sealed class NewsSourcesViewModel : ObservableObject
         RestoreCommand = new RelayCommand(Restore, () => NewsSource.Defaults.Any(d => _services.NewsSources.All(s => s.Kind != d.Kind)));
         ClearCacheCommand = new RelayCommand(() =>
         {
-            if (!Confirm("Vymazať všetky uložené premiéry a novinky vrátane histórie?\n\nVaše výbery a poznámky ostanú. Zdroje sa pri ďalšom zobrazení načítajú znova."))
+            if (!Confirm(Loc.T("Vymazať všetky uložené premiéry a novinky vrátane histórie?\n\nVaše výbery a poznámky ostanú. Zdroje sa pri ďalšom zobrazení načítajú znova.")))
             {
                 return;
             }
@@ -32,7 +33,7 @@ public sealed class NewsSourcesViewModel : ObservableObject
             try
             {
                 _services.ClearNews();
-                Status = "Uložené premiéry, novinky a história sú vymazané – pri ďalšom zobrazení sa zdroje načítajú znova.";
+                Status = Loc.T("Uložené premiéry, novinky a história sú vymazané – pri ďalšom zobrazení sa zdroje načítajú znova.");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -67,13 +68,13 @@ public sealed class NewsSourcesViewModel : ObservableObject
             _services.SetNewsSources(sources);
             Reload();
             var (back, ahead) = SeriesNews.Window(source);
-            Status = $"Zdroj „{rules.Name}“ je pridaný ({rules.PageAddress(DateOnly.FromDateTime(DateTime.Now)).Host}, " +
-                     $"{Texts.Count(back, "deň", "dni", "dní")} dozadu a {Texts.Count(ahead, "deň", "dni", "dní")} dopredu). Premiéry a Novinky ho načítajú pri ďalšom zobrazení.";
+            Status = Loc.F("Zdroj „{0}“ je pridaný ({1}, {2} dozadu a {3} dopredu). Premiéry a Novinky ho načítajú pri ďalšom zobrazení.", rules.Name,
+                     rules.PageAddress(DateOnly.FromDateTime(DateTime.Now)).Host, Texts.Count(back, Loc.T("deň"), Loc.T("dni"), Loc.T("dní")), Texts.Count(ahead, Loc.T("deň"), Loc.T("dni"), Loc.T("dní")));
             return true;
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
         {
-            Status = "Zdroj sa nepridal: " + ex.Message;
+            Status = Loc.T("Zdroj sa nepridal: ") + ex.Message;
             return false;
         }
     }
@@ -81,19 +82,19 @@ public sealed class NewsSourcesViewModel : ObservableObject
     internal void SetEnabled(NewsSourceRow row, bool enabled)
     {
         _services.SetNewsSources(_services.NewsSources.Select(s => s.Name == row.Name ? s with { Enabled = enabled } : s));
-        Status = enabled ? $"Zdroj „{row.Name}“ je zapnutý." : $"Zdroj „{row.Name}“ je vypnutý – nič sa z neho nečíta.";
+        Status = enabled ? Loc.F("Zdroj „{0}“ je zapnutý.", row.Name) : Loc.F("Zdroj „{0}“ je vypnutý – nič sa z neho nečíta.", row.Name);
     }
 
     internal void Remove(NewsSourceRow row)
     {
         _services.SetNewsSources(_services.NewsSources.Where(s => s.Name != row.Name));
         Reload();
-        Status = $"Zdroj „{row.Name}“ je odstránený.";
+        Status = Loc.F("Zdroj „{0}“ je odstránený.", row.Name);
     }
 
     private void Import()
     {
-        var dialog = new OpenFileDialog { Title = "Zdroj noviniek (súbor pravidiel)", Filter = "Pravidlá zdroja (*.json)|*.json" };
+        var dialog = new OpenFileDialog { Title = Loc.T("Zdroj noviniek (súbor pravidiel)"), Filter = Loc.T("Pravidlá zdroja") + " (*.json)|*.json" };
         if (dialog.ShowDialog() == true)
         {
             ImportFile(dialog.FileName);
@@ -104,7 +105,7 @@ public sealed class NewsSourcesViewModel : ObservableObject
     {
         _services.SetNewsSources(_services.NewsSources.Concat(NewsSource.Defaults.Where(d => _services.NewsSources.All(s => s.Kind != d.Kind))));
         Reload();
-        Status = "TVmaze a TMDB sú opäť medzi zdrojmi.";
+        Status = Loc.T("TVmaze a TMDB sú opäť medzi zdrojmi.");
     }
 
     private void Reload()
@@ -133,9 +134,9 @@ public sealed class NewsSourceRow(NewsSource source, NewsSourcesViewModel owner)
     public string Detail => source.Kind switch
     {
         NewsSourceKind.Page when source.Rules is { } rules =>
-            $"{Texts.Count(SeriesNews.Window(source).Back, "deň", "dni", "dní")} dozadu, {Texts.Count(SeriesNews.Window(source).Ahead, "deň", "dni", "dní")} dopredu · CZ/SK stanice: {rules.Domestic.Count}",
-        NewsSourceKind.TvMaze => $"krajiny {string.Join(", ", source.Countries)} a streamovacie služby · popularita aspoň {source.MinWeight}",
-        _ => "kľúč TMDB z karty TMDB",
+            Loc.F("{0} dozadu, {1} dopredu · CZ/SK stanice: {2}", Texts.Count(SeriesNews.Window(source).Back, Loc.T("deň"), Loc.T("dni"), Loc.T("dní")), Texts.Count(SeriesNews.Window(source).Ahead, Loc.T("deň"), Loc.T("dni"), Loc.T("dní")), rules.Domestic.Count),
+        NewsSourceKind.TvMaze => Loc.F("krajiny {0} a streamovacie služby · popularita aspoň {1}", string.Join(", ", source.Countries), source.MinWeight),
+        _ => Loc.T("kľúč TMDB z karty TMDB"),
     };
 
     public bool Enabled

@@ -4,6 +4,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
 using Universum.Core.Library;
@@ -21,8 +22,8 @@ namespace Universum.App.Pages;
 /// <summary>A subtitle file found with the video (owner, 30. 10. 2026, bod 5): why it belongs, added with one click.</summary>
 public sealed record FoundSubtitle(SubtitleFileMatch Match, RelayCommand AddCommand)
 {
-    public string Display => $"{Path.GetFileName(Match.Path)} – {Match.Reason}" + (Match.Language is { } language ? $", jazyk z názvu {language.Primary}" : "") +
-                             (Match.Forced ? ", forced" : "") + (Match.HearingImpaired ? ", pre nepočujúcich" : "");
+    public string Display => $"{Path.GetFileName(Match.Path)} – {Match.Reason}" + (Match.Language is { } language ? Loc.F(", jazyk z názvu {0}", language.Primary) : "") +
+                             (Match.Forced ? ", forced" : "") + (Match.HearingImpaired ? Loc.T(", pre nepočujúcich") : "");
 }
 
 /// <summary>
@@ -74,7 +75,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     private MediaFile? _file;
     private SubtitleRow? _selected;
     private string _fileName = "";
-    private string _summary = "Otvorte video (MKV, MP4 …) alebo súbory titulkov (SRT, ASS, VTT, TTML, SUB, TXT …), alebo ich sem pretiahnite myšou.";
+    private string _summary = Loc.T("Otvorte video (MKV, MP4 …) alebo súbory titulkov (SRT, ASS, VTT, TTML, SUB, TXT …), alebo ich sem pretiahnite myšou.");
     private string _result = "";
     private bool _busy;
     private bool _useRules = true;
@@ -117,7 +118,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         {
             Clear();
             FileName = "";
-            Summary = "Otvorte video alebo súbory titulkov, alebo ich sem pretiahnite myšou.";
+            Summary = Loc.T("Otvorte video alebo súbory titulkov, alebo ich sem pretiahnite myšou.");
             RefreshCommands();
         }, () => !_busy && (_file is not null || Rows.Count > 0));
     }
@@ -176,7 +177,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     public IReadOnlyList<string> OnlineLanguages { get; } = ["en", "cs", "sk"];
 
     private string _onlineLanguage = "en";
-    private string _hearingImpairedFilter = "všetky";
+    private readonly string[] _hearingImpairedFilters = [Loc.T("všetky"), Loc.T("len SDH"), Loc.T("bez SDH")];
+    private string? _hearingImpairedFilter;
     private string _translateTo = "cs";
     private string _onlineStatus = "";
     private System.Windows.Threading.DispatcherTimer? _downloadsWatch;
@@ -185,9 +187,10 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     /// <summary>The language searched on OpenSubtitles.com (owner: English, also SDH).</summary>
     public string OnlineLanguage { get => _onlineLanguage; set => SetProperty(ref _onlineLanguage, value); }
 
-    public IReadOnlyList<string> HearingImpairedFilters { get; } = ["všetky", "len SDH", "bez SDH"];
+    /// <summary>All, only SDH, without SDH – in the language of the window (the choice is told by its place in the list).</summary>
+    public IReadOnlyList<string> HearingImpairedFilters => _hearingImpairedFilters;
 
-    public string HearingImpairedFilter { get => _hearingImpairedFilter; set => SetProperty(ref _hearingImpairedFilter, value); }
+    public string HearingImpairedFilter { get => _hearingImpairedFilter ?? _hearingImpairedFilters[0]; set => SetProperty(ref _hearingImpairedFilter, value); }
 
     /// <summary>The language svsub.net translates into (owner: mostly "cz" = cs; also sk, en).</summary>
     public string TranslateTo { get => _translateTo; set => SetProperty(ref _translateTo, value); }
@@ -301,7 +304,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
     private async Task OpenVideoAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm;*.mpg|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm;*.mpg|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadVideoAsync(dialog.FileName);
@@ -329,7 +332,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         var dialog = new OpenFileDialog
         {
             Multiselect = true,
-            Filter = "Titulky|*.srt;*.vtt;*.webvtt;*.ass;*.ssa;*.ttml;*.dfxp;*.xml;*.smi;*.sami;*.sub;*.txt;*.mpl;*.sup;*.idx|Všetky súbory|*.*",
+            Filter = Loc.T("Titulky") + "|*.srt;*.vtt;*.webvtt;*.ass;*.ssa;*.ttml;*.dfxp;*.xml;*.smi;*.sami;*.sub;*.txt;*.mpl;*.sup;*.idx|" + Loc.T("Všetky súbory") + "|*.*",
         };
         return dialog.ShowDialog() == true ? dialog.FileNames : null;
     }
@@ -341,7 +344,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -354,12 +357,12 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             {
                 var forced = UniversumRules.IsForced(_file, track, _services.Profile);
                 var hearingImpaired = track.Flags.HearingImpaired || Core.Text.Words.ContainsAny(track.Name, _services.Profile.HearingImpairedKeywords);
-                Rows.Add(new SubtitleRow(track, null, null, track.Language, track.Name, forced, hearingImpaired, ForcedSubtitles.IsEmpty(track) ? "prázdna stopa – pravidlá ju odstránia" : "", Changed));
+                Rows.Add(new SubtitleRow(track, null, null, track.Language, track.Name, forced, hearingImpaired, ForcedSubtitles.IsEmpty(track) ? Loc.T("prázdna stopa – pravidlá ju odstránia") : "", Changed));
             }
 
             var fps = _file.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond;
-            Summary = $"{_file.ContainerName}, titulkové stopy: {Rows.Count}" + (fps is { } rate ? $", video {rate.ToString("0.###", CultureInfo.GetCultureInfo("sk-SK"))} FPS" : "") +
-                      (_file.IsMatroska ? "" : " – zmeny textu (konverzia, opravy) sú len pri MKV; časy a pridanie titulkov fungujú.");
+            Summary = Loc.F("{0}, titulkové stopy: {1}", _file.ContainerName, Rows.Count) + (fps is { } rate ? $", video {rate.ToString("0.###", CultureInfo.GetCultureInfo("sk-SK"))} FPS" : "") +
+                      (_file.IsMatroska ? "" : Loc.T(" – zmeny textu (konverzia, opravy) sú len pri MKV; časy a pridanie titulkov fungujú."));
             Library.Guess(path);
             FindBeside(path);
             // owner, 30. 10. 2026: the film plays here with its subtitles (paused at its start)
@@ -410,9 +413,9 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     private async Task LoadFilesAsync(IReadOnlyList<string> paths)
     {
         Clear();
-        FileName = paths.Count == 1 ? Path.GetFileName(paths[0]) : $"{paths.Count} súborov titulkov";
+        FileName = paths.Count == 1 ? Path.GetFileName(paths[0]) : Loc.F("{0} súborov titulkov", paths.Count);
         await AddFilesAsync(paths);
-        Summary = "Súbory titulkov – uložia sa ako nové súbory SRT (UTF-8) vedľa pôvodných; pôvodné ostanú nezmenené.";
+        Summary = Loc.T("Súbory titulkov – uložia sa ako nové súbory SRT (UTF-8) vedľa pôvodných; pôvodné ostanú nezmenené.");
     }
 
     // external subtitle files: read, their language from the text (návrh UNIVERSUM) or the name
@@ -432,13 +435,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 {
                     if (_file is null)
                     {
-                        problems.Add($"{Path.GetFileName(path)}: obrazové titulky sa dajú len pridať k videu.");
+                        problems.Add(Loc.F("{0}: obrazové titulky sa dajú len pridať k videu.", Path.GetFileName(path)));
                         continue;
                     }
 
                     var codec = Path.GetExtension(path).Equals(".sup", StringComparison.OrdinalIgnoreCase) ? "S_HDMV/PGS" : "S_VOBSUB";
                     var track = new MediaTrack { Id = _nextId++, Type = TrackType.Subtitles, CodecId = codec, Codec = codec == "S_VOBSUB" ? "VobSub" : "PGS", ExternalFile = path };
-                    Rows.Add(new SubtitleRow(track, null, path, match.Language ?? LanguageTag.Undetermined, null, match.Forced, match.HearingImpaired, "obrazové titulky – jazyk podľa názvu", Changed));
+                    Rows.Add(new SubtitleRow(track, null, path, match.Language ?? LanguageTag.Undetermined, null, match.Forced, match.HearingImpaired, Loc.T("obrazové titulky – jazyk podľa názvu"), Changed));
                     continue;
                 }
 
@@ -458,7 +461,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 if (SubtitleLanguage.Detect(document.PlainText) is { } read && read.Replaces(language))
                 {
                     language = LanguageTag.FromCode(read.Language);
-                    note += $" · návrh UNIVERSUM: {(read.Certain ? "isté" : "najpravdepodobnejšie")} – {read.Detail}";
+                    note += Loc.F(" · návrh UNIVERSUM: {0} – {1}", read.Certain ? Loc.T("isté") : Loc.T("najpravdepodobnejšie"), read.Detail);
                 }
 
                 var synthetic = new MediaTrack
@@ -472,7 +475,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         finally
         {
             _busy = false;
-            Result = problems.Count == 0 ? "" : "Niektoré súbory sa nedali prečítať:\n" + string.Join("\n", problems);
+            Result = problems.Count == 0 ? "" : Loc.T("Niektoré súbory sa nedali prečítať:") + "\n" + string.Join("\n", problems);
             SelectedRow ??= Rows.FirstOrDefault();
             Changed();
         }
@@ -485,7 +488,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         var words = Words.Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var language = words.Reverse().Select(w => w switch { "cz" or "czech" => "cs", "slovak" => "sk", "english" => "en", _ => w })
             .Select(w => w.Length is 2 or 3 ? Languages.FindCommon(w) : null).FirstOrDefault(l => l is not null);
-        return new SubtitleFileMatch(path, 0, "pridané ručne", language is null ? null : LanguageTag.FromCode(language.Ietf),
+        return new SubtitleFileMatch(path, 0, Loc.T("pridané ručne"), language is null ? null : LanguageTag.FromCode(language.Ietf),
             Core.Text.Words.ContainsAny(name, _services.Profile.ForcedKeywords), Core.Text.Words.ContainsAny(name, _services.Profile.HearingImpairedKeywords));
     }
 
@@ -635,13 +638,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
         if (_pictures.TryGetValue(row, out var pictures))
         {
-            ShowPreview(row, pictures.Select((cue, at) => PreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), cue.Start, timing, "(obrázok)", null, row)).ToList());
+            ShowPreview(row, pictures.Select((cue, at) => PreviewRow((at + 1).ToString(CultureInfo.InvariantCulture), cue.Start, timing, Loc.T("(obrázok)"), null, row)).ToList());
             return;
         }
 
         // a track of the video not read yet: where subtitles at a few times end up
         ShowPreview(row, new[] { 1, 10, 30, 60, 90 }.Select(m => TimeSpan.FromMinutes(m)).Where(t => _file?.Duration is not { } d || t <= d)
-            .Select(at => new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), "(príklad času)")).ToList());
+            .Select(at => new SubtitlePreviewRow("", SubtitleRow.Clock(at), SubtitleRow.Clock(timing.Apply(at)), Loc.T("(príklad času)"))).ToList());
     }
 
     // the list made anew (a change of time or of a text): the subtitle chosen in it stays chosen – the next one when it was
@@ -659,7 +662,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     private SubtitlePreviewRow PreviewRow(string number, TimeSpan start, SubtitleTiming timing, string text, int? index, SubtitleRow row)
     {
         var moved = timing.Apply(start);
-        return new SubtitlePreviewRow(number, SubtitleRow.Clock(start), moved < TimeSpan.Zero ? "vypadne (pred začiatkom)" : SubtitleRow.Clock(moved),
+        return new SubtitlePreviewRow(number, SubtitleRow.Clock(start), moved < TimeSpan.Zero ? Loc.T("vypadne (pred začiatkom)") : SubtitleRow.Clock(moved),
             text.Replace("\n", " | ", StringComparison.Ordinal), moved, index,
             index is null ? null : (place, value) => EditCueLater(row, place, value));
     }
@@ -679,13 +682,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
     /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
-        : "Pravidlá UNIVERSUM: " + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
+        : Loc.T("Pravidlá UNIVERSUM: ") + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
         {
-            RuleIssueKind.UndeterminedLanguage => $"stopa {(_file.Tracks.FirstOrDefault(t => t.Id == i.TrackId) is { } track ? $"{track.Id} ({Texts.Type(track.Type)})" : "")} má neurčený jazyk.",
-            RuleIssueKind.MultipleVideoTracks => "súbor má viac video stôp.",
-            RuleIssueKind.NoAudio => "súbor nemá zvukovú stopu.",
+            RuleIssueKind.UndeterminedLanguage => Loc.F("stopa {0} má neurčený jazyk.", _file.Tracks.FirstOrDefault(t => t.Id == i.TrackId) is { } track ? $"{track.Id} ({Texts.Type(track.Type)})" : ""),
+            RuleIssueKind.MultipleVideoTracks => Loc.T("súbor má viac video stôp."),
+            RuleIssueKind.NoAudio => Loc.T("súbor nemá zvukovú stopu."),
             _ => i.Kind.ToString(),
-        }).Distinct()) + " Určte ho v Úprave hlavičky alebo v Single spracovaní – alebo vypnite pravidlá (stopy ostanú, ako sú).";
+        }).Distinct()) + Loc.T(" Určte ho v Úprave hlavičky alebo v Single spracovaní – alebo vypnite pravidlá (stopy ostanú, ako sú).");
 
     // the names of the result: the batch's for the video's own tracks (a task), the ones the user wrote over them
     private Dictionary<int, string> NamesOf(Dictionary<int, SubtitleRow> rowOf, bool written)
@@ -812,11 +815,11 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 var document = row.Document;
                 if (document is null)
                 {
-                    Result = $"Čítam celú titulkovú stopu {row.Track.Id} (číta sa celý súbor)…";
+                    Result = Loc.F("Čítam celú titulkovú stopu {0} (číta sa celý súbor)…", row.Track.Id);
                     document = await SubtitleText.ExtractDocumentAsync(installation, _services.Runner, _file, row.Track);
                     if (document is null)
                     {
-                        Result = $"Titulkovú stopu {row.Track.Id} sa nepodarilo prečítať – nič sa nezapísalo.";
+                        Result = Loc.F("Titulkovú stopu {0} sa nepodarilo prečítať – nič sa nezapísalo.", row.Track.Id);
                         return;
                     }
 
@@ -833,21 +836,21 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             }
 
             var (target, _) = Build(_file, written);
-            Result = "Zapisujem nový súbor…";
+            Result = Loc.T("Zapisujem nový súbor…");
             var plan = EditPlan.For(target);
             var started = DateTime.UtcNow;
             var result = await _services.Processor(installation).ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep));
             _services.LogProcessing("Úprava titulkostopy", plan, result, started);
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Uložené do knižnice: {result.OutputPath}. Originál ostal nezmenený.",
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký výsledok už v knižnici je: {result.OutputPath}. Nič sa nezapísalo.",
-                _ => "Nepodarilo sa – nič sa nezmenilo.\n" + string.Join("\n", result.Messages),
+                ProcessingStatus.Done => Loc.F("Uložené do knižnice: {0}. Originál ostal nezmenený.", result.OutputPath),
+                ProcessingStatus.AlreadyInLibrary => Loc.F("Rovnaký výsledok už v knižnici je: {0}. Nič sa nezapísalo.", result.OutputPath),
+                _ => Loc.T("Nepodarilo sa – nič sa nezmenilo.") + "\n" + string.Join("\n", result.Messages),
             };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException)
         {
-            Result = "Nepodarilo sa: " + ex.Message;
+            Result = Loc.T("Nepodarilo sa: ") + ex.Message;
         }
         finally
         {
@@ -897,11 +900,11 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 saved.Add(Path.GetFileName(path));
             }
 
-            Result = saved.Count == 0 ? "Nebolo čo uložiť." : $"Uložené ako {OutputFormat} (UTF-8), pôvodné súbory ostali: {string.Join(", ", saved)}.";
+            Result = saved.Count == 0 ? Loc.T("Nebolo čo uložiť.") : Loc.F("Uložené ako {0} (UTF-8), pôvodné súbory ostali: {1}.", OutputFormat, string.Join(", ", saved));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Result = "Nepodarilo sa uložiť: " + ex.Message + (saved.Count > 0 ? $" (uložené: {string.Join(", ", saved)})" : "");
+            Result = Loc.T("Nepodarilo sa uložiť: ") + ex.Message + (saved.Count > 0 ? Loc.F(" (uložené: {0})", string.Join(", ", saved)) : "");
         }
         finally
         {
@@ -956,7 +959,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             return cues;
         }
 
-        SyncStatus = $"Čítam celú stopu {row.Track.Id} (súbor nemá index titulkov)…";
+        SyncStatus = Loc.F("Čítam celú stopu {0} (súbor nemá index titulkov)…", row.Track.Id);
         row.Document = await SubtitleText.ExtractDocumentAsync(installation, _services.Runner, _file, row.Track);
         return row.Document?.Cues.Select(c => (c.Start, c.End)).ToList();
     }
@@ -966,7 +969,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     {
         if (_file is not { Duration: { } duration } file || !file.TracksOf(TrackType.Audio).Any())
         {
-            return (null, "video nemá zvuk");
+            return (null, Loc.T("video nemá zvuk"));
         }
 
         var audio = file.TracksOf(TrackType.Audio).ToList();
@@ -986,15 +989,15 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is Core.Speech.SpeechException or IOException or UnauthorizedAccessException)
         {
-            return (null, "FFmpeg nie je k dispozícii: " + ex.Message);
+            return (null, Loc.T("FFmpeg nie je k dispozícii: ") + ex.Message);
         }
 
         var parts = Core.Subtitles.Sync.SpeechActivity.Parts(duration);
         var windows = await Core.Subtitles.Sync.SpeechActivity.ReadAsync(_services.Runner, ffmpeg, file.Path, ordinal, parts, TimeSpan.FromMinutes(2.5),
-            new Progress<int>(i => SyncStatus = $"Počúvam zvuk filmu – časť {i + 1} z {parts.Count}…"), cancellationToken);
+            new Progress<int>(i => SyncStatus = Loc.F("Počúvam zvuk filmu – časť {0} z {1}…", i + 1, parts.Count)), cancellationToken);
         if (windows.Count == 0)
         {
-            return (null, $"FFmpeg neprečítal zvukovú stopu {audio[ordinal].Id} (súbor je nedostupný alebo poškodený)");
+            return (null, Loc.F("FFmpeg neprečítal zvukovú stopu {0} (súbor je nedostupný alebo poškodený)", audio[ordinal].Id));
         }
 
         // a read that failed in parts is not kept: the next try reads the film again
@@ -1049,7 +1052,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         {
             if (await CuesOfAsync(row, cancellationToken) is not { Count: > 0 } cues)
             {
-                SyncStatus = "Časy týchto titulkov sa nedajú zistiť.";
+                SyncStatus = Loc.T("Časy týchto titulkov sa nedajú zistiť.");
                 return;
             }
 
@@ -1063,7 +1066,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 problem = why;
                 if (speech is { Count: > 0 })
                 {
-                    SyncStatus = "Porovnávam titulky s rečou…";
+                    SyncStatus = Loc.T("Porovnávam titulky s rečou…");
                     byAudio = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku", filmFps: fps), cancellationToken);
                 }
             }
@@ -1080,33 +1083,33 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             var result = Core.Subtitles.Sync.SubtitleSync.Combine(byAudio, bySubtitles, duration);
             if (result is null)
             {
-                SyncStatus = "Nedalo sa nič zistiť" + (problem is null ? " (bez zvuku aj bez iných titulkov)." : $": {problem}.");
+                SyncStatus = problem is null ? Loc.T("Nedalo sa nič zistiť (bez zvuku aj bez iných titulkov).") : Loc.F("Nedalo sa nič zistiť: {0}.", problem);
                 return;
             }
 
             if (result.Reliable)
             {
                 row.ApplySync(result);
-                SyncStatus = result.Detail + " Hodnoty sú nastavené pri titulkoch – skontrolujte náhľad a uložte.";
+                SyncStatus = result.Detail + Loc.T(" Hodnoty sú nastavené pri titulkoch – skontrolujte náhľad a uložte.");
             }
             else if (result.IsProposal)
             {
                 // never applied by itself: the user's own values stay until the proposal is taken
                 Proposal = (row, result);
-                SyncStatus = result.Detail + " Hodnoty titulkov sa nezmenili – návrh použijete tlačidlom „Použiť návrh“.";
+                SyncStatus = result.Detail + Loc.T(" Hodnoty titulkov sa nezmenili – návrh použijete tlačidlom „Použiť návrh“.");
             }
             else
             {
-                SyncStatus = result.Detail + " Hodnoty titulkov sa nezmenili." + (problem is null ? "" : $" ({problem})");
+                SyncStatus = result.Detail + Loc.T(" Hodnoty titulkov sa nezmenili.") + (problem is null ? "" : $" ({problem})");
             }
         }
         catch (OperationCanceledException)
         {
-            SyncStatus = "Napasovanie je zastavené – hodnoty titulkov sa nezmenili.";
+            SyncStatus = Loc.T("Napasovanie je zastavené – hodnoty titulkov sa nezmenili.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException)
         {
-            SyncStatus = "Napasovanie sa nepodarilo: " + ex.Message;
+            SyncStatus = Loc.T("Napasovanie sa nepodarilo: ") + ex.Message;
         }
         finally
         {
@@ -1119,7 +1122,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         if (Proposal is { } proposal && Rows.Contains(proposal.Row))
         {
             proposal.Row.ApplySync(proposal.Result);
-            SyncStatus = proposal.Result.Detail + " Návrh je nastavený – overte ho prehraním.";
+            SyncStatus = proposal.Result.Detail + Loc.T(" Návrh je nastavený – overte ho prehraním.");
         }
 
         Proposal = null;
@@ -1139,7 +1142,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             var (speech, problem) = await SpeechAsync(cancellationToken);
             if (speech is not { Count: > 0 })
             {
-                SyncStatus = "Zvuk filmu sa nepodarilo prečítať" + (problem is null ? "." : $": {problem}.");
+                SyncStatus = problem is null ? Loc.T("Zvuk filmu sa nepodarilo prečítať.") : Loc.F("Zvuk filmu sa nepodarilo prečítať: {0}.", problem);
                 return;
             }
 
@@ -1148,32 +1151,33 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             var lines = new List<string>();
             foreach (var row in Rows.Where(r => !r.IsExternal).ToList())
             {
-                var name = $"stopa {row.Track.Id} ({row.Language.Tag.Primary}{(row.Forced ? ", forced" : "")})";
+                var name = Loc.F("stopa {0} ({1}{2})", row.Track.Id, row.Language.Tag.Primary, row.Forced ? ", forced" : "");
                 var cues = row.Track.Number is { } number && index.TryGetValue(number, out var points)
                     ? Core.Subtitles.Sync.SubtitleSync.Intervals(points, picture: !row.IsText)
                     : [];
                 if (cues.Count < 10)
                 {
-                    lines.Add($"{name}: málo titulkov alebo bez indexu – nedá sa posúdiť");
+                    lines.Add(Loc.F("{0}: málo titulkov alebo bez indexu – nedá sa posúdiť", name));
                     continue;
                 }
 
                 var result = await Task.Run(() => Core.Subtitles.Sync.SubtitleSync.Align(cues, speech, "podľa zvuku", filmFps: fps), cancellationToken);
-                lines.Add(result is null ? $"{name}: nedá sa posúdiť"
-                    : !result.Reliable ? $"{name}: neisté – {result.Detail}"
-                    : result.Timing.IsNone ? $"{name}: sedia"
-                    : $"{name}: {Lag(result)}{(result.Rates is { } rates ? $", iné FPS ({rates.From.Label} → {rates.To.Label})" : "")} – {result.Timing.Describe()} (Napasovať ich nastaví)");
+                lines.Add(result is null ? Loc.F("{0}: nedá sa posúdiť", name)
+                    : !result.Reliable ? Loc.F("{0}: neisté – {1}", name, result.Detail)
+                    : result.Timing.IsNone ? Loc.F("{0}: sedia", name)
+                    : Loc.F("{0}: {1}{2} – {3} (Napasovať ich nastaví)", name, Lag(result),
+                        result.Rates is { } rates ? Loc.F(", iné FPS ({0} → {1})", rates.From.Label, rates.To.Label) : "", result.Timing.Describe()));
             }
 
-            SyncStatus = "Kontrola titulkov podľa zvuku: " + string.Join("; ", lines) + ".";
+            SyncStatus = Loc.T("Kontrola titulkov podľa zvuku: ") + string.Join("; ", lines) + ".";
         }
         catch (OperationCanceledException)
         {
-            SyncStatus = "Kontrola je zastavená.";
+            SyncStatus = Loc.T("Kontrola je zastavená.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ProcessStartException or TimeoutException)
         {
-            SyncStatus = "Kontrola sa nepodarila: " + ex.Message;
+            SyncStatus = Loc.T("Kontrola sa nepodarila: ") + ex.Message;
         }
         finally
         {
@@ -1184,7 +1188,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         {
             var at = (_file?.Duration ?? TimeSpan.FromHours(1)) / 2;
             var lag = result.LagAt(at).TotalSeconds;
-            return lag > 0 ? $"meškajú o {lag:0.0} s" : $"idú skôr o {-lag:0.0} s";
+            return lag > 0 ? Loc.F("meškajú o {0:0.0} s", lag) : Loc.F("idú skôr o {0:0.0} s", -lag);
         }
     }
 
@@ -1208,7 +1212,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
     {
         if (_services.OpenSubtitles() is not { } client)
         {
-            OnlineStatus = "OpenSubtitles: zadajte API kľúč v Nastaveniach (Titulky – sťahovanie a preklad).";
+            OnlineStatus = Loc.T("OpenSubtitles: zadajte API kľúč v Nastaveniach (Titulky – sťahovanie a preklad).");
             return;
         }
 
@@ -1218,7 +1222,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         try
         {
             var (name, year, tmdb, episode) = Title();
-            var filter = HearingImpairedFilter switch { "len SDH" => "only", "bez SDH" => "exclude", _ => "include" };
+            var filter = Array.IndexOf(_hearingImpairedFilters, HearingImpairedFilter) switch { 1 => "only", 2 => "exclude", _ => "include" };
             var results = await client.SearchAsync(new OpenSubtitlesQuery(OnlineLanguage, tmdb, name, year, episode?.Season, episode?.Episode, filter));
             // owner, 30. 10. 2026: the release that fits the video and the frame rate of the film first
             var video = _file?.Path ?? Anchor ?? "";
@@ -1234,8 +1238,8 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             }
 
             OnlineStatus = results.Count == 0
-                ? $"OpenSubtitles: pre „{name}“{(episode is null ? "" : " " + episode.Tag)} nič nenašiel" + (tmdb is null ? " – skúste titul s TMDB ID." : ".")
-                : $"OpenSubtitles: {results.Count} výsledkov" + (tmdb is null ? " (podľa názvu – presnejšie s TMDB ID)" : " (podľa TMDB ID)") + ".";
+                ? Loc.F("OpenSubtitles: pre „{0}“{1} nič nenašiel", name, episode is null ? "" : " " + episode.Tag) + (tmdb is null ? Loc.T(" – skúste titul s TMDB ID.") : ".")
+                : Loc.F("OpenSubtitles: {0} výsledkov", results.Count) + (tmdb is null ? Loc.T(" (podľa názvu – presnejšie s TMDB ID)") : Loc.T(" (podľa TMDB ID)")) + ".";
         }
         catch (SubtitleServiceException ex)
         {
@@ -1258,7 +1262,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         var (_, user, password) = _services.OpenSubtitlesAccount;
         if (user is null || password is null)
         {
-            OnlineStatus = "OpenSubtitles: na stiahnutie treba meno a heslo účtu v Nastaveniach.";
+            OnlineStatus = Loc.T("OpenSubtitles: na stiahnutie treba meno a heslo účtu v Nastaveniach.");
             return;
         }
 
@@ -1272,13 +1276,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             var language = result.Language.Length > 0 ? result.Language : OnlineLanguage;
             var saved = await SubtitleDownloads.SaveBesideAsync(anchor, document, language, result.HearingImpaired, result.ForeignPartsOnly);
             _taken.Add(saved);
-            OnlineStatus = $"Stiahnuté ({name}) a uložené vedľa videa ako {Path.GetFileName(saved)}" + (client.Remaining is { } left ? $"; dnes ešte {left} stiahnutí." : ".");
+            OnlineStatus = Loc.F("Stiahnuté ({0}) a uložené vedľa videa ako {1}", name, Path.GetFileName(saved)) + (client.Remaining is { } left ? Loc.F("; dnes ešte {0} stiahnutí.", left) : ".");
             _busy = false;
             await AddFilesAsync([saved]);
         }
         catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            OnlineStatus = ex is SubtitleServiceException ? ex.Message : "Stiahnuté titulky sa nepodarilo uložiť: " + ex.Message;
+            OnlineStatus = ex is SubtitleServiceException ? ex.Message : Loc.T("Stiahnuté titulky sa nepodarilo uložiť: ") + ex.Message;
         }
         finally
         {
@@ -1298,7 +1302,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            OnlineStatus = "Prehliadač sa nepodarilo otvoriť: " + ex.Message;
+            OnlineStatus = Loc.T("Prehliadač sa nepodarilo otvoriť: ") + ex.Message;
             return;
         }
 
@@ -1320,7 +1324,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             }
         };
         _downloadsWatch.Start();
-        OnlineStatus = $"titulky.com je otvorený v prehliadači („{query}“). Stiahnuté titulky (aj ZIP) UNIVERSUM do 30 minút sám vezme zo Stiahnutých súborov, uloží ich vedľa videa a pridá.";
+        OnlineStatus = Loc.F("titulky.com je otvorený v prehliadači („{0}“). Stiahnuté titulky (aj ZIP) UNIVERSUM do 30 minút sám vezme zo Stiahnutých súborov, uloží ich vedľa videa a pridá.", query);
     }
 
     private async Task TakeDownloadAsync(string download)
@@ -1352,13 +1356,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
             if (saved.Count > 0)
             {
-                OnlineStatus = $"Prevzaté zo Stiahnutých súborov: {Path.GetFileName(download)} → {string.Join(", ", saved.Select(Path.GetFileName))} (vedľa videa; pôvodný súbor ostal).";
+                OnlineStatus = Loc.F("Prevzaté zo Stiahnutých súborov: {0} → {1} (vedľa videa; pôvodný súbor ostal).", Path.GetFileName(download), string.Join(", ", saved.Select(Path.GetFileName)));
                 await AddFilesAsync(saved);
             }
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            OnlineStatus = $"{Path.GetFileName(download)} sa nedá prevziať: {ex.Message}";
+            OnlineStatus = Loc.F("{0} sa nedá prevziať: {1}", Path.GetFileName(download), ex.Message);
         }
     }
 
@@ -1372,7 +1376,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
 
         if (string.Equals(row.Language.Tag.Primary, TranslateTo, StringComparison.OrdinalIgnoreCase))
         {
-            OnlineStatus = "Zdrojový a cieľový jazyk nemôžu byť rovnaké – vyberte iný cieľový jazyk.";
+            OnlineStatus = Loc.T("Zdrojový a cieľový jazyk nemôžu byť rovnaké – vyberte iný cieľový jazyk.");
             return;
         }
 
@@ -1383,13 +1387,13 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
             var document = row.Document;
             if (document is null && _file is not null)
             {
-                OnlineStatus = "Čítam celú titulkovú stopu (číta sa celý súbor)…";
+                OnlineStatus = Loc.T("Čítam celú titulkovú stopu (číta sa celý súbor)…");
                 document = row.Document = await SubtitleText.ExtractDocumentAsync(installation, _services.Runner, _file, row.Track);
             }
 
             if (document is null)
             {
-                OnlineStatus = "Titulky sa nepodarilo prečítať.";
+                OnlineStatus = Loc.T("Titulky sa nepodarilo prečítať.");
                 return;
             }
 
@@ -1398,14 +1402,14 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 model: _services.SvSubModel, sourceLanguage: source);
             var saved = await SubtitleDownloads.SaveBesideAsync(anchor, SubtitleReader.Read(translated), TranslateTo, row.HearingImpaired, row.Forced);
             _taken.Add(saved);
-            OnlineStatus = $"Preložené ({row.Language.Tag.Primary} → {TranslateTo}) a uložené vedľa videa ako {Path.GetFileName(saved)}; " +
-                           (client.JobDeleted ? "úloha na svsub.net je zmazaná." : "úlohu na svsub.net sa nepodarilo zmazať – zmažte ju na stránke služby.");
+            OnlineStatus = Loc.F("Preložené ({0} → {1}) a uložené vedľa videa ako {2}; ", row.Language.Tag.Primary, TranslateTo, Path.GetFileName(saved)) +
+                           (client.JobDeleted ? Loc.T("úloha na svsub.net je zmazaná.") : Loc.T("úlohu na svsub.net sa nepodarilo zmazať – zmažte ju na stránke služby."));
             _busy = false;
             await AddFilesAsync([saved]);
         }
         catch (Exception ex) when (ex is SubtitleServiceException or FormatException or IOException or UnauthorizedAccessException)
         {
-            OnlineStatus = ex is SubtitleServiceException ? ex.Message : "Preklad sa nepodarilo uložiť: " + ex.Message;
+            OnlineStatus = ex is SubtitleServiceException ? ex.Message : Loc.T("Preklad sa nepodarilo uložiť: ") + ex.Message;
         }
         finally
         {

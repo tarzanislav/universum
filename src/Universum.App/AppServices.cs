@@ -13,6 +13,7 @@ using Universum.Core.Speech;
 using Universum.Core.Subtitles;
 using Universum.Core.Weather;
 using Universum.Platform.Windows;
+using Universum.App.Localization;
 
 namespace Universum.App;
 
@@ -52,7 +53,7 @@ public sealed class AppServices
             if (Library?.ResultFolders.Any(r => Universum.Core.IO.Paths.Same(r, folder) ||
                     folder.StartsWith(Path.TrimEndingDirectorySeparator(r) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) == true)
             {
-                throw new ArgumentException("Vstupný priečinok nemôže byť v MOVIES ani v TVSHOWS knižnice – tam sú výsledky.");
+                throw new ArgumentException(Loc.T("Vstupný priečinok nemôže byť v MOVIES ani v TVSHOWS knižnice – tam sú výsledky."));
             }
         }
 
@@ -323,7 +324,7 @@ public sealed class AppServices
         }
 
         var folder = Environment.GetEnvironmentVariable("UNIVERSUM_SPEECH_DIR") is { Length: > 0 } custom ? custom : SpeechTools.DefaultFolder;
-        var tools = SpeechTools.In(folder) ?? throw new SpeechException("Rozpoznávanie reči nie je nainštalované – nainštalujte UNIVERSUM znova (inštalátor ho obsahuje).");
+        var tools = SpeechTools.In(folder) ?? throw new SpeechException(Loc.T("Rozpoznávanie reči nie je nainštalované – nainštalujte UNIVERSUM znova (inštalátor ho obsahuje)."));
         await tools.VerifyAsync(cancellationToken);
         return _speech = tools;
     }
@@ -819,7 +820,7 @@ public sealed class AppServices
                         file = AppSettings.MegaFile + ".novy";
                     }
 
-                    MegaProblem = $"Zoznam dávok sa nedal prečítať ({ex.Message}); pôvodný je odložený v {aside}.";
+                    MegaProblem = Loc.F("Zoznam dávok sa nedal prečítať ({0}); pôvodný je odložený v {1}.", ex.Message, aside);
                     _mega = new Universum.Core.Mega.MegaStore(file);
                 }
             }

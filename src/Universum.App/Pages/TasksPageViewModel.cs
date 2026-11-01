@@ -357,7 +357,7 @@ public sealed class TasksPageViewModel : ObservableObject
             {
                 File.WriteAllText(path, AgendaExport.Ics(shown.Select(i => new AgendaItem { Id = i.Id, Title = i.Title, Text = i.Text, Tags = i.Tags, Task = i.Task, Created = i.Created })));
                 return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
-            }, ToolTip: "Úlohy pre Outlook a Google (VTODO)"),
+            }, ToolTip: Loc.T("Úlohy pre Outlook a Google (VTODO)")),
             new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – úlohy.csv", path =>
             {
                 File.WriteAllText(path, AgendaExport.Csv(shown, Loc.Language));

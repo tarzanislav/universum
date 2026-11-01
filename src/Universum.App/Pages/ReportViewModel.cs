@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Reports;
 using Sheet = Universum.Core.Reports.Paper;
 
@@ -171,9 +172,9 @@ public sealed class ReportViewModel : ObservableObject
 
     public static IReadOnlyList<VideoChoice<Paper>> Papers { get; } = [new(Sheet.A4, "A4"), new(Sheet.A3, "A3"), new(Sheet.A5, "A5"), new(Sheet.Letter, "Letter")];
 
-    public static IReadOnlyList<VideoChoice<bool?>> Orientations { get; } = [new(null, "podľa zostavy"), new(false, "na výšku"), new(true, "na šírku")];
+    public static IReadOnlyList<VideoChoice<bool?>> Orientations { get; } = [new(null, Loc.T("podľa zostavy")), new(false, Loc.T("na výšku")), new(true, Loc.T("na šírku"))];
 
-    public static IReadOnlyList<VideoChoice<int>> PerSheet { get; } = [new(1, "1 strana na list"), new(2, "2 strany na list"), new(4, "4 strany na list")];
+    public static IReadOnlyList<VideoChoice<int>> PerSheet { get; } = [new(1, Loc.T("1 strana na list")), new(2, Loc.T("2 strany na list")), new(4, Loc.T("4 strany na list"))];
 
     private ReportOptions Options => _services.Settings.Print;
 
@@ -198,7 +199,7 @@ public sealed class ReportViewModel : ObservableObject
 
     public int PageCount => _pages.Count;
 
-    public string Summary => _document is null ? "" : $"Strany: {_pages.Count} · listy papiera: {_document.Pages.Count}";
+    public string Summary => _document is null ? "" : Loc.F("Strany: {0} · listy papiera: {1}", _pages.Count, _document.Pages.Count);
 
     public string Status { get => _status; set => SetProperty(ref _status, value); }
 
@@ -236,7 +237,7 @@ public sealed class ReportViewModel : ObservableObject
     {
         if (Fonts is not { } fonts)
         {
-            Status = "Nenašlo sa písmo, ktoré sa smie vložiť do PDF (Segoe UI, Arial, Tahoma, Verdana, Calibri).";
+            Status = Loc.T("Nenašlo sa písmo, ktoré sa smie vložiť do PDF (Segoe UI, Arial, Tahoma, Verdana, Calibri).");
             Document = null;
             return;
         }
@@ -274,7 +275,7 @@ public sealed class ReportViewModel : ObservableObject
         if (dialog.ShowDialog() == true)
         {
             dialog.PrintDocument(document.DocumentPaginator, "UNIVERSUM – " + Title);
-            Status = "Odoslané na tlačiareň.";
+            Status = Loc.T("Odoslané na tlačiareň.");
         }
     }
 
@@ -288,11 +289,11 @@ public sealed class ReportViewModel : ObservableObject
         try
         {
             write(path);
-            Status = "Uložené: " + path;
+            Status = Loc.T("Uložené: ") + path;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Status = "Nedá sa uložiť: " + ex.Message;
+            Status = Loc.T("Nedá sa uložiť: ") + ex.Message;
         }
     }
 
@@ -311,7 +312,7 @@ public sealed class ReportViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
-            Status = (export.Opens ? "Nedá sa načítať: " : "Nedá sa uložiť: ") + ex.Message;
+            Status = (export.Opens ? Loc.T("Nedá sa načítať: ") : Loc.T("Nedá sa uložiť: ")) + ex.Message;
         }
     }
 

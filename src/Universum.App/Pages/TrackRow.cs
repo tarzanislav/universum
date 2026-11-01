@@ -1,3 +1,4 @@
+using Universum.App.Localization;
 using Universum.Core.Media;
 
 namespace Universum.App.Pages;
@@ -11,10 +12,10 @@ public sealed class TrackRow(MediaTrack track)
 
     public string Type => Track.Type switch
     {
-        TrackType.Video => "Video",
-        TrackType.Audio => "Zvuk",
-        TrackType.Subtitles => "Titulky",
-        _ => "Iné",
+        TrackType.Video => Loc.T("Video"),
+        TrackType.Audio => Loc.T("Zvuk"),
+        TrackType.Subtitles => Loc.T("Titulky"),
+        _ => Loc.T("Iné"),
     };
 
     public string Codec => Track.Codec;
@@ -24,7 +25,7 @@ public sealed class TrackRow(MediaTrack track)
         get
         {
             var language = Languages.Find(Track.Language.Primary);
-            var name = Track.Language.IsUndetermined ? "neurčený (und)" : language?.SlovakName ?? Track.Language.Primary;
+            var name = Track.Language.IsUndetermined ? Loc.T("neurčený (und)") : language?.SlovakName ?? Track.Language.Primary;
             return $"{name} – {Track.Language}";
         }
     }
@@ -43,18 +44,18 @@ public sealed class TrackRow(MediaTrack track)
     /// <summary>The less common flags: "nepočujúci, komentár".</summary>
     public string FlagMarks => string.Join(", ", new[]
     {
-        Track.Flags.HearingImpaired ? "nepočujúci" : null,
-        Track.Flags.VisualImpaired ? "nevidiaci" : null,
-        Track.Flags.TextDescriptions ? "popis textom" : null,
-        Track.Flags.Original ? "pôvodný" : null,
-        Track.Flags.Commentary ? "komentár" : null,
+        Track.Flags.HearingImpaired ? Loc.T("nepočujúci") : null,
+        Track.Flags.VisualImpaired ? Loc.T("nevidiaci") : null,
+        Track.Flags.TextDescriptions ? Loc.T("popis textom") : null,
+        Track.Flags.Original ? Loc.T("pôvodný") : null,
+        Track.Flags.Commentary ? Loc.T("komentár") : null,
     }.OfType<string>());
 
     public string Properties => Track.Type switch
     {
         TrackType.Video => Track.PixelDimensions ?? "",
-        TrackType.Audio => $"{Track.AudioChannels} kan., {Track.AudioSamplingFrequency} Hz",
-        TrackType.Subtitles => Track.IsTextSubtitles ? "textové" : "obrázkové",
+        TrackType.Audio => Loc.F("{0} kan., {1} Hz", Track.AudioChannels, Track.AudioSamplingFrequency),
+        TrackType.Subtitles => Track.IsTextSubtitles ? Loc.T("textové") : Loc.T("obrázkové"),
         _ => "",
     };
 }

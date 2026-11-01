@@ -1,6 +1,7 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.Core.Jobs;
+using Universum.App.Localization;
 
 namespace Universum.App.Jobs;
 
@@ -21,12 +22,12 @@ public sealed class JobRow : ObservableObject
 
     public string Status => Job.Status switch
     {
-        JobStatus.Waiting => "čaká",
-        JobStatus.Running => $"beží {Job.Progress:P0}",
-        JobStatus.Done => "hotovo",
-        JobStatus.DoneWithWarnings => $"hotovo, upozornenia: {Job.Warnings}",
-        JobStatus.Failed => "chyba",
-        JobStatus.Cancelled => "zrušené",
+        JobStatus.Waiting => Loc.T("čaká"),
+        JobStatus.Running => Loc.F("beží {0:P0}", Job.Progress),
+        JobStatus.Done => Loc.T("hotovo"),
+        JobStatus.DoneWithWarnings => Loc.F("hotovo, upozornenia: {0}", Job.Warnings),
+        JobStatus.Failed => Loc.T("chyba"),
+        JobStatus.Cancelled => Loc.T("zrušené"),
         _ => Job.Status.ToString(),
     };
 
@@ -68,7 +69,7 @@ public sealed record JobMessageRow(string Time, string Severity, string Text, bo
 {
     public static JobMessageRow Of(JobMessage message) => new(
         message.TimeUtc.ToLocalTime().ToString("HH:mm:ss"),
-        message.Severity switch { JobSeverity.Warning => "upozornenie", JobSeverity.Error => "chyba", _ => "info" },
+        message.Severity switch { JobSeverity.Warning => Loc.T("upozornenie"), JobSeverity.Error => Loc.T("chyba"), _ => "info" },
         message.Text,
         message.Severity == JobSeverity.Warning,
         message.Severity == JobSeverity.Error);

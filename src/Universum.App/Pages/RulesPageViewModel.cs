@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.App.Jobs;
+using Universum.App.Localization;
 using Universum.Core.Execution;
 using Universum.Core.Jobs;
 using Universum.Core.Library;
@@ -36,7 +37,7 @@ public sealed class RulesPageViewModel : ObservableObject
     private MediaFile? _file;
     private EditPlan? _plan;
     private string _fileName = "";
-    private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+    private string _summary = Loc.T("Otvorte súbor MKV alebo ho sem pretiahnite myšou.");
     private string _issues = "";
     private string _result = "";
     private double _progress;
@@ -86,7 +87,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private void Clear()
     {
-        if (Busy || !Confirm("Vymazať frontu Single spracovania?\n\nZabudne sa otvorený súbor a jeho nastavenie. Na disku sa nič nezmení."))
+        if (Busy || !Confirm(Loc.T("Vymazať frontu Single spracovania?\n\nZabudne sa otvorený súbor a jeho nastavenie. Na disku sa nič nezmení.")))
         {
             return;
         }
@@ -117,7 +118,7 @@ public sealed class RulesPageViewModel : ObservableObject
         Issues = "";
         Target = "";
         TitleNote = "";
-        Summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+        Summary = Loc.T("Otvorte súbor MKV alebo ho sem pretiahnite myšou.");
         OnPropertyChanged(nameof(TitleText));
         OnPropertyChanged(nameof(EpisodeText));
         OnPropertyChanged(nameof(Plan));
@@ -203,7 +204,7 @@ public sealed class RulesPageViewModel : ObservableObject
         set => SetHandling(value ? OriginalHandling.Delete : null);
     }
 
-    public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
+    public string OutputDescription => _services.Library?.Root ?? Loc.T("nie je nastavený – zvoľte ho tlačidlom Priečinok…");
 
     public bool IsMovie
     {
@@ -309,7 +310,7 @@ public sealed class RulesPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             RefreshCommands();
             return;
         }
@@ -431,10 +432,10 @@ public sealed class RulesPageViewModel : ObservableObject
             Rows.Add(new RuleRow(track, i + 1, chosen, LanguageChosen, Moved, KeepChanged, kept: _kept.Contains(track.TrackId))
             {
                 LanguageNote = !_languages.ContainsKey(track.TrackId) && _detected.TryGetValue(track.TrackId, out var note)
-                    ? $"návrh UNIVERSUM: {(note.Certain ? "isté" : "najpravdepodobnejšie")} – {note.Detail}"
+                    ? Loc.F("návrh UNIVERSUM: {0} – {1}", note.Certain ? Loc.T("isté") : Loc.T("najpravdepodobnejšie"), note.Detail)
                     : "",
                 ForcedNote = track.Type != TrackType.Subtitles || _forced.ContainsKey(track.TrackId) || track.Source.Flags.Forced ? ""
-                    : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? "návrh UNIVERSUM: forced – " + amount
+                    : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? Loc.F("návrh UNIVERSUM: forced – {0}", amount)
                     : "",
                 ForcedChanged = ForcedChanged,
                 NameWritten = NameWritten,
@@ -450,20 +451,20 @@ public sealed class RulesPageViewModel : ObservableObject
 
         Summary = _plan.Method switch
         {
-            WriteMethod.None => "Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice.",
-            WriteMethod.HeaderEdit => $"Zmení sa len hlavička ({ChangeCount(_plan.Changes.Count)}) – trvá to pár sekúnd.",
-            _ when target.ContainerChanged => $"Súbor {_file.ContainerName} sa prevedie do MKV – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
-            _ when target.AddsFiles || target.TimingChanged => $"Vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
-            _ => $"Mení sa poradie stôp – vznikne nový súbor ({ChangeCount(_plan.Changes.Count)}).",
+            WriteMethod.None => Loc.T("Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice."),
+            WriteMethod.HeaderEdit => Loc.F("Zmení sa len hlavička ({0}) – trvá to pár sekúnd.", ChangeCount(_plan.Changes.Count)),
+            _ when target.ContainerChanged => Loc.F("Súbor {0} sa prevedie do MKV – vznikne nový súbor ({1}).", _file.ContainerName, ChangeCount(_plan.Changes.Count)),
+            _ when target.AddsFiles || target.TimingChanged => Loc.F("Vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
+            _ => Loc.F("Mení sa poradie stôp – vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
         } + (target.RemovedByLanguage.Count > 0
-                ? " Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): " + string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))) + "."
+                ? Loc.F(" Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): {0}.", string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))))
                 : "")
-          + (target.RemovedEmpty.Count > 0 ? $" Odstránia sa prázdne titulkové stopy (bez titulkov): {target.RemovedEmpty.Count}." : "")
+          + (target.RemovedEmpty.Count > 0 ? Loc.F(" Odstránia sa prázdne titulkové stopy (bez titulkov): {0}.", target.RemovedEmpty.Count) : "")
           + (target.Tracks.Count(t => t.IsAdded) is > 0 and var added
-              ? $" Pridajú sa externé titulky pri videu ({added}): " + string.Join(", ", target.Tracks.Where(t => t.IsAdded).Select(t => Path.GetFileName(t.Source.ExternalFile))) + "."
+              ? Loc.F(" Pridajú sa externé titulky pri videu ({0}): {1}.", added, string.Join(", ", target.Tracks.Where(t => t.IsAdded).Select(t => Path.GetFileName(t.Source.ExternalFile))))
               : "")
-          + (_subtitleReading is not null ? " Čítam titulky (jazyk každej titulkovej stopy)…" : "")
-          + (target.TagsChanged ? " Tagy sa odstránia." : "") + (target.RepairIndex ? " Vytvorí sa chýbajúci index videa." : "") + (_file.HasChapters ? " Kapitoly ostanú." : "");
+          + (_subtitleReading is not null ? Loc.T(" Čítam titulky (jazyk každej titulkovej stopy)…") : "")
+          + (target.TagsChanged ? Loc.T(" Tagy sa odstránia.") : "") + (target.RepairIndex ? Loc.T(" Vytvorí sa chýbajúci index videa.") : "") + (_file.HasChapters ? Loc.T(" Kapitoly ostanú.") : "");
         Issues = string.Join("\n", target.Issues.Select(Describe));
         UpdateTarget();
     }
@@ -616,7 +617,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _tmdbTitle = null;
         _addition = "";
         OnPropertyChanged(nameof(Addition));
-        TitleNote = _rememberedSeries is null ? "" : "Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).";
+        TitleNote = _rememberedSeries is null ? "" : Loc.T("Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).");
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
@@ -652,15 +653,15 @@ public sealed class RulesPageViewModel : ObservableObject
         }
         else if (layout is null)
         {
-            Target = "Najprv nastavte výstupný priečinok (knižnicu).";
+            Target = Loc.T("Najprv nastavte výstupný priečinok (knižnicu).");
         }
         else if (title is null)
         {
-            Target = "Zadajte názov titulu, napr. Creep (2004).";
+            Target = Loc.T("Zadajte názov titulu, napr. Creep (2004).");
         }
         else if (title.Problem is { } problem)
         {
-            Target = $"Názov titulu: {problem} – napr. Creep (2004).";
+            Target = Loc.F("Názov titulu: {0} – napr. Creep (2004).", problem);
         }
         else if (Tmdb.NeedsConfirmation)
         {
@@ -668,17 +669,17 @@ public sealed class RulesPageViewModel : ObservableObject
         }
         else if (_kind == MediaKind.Series && episode is null)
         {
-            Target = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : "Zadajte epizódu, napr. S01E04.";
+            Target = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : Loc.T("Zadajte epizódu, napr. S01E04.");
         }
         else
         {
             _placement = layout.Place(_plan.Target, title, episode, _services.Profile).WithAddition(_addition);
             var size = SourceSize();
             Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
-                ? "Súbor už je v knižnici na svojom mieste."
+                ? Loc.T("Súbor už je v knižnici na svojom mieste.")
                 : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
-                  (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +
-                  (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "") +
+                  (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? Loc.T("  – cesta je príliš dlhá pre Windows") : "") +
+                  (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? Loc.T("  – TMDB takú epizódu nepozná") : "") +
                   (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");
         }
 
@@ -705,13 +706,13 @@ public sealed class RulesPageViewModel : ObservableObject
         _placement = null;
         if (_services.Tmdb is not null)
         {
-            Target = "Hľadám titul na TMDB…";
+            Target = Loc.T("Hľadám titul na TMDB…");
             _ = Tmdb.SearchAsync();
         }
         else
         {
-            TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
-            Target = "Zadajte názov titulu, napr. Creep (2004).";
+            TitleNote = Loc.T("Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).");
+            Target = Loc.T("Zadajte názov titulu, napr. Creep (2004).");
         }
 
         RefreshCommands();
@@ -754,7 +755,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
         var file = Core.Mega.MegaFile.FromSingle(_file!, Decisions(), title, EpisodeNumber.TryParse(EpisodeText), _addition.Length > 0 ? _addition : null, revision: false,
             _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())));
-        Result = Mega.Send([file], "Single spracovanie: " + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), library.Root, _services.Profile);
+        Result = Mega.Send([file], Loc.T("Single spracovanie: ") + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), library.Root, _services.Profile);
         _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
     }
 
@@ -802,7 +803,7 @@ public sealed class RulesPageViewModel : ObservableObject
         var plan = revision ? _plan with { Revision = true } : _plan;
         CanRevise = false;
         Busy = true;
-        Result = "Pracujem…";
+        Result = Loc.T("Pracujem…");
         Progress = 0;
         try
         {
@@ -810,7 +811,7 @@ public sealed class RulesPageViewModel : ObservableObject
             var series = SeriesToRemember();
             var started = DateTime.UtcNow;
             var result = await processor.ProcessAsync(plan, _placement, new OutputOptions(handling), new Progress<double>(p => Progress = p));
-            _services.LogProcessing(revision ? "Single spracovanie – revízia" : "Single spracovanie", plan, result, started);
+            _services.LogProcessing(revision ? Loc.T("Single spracovanie – revízia") : Loc.T("Single spracovanie"), plan, result, started);
             CanRevise = result.Status == ProcessingStatus.AlreadyInLibrary;
             _undoRecord = result.UndoRecordPath;
             if (result.Status is ProcessingStatus.Done or ProcessingStatus.Unchanged or ProcessingStatus.AlreadyInLibrary)
@@ -826,15 +827,16 @@ public sealed class RulesPageViewModel : ObservableObject
             }
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Hotovo{(revision ? " (revízia – doterajšia verzia je v Koši)" : "")}: {result.OutputPath}" + (_undoRecord is null ? "" : "\nZmenu je možné vrátiť späť."),
-                ProcessingStatus.Unchanged => "Súbor už spĺňa pravidlá a je v knižnici.",
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký stream už v knižnici je: {result.OutputPath}\nNič sa nezapísalo, originál ostal. Ak ho chcete spracovať znova ako novú verziu, stlačte Revízia.",
-                ProcessingStatus.NeedsReview => "Súbor treba najprv skontrolovať (pozri upozornenia).",
-                ProcessingStatus.Cancelled => "Zrušené.",
+                ProcessingStatus.Done => (revision ? Loc.F("Hotovo (revízia – doterajšia verzia je v Koši): {0}", result.OutputPath) : Loc.F("Hotovo: {0}", result.OutputPath)) +
+                                         (_undoRecord is null ? "" : "\n" + Loc.T("Zmenu je možné vrátiť späť.")),
+                ProcessingStatus.Unchanged => Loc.T("Súbor už spĺňa pravidlá a je v knižnici."),
+                ProcessingStatus.AlreadyInLibrary => Loc.F("Rovnaký stream už v knižnici je: {0}\nNič sa nezapísalo, originál ostal. Ak ho chcete spracovať znova ako novú verziu, stlačte Revízia.", result.OutputPath),
+                ProcessingStatus.NeedsReview => Loc.T("Súbor treba najprv skontrolovať (pozri upozornenia)."),
+                ProcessingStatus.Cancelled => Loc.T("Zrušené."),
                 _ when FileProcessor.NeedsAttention(result) =>
-                    "POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri podrobnosti; záznam na vrátenie: " + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
-                _ when result.Messages.Contains(FileProcessor.RestoredMessage) => "Nepodarilo sa – originál je vrátený do pôvodného stavu.\n" + string.Join("\n", result.Messages),
-                _ => "Nepodarilo sa – originál ostal nezmenený.\n" + string.Join("\n", result.Messages),
+                    Loc.T("POZOR: nepodarilo sa a originál sa nepodarilo úplne vrátiť – pozri podrobnosti; záznam na vrátenie: ") + result.UndoRecordPath + "\n" + string.Join("\n", result.Messages),
+                _ when result.Messages.Contains(FileProcessor.RestoredMessage) => Loc.T("Nepodarilo sa – originál je vrátený do pôvodného stavu.") + "\n" + string.Join("\n", result.Messages),
+                _ => Loc.T("Nepodarilo sa – originál ostal nezmenený.") + "\n" + string.Join("\n", result.Messages),
             };
             if (result.Status == ProcessingStatus.Done && result.Messages.Count > 0)
             {
@@ -854,7 +856,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var job = new FileJob($"Single spracovanie: {Path.GetFileName(_plan.Target.Source.Path)} → {Path.GetFileName(_placement.Directory)}",
+        var job = new FileJob(Loc.F("Single spracovanie: {0} → {1}", Path.GetFileName(_plan.Target.Source.Path), Path.GetFileName(_placement.Directory)),
             _services.Processor(installation), _plan, _placement, new OutputOptions(handling));
         job.Finished += (_, result) => JobRow.OnUi(() =>
         {
@@ -866,7 +868,9 @@ public sealed class RulesPageViewModel : ObservableObject
         });
         _services.Enqueue(job);
         _services.RememberSeries(SeriesToRemember(), _plan.Target.Source.Path);
-        Result = $"Pridané do fronty ako úloha {job.Id}" + (_services.Settings.AutoStartQueue ? "." : " – frontu spustíte na stránke Fronta úloh.");
+        Result = _services.Settings.AutoStartQueue
+            ? Loc.F("Pridané do fronty ako úloha {0}.", job.Id)
+            : Loc.F("Pridané do fronty ako úloha {0} – frontu spustíte na stránke Fronta úloh.", job.Id);
     }
 
     private async Task UndoAsync()
@@ -881,7 +885,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             var processor = _services.Processor(_services.CurrentMkvToolNix);
             var problems = await processor.UndoAsync(_undoRecord);
-            Result = problems.Count == 0 ? "Pôvodná hlavička je obnovená a súbor je na pôvodnom mieste." : "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
+            Result = problems.Count == 0 ? Loc.T("Pôvodná hlavička je obnovená a súbor je na pôvodnom mieste.") : Loc.T("Vrátenie sa nepodarilo:") + "\n" + string.Join("\n", problems);
             if (problems.Count == 0)
             {
                 _undoRecord = null;
@@ -897,7 +901,7 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         // every video format MKVToolNix reads; anything other than MKV becomes a new MKV
         var patterns = string.Join(";", Universum.Core.Batch.BatchAnalyzer.VideoExtensions.Select(e => "*" + e));
-        var dialog = new OpenFileDialog { Filter = $"Video (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = $"Video (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…)|{patterns}|{Loc.T("Všetky súbory")}|*.*" };
         if (_services.Settings.InputDirectory is { } input && Directory.Exists(input))
         {
             // the input folder of the settings is where new files come
@@ -912,7 +916,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
         if (dialog.ShowDialog() == true)
         {
             _services.SetOutputDirectory(dialog.FolderName);
@@ -947,20 +951,20 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private string Describe(RuleIssue issue) => issue.Kind switch
     {
-        RuleIssueKind.UndeterminedLanguage => $"Stopa {Rows.FirstOrDefault(r => r.TrackId == issue.TrackId)?.Position}: neurčený jazyk – vyberte ho v stĺpci Jazyk.",
-        RuleIssueKind.MultipleVideoTracks => "Súbor má viac video stôp – treba ho skontrolovať ručne.",
-        RuleIssueKind.NoAudio => "Súbor nemá zvukovú stopu – treba ho skontrolovať ručne.",
-        RuleIssueKind.NoPreferredSubtitles => "Zvuk nie je v preferovanom jazyku a chýbajú titulky v preferovanom jazyku – žiadne titulky sa nezobrazia automaticky.",
-        RuleIssueKind.MissingIndex => "Video nemá index (pretáčanie môže byť pomalé alebo nefunkčné) – nový zápis ho vytvorí.",
-        RuleIssueKind.ContainerWarnings => "mkvmerge pri čítaní hlási upozornenia: " + string.Join(" ", _file?.Warnings ?? []),
+        RuleIssueKind.UndeterminedLanguage => Loc.F("Stopa {0}: neurčený jazyk – vyberte ho v stĺpci Jazyk.", Rows.FirstOrDefault(r => r.TrackId == issue.TrackId)?.Position),
+        RuleIssueKind.MultipleVideoTracks => Loc.T("Súbor má viac video stôp – treba ho skontrolovať ručne."),
+        RuleIssueKind.NoAudio => Loc.T("Súbor nemá zvukovú stopu – treba ho skontrolovať ručne."),
+        RuleIssueKind.NoPreferredSubtitles => Loc.T("Zvuk nie je v preferovanom jazyku a chýbajú titulky v preferovanom jazyku – žiadne titulky sa nezobrazia automaticky."),
+        RuleIssueKind.MissingIndex => Loc.T("Video nemá index (pretáčanie môže byť pomalé alebo nefunkčné) – nový zápis ho vytvorí."),
+        RuleIssueKind.ContainerWarnings => Loc.T("mkvmerge pri čítaní hlási upozornenia: ") + string.Join(" ", _file?.Warnings ?? []),
         _ => issue.Kind.ToString(),
     };
 
     // "1 zmena", "3 zmeny", "5 zmien"
     private static string ChangeCount(int count) => count switch
     {
-        1 => "1 zmena",
-        >= 2 and <= 4 => $"{count} zmeny",
-        _ => $"{count} zmien",
+        1 => Loc.T("1 zmena"),
+        >= 2 and <= 4 => Loc.F("{0} zmeny", count),
+        _ => Loc.F("{0} zmien", count),
     };
 }

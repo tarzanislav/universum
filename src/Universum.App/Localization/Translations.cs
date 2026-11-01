@@ -3017,6 +3017,15 @@ internal static class Translations
         ["Editácia videostôp"] = "Editace videostop",
         ["Šablóny (template)"] = "Šablony (template)",
         ["Štatistika"] = "Statistika",
+        // SRT conversion (1. 11. 2026)
+        ["Na SRT"] = "Na SRT",
+        ["na SRT"] = "na SRT",
+        ["Previesť na SRT"] = "Převést na SRT",
+        ["Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)"] = "Titulky se ve výsledku zapíšou jako SRT; stopa původního formátu v něm nebude (originál se nemění)",
+        ["{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze"] = "{0} → SRT: titulky ztratí barvy, písma a umístění na obraze",
+        ["{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude"] = "{0} → SRT uvnitř výsledku; původní formát v něm nebude",
+        ["externé titulky sa vždy zapíšu ako SRT"] = "externí titulky se vždy zapíšou jako SRT",
+        ["titulky {0} prevedené na SRT."] = "titulky {0} převedeny na SRT.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6030,5 +6039,14 @@ internal static class Translations
         ["Editácia videostôp"] = "Track editing",
         ["Šablóny (template)"] = "Templates",
         ["Štatistika"] = "Statistics",
+        // SRT conversion (1. 11. 2026)
+        ["Na SRT"] = "To SRT",
+        ["na SRT"] = "to SRT",
+        ["Previesť na SRT"] = "Convert to SRT",
+        ["Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)"] = "The subtitles are written as SRT in the result; the track in the original format is not kept (the original file does not change)",
+        ["{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze"] = "{0} → SRT: the subtitles lose their colors, fonts and on-screen positions",
+        ["{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude"] = "{0} → SRT inside the result; the original format is not kept",
+        ["externé titulky sa vždy zapíšu ako SRT"] = "external subtitles are always written as SRT",
+        ["titulky {0} prevedené na SRT."] = "subtitles {0} converted to SRT.",
     };
 }

@@ -16,6 +16,9 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 ![Single processing – tracks, title and library target before writing](rules-preview.jpg)
 
 - **Forced** – tick it to mark subtitles as forced. UNIVERSUM sometimes suggests this by itself, for example when there are only a few subtitles.
+- **To SRT** – subtitles of another format (WebVTT, ASS…) are written as SRT in the result, only when you tick it. The track in
+  the original format is not kept; the original file does not change. External subtitles next to the video are always written
+  as SRT. ASS loses its colors and fonts.
 - [Revision] – appears when the result is already in the library. The file is processed again as a new version: the new one is written and verified, and only then does the current one go to the Recycle Bin.
 - [Folder…] next to **Library:** changes where the results are written.
 - [Clear the queue] forgets the open file that has not been processed yet. Nothing changes on the disk.

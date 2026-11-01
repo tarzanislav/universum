@@ -103,6 +103,7 @@ public static partial class ProcessingWords
             ChangeKind.Added => track + CoreText.F("pridaná zo súboru {0}.", change.After),
             ChangeKind.Position => track + CoreText.F("presunutá z {0}. na {1}. miesto.", change.Before, change.After),
             ChangeKind.Timing => track + CoreText.F("nové časy titulkov – {0}.", change.After),
+            ChangeKind.ToSrt => track + CoreText.F("titulky {0} prevedené na SRT.", change.Before),
             ChangeKind.Name => track + CoreText.F("názov „{0}“ → „{1}“.", change.Before, change.After),
             ChangeKind.Language => track + CoreText.F("jazyk {0} → {1}.", change.Before, change.After),
             ChangeKind.Default => track + CoreText.F("predvolená (Default) {0} → {1}.", YesNo(change.Before), YesNo(change.After)),

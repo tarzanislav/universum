@@ -28,6 +28,8 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
   they will have in the output. Change the order with the arrows (**Ctrl+↑** / **Ctrl+↓**), the arrows at a track or by dragging its grip in the
   **Order** column (within audio or subtitles). When you change a track's language or Forced, the tracks arrange
   themselves by the rules after **2 seconds**: CZ at the top, SK under it, then the others, commentary last.
+- Write subtitles of another format (e.g. an added **WebVTT**) as SRT inside the result by ticking **Convert to SRT** in
+  the track's Properties. The track in the original format is not kept; the added file does not change.
 - After you select a track, you can change [Track name], [Language] and the flags in the **Properties** part on the right:
   [Default track (Default)], [Track enabled (Enabled)], [Forced display (Forced)].
 - [More flags and advanced properties]: SDH, audio description, commentary, delay (ms), FPS, aspect ratio, cropping,

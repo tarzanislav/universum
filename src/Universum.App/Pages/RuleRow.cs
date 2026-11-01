@@ -61,6 +61,33 @@ public sealed class RuleRow : ObservableObject
         }
     }
 
+    /// <summary>Called when the user ticks or unticks Na SRT.</summary>
+    public Action<RuleRow, bool>? ToSrtChanged { get; init; }
+
+    /// <summary>Text subtitles of another format than SRT: they can be written as SRT (owner, 1. 11. 2026).</summary>
+    public bool CanConvertToSrt => !IsRemovedByLanguage && Core.Subtitles.SrtConversion.Offers(Target.Source);
+
+    /// <summary>Written as SRT inside the result; the track of the other format is not in it.</summary>
+    public bool ToSrt
+    {
+        get => Target.ToSrt;
+        set
+        {
+            if (value != ToSrt)
+            {
+                ToSrtChanged?.Invoke(this, value);
+            }
+        }
+    }
+
+    /// <summary>What the conversion means ("WebVTT → SRT"; styled subtitles lose their look; external files always SRT).</summary>
+    public string ToSrtHint => Target.Source is { ExternalFile: { } file, IsTextSubtitles: true } && !file.EndsWith(".srt", StringComparison.OrdinalIgnoreCase)
+            ? Loc.T("externé titulky sa vždy zapíšu ako SRT")
+        : !CanConvertToSrt ? ""
+        : Core.Subtitles.SrtConversion.IsStyled(Target.Source)
+            ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(Target.Source))
+            : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(Target.Source));
+
     public int TrackId => Target.TrackId;
 
     /// <summary>Position after applying the rules (1-based).</summary>

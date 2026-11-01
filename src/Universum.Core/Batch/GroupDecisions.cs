@@ -45,6 +45,9 @@ public sealed class GroupDecisions
     /// <summary>Names of audio and subtitle slots written by the user (owner, 30. 10. 2026); empty = no name.</summary>
     public Dictionary<SlotKey, string> Names { get; } = [];
 
+    /// <summary>Subtitle slots written as SRT (WebVTT, ASS … – owner, 1. 11. 2026: only when the user ticks it).</summary>
+    public HashSet<SlotKey> ToSrt { get; } = [];
+
     /// <summary>Subtitle slots kept although their language is not among the profile's subtitle languages.</summary>
     public HashSet<SlotKey> Kept { get; } = [];
 

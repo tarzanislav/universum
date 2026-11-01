@@ -39,6 +39,11 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
                 changes.Add(new PlannedChange(track.TrackId, ChangeKind.Position, (sourcePositions[track.TrackId] + 1).ToString(), (position + 1).ToString()));
             }
 
+            if (track.ToSrt)
+            {
+                changes.Add(new PlannedChange(track.TrackId, ChangeKind.ToSrt, source.Codec, "SRT"));
+            }
+
             if (track.TimingChanged)
             {
                 changes.Add(new PlannedChange(track.TrackId, ChangeKind.Timing, null, track.Timing!.Describe()));

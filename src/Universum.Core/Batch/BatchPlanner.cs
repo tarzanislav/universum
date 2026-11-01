@@ -200,6 +200,7 @@ public static class BatchPlanner
             Languages = languages,
             Forced = forced,
             Kept = group.Decisions.Kept.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
+            ToSrt = group.Decisions.ToSrt.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
             Order = group.Decisions.Order.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToList(),
             Names = group.Decisions.Names.Where(n => trackOf.ContainsKey(n.Key) && n.Key.Type is TrackType.Audio or TrackType.Subtitles)
                 .ToDictionary(n => trackOf[n.Key], n => n.Value),

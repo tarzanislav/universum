@@ -62,6 +62,11 @@ public sealed partial record MuxTrackOptions
     /// <summary>Character set of text subtitles that are not UTF-8: "cp1250" (Czech and Slovak in Windows), "iso-8859-2".</summary>
     public string? SubtitleCharset { get; init; }
 
+    /// <summary>
+    /// Text subtitles of another format (WebVTT, ASS …) written as SRT (owner, 1. 11. 2026); the result has only the SRT.
+    /// </summary>
+    public bool ToSrt { get; init; }
+
     public bool IsEmpty => this == new MuxTrackOptions();
 
     /// <summary>What is wrong with the values (Slovak), for track <paramref name="where"/>.</summary>

@@ -105,6 +105,40 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Written as SRT (owner, 1. 11. 2026: WebVTT, ASS … converted inside the result, only when ticked); the track of the
+    /// other format is not in the result.
+    /// </summary>
+    public bool ToSrt
+    {
+        get => Group.Decisions.ToSrt.Contains(Key);
+        set
+        {
+            if (value)
+            {
+                Group.Decisions.ToSrt.Add(Key);
+            }
+            else
+            {
+                Group.Decisions.ToSrt.Remove(Key);
+            }
+
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>Text subtitles of another format than SRT: they can be written as SRT.</summary>
+    public bool CanConvertToSrt => Core.Subtitles.SrtConversion.Offers(Track);
+
+    /// <summary>What the conversion means for the track ("WebVTT → SRT"; styled subtitles lose their look).</summary>
+    public string ToSrtHint => Track is { ExternalFile: { } file, IsTextSubtitles: true } && !file.EndsWith(".srt", StringComparison.OrdinalIgnoreCase)
+            ? Loc.T("externé titulky sa vždy zapíšu ako SRT")
+        : !CanConvertToSrt ? ""
+        : Core.Subtitles.SrtConversion.IsStyled(Track)
+            ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(Track))
+            : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(Track));
+
     /// <summary>Subtitles out of the language list: the user may keep them.</summary>
     public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);
 

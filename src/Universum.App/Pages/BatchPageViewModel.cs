@@ -3028,6 +3028,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));
+                group.Decisions.ToSrt.UnionWith(file.ToSrt.Where(slots.ContainsKey).Select(id => slots[id]));
                 if (file.Order.Count > 0 && group.Decisions.Order.Count == 0)
                 {
                     // a sound written anew in the order stands for its original

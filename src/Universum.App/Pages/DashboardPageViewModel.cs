@@ -75,6 +75,7 @@ public sealed class DashboardPageViewModel : ObservableObject
         Tools = new("", "MKVToolNix a aktualizácie", () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
         Status = [Queue, Mux, Batch, Library, Titles, Tools];
         Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres), found => _main.ProcessFoundAsync(found));
+        Agenda = new AgendaOverview(services, main);
 
         services.WeatherChanged += () =>
         {
@@ -227,10 +228,14 @@ public sealed class DashboardPageViewModel : ObservableObject
     /// <summary>The episodes and films of this week.</summary>
     public WeekOverview Week { get; }
 
+    /// <summary>POZNÁMKY: the coming week of the calendar, the open tasks, the pinned notes.</summary>
+    public AgendaOverview Agenda { get; }
+
     /// <summary>The page is shown: the overview now, the weather when it is old, the library counted again.</summary>
     public void Shown()
     {
         _ = Week.RefreshAsync();
+        Agenda.Shown();
         _ = _services.InputWatch.ScanAsync();
         RefreshStatus();
         _ = CountLibraryAsync();
@@ -330,8 +335,9 @@ public sealed class DashboardPageViewModel : ObservableObject
             OnPropertyChanged(nameof(DayInfo));
             OnPropertyChanged(nameof(WeatherDays));
 
-            // a new day: the forecast for it
+            // a new day: the forecast for it, the days of the calendar from it
             _ = RefreshWeatherAsync(force: true);
+            Agenda.Refresh();
         }
 
         // the overview every 5 seconds, the weather every half hour (only with a town)

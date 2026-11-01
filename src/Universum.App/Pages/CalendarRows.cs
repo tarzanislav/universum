@@ -46,6 +46,12 @@ public enum CalendarLayer
     Memorial,
     School,
     NameDays,
+
+    /// <summary>The batches of MEGA spracovanie planned for a day and an hour.</summary>
+    Mega,
+
+    /// <summary>The runs of processing kept in the logs, on the day they ended.</summary>
+    Processed,
 }
 
 /// <summary>The colours of the layers: those of the tabs of Premiéry and Novinky, so nothing has to be learnt again.</summary>
@@ -66,6 +72,9 @@ public static class CalendarColors
         [CalendarLayer.Memorial] = Frozen(0x8C, 0x8C, 0x8C),
         [CalendarLayer.School] = Frozen(0xE8, 0xB9, 0x3A),
         [CalendarLayer.NameDays] = Frozen(0x7A, 0x7A, 0x9A),
+        // the tints of the groups ŠABLÓNY (MEGA spracovanie) and MULTIPLEXING in the left rail
+        [CalendarLayer.Mega] = Frozen(0x3E, 0xA8, 0x5F),
+        [CalendarLayer.Processed] = Frozen(0x4A, 0x7B, 0xD9),
     };
 
     /// <summary>The group POZNÁMKY in the left rail – a soft rose.</summary>
@@ -199,7 +208,7 @@ public sealed class CalendarEntry
 
     public bool CanOpen => OpenCommand is not null;
 
-    /// <summary>The order on a day: holidays, records by their hour, premieres, episodes.</summary>
+    /// <summary>The order on a day: holidays, records by their hour, premieres, episodes, what UNIVERSUM plans and did.</summary>
     internal int Rank => Layer switch
     {
         CalendarLayer.Holidays => 0,
@@ -208,6 +217,7 @@ public sealed class CalendarEntry
         CalendarLayer.Events or CalendarLayer.Tasks or CalendarLayer.Notes => 3,
         CalendarLayer.FilmsDomestic or CalendarLayer.FilmsWorld => 4,
         CalendarLayer.SeriesDomestic or CalendarLayer.SeriesWorld => 5,
+        CalendarLayer.Mega or CalendarLayer.Processed => 7,
         _ => 6,
     };
 }

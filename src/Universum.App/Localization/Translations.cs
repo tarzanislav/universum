@@ -230,6 +230,13 @@ internal static class Translations
         ["Nová poznámka…"] = "Nová poznámka…",
         ["Vysypať kôš"] = "Vysypat koš",
         ["Tlač a export…"] = "Tisk a export…",
+        ["Nová udalosť dnes"] = "Nová událost dnes",
+        ["Kalendár – najbližších 7 dní"] = "Kalendář – nejbližších 7 dní",
+        ["Na najbližších 7 dní nie je v kalendári nič – udalosť pridáte tlačidlom +."] = "Na nejbližších 7 dní není v kalendáři nic – událost přidáte tlačítkem +.",
+        ["Úlohy"] = "Úkoly",
+        ["Žiadna otvorená úloha na najbližších 7 dní."] = "Žádný otevřený úkol na nejbližších 7 dní.",
+        ["Hotovo"] = "Hotovo",
+        ["Pripnuté poznámky"] = "Připnuté poznámky",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -456,5 +463,12 @@ internal static class Translations
         ["Nová poznámka…"] = "New note…",
         ["Vysypať kôš"] = "Empty the bin",
         ["Tlač a export…"] = "Print and export…",
+        ["Nová udalosť dnes"] = "New event today",
+        ["Kalendár – najbližších 7 dní"] = "Calendar – the next 7 days",
+        ["Na najbližších 7 dní nie je v kalendári nič – udalosť pridáte tlačidlom +."] = "Nothing in the calendar for the next 7 days – add an event with +.",
+        ["Úlohy"] = "Tasks",
+        ["Žiadna otvorená úloha na najbližších 7 dní."] = "No open task for the next 7 days.",
+        ["Hotovo"] = "Done",
+        ["Pripnuté poznámky"] = "Pinned notes",
     };
 }

@@ -1282,6 +1282,7 @@ internal static class SelfTest
         await TestTasksAsync(model, window, services);
         await TestNotesAsync(model, window, services);
         await TestReportsAsync(model, services);
+        await TestDashboardAgendaAsync(model, window, services);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
@@ -1384,6 +1385,65 @@ internal static class SelfTest
         }
 
         store.EmptyBin();
+    }
+
+    /// <summary>
+    /// The Dashboard's POZNÁMKY (owner, 31. 10. 2026, stage P3b): the calendar of the coming week without the tasks (they
+    /// have their own list), the late and today's tasks (not those of a month later), the pinned note with the beginning of
+    /// its text, a task written in one line, a task ticked off, an event and a note opened in their pages; invented texts.
+    /// </summary>
+    private static async Task TestDashboardAgendaAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var store = services.Agenda;
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslený koncert", Time = new Core.Agenda.AgendaTime { Start = today.AddDays(2), StartTime = new TimeOnly(19, 30) } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená úloha po termíne", Task = new Core.Agenda.AgendaTask { Due = today.AddDays(-1) } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená úloha na dnes", Task = new Core.Agenda.AgendaTask { Due = today, Priority = 2 } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená úloha o mesiac", Task = new Core.Agenda.AgendaTask { Due = today.AddDays(30) } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená pripnutá poznámka", Text = "Prvý riadok textu.\nĎalší riadok.", Note = new Core.Agenda.AgendaNote { Pinned = true } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená obyčajná poznámka", Note = new Core.Agenda.AgendaNote() });
+
+        var dashboard = model.Dashboard;
+        var agenda = dashboard.Agenda;
+        model.Open(dashboard);
+        agenda.Refresh();
+        Check(agenda.Calendar.Any(r => r.Title == "Vymyslený koncert" && r.Time == "19:30" && !r.IsToday) && !agenda.Calendar.Any(r => r.Title.StartsWith("Vymyslená úloha", StringComparison.Ordinal)),
+            "dashboard: the event of the coming week in the calendar, the tasks not there – " + string.Join(" | ", agenda.Calendar.Select(r => $"{r.Day} {r.Time} {r.Title}")));
+        Check(agenda.Tasks.Select(t => t.Title).SequenceEqual(["Vymyslená úloha po termíne", "Vymyslená úloha na dnes"]) && agenda.Tasks[0].Late && agenda.Tasks[1].High && !agenda.Tasks[1].Late,
+            "dashboard: the late task first, then today's, the one of a month later not yet – " + string.Join(" | ", agenda.Tasks.Select(t => $"{t.Due} {t.Title}")));
+        Check(agenda.Notes.Count == 1 && agenda.Notes[0].Title == "Vymyslená pripnutá poznámka" && agenda.Notes[0].Preview == "Prvý riadok textu.",
+            "dashboard: only the pinned note, with the beginning of its text");
+
+        agenda.QuickText = "zajtra 18:00 vymyslená úloha z dashboardu #test !";
+        Check(agenda.QuickHint.Contains("vymyslená úloha z dashboardu", StringComparison.Ordinal) && agenda.QuickHint.Contains("18:00", StringComparison.Ordinal),
+            "dashboard: the line understood before it is added – " + agenda.QuickHint);
+        agenda.AddCommand.Execute(null);
+        var quick = store.Items.SingleOrDefault(i => i.Title == "vymyslená úloha z dashboardu");
+        Check(quick?.Task is { Priority: 2, DueTime.Hour: 18 } && quick.Task.Due == today.AddDays(1) && quick.Tags.SequenceEqual(["test"]) && agenda.QuickText.Length == 0 &&
+              agenda.Tasks.Any(t => t.Title == quick.Title && t.High), "dashboard: a task written in one line – " + agenda.Status);
+        await Screenshot(window, "dashboard-agenda.png");
+
+        agenda.Tasks.First(t => t.Title == "Vymyslená úloha po termíne").IsDone = true;
+        Check(store.Items.Single(i => i.Title == "Vymyslená úloha po termíne").Task!.State == Core.Agenda.TaskState.Done && agenda.Tasks.All(t => t.Title != "Vymyslená úloha po termíne"),
+            "dashboard: a task ticked off – done, it leaves the list");
+
+        agenda.Calendar.First(r => r.Title == "Vymyslený koncert").OpenCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.Calendar && model.Calendar.SelectedDate == today.AddDays(2) && model.Calendar.Editor is { Title: "Vymyslený koncert" },
+            "dashboard: an event opens in Kalendár on its day, in its editor");
+        model.Calendar.Editor?.CancelCommand.Execute(null);
+        model.Open(dashboard);
+        agenda.Notes[0].OpenCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.AgendaNotes && model.AgendaNotes.Editor is AgendaEditor { Title: "Vymyslená pripnutá poznámka" }, "dashboard: a pinned note opens in Poznámky");
+        (model.AgendaNotes.Editor as AgendaEditor)?.CancelCommand.Execute(null);
+
+        foreach (var record in store.Items.ToList())
+        {
+            store.Delete(record.Id);
+        }
+
+        store.EmptyBin();
+        model.Open(dashboard);
+        Check(agenda.NoCalendar && agenda.NoTasks && !agenda.HasNotes, "dashboard: nothing left when the records are gone");
     }
 
     /// <summary>
@@ -1677,6 +1737,17 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.SeriesNews && model.SeriesNews.Filter.Length > 0 && episode.Title.TrimStart('★', ' ').StartsWith(model.SeriesNews.Filter, StringComparison.Ordinal),
             $"calendar: an episode opens in Novinky with its series looked for – {episode.Title} → {model.SeriesNews.Filter}");
         model.SeriesNews.Filter = "";
+
+        // the layer UNIVERSUM: today's runs of processing of the tests before, a run opened in Záznamy spracovania
+        model.Open(calendar);
+        calendar.TodayCommand.Execute(null);
+        var runs = calendar.DetailSections.FirstOrDefault(s => s.Title == "UNIVERSUM");
+        var run = runs?.Entries.FirstOrDefault(e => e.Layer == CalendarLayer.Processed);
+        Check(run is not null && run.HasTime && run.Detail.Length > 0, "calendar: today's runs of processing in the layer UNIVERSUM – " + string.Join(", ", runs?.Entries.Select(e => $"{e.TimeText} {e.Title}") ?? []));
+        run!.OpenCommand!.Execute(null);
+        Check(model.SelectedTool.Page == model.Logs && model.Logs.Selected is { } shownLog && shownLog.Kind == run.Title.TrimStart('⚠', ' '),
+            "calendar: a run opens its log – " + run.Title);
+        model.Open(calendar);
 
         foreach (var record in services.Agenda.Items.ToList())
         {
@@ -3281,6 +3352,14 @@ internal static class SelfTest
         model.Mega.Selected.Start = Core.Mega.MegaStart.At;
         Check(megaBatch.StartAt is { } at && at > DateTime.Now && model.Mega.Selected.State.StartsWith("čaká na ", StringComparison.Ordinal),
             "mega: a time to start – " + model.Mega.Selected.State);
+        // the batch scheduled for a day and an hour is in Kalendár (the layer UNIVERSUM) and opens MEGA spracovanie
+        model.Calendar.Select(DateOnly.FromDateTime(megaBatch.StartAt!.Value));
+        var scheduled = model.Calendar.DetailSections.SelectMany(s => s.Entries).FirstOrDefault(e => e.Layer == CalendarLayer.Mega);
+        Check(scheduled is not null && scheduled.Title.StartsWith(megaBatch.Label, StringComparison.Ordinal) && scheduled.TimeText == megaBatch.StartAt.Value.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+            "calendar: the scheduled batch of MEGA on its day and hour – " + scheduled?.TimeText + " " + scheduled?.Title + " · " + scheduled?.Detail);
+        model.Open(model.Calendar);
+        scheduled!.OpenCommand!.Execute(null);
+        Check(model.SelectedTool.Page == model.Mega && model.Mega.Selected?.Batch == megaBatch, "calendar: the scheduled batch opens in MEGA spracovanie");
         await Screenshot(window, "mega.png");
 
         // owner, 29. 10. 2026: the batch opens in Hromadné spracovanie with every decision, and is saved back

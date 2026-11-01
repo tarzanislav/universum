@@ -56,17 +56,12 @@ public sealed class MainViewModel : ObservableObject
             SendToBatch = SendEpisodesToBatchAsync,
         };
         Interests = new InterestsPageViewModel(services);
-        Calendar = new CalendarPageViewModel(services) { OpenNews = OpenInNews };
+        Calendar = new CalendarPageViewModel(services) { OpenNews = OpenInNews, OpenMega = OpenMegaBatch, OpenLog = OpenProcessingLog };
         AgendaTasks = new TasksPageViewModel(services)
         {
             ProcessFound = ProcessFoundAsync,
             OpenNews = OpenInNews,
-            OpenLog = id =>
-            {
-                Open(Logs);
-                Logs.Refresh();
-                Logs.Selected = Logs.Logs.FirstOrDefault(l => l.Log.Id == id);
-            },
+            OpenLog = OpenProcessingLog,
         };
         AgendaNotes = new NotesPageViewModel(services);
         NotesGuide = new PlaceholderPageViewModel(Loc.T("Návod"), "Stručný návod ku skupine POZNÁMKY – s obrázkami, zvýrazneniami a postupmi krok za krokom.", "etapa N");
@@ -89,7 +84,7 @@ public sealed class MainViewModel : ObservableObject
             if (_reminderDay is { } day)
             {
                 Open(Calendar);
-                Calendar.Select(day);
+                Calendar.Show(day);
             }
 
             ReminderText = "";
@@ -480,6 +475,21 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>The calendar opens a premiere in Premiéry or an episode in Novinky: its tab, the title looked for.</summary>
+    // a log of processing opened in Záznamy spracovania (the calendar, the tasks)
+    private void OpenProcessingLog(string id)
+    {
+        Open(Logs);
+        Logs.Refresh();
+        Logs.Selected = Logs.Logs.FirstOrDefault(l => l.Log.Id == id);
+    }
+
+    // a batch opened in MEGA spracovanie (the calendar)
+    private void OpenMegaBatch(Guid id)
+    {
+        Open(Mega);
+        Mega.Selected = Mega.Rows.FirstOrDefault(r => r.Batch.Id == id) ?? Mega.Selected;
+    }
+
     private void OpenInNews(CalendarLayer layer, string title)
     {
         var find = title.StartsWith("★ ", StringComparison.Ordinal) ? title[2..] : title;

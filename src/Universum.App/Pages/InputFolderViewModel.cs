@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 
 namespace Universum.App.Pages;
 
@@ -38,13 +39,13 @@ public sealed class InputFolderViewModel : ObservableObject
     public bool IsSet => Folder is not null;
 
     public string Display => Folder is { } folder
-        ? Directory.Exists(folder) ? folder : folder + " (nie je dostupný)"
-        : "nie je nastavený – zvoľte ho tlačidlom Zmeniť…";
+        ? Directory.Exists(folder) ? folder : folder + Loc.T(" (nie je dostupný)")
+        : Loc.T("nie je nastavený – zvoľte ho tlačidlom Zmeniť…");
 
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
     /// <summary>Owner, 29. 10. 2026: films go into MOVIES, series into TVSHOWS (each series in its own folder).</summary>
-    public string SortingHint => IsSet ? "Filmy dajte do priečinka MOVIES, seriály do TVSHOWS – každý seriál do vlastného priečinka." : "";
+    public string SortingHint => IsSet ? Loc.T("Filmy dajte do priečinka MOVIES, seriály do TVSHOWS – každý seriál do vlastného priečinka.") : "";
 
     public RelayCommand ChooseCommand { get; }
 
@@ -55,7 +56,7 @@ public sealed class InputFolderViewModel : ObservableObject
     /// <summary>Asks for a folder; the self-test answers instead.</summary>
     public Func<string?, string?> PickFolder { get; set; } = start =>
     {
-        var dialog = new OpenFolderDialog { Title = "Vstupný priečinok (kam prichádzajú nové filmy a epizódy)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Vstupný priečinok (kam prichádzajú nové filmy a epizódy)") };
         if (start is not null && Directory.Exists(start))
         {
             dialog.InitialDirectory = start;
@@ -70,7 +71,7 @@ public sealed class InputFolderViewModel : ObservableObject
         try
         {
             _services.SetInputDirectory(folder);
-            Message = folder is null ? "Vstupný priečinok je zrušený." : "";
+            Message = folder is null ? Loc.T("Vstupný priečinok je zrušený.") : "";
             return true;
         }
         catch (ArgumentException ex)

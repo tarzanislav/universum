@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Batch;
 using Universum.Core.Library;
 using Universum.Core.Media;
@@ -19,7 +20,7 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     /// <summary>What the group holds, by the titles of its files without year and ID: "Zlatý kapor", "Zlatý kapor + 2 ďalšie".</summary>
     public string Title
     {
-        get => _title.Length > 0 ? _title : "Skupina " + Label;
+        get => _title.Length > 0 ? _title : Loc.F("Skupina {0}", Label);
         set
         {
             if (SetProperty(ref _title, value))
@@ -30,7 +31,7 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     }
 
     /// <summary>"Skupina A: Zlatý kapor + 2 ďalšie" – the letter the report and universum-cli use.</summary>
-    public string Tooltip => $"Skupina {Label}: {Title}";
+    public string Tooltip => Loc.F("Skupina {0}: {1}", Label, Title);
 
     public int Count => Group.Files.Count;
 
@@ -108,8 +109,8 @@ public sealed class SlotRow : ObservableObject
     public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);
 
     /// <summary>What happens with the track in the result when it is not just kept.</summary>
-    public string ResultNote => _removedByLanguage ? "odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)"
-        : Kept ? "ponechané – jazyk mimo zoznamu titulkov"
+    public string ResultNote => _removedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
+        : Kept ? Loc.T("ponechané – jazyk mimo zoznamu titulkov")
         : "";
 
     /// <summary>An audio or subtitle track: its name can be written for the whole group (owner, 30. 10. 2026).</summary>
@@ -220,9 +221,9 @@ public sealed class SlotRow : ObservableObject
     /// are summed up (owner, 29. 10. 2026: "návrhy pri súboroch: angličtina 20×, čeština 2×") – each file has its own.
     /// </summary>
     public string Evidence => _evidence is null && FileSuggestions is { Length: > 0 } files
-        ? $"návrhy pri súboroch: {files} – potvrďte ich tlačidlom Potvrdiť návrhy (alebo vyberte jazyk pre celú skupinu)"
+        ? Loc.F("návrhy pri súboroch: {0} – potvrďte ich tlačidlom Potvrdiť návrhy (alebo vyberte jazyk pre celú skupinu)", files)
         : !NeedsLanguage && _evidence is { Source: EvidenceSource.GroupDecision }
-            ? $"vaša voľba (v súbore: {Texts.Language(Track.Language)})"
+            ? Loc.F("vaša voľba (v súbore: {0})", Texts.Language(Track.Language))
             : Texts.Evidence(_evidence);
 
     // the files' own suggestions for this track, by language: "angličtina 20×, čeština 2×"
@@ -269,9 +270,9 @@ public sealed class SlotRow : ObservableObject
     /// UNIVERSUM's suggestion, changed with the check box).
     /// </summary>
     public string ForcedHint => !IsSubtitles || Group.Decisions.Forced.ContainsKey(Key) ? ""
-        : Track.Flags.Forced ? "forced v súbore"
-        : Core.Text.Words.ContainsAny(Track.Name, _profile.ForcedKeywords) ? "forced podľa názvu"
-        : ForcedSubtitles.ByAmount(Group.Representative, Track) is { } amount ? $"NÁVRH UNIVERSUM: forced – {amount}"
+        : Track.Flags.Forced ? Loc.T("forced v súbore")
+        : Core.Text.Words.ContainsAny(Track.Name, _profile.ForcedKeywords) ? Loc.T("forced podľa názvu")
+        : ForcedSubtitles.ByAmount(Group.Representative, Track) is { } amount ? Loc.F("NÁVRH UNIVERSUM: forced – {0}", amount)
         : "";
 
     /// <summary>Accepts the language suggestion as the group's decision.</summary>
@@ -372,11 +373,11 @@ public sealed class FileSlotRow : ObservableObject
     /// <summary>What decides the language when none is chosen for the file: "skupina: čeština", "návrh: … (overte)".</summary>
     public string Hint => _evidence switch
     {
-        null => "neurčený – vyberte",
+        null => Loc.T("neurčený – vyberte"),
         { Source: EvidenceSource.FileDecision } => "",
-        { Confidence: Confidence.Medium } suggestion => "návrh: " + Texts.Language(suggestion.Language) +
+        { Confidence: Confidence.Medium } suggestion => Loc.T("návrh: ") + Texts.Language(suggestion.Language) +
                                                          (suggestion.Detail is { } detail ? $" ({detail})" : "") +
-                                                         (Group.FileSuggestion(Path, Key) is null ? " – zo skupiny" : ""),
+                                                         (Group.FileSuggestion(Path, Key) is null ? Loc.T(" – zo skupiny") : ""),
         { } known => Texts.Evidence(known) + ": " + Texts.Language(known.Language),
     };
 
@@ -409,11 +410,11 @@ public sealed class FileSlotRow : ObservableObject
     // item says only where it would go back to
     private string InheritedLabel() => _evidence switch
     {
-        null => "nevybraté – vyberte",
-        { Source: EvidenceSource.FileDecision } => "podľa skupiny",
-        { Confidence: Confidence.Medium } suggestion => $"návrh ({Name(suggestion.Language)}) – overte",
-        { Source: EvidenceSource.GroupDecision } known => $"podľa skupiny ({Name(known.Language)})",
-        { } known => $"automaticky ({Name(known.Language)})",
+        null => Loc.T("nevybraté – vyberte"),
+        { Source: EvidenceSource.FileDecision } => Loc.T("podľa skupiny"),
+        { Confidence: Confidence.Medium } suggestion => Loc.F("návrh ({0}) – overte", Name(suggestion.Language)),
+        { Source: EvidenceSource.GroupDecision } known => Loc.F("podľa skupiny ({0})", Name(known.Language)),
+        { } known => Loc.F("automaticky ({0})", Name(known.Language)),
     };
 
     private static string Name(LanguageTag tag) => Languages.Find(tag.Primary)?.SlovakName ?? Texts.Language(tag);
@@ -526,11 +527,11 @@ public sealed class FileRow : ObservableObject
 
             if (library.KindFor(Item.File.Path) == MediaKind.Series)
             {
-                return library.EpisodeFor(Item.File.Path) is ({ } number, true) ? "návrh: " + number.Tag : "";
+                return library.EpisodeFor(Item.File.Path) is ({ } number, true) ? Loc.T("návrh: ") + number.Tag : "";
             }
 
             return library.SuggestedTitleFor(Item.File.Path) is { } title
-                ? "návrh: " + title.FolderName + (page.UnverifiedNote(Item.File.Path) is { } why ? " ⚠ " + why : "")
+                ? Loc.T("návrh: ") + title.FolderName + (page.UnverifiedNote(Item.File.Path) is { } why ? " ⚠ " + why : "")
                 : "";
         }
     }
@@ -595,10 +596,10 @@ public sealed class FileRow : ObservableObject
     }
 
     /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container.</summary>
-    public string Status => Item.Plan.Revision && Item.Reasons.Count == 0 ? "revízia – nová verzia nahradí výsledok v knižnici"
-        : Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? "už v knižnici"
+    public string Status => Item.Plan.Revision && Item.Reasons.Count == 0 ? Loc.T("revízia – nová verzia nahradí výsledok v knižnici")
+        : Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? Loc.T("už v knižnici")
         : Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
-        ? $"nový MKV z {Item.File.ContainerName}"
+        ? Loc.F("nový MKV z {0}", Item.File.ContainerName)
         : Texts.Status(Item.Status);
 
     public string Reasons => string.Join("; ", Item.Reasons.Select(Texts.Reason));

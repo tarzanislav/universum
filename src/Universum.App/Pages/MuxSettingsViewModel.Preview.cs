@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Muxing;
 using Range = Universum.Core.Muxing.PreviewRange;
@@ -24,8 +25,8 @@ public sealed partial class MuxSettingsViewModel
 
     public static IReadOnlyList<VideoChoice<Range>> PreviewRanges { get; } =
     [
-        new(Range.Samples, "úseky: začiatok, stred, koniec (3 × 2 min)"),
-        new(Range.Whole, "celý film"),
+        new(Range.Samples, Loc.T("úseky: začiatok, stred, koniec (3 × 2 min)")),
+        new(Range.Whole, Loc.T("celý film")),
     ];
 
     /// <summary>How much the preview writes (kept in the settings).</summary>
@@ -101,7 +102,7 @@ public sealed partial class MuxSettingsViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            PreviewText = "Priečinok náhľadov sa nedá vytvoriť: " + ex.Message;
+            PreviewText = Loc.T("Priečinok náhľadov sa nedá vytvoriť: ") + ex.Message;
             return;
         }
 
@@ -111,7 +112,7 @@ public sealed partial class MuxSettingsViewModel
         _previewing = new CancellationTokenSource();
         RefreshPreview();
         PreviewProgress = 0;
-        PreviewText = preview.PreviewParts is null ? "Zapisujem náhľad celého filmu…" : "Zapisujem náhľad – tri úseky po dve minúty…";
+        PreviewText = preview.PreviewParts is null ? Loc.T("Zapisujem náhľad celého filmu…") : Loc.T("Zapisujem náhľad – tri úseky po dve minúty…");
         try
         {
             var result = await new Multiplexer(installation, _services.Runner).MuxAsync(preview, new Progress<double>(p => PreviewProgress = p), _previewing.Token);
@@ -121,17 +122,18 @@ public sealed partial class MuxSettingsViewModel
                 Forget(_previewPath);
                 _previewPath = written;
                 _previewRecipe = Recipe(spec);
-                PreviewText = (preview.PreviewParts is null ? "Náhľad celého filmu" : "Náhľad úsekov (začiatok, stred, koniec)") +
-                              $" je hotový ({Size(new FileInfo(written).Length)}) – prehrajte ho; keď je výsledok v poriadku, odošlite ho do MEGA.";
+                PreviewText = Loc.F("{0} je hotový ({1}) – prehrajte ho; keď je výsledok v poriadku, odošlite ho do MEGA.",
+                                    preview.PreviewParts is null ? Loc.T("Náhľad celého filmu") : Loc.T("Náhľad úsekov (začiatok, stred, koniec)"),
+                                    Size(new FileInfo(written).Length));
             }
             else
             {
-                PreviewText = result.Status == MuxStatus.Cancelled ? "Náhľad sa zastavil – nič sa nezapísalo." : "Náhľad sa nepodarilo zapísať: " + string.Join(" | ", result.Messages);
+                PreviewText = result.Status == MuxStatus.Cancelled ? Loc.T("Náhľad sa zastavil – nič sa nezapísalo.") : Loc.T("Náhľad sa nepodarilo zapísať: ") + string.Join(" | ", result.Messages);
             }
         }
         catch (OperationCanceledException)
         {
-            PreviewText = "Náhľad sa zastavil – nič sa nezapísalo.";
+            PreviewText = Loc.T("Náhľad sa zastavil – nič sa nezapísalo.");
         }
         finally
         {
@@ -153,8 +155,8 @@ public sealed partial class MuxSettingsViewModel
         var title = Library.Title ?? new TitleInfo(MediaKind.Movie, Path.GetFileNameWithoutExtension(DisplayName), null);
         var planned = spec.Placement is { } placement ? Path.Combine(placement.Directory, placement.Prefix) + " …" + placement.Extension : spec.OutputPath;
         var file = Core.Mega.MegaFile.FromMux(spec, title, Library.Episode, planned);
-        Result = Mega.Send([file], "Zlučovanie: " + title.Name + (Library.Episode is { } episode ? " " + episode.Tag : ""), library.Root, _services.Profile) +
-                 (PreviewIsOld ? " (Pozor: nastavenia sa od náhľadu zmenili.)" : "");
+        Result = Mega.Send([file], Loc.T("Zlučovanie: ") + title.Name + (Library.Episode is { } episode ? " " + episode.Tag : ""), library.Root, _services.Profile) +
+                 (PreviewIsOld ? Loc.T(" (Pozor: nastavenia sa od náhľadu zmenili.)") : "");
         IsModified = false;
         OnPropertyChanged(nameof(IsUnprocessed));
     }
@@ -181,7 +183,7 @@ public sealed partial class MuxSettingsViewModel
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
             {
-                PreviewText = "Windows nemá prehrávač pre MKV: " + ex.Message;
+                PreviewText = Loc.T("Windows nemá prehrávač pre MKV: ") + ex.Message;
             }
         }
     }

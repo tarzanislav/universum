@@ -9,7 +9,7 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 1. Click [Open file…] and choose a video (MKV, MP4, AVI, TS…). The dialog starts in the input folder.
 2. In the track table, check the **Jazyk (pred → po)** and **Názov (pred → po)** columns. Choose an undetermined or wrong language from the menu; you can rewrite the track name.
 3. Change the order of audio and subtitle tracks in the **Poradie** column – drag a track, or use the arrows.
-4. Choose *film* or *seriál*, type *Title (year)* in the **Titul** field and click [TMDB]. If [Confirm the title] appears, check the suggestion and confirm it.
+4. Choose *film* or *series*, type *Title (year)* in the **Titul** field and click [TMDB]. If [Confirm the title] appears, check the suggestion and confirm it.
 5. For a series, fill in **Epizóda** (e.g. S01E04). If needed, choose a **Doplnok** (e.g. Directors Cut).
 6. Check the **Cieľ** line and click [Apply the rules]. If you want to run the processing later, click [Add to queue].
 
@@ -27,14 +27,14 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 @otvorit Rules Open Single processing
 
 ## Batch processing
-A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows a simulated result (*výsledok simulácie*) – before anything is written, you can see what each file will become.
+A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows the *simulation result* – before anything is written, you can see what each file will become.
 
 1. Click [Folder…], tick **aj podpriečinky** if needed, and click [Analyze].
 2. On the left, choose a group in the **Skupina (film / seriál)** list. On the right you will see its files and, below them, **Stopy skupiny**.
-3. Choose the kind, *filmy* or *seriál*. For a series, fill in **Seriál:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
+3. Choose the kind, *films* or *series*. For a series, fill in **Seriál:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
 4. Check and accept the suggested names: [Refine the titles], [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
 5. In **Stopy skupiny**, set **Jazyk**, **Názov stopy**, **Forced** and the order. The decision applies to all files in the group.
-6. At **Originál:**, choose *zachovať*, *zmazať automaticky* or *zmazať ručne*.
+6. At **Originál:**, choose *keep*, *delete automatically* or *delete manually*.
 7. Click [Start]. You can follow the progress in the Job queue too; a prominent bar shows when it has finished.
 
 ![Batch processing ready to start](batch-ready.jpg)
@@ -48,7 +48,7 @@ A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups**
 - **Revízia** – the result is already in the library; the file is processed again as a new version.
 
 ### Speech language detection
-If an audio track has no language, click [Recognize the audio languages ▾] and choose *Vybrané súbory*, *Celá skupina* or *Všetky skupiny*. UNIVERSUM listens to several sections from different parts of the film and suggests the language. Everything happens **only on your computer**. Accept the suggestions with [Confirm the suggestions].
+If an audio track has no language, click [Recognize the audio languages ▾] and choose *Selected files*, *Whole group* or *All groups*. UNIVERSUM listens to several sections from different parts of the film and suggests the language. Everything happens **only on your computer**. Accept the suggestions with [Confirm the suggestions].
 
 ![Suggested speech languages for the files](batch-speech.jpg)
 
@@ -63,7 +63,7 @@ If an audio track has no language, click [Recognize the audio languages ▾] and
 
 ![Episodes sorted into series and seasons](batch-sorted-series.jpg)
 
-!pozor With *zmazať automaticky*, each original goes to the Recycle Bin as soon as the new file has been written and verified. With *zmazať ručne*, nothing is deleted during the run; send the originals to the Recycle Bin afterwards with [Delete the originals].
+!pozor With *delete automatically*, each original goes to the Recycle Bin as soon as the new file has been written and verified. With *delete manually*, nothing is deleted during the run; send the originals to the Recycle Bin afterwards with [Delete the originals].
 
 @otvorit Batch Open Batch processing
 
@@ -72,20 +72,20 @@ Batches prepared in Batch processing, Single processing or Merging that are writ
 
 1. In Batch processing, prepare the files and, in the menu next to the button, choose a *new batch* or adding to a waiting batch.
 2. Click [Send to MEGA]. The files are saved to the batch with all the decisions, the template and the choice for the originals.
-3. In MEGA processing, use the **Spustiť** column to set when the batch starts: *keď ju spustím*, *po predchádzajúcej dávke* or *v dátum a čas* (a date and time, e.g. 2:00).
+3. In MEGA processing, use the **Spustiť** column to set when the batch starts: *when I start it*, *after the previous batch* or *at a date and time* (a date and time, e.g. 2:00).
 4. Change the order of the batches with the [▲] and [▼] arrows. Start a batch immediately with [Start now].
 
 ![List of MEGA processing batches](mega.jpg)
 
-- Batch columns: **Dávka**, **Čo obsahuje**, **Súbory**, **Originály** (*zachovať*, *mazať automaticky*, *mazať ručne*), **Spustiť**, **Stav**, **Výsledok**.
+- Batch columns: **Dávka**, **Čo obsahuje**, **Súbory**, **Originály** (*keep*, *delete automatically*, *delete manually*), **Spustiť**, **Stav**, **Výsledok**.
 - **Súbory vybranej dávky** shows the **Cieľ v knižnici**, **Stav** and **Poznámka** of each file.
 - [Edit in Batch processing] – opens the batch with all its decisions. After making changes, click the button with the batch number, e.g. [Uložiť do Dávka 1]. While a batch is being edited, it does not start.
 - [Again the skipped and failed] – files of a finished batch that were skipped, failed or were cancelled are checked and written again.
-- [Delete the originals] – for a batch sent with *zmazať ručne*, sends the originals of the written files to the Windows Recycle Bin.
-- [Choose a file from the batch] and [Remove the batch] don't change the files. Files that were not written show up as free again in Batch processing.
+- [Delete the originals] – for a batch sent with *delete manually*, sends the originals of the written files to the Windows Recycle Bin.
+- [Take the file out of the batch] and [Remove the batch] don't change the files. Files that were not written show up as free again in Batch processing.
 - [Clear finished] removes finished batches from the list.
 
-!pozor A batch set for a time starts **only while UNIVERSUM is running** and the computer is not asleep. Otherwise it gets the state *ZMEŠKANÉ* – start it by hand or set a new time.
+!pozor A batch set for a time starts **only while UNIVERSUM is running** and the computer is not asleep. Otherwise it gets the state *MISSED* – start it by hand or set a new time.
 
 !info Before writing, every file is checked again. A missing or changed file, or one that is already in the library, is **skipped** and nothing breaks.
 
@@ -107,12 +107,12 @@ The file name contains the title, year, languages, resolution, codec and size cl
 !info A title in Latin script gets its original name; a title in another script gets its English name. The name is checked via TMDB.
 
 ## Tips
-- When new videos appear in the input folder, UNIVERSUM shows the *Nové súbory vo vstupnom priečinku* bar with an offer to analyze them. It never starts anything by itself.
+- When new videos appear in the input folder, UNIVERSUM shows the *New files arrived in the input* bar with an offer to analyze them. It never starts anything by itself.
 - Groups with new files since the previous analysis are tinted **light green**.
 - [Skryť nastavenia ▴] gives the tables the whole window.
-- Before a big batch, leave the originals on *zachovať* and check the result in the library. You can delete them later with [Delete the originals].
+- Before a big batch, leave the originals on *keep* and check the result in the library. You can delete them later with [Delete the originals].
 - You can see what happened during processing in the Job queue and in the Processing logs.
 
-!tip For overnight processing: prepare several batches, set the first to *v dátum a čas* and the rest to *po predchádzajúcej dávke*. Leave UNIVERSUM running.
+!tip For overnight processing: prepare several batches, set the first to *at a date and time* and the rest to *after the previous batch*. Leave UNIVERSUM running.
 
 @otvorit Queue Open Job queue

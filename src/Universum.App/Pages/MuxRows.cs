@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.Muxing;
 
@@ -30,10 +31,10 @@ public sealed class MuxInputRow(MediaFile file, int number, Action changed) : Ob
     public ObservableCollection<MediaFile> Appended { get; } = [];
 
     public string Details =>
-        $"{File.ContainerType}, stopy: {File.Tracks.Count}" +
-        (File.HasChapters ? $", kapitoly: {File.ChapterEntries}" : "") +
-        (File.AttachmentCount > 0 ? $", prílohy: {File.AttachmentCount}" : "") +
-        (File.HasTags ? ", tagy" : "");
+        Loc.F("{0}, stopy: {1}", File.ContainerType, File.Tracks.Count) +
+        (File.HasChapters ? Loc.F(", kapitoly: {0}", File.ChapterEntries) : "") +
+        (File.AttachmentCount > 0 ? Loc.F(", prílohy: {0}", File.AttachmentCount) : "") +
+        (File.HasTags ? Loc.T(", tagy") : "");
 
     public bool HasChapters => File.HasChapters;
 
@@ -89,9 +90,9 @@ public sealed class MuxSourceRow(MuxInputRow input, MuxSourceKind kind, string p
 
     public string Role => Kind switch
     {
-        MuxSourceKind.Part => "ďalšia časť súboru",
-        MuxSourceKind.Appended => "pripojený súbor",
-        _ => "vstupný súbor",
+        MuxSourceKind.Part => Loc.T("ďalšia časť súboru"),
+        MuxSourceKind.Appended => Loc.T("pripojený súbor"),
+        _ => Loc.T("vstupný súbor"),
     };
 }
 
@@ -184,8 +185,8 @@ public sealed class MuxTrackRow : ObservableObject
 
     public static IReadOnlyList<Choice<MuxCompression>> CompressionChoices { get; } =
     [
-        new(MuxCompression.Automatic, "Určiť automaticky"),
-        new(MuxCompression.None, "Bez kompresie"),
+        new(MuxCompression.Automatic, Loc.T("Určiť automaticky")),
+        new(MuxCompression.None, Loc.T("Bez kompresie")),
         new(MuxCompression.Zlib, "zlib"),
     ];
 
@@ -217,11 +218,11 @@ public sealed class MuxTrackRow : ObservableObject
     /// <summary>Short marks of the less common flags for the track list: "nepočujúci, komentár".</summary>
     public string FlagMarks => string.Join(", ", new[]
     {
-        _flags.HearingImpaired ? "nepočujúci" : null,
-        _flags.VisualImpaired ? "nevidiaci" : null,
-        _flags.TextDescriptions ? "popis textom" : null,
-        _flags.Original ? "pôvodný" : null,
-        _flags.Commentary ? "komentár" : null,
+        _flags.HearingImpaired ? Loc.T("nepočujúci") : null,
+        _flags.VisualImpaired ? Loc.T("nevidiaci") : null,
+        _flags.TextDescriptions ? Loc.T("popis textom") : null,
+        _flags.Original ? Loc.T("pôvodný") : null,
+        _flags.Commentary ? Loc.T("komentár") : null,
     }.OfType<string>());
 
     /// <summary>Delay in milliseconds as typed ("", "-120").</summary>
@@ -342,11 +343,11 @@ public sealed class MuxAppendedTrackRow(MuxTrackRow parent, MediaFile file, Medi
 
     public string Type => Parent.Type;
 
-    public string Codec => Track?.Codec ?? "chýba";
+    public string Codec => Track?.Codec ?? Loc.T("chýba");
 
     public LanguageChoice Language => Parent.Language;
 
-    public string Name => IsMismatch ? $"+ {FileName}: stopa {Parent.Track.Id} chýba alebo je iná" : "+ " + FileName;
+    public string Name => IsMismatch ? Loc.F("+ {0}: stopa {1} chýba alebo je iná", FileName, Parent.Track.Id) : "+ " + FileName;
 
     public bool IsDefault => Parent.IsDefault;
 
@@ -358,9 +359,9 @@ public sealed class MuxAppendedTrackRow(MuxTrackRow parent, MediaFile file, Medi
 
     /// <summary>What the row is, for its tooltip and the properties panel.</summary>
     public string Explanation => IsMismatch
-        ? $"Súbor {FileName} nemá stopu {Parent.Track.Id} rovnakého typu a kodeku ako hlavný súbor – takto sa pripojiť nedá."
-        : $"Pripojená časť zo súboru {FileName}: pokračuje stopou {Parent.Position} ({Parent.Type}, {Parent.Language.Display}) zo súboru {Parent.Input.FileName}. " +
-          "Názov, jazyk a príznaky má od nej – upravte hlavnú stopu.";
+        ? Loc.F("Súbor {0} nemá stopu {1} rovnakého typu a kodeku ako hlavný súbor – takto sa pripojiť nedá.", FileName, Parent.Track.Id)
+        : Loc.F("Pripojená časť zo súboru {0}: pokračuje stopou {1} ({2}, {3}) zo súboru {4}. Názov, jazyk a príznaky má od nej – upravte hlavnú stopu.",
+            FileName, Parent.Position, Parent.Type, Parent.Language.Display, Parent.Input.FileName);
 
     internal void ParentChanged() => OnPropertyChanged(string.Empty);
 }
@@ -371,8 +372,8 @@ internal readonly record struct MuxTrackRowText(MediaTrack Track)
     public string Properties => Track.Type switch
     {
         TrackType.Video => Track.PixelDimensions ?? "",
-        TrackType.Audio => Track.AudioChannels is { } channels ? $"{channels} kan., {Track.AudioSamplingFrequency} Hz" : "",
-        TrackType.Subtitles => Track.IsTextSubtitles ? "textové" : "obrázkové",
+        TrackType.Audio => Track.AudioChannels is { } channels ? Loc.F("{0} kan., {1} Hz", channels, Track.AudioSamplingFrequency) : "",
+        TrackType.Subtitles => Track.IsTextSubtitles ? Loc.T("textové") : Loc.T("obrázkové"),
         _ => "",
     };
 }
@@ -382,9 +383,9 @@ public static class TrackTypes
 {
     public static string Text(TrackType type) => type switch
     {
-        TrackType.Video => "Video",
-        TrackType.Audio => "Zvuk",
-        TrackType.Subtitles => "Titulky",
-        _ => "Iné",
+        TrackType.Video => Loc.T("Video"),
+        TrackType.Audio => Loc.T("Zvuk"),
+        TrackType.Subtitles => Loc.T("Titulky"),
+        _ => Loc.T("Iné"),
     };
 }

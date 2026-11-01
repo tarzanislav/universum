@@ -5,6 +5,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Jobs;
+using Universum.App.Localization;
 
 namespace Universum.App.Jobs;
 
@@ -35,9 +36,9 @@ public sealed class LogFileRow(LoggedFile file, RelayCommand<string> open)
 
     public string Headline => File.Headline;
 
-    public string Source => "Originál: " + File.Source;
+    public string Source => Loc.T("Originál: ") + File.Source;
 
-    public string? Result => File.Result is { } result ? "Výsledok: " + result : null;
+    public string? Result => File.Result is { } result ? Loc.T("Výsledok: ") + result : null;
 
     public bool HasResult => File.Result is not null;
 
@@ -124,7 +125,7 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         }
     }
 
-    public string Title => _selected is null ? "Vyberte záznam vľavo." : $"{_selected.Kind} – {_selected.When}";
+    public string Title => _selected is null ? Loc.T("Vyberte záznam vľavo.") : $"{_selected.Kind} – {_selected.When}";
 
     public string Outcome => _selected?.Log.Outcome ?? "";
 
@@ -161,8 +162,8 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         Selected = Logs.FirstOrDefault(l => l.Log.Id == selected) ?? Logs.FirstOrDefault();
         ShowFiles();
         Status = Logs.Count == 0
-            ? "Zatiaľ žiadne záznamy. Každé spracovanie (Hromadné, Single, MEGA, štúdiá, Úprava hlavičky, Kapitoly, Zlučovanie) sa sem zapíše samo."
-            : $"Záznamov: {Logs.Count}, s problémom: {Logs.Count(l => l.HasProblems)}. Sú len v tomto počítači a ostanú, kým ich nezmažete.";
+            ? Loc.T("Zatiaľ žiadne záznamy. Každé spracovanie (Hromadné, Single, MEGA, štúdiá, Úprava hlavičky, Kapitoly, Zlučovanie) sa sem zapíše samo.")
+            : Loc.F("Záznamov: {0}, s problémom: {1}. Sú len v tomto počítači a ostanú, kým ich nezmažete.", Logs.Count, Logs.Count(l => l.HasProblems));
         DeleteAllCommand.NotifyCanExecuteChanged();
         DeleteCommand.NotifyCanExecuteChanged();
     }
@@ -193,7 +194,9 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
             chosen = [_selected];
         }
 
-        if (chosen.Count == 0 || !Confirm($"Zmazať {(chosen.Count == 1 ? "záznam" : $"{chosen.Count} záznamy")}?\n\nZmaže sa len záznam – filmy ani súbory v knižnici sa nezmenia."))
+        if (chosen.Count == 0 || !Confirm(chosen.Count == 1
+            ? Loc.T("Zmazať záznam?\n\nZmaže sa len záznam – filmy ani súbory v knižnici sa nezmenia.")
+            : Loc.F("Zmazať {0} záznamy?\n\nZmaže sa len záznam – filmy ani súbory v knižnici sa nezmenia.", chosen.Count)))
         {
             return;
         }
@@ -204,13 +207,13 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Status = "Záznam sa nepodarilo zmazať: " + ex.Message;
+            Status = Loc.T("Záznam sa nepodarilo zmazať: ") + ex.Message;
         }
     }
 
     private void DeleteAll()
     {
-        if (!Confirm($"Zmazať všetky záznamy spracovania ({Logs.Count})?\n\nZmažú sa len záznamy – filmy ani súbory v knižnici sa nezmenia."))
+        if (!Confirm(Loc.F("Zmazať všetky záznamy spracovania ({0})?\n\nZmažú sa len záznamy – filmy ani súbory v knižnici sa nezmenia.", Logs.Count)))
         {
             return;
         }
@@ -221,7 +224,7 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Status = "Záznamy sa nepodarilo zmazať: " + ex.Message;
+            Status = Loc.T("Záznamy sa nepodarilo zmazať: ") + ex.Message;
         }
     }
 
@@ -231,7 +234,7 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         var target = select && File.Exists(path) ? $"/select,\"{path}\"" : Directory.Exists(path) ? $"\"{path}\"" : Path.GetDirectoryName(path) is { } folder && Directory.Exists(folder) ? $"\"{folder}\"" : null;
         if (target is null)
         {
-            Status = $"{path} už neexistuje.";
+            Status = Loc.F("{0} už neexistuje.", path);
             return;
         }
 
@@ -241,7 +244,7 @@ public sealed class ProcessingLogsPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            Status = "Prieskumník sa nepodarilo otvoriť: " + ex.Message;
+            Status = Loc.T("Prieskumník sa nepodarilo otvoriť: ") + ex.Message;
         }
     }
 }

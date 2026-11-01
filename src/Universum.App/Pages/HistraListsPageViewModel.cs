@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Histra;
 using Universum.Core.Text;
@@ -54,7 +55,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
             Lists.Add(new HistraListRow(list, this));
         }
 
-        _status = Lists.Count == 0 ? "" : $"Importované listy: {Lists.Count}.";
+        _status = Lists.Count == 0 ? "" : Loc.F("Importované listy: {0}.", Lists.Count);
     }
 
     public ObservableCollection<HistraListRow> Lists { get; } = [];
@@ -64,8 +65,8 @@ public sealed class HistraListsPageViewModel : ObservableObject
 
     /// <summary>What to do before lists can be imported; empty when they can.</summary>
     public string Requirement => CanUse ? ""
-        : _services.HistraToken is null ? "Na import listov uložte v Nastaveniach svoj token HISTRA."
-        : "Pripájanie k HISTRA je v Nastaveniach vypnuté – importované listy sa dajú prezerať, synchronizovať nie.";
+        : _services.HistraToken is null ? Loc.T("Na import listov uložte v Nastaveniach svoj token HISTRA.")
+        : Loc.T("Pripájanie k HISTRA je v Nastaveniach vypnuté – importované listy sa dajú prezerať, synchronizovať nie.");
 
     public bool IsEmpty => Lists.Count == 0;
 
@@ -90,7 +91,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
     /// Sends a title to processing (set by the main window): its kind, names, year and caption; what happened in words when
     /// it was not sent, null when it was.
     /// </summary>
-    public Func<MediaKind, IReadOnlyList<string>, int?, string, Task<string?>> SendToSingle { get; set; } = (_, _, _, _) => Task.FromResult<string?>("Nedá sa.");
+    public Func<MediaKind, IReadOnlyList<string>, int?, string, Task<string?>> SendToSingle { get; set; } = (_, _, _, _) => Task.FromResult<string?>(Loc.T("Nedá sa."));
 
     // the names of the title shown: TMDB's when its detail came, else HISTRA's
     private async Task ToSingleAsync()
@@ -112,7 +113,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
             return;
         }
 
-        Status = "Hľadám titul vo vstupnom priečinku…";
+        Status = Loc.T("Hľadám titul vo vstupnom priečinku…");
         Status = await SendToSingle(card.Kind, names, year, caption) ?? "";
     }
     /// <summary>Shows the import window; the self-test answers instead.</summary>
@@ -217,11 +218,11 @@ public sealed class HistraListsPageViewModel : ObservableObject
         }
 
         Busy = true;
-        Status = "Načítavam vaše listy z HISTRA…";
+        Status = Loc.T("Načítavam vaše listy z HISTRA…");
         try
         {
             var overview = await histra.OverviewAsync();
-            Status = overview.Count == 0 ? "V HISTRA nemáte žiadne listy." : "";
+            Status = overview.Count == 0 ? Loc.T("V HISTRA nemáte žiadne listy.") : "";
             return overview.Count == 0 ? null : new HistraImportViewModel(_services, overview, Lists.Select(l => l.List.Info.Id).ToHashSet());
         }
         catch (TitleServiceException ex)
@@ -251,15 +252,15 @@ public sealed class HistraListsPageViewModel : ObservableObject
             return;
         }
 
-        var read = await ReadAsync(chosen, "Importujem");
+        var read = await ReadAsync(chosen, Loc.T("Importujem"));
         foreach (var list in read.Lists)
         {
             Replace(list);
         }
 
         Save();
-        Status = read.Problem ?? $"Importované: {Texts.Count(read.Lists.Count, "list", "listy", "listov")} " +
-            $"({Texts.Count(read.Lists.Sum(l => l.Items.Count), "titul", "tituly", "titulov")}).";
+        Status = read.Problem ?? Loc.F("Importované: {0} ({1}).", Texts.Count(read.Lists.Count, Loc.T("list"), Loc.T("listy"), Loc.T("listov")),
+            Texts.Count(read.Lists.Sum(l => l.Items.Count), Loc.T("titul"), Loc.T("tituly"), Loc.T("titulov")));
     }
 
     /// <summary>
@@ -269,7 +270,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
     public async Task SyncAsync()
     {
         var infos = Lists.Select(l => l.List.Info).ToList();
-        var read = await ReadAsync(infos, "Synchronizujem");
+        var read = await ReadAsync(infos, Loc.T("Synchronizujem"));
         foreach (var list in read.Lists)
         {
             Replace(list);
@@ -284,8 +285,8 @@ public sealed class HistraListsPageViewModel : ObservableObject
         }
 
         Save();
-        Status = read.Problem ?? $"Synchronizované {DateTime.Now:d. M. yyyy H:mm}: {Texts.Count(read.Lists.Count, "list", "listy", "listov")}" +
-            (read.Missing.Count > 0 ? $"; v HISTRA už nie je: {read.Missing.Count} (ostávajú tu, odstrániť ich môžete sami)." : ".");
+        Status = read.Problem ?? Loc.F("Synchronizované {0:d. M. yyyy H:mm}: {1}", DateTime.Now, Texts.Count(read.Lists.Count, Loc.T("list"), Loc.T("listy"), Loc.T("listov"))) +
+            (read.Missing.Count > 0 ? Loc.F("; v HISTRA už nie je: {0} (ostávajú tu, odstrániť ich môžete sami).", read.Missing.Count) : ".");
     }
 
     private async Task<(List<HistraList> Lists, List<int> Missing, string? Problem)> ReadAsync(IReadOnlyList<HistraListInfo> infos, string verb)
@@ -311,7 +312,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
                 {
                     if (Busy)
                     {
-                        Status = $"{position} – {p.Read} z {p.Total} titulov…";
+                        Status = Loc.F("{0} – {1} z {2} titulov…", position, p.Read, p.Total);
                     }
                 });
                 if (await histra.ReadAsync(info.Id, progress, work.Token) is { } list)
@@ -328,11 +329,11 @@ public sealed class HistraListsPageViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            return (lists, missing, $"Zastavené – uložené je, čo sa stihlo načítať ({Texts.Count(lists.Count, "list", "listy", "listov")}).");
+            return (lists, missing, Loc.F("Zastavené – uložené je, čo sa stihlo načítať ({0}).", Texts.Count(lists.Count, Loc.T("list"), Loc.T("listy"), Loc.T("listov"))));
         }
         catch (TitleServiceException ex)
         {
-            return (lists, missing, ex.Message + (lists.Count > 0 ? $" Uložené je, čo sa stihlo načítať ({lists.Count})." : ""));
+            return (lists, missing, ex.Message + (lists.Count > 0 ? Loc.F(" Uložené je, čo sa stihlo načítať ({0}).", lists.Count) : ""));
         }
         finally
         {
@@ -346,7 +347,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
 
     internal void Remove(HistraListRow row)
     {
-        if (!Confirm($"Odstrániť list „{row.Name}“ z UNIVERSUM?\n\nV HISTRA ostane bez zmeny, dá sa kedykoľvek importovať znova."))
+        if (!Confirm(Loc.F("Odstrániť list „{0}“ z UNIVERSUM?\n\nV HISTRA ostane bez zmeny, dá sa kedykoľvek importovať znova.", row.Name)))
         {
             return;
         }
@@ -358,7 +359,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
 
         Lists.Remove(row);
         Save();
-        Status = $"List „{row.Name}“ je odstránený z UNIVERSUM (v HISTRA ostal).";
+        Status = Loc.F("List „{0}“ je odstránený z UNIVERSUM (v HISTRA ostal).", row.Name);
         Refresh();
     }
 
@@ -403,7 +404,7 @@ public sealed class HistraListsPageViewModel : ObservableObject
             list.PlaceChanged();
         }
 
-        Status = $"List „{row.Name}“ je na {index + 1}. mieste.";
+        Status = Loc.F("List „{0}“ je na {1}. mieste.", row.Name, index + 1);
     }
 
     internal bool IsFirst(HistraListRow row) => Lists.IndexOf(row) <= 0;
@@ -490,23 +491,23 @@ public sealed class HistraListRow : ObservableObject
         get
         {
             var films = All.Count(r => r.Item.Kind == MediaKind.Movie);
-            var parts = new List<string> { Texts.Count(All.Count, "titul", "tituly", "titulov") };
+            var parts = new List<string> { Texts.Count(All.Count, Loc.T("titul"), Loc.T("tituly"), Loc.T("titulov")) };
             if (films > 0)
             {
-                parts.Add(Texts.Count(films, "film", "filmy", "filmov"));
+                parts.Add(Texts.Count(films, Loc.T("film"), Loc.T("filmy"), Loc.T("filmov")));
             }
 
             if (All.Count - films > 0)
             {
-                parts.Add(Texts.Count(All.Count - films, "seriál", "seriály", "seriálov"));
+                parts.Add(Texts.Count(All.Count - films, Loc.T("seriál"), Loc.T("seriály"), Loc.T("seriálov")));
             }
 
             if (List.Info.UpdatedAt is { } updated)
             {
-                parts.Add($"v HISTRA zmenený {updated.ToLocalTime():d. M. yyyy}");
+                parts.Add(Loc.F("v HISTRA zmenený {0:d. M. yyyy}", updated.ToLocalTime()));
             }
 
-            parts.Add($"načítaný {List.ReadAt.ToLocalTime():d. M. yyyy H:mm}");
+            parts.Add(Loc.F("načítaný {0:d. M. yyyy H:mm}", List.ReadAt.ToLocalTime()));
             return string.Join(" · ", parts);
         }
     }
@@ -532,7 +533,7 @@ public sealed class HistraListRow : ObservableObject
 
     public bool CanExpand => _matched.Count > Collapsed;
 
-    public string ExpandText => Expanded ? "Zobraziť menej" : $"Zobraziť všetky ({_matched.Count.ToString("N0", Texts.Slovak)})";
+    public string ExpandText => Expanded ? Loc.T("Zobraziť menej") : Loc.F("Zobraziť všetky ({0})", _matched.Count.ToString("N0", Texts.Slovak));
 
     /// <summary>With a filter: how many titles of the list match it.</summary>
     public string FilterResult { get; private set; } = "";
@@ -554,7 +555,7 @@ public sealed class HistraListRow : ObservableObject
     {
         var wanted = Words.Normalize(filter);
         _matched = wanted.Length == 0 ? All.ToList() : All.Where(r => r.Matches(wanted)).ToList();
-        FilterResult = wanted.Length == 0 ? "" : $"Zhoda: {_matched.Count}";
+        FilterResult = wanted.Length == 0 ? "" : Loc.F("Zhoda: {0}", _matched.Count);
         OnPropertyChanged(nameof(FilterResult));
         ShowVisible();
     }
@@ -599,7 +600,7 @@ public sealed class HistraItemRow : ObservableObject
             ("HISTRA", TitleLinks.Histra(item.Kind, item.Ids.Histra)),
             ("TMDB", TitleLinks.Tmdb(item.Kind, item.Ids.Tmdb)),
             ("IMDb", TitleLinks.Imdb(item.Ids.Imdb)),
-            ("ČSFD (hľadať)", TitleLinks.CsfdSearch(LibraryNames.IsLatinScript(item.OriginalTitle) ? item.OriginalTitle : item.Title)),
+            (Loc.T("ČSFD (hľadať)"), TitleLinks.CsfdSearch(LibraryNames.IsLatinScript(item.OriginalTitle) ? item.OriginalTitle : item.Title)),
         }.Where(l => l.Item2 is not null).Select(l => new TitleLink(l.Item1, l.Item2!)).ToList();
         Ids = new[]
         {
@@ -627,13 +628,13 @@ public sealed class HistraItemRow : ObservableObject
 
     public string Facts => string.Join(" · ", new[]
     {
-        Item.Kind == MediaKind.Movie ? "Film" : "Seriál",
+        Item.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"),
         Item.Runtime is { } minutes ? $"{minutes} min" : null,
-        Item.Rating is { } rating ? $"hodnotenie {rating.ToString("0.0", Texts.Slovak)}" : null,
+        Item.Rating is { } rating ? Loc.F("hodnotenie {0}", rating.ToString("0.0", Texts.Slovak)) : null,
         Item.Status.Length > 0 ? Status(Item.Status) : null,
     }.OfType<string>());
 
-    public string Overview => Item.Overview.Length > 0 ? Item.Overview : "HISTRA k titulu nemá popis.";
+    public string Overview => Item.Overview.Length > 0 ? Item.Overview : Loc.T("HISTRA k titulu nemá popis.");
 
     public PosterThumb SmallPoster { get; }
 
@@ -659,12 +660,12 @@ public sealed class HistraItemRow : ObservableObject
 
     private static string Status(string status) => status switch
     {
-        "Ended" => "ukončený",
-        "Canceled" or "Cancelled" => "zrušený",
-        "Returning Series" => "pokračuje",
-        "In Production" => "vo výrobe",
-        "Planned" => "plánovaný",
-        "Released" => "vydaný",
+        "Ended" => Loc.T("ukončený"),
+        "Canceled" or "Cancelled" => Loc.T("zrušený"),
+        "Returning Series" => Loc.T("pokračuje"),
+        "In Production" => Loc.T("vo výrobe"),
+        "Planned" => Loc.T("plánovaný"),
+        "Released" => Loc.T("vydaný"),
         _ => status,
     };
 }
@@ -702,10 +703,10 @@ public sealed class HistraImportViewModel : ObservableObject
 
     public IReadOnlyList<HistraListInfo> Chosen => Rows.Where(r => r.IsChecked).Select(r => r.Info).ToList();
 
-    public string ImportText => $"Importovať vybrané ({Rows.Count(r => r.IsChecked)})";
+    public string ImportText => Loc.F("Importovať vybrané ({0})", Rows.Count(r => r.IsChecked));
 
-    public string Summary => $"V HISTRA máte {Texts.Count(Rows.Count, "list", "listy", "listov")}. Vyberte, ktoré má mať UNIVERSUM – " +
-                             "importuje sa ich obsah s plagátmi, názvami a ID. Do HISTRA sa nič nezapisuje.";
+    public string Summary => Loc.F("V HISTRA máte {0}. Vyberte, ktoré má mať UNIVERSUM – importuje sa ich obsah s plagátmi, názvami a ID. Do HISTRA sa nič nezapisuje.",
+                             Texts.Count(Rows.Count, Loc.T("list"), Loc.T("listy"), Loc.T("listov")));
 
     public RelayCommand AllCommand { get; }
 
@@ -761,11 +762,11 @@ public sealed class HistraImportRow : ObservableObject
 
     public string Summary => string.Join(" · ", new[]
     {
-        Texts.Count(Info.ItemCount, "titul", "tituly", "titulov"),
-        Info.Visibility switch { "public" => "verejný", "private" => "súkromný", "" => null, var other => other },
-        Info.UpdatedAt is { } updated ? $"zmenený {updated.ToLocalTime():d. M. yyyy}" : null,
-        Info.IsMine ? null : Info.OwnerName.Length > 0 ? $"od {Info.OwnerName}" : "cudzí list",
-        Imported ? "už je v UNIVERSUM – načíta sa znova" : null,
+        Texts.Count(Info.ItemCount, Loc.T("titul"), Loc.T("tituly"), Loc.T("titulov")),
+        Info.Visibility switch { "public" => Loc.T("verejný"), "private" => Loc.T("súkromný"), "" => null, var other => other },
+        Info.UpdatedAt is { } updated ? Loc.F("zmenený {0:d. M. yyyy}", updated.ToLocalTime()) : null,
+        Info.IsMine ? null : Info.OwnerName.Length > 0 ? Loc.F("od {0}", Info.OwnerName) : Loc.T("cudzí list"),
+        Imported ? Loc.T("už je v UNIVERSUM – načíta sa znova") : null,
     }.OfType<string>());
 
     public IReadOnlyList<PosterThumb> Posters { get; }

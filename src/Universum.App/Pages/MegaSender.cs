@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Execution;
 using Universum.Core.Mega;
 using Universum.Core.Rules;
@@ -35,10 +36,10 @@ public sealed class MegaSender : ObservableObject
     {
         var chosen = _selected?.Batch;
         Targets.Clear();
-        Targets.Add(new MegaTarget("do novej dávky", null));
+        Targets.Add(new MegaTarget(Loc.T("do novej dávky"), null));
         foreach (var batch in _services.Mega.Batches.Where(b => b.State is MegaBatchState.Waiting or MegaBatchState.Missed && !b.IsBeingEdited))
         {
-            Targets.Add(new MegaTarget($"doplniť {batch.Label}: {batch.Name}", batch));
+            Targets.Add(new MegaTarget(Loc.F("doplniť {0}: {1}", batch.Label, batch.Name), batch));
         }
 
         Selected = Targets.FirstOrDefault(t => t.Batch == chosen) ?? Targets[0];
@@ -54,34 +55,34 @@ public sealed class MegaSender : ObservableObject
             {
                 if (batch.State is not (MegaBatchState.Waiting or MegaBatchState.Missed) || batch.IsBeingEdited)
                 {
-                    return $"{batch.Label} už nečaká (spúšťa sa alebo sa upravuje) – zvoľte inú dávku alebo novú.";
+                    return Loc.F("{0} už nečaká (spúšťa sa alebo sa upravuje) – zvoľte inú dávku alebo novú.", batch.Label);
                 }
 
                 var (added, changed) = _services.Mega.Put(batch, files);
                 if (added + changed == 0)
                 {
-                    return "Súbor už je v inej dávke MEGA spracovania.";
+                    return Loc.T("Súbor už je v inej dávke MEGA spracovania.");
                 }
 
                 Last = batch;
-                said = changed > 0 ? $"V {batch.Label} sa súbor nahradil novými rozhodnutiami." : $"Pridané do {batch.Label} MEGA spracovania.";
+                said = changed > 0 ? Loc.F("V {0} sa súbor nahradil novými rozhodnutiami.", batch.Label) : Loc.F("Pridané do {0} MEGA spracovania.", batch.Label);
             }
             else if (_services.Mega.Add(name, libraryRoot, profile, OriginalsMode.Keep, files) is { } created)
             {
                 Last = created;
-                said = $"Odoslané do MEGA spracovania ako {created.Label}.";
+                said = Loc.F("Odoslané do MEGA spracovania ako {0}.", created.Label);
             }
             else
             {
-                return "Súbor už je v niektorej dávke MEGA spracovania.";
+                return Loc.T("Súbor už je v niektorej dávke MEGA spracovania.");
             }
 
             _services.NotifyMegaChanged();
-            return said + " Zapíše sa, keď dávku spustíte alebo v nastavenom čase; originál ostane.";
+            return said + Loc.T(" Zapíše sa, keď dávku spustíte alebo v nastavenom čase; originál ostane.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            return "Do MEGA sa to nepodarilo uložiť: " + ex.Message;
+            return Loc.T("Do MEGA sa to nepodarilo uložiť: ") + ex.Message;
         }
     }
 }

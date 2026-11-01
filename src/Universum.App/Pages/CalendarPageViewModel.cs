@@ -118,7 +118,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         Build();
     }
 
-    public static IReadOnlyList<VideoChoice<int>> AgendaSpans { get; } = [new(7, "7 dní"), new(30, "30 dní"), new(90, "90 dní")];
+    public static IReadOnlyList<VideoChoice<int>> AgendaSpans { get; } = [new(7, Loc.T("7 dní")), new(30, Loc.T("30 dní")), new(90, Loc.T("90 dní"))];
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
 
@@ -374,7 +374,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
                 {
                     File.WriteAllText(path, AgendaExport.Ics(store.Items, null, Loc.Language));
                     return L("Uložené pre Outlook a Google: ", "Uloženo pro Outlook a Google: ", "Saved for Outlook and Google: ") + path;
-                }, ToolTip: "Udalosti s opakovaním a pripomienkou, úlohy, poznámky k dňom"),
+                }, ToolTip: Loc.T("Udalosti s opakovaním a pripomienkou, úlohy, poznámky k dňom")),
             new(L("iCalendar (.ics) – sviatky roka…", "iCalendar (.ics) – svátky roku…", "iCalendar (.ics) – holidays of the year…"), "iCalendar|*.ics", $"UNIVERSUM – sviatky {_anchor.Year}.ics",
                 path =>
                 {
@@ -394,9 +394,9 @@ public sealed partial class CalendarPageViewModel : ObservableObject
                 }),
             new(L("Obnoviť zo zálohy…", "Obnovit ze zálohy…", "Restore from a backup…"), "JSON|*.json", "",
                 path => L("Zo zálohy pridané alebo obnovené záznamy: ", "Ze zálohy přidané nebo obnovené záznamy: ", "Records added or restored: ") + store.Import(path).ToString(CultureInfo.InvariantCulture),
-                Opens: true, ToolTip: "Pridá záznamy, ktoré tu nie sú, a obnoví staršie verzie novšími zo zálohy – nič sa nemaže"),
+                Opens: true, ToolTip: Loc.T("Pridá záznamy, ktoré tu nie sú, a obnoví staršie verzie novšími zo zálohy – nič sa nemaže")),
             new(L("Načítať iCalendar (.ics)…", "Načíst iCalendar (.ics)…", "Read an iCalendar file (.ics)…"), "iCalendar|*.ics", "", ImportIcs,
-                Opens: true, ToolTip: "Udalosti a úlohy z Outlooku, Googlu alebo zo súboru UNIVERSUM – čo tu už je, sa nepridá druhý raz"),
+                Opens: true, ToolTip: Loc.T("Udalosti a úlohy z Outlooku, Googlu alebo zo súboru UNIVERSUM – čo tu už je, sa nepridá druhý raz")),
         ];
         return new ReportViewModel(_services, L("Kalendár", "Kalendář", "Calendar") + " – " + PeriodText, forms, BuildReport, exports);
     }
@@ -1180,7 +1180,7 @@ internal sealed partial class CalendarSources(AppServices services)
             }
 
             var layer = first.Region == NewsRegion.Domestic ? CalendarLayer.SeriesDomestic : CalendarLayer.SeriesWorld;
-            var what = first.Season is null or 1 ? "nový seriál" : $"{first.Season}. séria";
+            var what = first.Season is null or 1 ? Loc.T("nový seriál") : Loc.F("{0}. séria", first.Season);
             yield return (first.AirDate, Entry(layer, first.Caption, string.Join(" · ", new[] { what, first.Channel, first.Title != first.OriginalTitle ? first.Title : "" }.Where(t => t.Length > 0)), chosen, open));
         }
 

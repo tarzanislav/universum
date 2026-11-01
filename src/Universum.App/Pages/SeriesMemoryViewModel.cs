@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Library;
+using Universum.App.Localization;
 
 namespace Universum.App.Pages;
 
@@ -11,9 +12,9 @@ public sealed record SeriesMemoryRow(RememberedSeries Series)
 {
     public string Title => Series.Title.FolderName + (Series.Title is { TmdbId: { } id, IncludeId: false } ? $" · TMDB {id}" : "");
 
-    public string Names => "podľa: " + string.Join(", ", Series.Names);
+    public string Names => Loc.T("podľa: ") + string.Join(", ", Series.Names);
 
-    public string Used => $"naposledy {Series.LastUsedUtc.ToLocalTime().ToString("d. M. yyyy", CultureInfo.GetCultureInfo("sk-SK"))} · {Series.Uses}×";
+    public string Used => Loc.F("naposledy {0} · {1}×", Series.LastUsedUtc.ToLocalTime().ToString("d. M. yyyy", CultureInfo.GetCultureInfo("sk-SK")), Series.Uses);
 }
 
 /// <summary>
@@ -53,8 +54,8 @@ public sealed class SeriesMemoryViewModel : ObservableObject
     public RelayCommand<SeriesMemoryRow> ForgetCommand { get; }
 
     public string Status => Rows.Count == 0
-        ? "Zatiaľ žiadny seriál – zapamätá sa, keď jeho epizódy spracujete (Hromadné, MEGA alebo Single spracovanie)."
-        : $"Zapamätané seriály: {Rows.Count}.";
+        ? Loc.T("Zatiaľ žiadny seriál – zapamätá sa, keď jeho epizódy spracujete (Hromadné, MEGA alebo Single spracovanie).")
+        : Loc.F("Zapamätané seriály: {0}.", Rows.Count);
 
     private void Refresh()
     {

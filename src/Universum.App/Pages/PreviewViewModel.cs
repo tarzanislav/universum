@@ -1,5 +1,6 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Playback;
@@ -14,12 +15,12 @@ namespace Universum.App.Pages;
 /// </summary>
 public sealed class PreviewViewModel : ObservableObject
 {
-    private static readonly VideoChoice<int?> NoSubtitles = new(null, "bez titulkov");
+    private static readonly VideoChoice<int?> NoSubtitles = new(null, Loc.T("bez titulkov"));
     private readonly AppServices _services;
     private readonly string _path;
     private MediaFile? _file;
     private VideoChoice<int?> _subtitle = NoSubtitles;
-    private string _status = "Otváram náhľad…";
+    private string _status = Loc.T("Otváram náhľad…");
     private int _loading;
 
     public PreviewViewModel(AppServices services, string path)
@@ -56,7 +57,7 @@ public sealed class PreviewViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Status = "MKVToolNix nie je k dispozícii.";
+            Status = Loc.T("MKVToolNix nie je k dispozícii.");
             return;
         }
 
@@ -67,7 +68,7 @@ public sealed class PreviewViewModel : ObservableObject
             Subtitles = [NoSubtitles, .. _file.TracksOf(TrackType.Subtitles).Select((t, i) =>
                 new VideoChoice<int?>(t.Id, $"{i + 1}: {Texts.Language(t.Language)}{(t.Name is { Length: > 0 } name ? " – " + name : "")}{(t.Flags.Forced ? " (forced)" : "")}"))];
             OnPropertyChanged(nameof(Subtitles));
-            Status = $"{_file.TracksOf(TrackType.Audio).Count()} zvuk(y), {_file.TracksOf(TrackType.Subtitles).Count()} titulky – zvuk prepnete pod obrazom, titulky vpravo hore.";
+            Status = Loc.F("{0} zvuk(y), {1} titulky – zvuk prepnete pod obrazom, titulky vpravo hore.", _file.TracksOf(TrackType.Audio).Count(), _file.TracksOf(TrackType.Subtitles).Count());
             // the subtitles a player shows by themselves: the default (or forced) track
             if ((_file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Default) ?? _file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Forced)) is { } shown)
             {
@@ -76,7 +77,7 @@ public sealed class PreviewViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException or Core.Speech.SpeechException)
         {
-            Status = "Náhľad sa nedá otvoriť: " + ex.Message;
+            Status = Loc.T("Náhľad sa nedá otvoriť: ") + ex.Message;
         }
     }
 

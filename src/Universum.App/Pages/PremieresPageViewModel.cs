@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.News;
 using Universum.Core.Text;
@@ -49,10 +50,10 @@ public sealed class PremieresPageViewModel : ObservableObject
         _opener = new TitleOpener(services);
         Tabs =
         [
-            new(PremiereTab.FilmDomestic, "FILM – SK/CZ premiéry", Color.FromRgb(0xF2, 0x8C, 0x7C)),
-            new(PremiereTab.FilmWorld, "FILM – SVET premiéry", Color.FromRgb(0x6F, 0xA8, 0xE8)),
-            new(PremiereTab.SeriesDomestic, "SERIÁL – SK/CZ premiéry", Color.FromRgb(0x63, 0xC4, 0x8F)),
-            new(PremiereTab.SeriesWorld, "SERIÁL – SVET premiéry", Color.FromRgb(0xA7, 0x8B, 0xE6)),
+            new(PremiereTab.FilmDomestic, Loc.T("FILM – SK/CZ premiéry"), Color.FromRgb(0xF2, 0x8C, 0x7C)),
+            new(PremiereTab.FilmWorld, Loc.T("FILM – SVET premiéry"), Color.FromRgb(0x6F, 0xA8, 0xE8)),
+            new(PremiereTab.SeriesDomestic, Loc.T("SERIÁL – SK/CZ premiéry"), Color.FromRgb(0x63, 0xC4, 0x8F)),
+            new(PremiereTab.SeriesWorld, Loc.T("SERIÁL – SVET premiéry"), Color.FromRgb(0xA7, 0x8B, 0xE6)),
         ];
         _selected = Tabs[0];
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(refresh: true), () => !Busy);
@@ -229,36 +230,36 @@ public sealed class PremieresPageViewModel : ObservableObject
     /// <summary>What the chosen table contains and where it comes from.</summary>
     public string Note => _view switch
     {
-        NewsView.History => "História – premiéry, ktoré už boli (najnovšie hore). ",
-        NewsView.Recent => "Premiéry posledného týždňa (najnovšie hore). ",
-        NewsView.All => "Všetko – história aj nadchádzajúce premiéry (najneskoršie hore). ",
+        NewsView.History => Loc.T("História – premiéry, ktoré už boli (najnovšie hore). "),
+        NewsView.Recent => Loc.T("Premiéry posledného týždňa (najnovšie hore). "),
+        NewsView.All => Loc.T("Všetko – história aj nadchádzajúce premiéry (najneskoršie hore). "),
         _ => "",
     } + SelectedTab.Tab switch
     {
-        PremiereTab.FilmDomestic => $"Len české a slovenské filmy (aj koprodukcie) – premiéry v kinách na Slovensku a v Česku (sledované {FilmDaysAhead} dní dopredu), s dátumom na VOD a v TV. Zdroj: TMDB.",
-        PremiereTab.FilmWorld => $"Filmy sveta okrem českých a slovenských – najpopulárnejšie s prvou premiérou vo svete (sledované {FilmDaysAhead} dní dopredu); ak idú aj do našich kín, dátum je pri premiére. Zdroj: TMDB.",
-        PremiereTab.SeriesDomestic => $"Len české a slovenské seriály – nové seriály a nové série (sledované {SeriesNews.PageDaysAhead} dní dopredu, podľa zdrojov v Nastaveniach).",
-        _ => $"Seriály sveta okrem českých a slovenských – nové seriály a nové série na staniciach a streamovacích službách (sledované {SeriesNews.TvMazeDaysAhead} dní dopredu; TVmaze a zdroje v Nastaveniach).",
+        PremiereTab.FilmDomestic => Loc.F("Len české a slovenské filmy (aj koprodukcie) – premiéry v kinách na Slovensku a v Česku (sledované {0} dní dopredu), s dátumom na VOD a v TV. Zdroj: TMDB.", FilmDaysAhead),
+        PremiereTab.FilmWorld => Loc.F("Filmy sveta okrem českých a slovenských – najpopulárnejšie s prvou premiérou vo svete (sledované {0} dní dopredu); ak idú aj do našich kín, dátum je pri premiére. Zdroj: TMDB.", FilmDaysAhead),
+        PremiereTab.SeriesDomestic => Loc.F("Len české a slovenské seriály – nové seriály a nové série (sledované {0} dní dopredu, podľa zdrojov v Nastaveniach).", SeriesNews.PageDaysAhead),
+        _ => Loc.F("Seriály sveta okrem českých a slovenských – nové seriály a nové série na staniciach a streamovacích službách (sledované {0} dní dopredu; TVmaze a zdroje v Nastaveniach).", SeriesNews.TvMazeDaysAhead),
     };
 
     /// <summary>Why the chosen table is empty.</summary>
     public string EmptyText =>
         SelectedTab.Tab == PremiereTab.SeriesDomestic && !HasDomesticSource
-            ? "České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja)."
-            : OnlyChosen ? "Žiadne vybrané tituly – výber zaškrtnete v stĺpci Vybrané."
-            : Filter.Length > 0 ? "Nič nezodpovedá hľadaniu."
-            : ShowHistory ? "História je zatiaľ prázdna – premiéra sem prejde deň po svojom dátume."
-            : ShowAll && !Busy ? "Žiadne premiéry ani história – skúste Obnoviť."
-            : Busy ? "Načítavam…" : "Žiadne premiéry – skúste Obnoviť.";
+            ? Loc.T("České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja).")
+            : OnlyChosen ? Loc.T("Žiadne vybrané tituly – výber zaškrtnete v stĺpci Vybrané.")
+            : Filter.Length > 0 ? Loc.T("Nič nezodpovedá hľadaniu.")
+            : ShowHistory ? Loc.T("História je zatiaľ prázdna – premiéra sem prejde deň po svojom dátume.")
+            : ShowAll && !Busy ? Loc.T("Žiadne premiéry ani história – skúste Obnoviť.")
+            : Busy ? Loc.T("Načítavam…") : Loc.T("Žiadne premiéry – skúste Obnoviť.");
 
     public bool IsEmpty => SelectedTab.Rows.Count == 0;
 
     /// <summary>The sources and their attribution under the tables.</summary>
     public string Attribution =>
-        "Zdroje: " + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled).Select(s => s.Kind switch
+        Loc.T("Zdroje: ") + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled).Select(s => s.Kind switch
         {
             NewsSourceKind.TvMaze => TvMazeClient.Attribution,
-            NewsSourceKind.TmdbFilms => "TMDB (filmy)",
+            NewsSourceKind.TmdbFilms => Loc.T("TMDB (filmy)"),
             _ => s.Name,
         })) + ". " + Universum.Core.Library.Tmdb.TmdbClient.Attribution;
 
@@ -347,7 +348,7 @@ public sealed class PremieresPageViewModel : ObservableObject
                         var merged = PremiereArchive.MergeFilms(archive.Films, read, today, out var recheck);
                         for (var i = 0; i < recheck.Count; i++)
                         {
-                            Status = $"Filmy – kontrola uložených: {i + 1} z {recheck.Count}…";
+                            Status = Loc.F("Filmy – kontrola uložených: {0} z {1}…", i + 1, recheck.Count);
                             var film = recheck[i];
                             merged.RemoveAll(f => f.Region == film.Region && f.TmdbId == film.TmdbId);
                             if (await films.RecheckAsync(film, from, work.Token) is { } now)
@@ -366,7 +367,7 @@ public sealed class PremieresPageViewModel : ObservableObject
                 }
                 else
                 {
-                    problems.Add("Filmové premiéry čítajú z TMDB – uložte v Nastaveniach kľúč TMDB (a zapnite pripájanie).");
+                    problems.Add(Loc.T("Filmové premiéry čítajú z TMDB – uložte v Nastaveniach kľúč TMDB (a zapnite pripájanie)."));
                 }
             }
 
@@ -382,11 +383,11 @@ public sealed class PremieresPageViewModel : ObservableObject
                 ReadAt = DateTime.Now,
             };
             Keep(archive);
-            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm} · zdroje sa pýtajú raz denne alebo tlačidlom Obnoviť.";
+            Status = Loc.F("Aktuálne k {0:d. M. yyyy H:mm} · zdroje sa pýtajú raz denne alebo tlačidlom Obnoviť.", DateTime.Now);
         }
         catch (OperationCanceledException)
         {
-            Status = "Zastavené – zobrazené je, čo sa stihlo načítať.";
+            Status = Loc.T("Zastavené – zobrazené je, čo sa stihlo načítať.");
         }
         finally
         {
@@ -423,7 +424,7 @@ public sealed class PremieresPageViewModel : ObservableObject
         Build();
         if (_archive.ReadAt is { } read)
         {
-            Status = $"Uložené premiéry z {read:d. M. yyyy H:mm}.";
+            Status = Loc.F("Uložené premiéry z {0:d. M. yyyy H:mm}.", read);
         }
     }
 
@@ -433,7 +434,7 @@ public sealed class PremieresPageViewModel : ObservableObject
         _archive = archive;
         if (!_services.PremiereStore.Save(archive))
         {
-            Status = "Premiéry sa nedajú uložiť – ostanú len do zatvorenia programu.";
+            Status = Loc.T("Premiéry sa nedajú uložiť – ostanú len do zatvorenia programu.");
         }
 
         Build();
@@ -654,15 +655,15 @@ public sealed class PremiereSeriesRow : PremiereRow
     /// <summary>Žáner (owner, 31. 10. 2026) – the source's genres in Slovak, else TMDB's.</summary>
     public GenreCell Genre { get; }
 
-    public string What => Premiere.First.Kind == EpisodeKind.SeriesPremiere ? $"nový seriál · {Premiere.First.Code}" : $"{Premiere.First.Season}. séria · {Premiere.First.Code}";
+    public string What => Premiere.First.Kind == EpisodeKind.SeriesPremiere ? Loc.F("nový seriál · {0}", Premiere.First.Code) : Loc.F("{0}. séria · {1}", Premiere.First.Season, Premiere.First.Code);
 
     public string Periodicity => Premiere.Periodicity.Length > 0 ? Premiere.Periodicity : "–";
 
     public override string Rhythm => Premiere.Periodicity;
 
-    public string Episodes => Premiere.EpisodeCount is { } count ? Texts.Count(count, "epizóda", "epizódy", "epizód") : "–";
+    public string Episodes => Premiere.EpisodeCount is { } count ? Texts.Count(count, Loc.T("epizóda"), Loc.T("epizódy"), Loc.T("epizód")) : "–";
 
-    public string SourceText => $"Otvoriť v zdroji ({Premiere.First.Source})";
+    public string SourceText => Loc.F("Otvoriť v zdroji ({0})", Premiere.First.Source);
 
     public override bool HasSource => Premiere.First.Link is not null;
 

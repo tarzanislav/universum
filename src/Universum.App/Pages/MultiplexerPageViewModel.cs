@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.App.Jobs;
+using Universum.App.Localization;
 using Universum.Core.Jobs;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -80,7 +81,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     public RelayCommand ClearSourcesCommand => _clearSources ??= new RelayCommand(() =>
     {
         if (Current is { Inputs.Count: > 0 } current &&
-            Confirm("Odstrániť všetky zdrojové súbory zo Zlučovania?\n\nZabudnú sa aj ich stopy a nastavenia. Na disku sa nič nezmení."))
+            Confirm(Loc.T("Odstrániť všetky zdrojové súbory zo Zlučovania?\n\nZabudnú sa aj ich stopy a nastavenia. Na disku sa nič nezmení.")))
         {
             current.RemoveAllSourcesCommand.Execute(null);
         }
@@ -139,9 +140,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
             var waiting = jobs.Count(j => j.Status == JobStatus.Waiting);
             var done = jobs.Count(j => j.IsFinished);
             return jobs.Count == 0
-                ? "Fronta úloh je prázdna."
-                : $"Fronta: {(running is null ? "nič nebeží" : $"beží úloha {running.Id} ({running.Progress:P0})")}, čaká {waiting}, dokončené {done}" +
-                  (jobs.Any(j => j.Status == JobStatus.Failed) ? $", s chybou {jobs.Count(j => j.Status == JobStatus.Failed)}" : "") + ".";
+                ? Loc.T("Fronta úloh je prázdna.")
+                : Loc.F("Fronta: {0}, čaká {1}, dokončené {2}", running is null ? Loc.T("nič nebeží") : Loc.F("beží úloha {0} ({1:P0})", running.Id, running.Progress), waiting, done) +
+                  (jobs.Any(j => j.Status == JobStatus.Failed) ? Loc.F(", s chybou {0}", jobs.Count(j => j.Status == JobStatus.Failed)) : "") + ".";
         }
     }
 
@@ -153,7 +154,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     /// <summary>Every file the multiplexer reads now, labelled by its settings (for the Information page).</summary>
     public IEnumerable<KnownFile> KnownFiles =>
-        Settings.SelectMany(s => s.Files.Select(f => new KnownFile($"Zlučovanie – {s.ShortName}", Path.GetFileName(f), f)));
+        Settings.SelectMany(s => s.Files.Select(f => new KnownFile(Loc.F("Zlučovanie – {0}", s.ShortName), Path.GetFileName(f), f)));
 
     /// <summary>
     /// Adds files (button, drag and drop, self-test): with several files, or when the current settings already have
@@ -187,9 +188,9 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     {
         var title = action switch
         {
-            MuxAddAction.Append => $"Pripojiť súbory k {to?.FileName}",
-            MuxAddAction.AdditionalParts => $"Pridať ďalšie časti súboru {to?.FileName}",
-            _ => "Pridať súbory",
+            MuxAddAction.Append => Loc.F("Pripojiť súbory k {0}", to?.FileName),
+            MuxAddAction.AdditionalParts => Loc.F("Pridať ďalšie časti súboru {0}", to?.FileName),
+            _ => Loc.T("Pridať súbory"),
         };
         if (PickFiles(title) is not { Count: > 0 } picked)
         {
@@ -219,7 +220,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Message = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Message = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -228,7 +229,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         {
             if (!target.Inputs.Contains(owner))
             {
-                Message = TargetGone;
+                Message = Loc.T(TargetGone);
                 return;
             }
 
@@ -247,7 +248,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
                 var file = await inspector.InspectAsync(path);
                 if (!file.IsRecognized || !file.IsSupported || file.Tracks.Count == 0)
                 {
-                    problems.Add($"{Path.GetFileName(path)}: mkvmerge tento súbor nevie spracovať.");
+                    problems.Add(Loc.F("{0}: mkvmerge tento súbor nevie spracovať.", Path.GetFileName(path)));
                     continue;
                 }
 
@@ -261,11 +262,11 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
         if (!Settings.Contains(target))
         {
-            problems.Insert(0, "Nastavenia, do ktorých sa mali súbory pridať, boli medzitým zatvorené – súbory sa nepridali.");
+            problems.Insert(0, Loc.T("Nastavenia, do ktorých sa mali súbory pridať, boli medzitým zatvorené – súbory sa nepridali."));
         }
         else if (choice.Target is { } appendTo && !target.Inputs.Contains(appendTo))
         {
-            problems.Insert(0, TargetGone);
+            problems.Insert(0, Loc.T(TargetGone));
         }
         else
         {
@@ -281,7 +282,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
     public void Close(MuxSettingsViewModel settings)
     {
         if (settings.IsUnprocessed &&
-            !Confirm($"Nastavenia zlučovania „{settings.DisplayName}“ boli zmenené. Naozaj ich chcete zavrieť? Všetky zmeny sa stratia."))
+            !Confirm(Loc.F("Nastavenia zlučovania „{0}“ boli zmenené. Naozaj ich chcete zavrieť? Všetky zmeny sa stratia.", settings.DisplayName)))
         {
             return;
         }
@@ -446,7 +447,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
 
     private async Task AddFilesAsync()
     {
-        if (PickFiles("Pridať súbory") is { Count: > 0 } picked)
+        if (PickFiles(Loc.T("Pridať súbory")) is { Count: > 0 } picked)
         {
             await AddFilesAsync(picked);
         }
@@ -458,7 +459,7 @@ public sealed class MultiplexerPageViewModel : ObservableObject
         {
             Title = title,
             Multiselect = true,
-            Filter = "Video, zvuk a titulky|*.mkv;*.mka;*.mks;*.mk3d;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.vob;*.webm;*.ogg;*.ogm;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.h264;*.h265;*.hevc;*.mpls;*.flv;*.rm;*.rmvb;*.3gp;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|Všetky súbory|*.*",
+            Filter = $"{Loc.T("Video, zvuk a titulky")}|*.mkv;*.mka;*.mks;*.mk3d;*.mp4;*.m4v;*.m4a;*.mov;*.avi;*.ts;*.m2ts;*.mts;*.mpg;*.mpeg;*.vob;*.webm;*.ogg;*.ogm;*.opus;*.flac;*.ac3;*.eac3;*.dts;*.aac;*.mp3;*.wav;*.h264;*.h265;*.hevc;*.mpls;*.flv;*.rm;*.rmvb;*.3gp;*.srt;*.ass;*.ssa;*.vtt;*.sup;*.idx|{Loc.T("Všetky súbory")}|*.*",
         };
         return dialog.ShowDialog() == true ? dialog.FileNames : null;
     }

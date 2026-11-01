@@ -107,7 +107,7 @@ Meno súboru obsahuje názov, rok, jazyky, rozlíšenie, kodek a veľkostnú tri
 !info Titul v latinke dostane pôvodný názov, titul v inom písme anglický názov. Názov sa overuje cez TMDB.
 
 ## Tipy
-- Ak sa vo vstupnom priečinku objavia nové videá, UNIVERSUM ukáže pruh *Nové súbory vo vstupnom priečinku* s ponukou analýzy. Samo nič nespustí.
+- Ak sa vo vstupnom priečinku objavia nové videá, UNIVERSUM ukáže pruh *Na vstupe pribudli nové súbory* s ponukou analýzy. Samo nič nespustí.
 - Skupiny s novými súbormi od predchádzajúcej analýzy sú podfarbené **zelenkavo**.
 - Tlačidlom [Skryť nastavenia ▴] dostanú tabuľky celé okno.
 - Pred veľkou dávkou nechajte originály *zachovať* a skontrolujte výsledok v knižnici. Mazať môžete aj neskôr, tlačidlom [Zmazať originály].

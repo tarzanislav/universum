@@ -130,7 +130,7 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public static string AllTags => L("všetky", "všechny", "all");
 
-    public static IReadOnlyList<VideoChoice<int>> Sorts { get; } = [new(0, "podľa zmeny"), new(1, "podľa vytvorenia"), new(2, "podľa názvu")];
+    public static IReadOnlyList<VideoChoice<int>> Sorts { get; } = [new(0, Loc.T("podľa zmeny")), new(1, Loc.T("podľa vytvorenia")), new(2, Loc.T("podľa názvu"))];
 
     /// <summary>The captions of titles are known (awaited by the self-test).</summary>
     public Task Ready { get; private set; } = Task.CompletedTask;

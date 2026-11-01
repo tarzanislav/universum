@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using Universum.Core.Security;
 using Universum.Core.Updates;
+using Universum.App.Localization;
 
 namespace Universum.App.Setup;
 
@@ -28,12 +29,12 @@ public static class UniversumInstaller
     {
         if (release.Installer is null || release.Checksums is null || release.ChecksumsSignature is null || !ReleaseSignature.IsConfigured)
         {
-            throw new SetupException("Toto vydanie UNIVERSUM nie je podpísané – inštalujte ho ručne zo stránky vydania.");
+            throw new SetupException(Loc.T("Toto vydanie UNIVERSUM nie je podpísané – inštalujte ho ručne zo stránky vydania."));
         }
 
         var expected = ReleaseSignature.ExpectedInstallerHash(
             await GetBytesAsync(release.Checksums, cancellationToken), await GetBytesAsync(release.ChecksumsSignature, cancellationToken), release.Version)
-            ?? throw new SetupException("Podpis vydania UNIVERSUM nesedí – inštalátor sa nestiahol ani nespustil.");
+            ?? throw new SetupException(Loc.T("Podpis vydania UNIVERSUM nesedí – inštalátor sa nestiahol ani nespustil."));
 
         // a new folder with a random name: nothing can be prepared there in advance
         var folder = Directory.CreateTempSubdirectory("UNIVERSUM-update-").FullName;
@@ -42,7 +43,7 @@ public static class UniversumInstaller
         if (!FileHashes.Matches(expected, await FileHashes.Sha256Async(target, cancellationToken)))
         {
             File.Delete(target);
-            throw new SetupException("Stiahnutý inštalátor UNIVERSUM nemá podpísaný kontrolný súčet, preto sa zmazal.");
+            throw new SetupException(Loc.T("Stiahnutý inštalátor UNIVERSUM nemá podpísaný kontrolný súčet, preto sa zmazal."));
         }
 
         return new VerifiedInstaller(target, expected);
@@ -58,7 +59,7 @@ public static class UniversumInstaller
         using var locked = new FileStream(installer.Path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (!FileHashes.Matches(installer.Sha256, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(locked))))
         {
-            throw new SetupException("Inštalátor UNIVERSUM sa po overení zmenil – nespustil sa.");
+            throw new SetupException(Loc.T("Inštalátor UNIVERSUM sa po overení zmenil – nespustil sa."));
         }
 
         try
@@ -84,7 +85,7 @@ public static class UniversumInstaller
         }
         catch (HttpRequestException ex)
         {
-            throw new SetupException($"Vydanie UNIVERSUM sa nepodarilo stiahnuť.\n({ex.Message})", ex);
+            throw new SetupException(Loc.F("Vydanie UNIVERSUM sa nepodarilo stiahnuť.\n({0})", ex.Message), ex);
         }
     }
 
@@ -114,7 +115,7 @@ public static class UniversumInstaller
         }
         catch (HttpRequestException ex)
         {
-            throw new SetupException($"Inštalátor UNIVERSUM sa nepodarilo stiahnuť.\n({ex.Message})", ex);
+            throw new SetupException(Loc.F("Inštalátor UNIVERSUM sa nepodarilo stiahnuť.\n({0})", ex.Message), ex);
         }
     }
 
@@ -122,7 +123,7 @@ public static class UniversumInstaller
     {
         if (!UniversumRelease.IsOfficial(address))
         {
-            throw new SetupException($"Adresa {address} nie je stránka vydaní UNIVERSUM na GitHube, sťahovanie sa zastavilo.");
+            throw new SetupException(Loc.F("Adresa {0} nie je stránka vydaní UNIVERSUM na GitHube, sťahovanie sa zastavilo.", address));
         }
     }
 }

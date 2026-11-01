@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Agenda;
 
 namespace Universum.App.Pages;
@@ -132,21 +133,21 @@ public sealed class AgendaEditor : ObservableObject
     }
 
     public static IReadOnlyList<VideoChoice<RepeatEvery?>> Repeats { get; } =
-        [new(null, "neopakuje sa"), new(RepeatEvery.Day, "každý deň"), new(RepeatEvery.Week, "každý týždeň"), new(RepeatEvery.Month, "každý mesiac"), new(RepeatEvery.Year, "každý rok")];
+        [new(null, Loc.T("neopakuje sa")), new(RepeatEvery.Day, Loc.T("každý deň")), new(RepeatEvery.Week, Loc.T("každý týždeň")), new(RepeatEvery.Month, Loc.T("každý mesiac")), new(RepeatEvery.Year, Loc.T("každý rok"))];
 
     public static IReadOnlyList<VideoChoice<int?>> Reminders { get; } =
-        [new(null, "bez pripomienky"), new(0, "v čase začiatku"), new(15, "15 minút vopred"), new(60, "1 hodinu vopred"), new(1440, "1 deň vopred"), new(10080, "1 týždeň vopred")];
+        [new(null, Loc.T("bez pripomienky")), new(0, Loc.T("v čase začiatku")), new(15, Loc.T("15 minút vopred")), new(60, Loc.T("1 hodinu vopred")), new(1440, Loc.T("1 deň vopred")), new(10080, Loc.T("1 týždeň vopred"))];
 
-    public static IReadOnlyList<VideoChoice<int>> Priorities { get; } = [new(0, "nízka"), new(1, "normálna"), new(2, "vysoká")];
+    public static IReadOnlyList<VideoChoice<int>> Priorities { get; } = [new(0, Loc.T("nízka")), new(1, Loc.T("normálna")), new(2, Loc.T("vysoká"))];
 
     /// <summary>Very light pastel colours of a record (owner: "jemné, príjemné").</summary>
     public static IReadOnlyList<VideoChoice<string?>> Colors { get; } =
-        [new(null, "podľa druhu"), new("#E88AA6", "ružová"), new("#F2A65A", "oranžová"), new("#E6C84F", "žltá"), new("#7CC49A", "zelená"), new("#6FB7D9", "modrá"), new("#A58BE0", "fialová"), new("#9AA3AD", "sivá")];
+        [new(null, Loc.T("podľa druhu")), new("#E88AA6", Loc.T("ružová")), new("#F2A65A", Loc.T("oranžová")), new("#E6C84F", Loc.T("žltá")), new("#7CC49A", Loc.T("zelená")), new("#6FB7D9", Loc.T("modrá")), new("#A58BE0", Loc.T("fialová")), new("#9AA3AD", Loc.T("sivá"))];
 
     /// <summary>What UNIVERSUM can do by itself at the time of an event (owner, 31. 10. 2026 – tasks for UNIVERSUM).</summary>
     public static IReadOnlyList<VideoChoice<AgendaActionKind?>> Actions { get; } =
     [
-        new(null, "nič – len udalosť"),
+        new(null, Loc.T("nič – len udalosť")),
         new(AgendaActionKind.RefreshNews, ActionText(AgendaActionKind.RefreshNews)),
         new(AgendaActionKind.SyncHistra, ActionText(AgendaActionKind.SyncHistra)),
         new(AgendaActionKind.AnalyzeInput, ActionText(AgendaActionKind.AnalyzeInput)),
@@ -156,9 +157,9 @@ public sealed class AgendaEditor : ObservableObject
     /// <summary>"obnoviť Premiéry a Novinky" …</summary>
     public static string ActionText(AgendaActionKind kind) => kind switch
     {
-        AgendaActionKind.RefreshNews => Localization.Loc.Language switch { "cs" => "obnovit Premiéry a Novinky", "en" => "refresh Premiéry and Novinky", _ => "obnoviť Premiéry a Novinky" },
-        AgendaActionKind.SyncHistra => Localization.Loc.Language switch { "cs" => "synchronizovat listy HISTRA", "en" => "synchronise the HISTRA lists", _ => "synchronizovať listy HISTRA" },
-        AgendaActionKind.AnalyzeInput => Localization.Loc.Language switch { "cs" => "analyzovat složku Hromadného zpracování", "en" => "analyse the folder of Batch processing", _ => "analyzovať priečinok Hromadného spracovania" },
+        AgendaActionKind.RefreshNews => Localization.Loc.Language switch { "cs" => "obnovit Premiéry a Novinky", "en" => "refresh Premieres and News", _ => "obnoviť Premiéry a Novinky" },
+        AgendaActionKind.SyncHistra => Localization.Loc.Language switch { "cs" => "synchronizovat listy HISTRA", "en" => "synchronize the HISTRA lists", _ => "synchronizovať listy HISTRA" },
+        AgendaActionKind.AnalyzeInput => Localization.Loc.Language switch { "cs" => "analyzovat složku Hromadného zpracování", "en" => "analyze the Batch processing folder", _ => "analyzovať priečinok Hromadného spracovania" },
         _ => Localization.Loc.Language switch { "cs" => "spustit MEGA dávku", "en" => "start a MEGA batch", _ => "spustiť MEGA dávku" },
     };
 
@@ -202,8 +203,8 @@ public sealed class AgendaEditor : ObservableObject
     public bool NoMegaBatch => MegaBatches.Count == 0;
 
     /// <summary>How the action works, and how it ended the last time.</summary>
-    public string ActionHint => "Vykoná sa len vtedy, keď UNIVERSUM beží (zmeškaný čas sa nedobieha); nič nezvratné sa samo nespúšťa." +
-                                (_item?.Action is { LastRun: { } last } action ? $"\nNaposledy {last.LocalDateTime:d. M. yyyy HH:mm}: {action.LastOutcome}" : "");
+    public string ActionHint => Loc.T("Vykoná sa len vtedy, keď UNIVERSUM beží (zmeškaný čas sa nedobieha); nič nezvratné sa samo nespúšťa.") +
+                                (_item?.Action is { LastRun: { } last } action ? Loc.F("\nNaposledy {0:d. M. yyyy HH:mm}: {1}", last.LocalDateTime, action.LastOutcome) : "");
 
     /// <summary>A new action of UNIVERSUM (Plánované úlohy): every night at three, the kind chosen.</summary>
     public void PresetAction(AgendaActionKind kind)
@@ -221,12 +222,12 @@ public sealed class AgendaEditor : ObservableObject
     /// <summary>The day the editor was opened for.</summary>
     public DateOnly Day { get; }
 
-    public string Heading => (_item is null ? "Nový záznam" : "Upraviť záznam") + " – " + Day.ToString("d. M. yyyy", CultureInfo.InvariantCulture);
+    public string Heading => (_item is null ? Loc.T("Nový záznam") : Loc.T("Upraviť záznam")) + " – " + Day.ToString("d. M. yyyy", CultureInfo.InvariantCulture);
 
     public bool IsEvent { get => _kind == AgendaKind.Event; set => SetKind(value, AgendaKind.Event); }
 
     /// <summary>The languages the voice is written down in.</summary>
-    public static IReadOnlyList<VideoChoice<string>> VoiceLanguages { get; } = [new("sk", "slovensky"), new("cs", "česky"), new("en", "anglicky")];
+    public static IReadOnlyList<VideoChoice<string>> VoiceLanguages { get; } = [new("sk", Loc.T("slovensky")), new("cs", Loc.T("česky")), new("en", Loc.T("anglicky"))];
 
     /// <summary>The recording and writing down of the voice (null: without it – the editor of the self-test's first steps).</summary>
     public VoiceRecorder? Voice { get; init; }
@@ -242,7 +243,7 @@ public sealed class AgendaEditor : ObservableObject
 
     public bool IsRecording { get => _recordingNow; private set { if (SetProperty(ref _recordingNow, value)) { OnPropertyChanged(nameof(RecordText)); } } }
 
-    public string RecordText => IsRecording ? "Zastaviť a prepísať" : "Nahrať hlasom";
+    public string RecordText => IsRecording ? Loc.T("Zastaviť a prepísať") : Loc.T("Nahrať hlasom");
 
     public string VoiceStatus { get => _voiceStatus; private set => SetProperty(ref _voiceStatus, value); }
 
@@ -277,15 +278,15 @@ public sealed class AgendaEditor : ObservableObject
 
         if (!IsRecording)
         {
-            VoiceStatus = "Spúšťam mikrofón…";
+            VoiceStatus = Loc.T("Spúšťam mikrofón…");
             var problem = await voice.StartAsync();
             IsRecording = problem is null;
-            VoiceStatus = problem ?? "Nahrávam – hovorte. Keď skončíte, kliknite na Zastaviť a prepísať.";
+            VoiceStatus = problem ?? Loc.T("Nahrávam – hovorte. Keď skončíte, kliknite na Zastaviť a prepísať.");
             return;
         }
 
         IsRecording = false;
-        VoiceStatus = "Prepisujem nahrávku (v počítači, bez internetu)…";
+        VoiceStatus = Loc.T("Prepisujem nahrávku (v počítači, bez internetu)…");
         var (recording, text, trouble) = await voice.StopAsync(VoiceLanguage.Value);
         if (text is not null)
         {
@@ -296,7 +297,7 @@ public sealed class AgendaEditor : ObservableObject
             AddSpoken("", recording);
         }
 
-        VoiceStatus = trouble ?? "Prepísané – skontrolujte text. Nahrávka ostáva pri poznámke.";
+        VoiceStatus = trouble ?? Loc.T("Prepísané – skontrolujte text. Nahrávka ostáva pri poznámke.");
     }
 
     /// <summary>The checklist of a task (also of an event that is a task).</summary>
@@ -438,7 +439,7 @@ public sealed class AgendaEditor : ObservableObject
     {
         if (Title.Trim().Length == 0 && !(IsNote && Text.Trim().Length > 0))
         {
-            Problem = "Napíšte názov.";
+            Problem = Loc.T("Napíšte názov.");
             return null;
         }
 
@@ -460,13 +461,13 @@ public sealed class AgendaEditor : ObservableObject
                 {
                     if (time.StartTime is null)
                     {
-                        Problem = "Akcia UNIVERSUM potrebuje čas (zrušte Celý deň).";
+                        Problem = Loc.T("Akcia UNIVERSUM potrebuje čas (zrušte Celý deň).");
                         return null;
                     }
 
                     if (kind == AgendaActionKind.StartMega && MegaBatch?.Value is null)
                     {
-                        Problem = "Zvoľte MEGA dávku, ktorá čaká na spustenie.";
+                        Problem = Loc.T("Zvoľte MEGA dávku, ktorá čaká na spustenie.");
                         return null;
                     }
 
@@ -490,13 +491,13 @@ public sealed class AgendaEditor : ObservableObject
             case AgendaKind.Task:
                 if (DueDate is null && DueTimeText.Trim().Length > 0)
                 {
-                    Problem = "Čas úlohy potrebuje aj deň.";
+                    Problem = Loc.T("Čas úlohy potrebuje aj deň.");
                     return null;
                 }
 
                 if (!TryHours(DueTimeText, out var dueTime))
                 {
-                    Problem = "Čas úlohy napíšte ako 20:00.";
+                    Problem = Loc.T("Čas úlohy napíšte ako 20:00.");
                     return null;
                 }
 
@@ -540,7 +541,7 @@ public sealed class AgendaEditor : ObservableObject
     {
         if (StartDate is not { } startDate)
         {
-            Problem = "Zvoľte deň začiatku.";
+            Problem = Loc.T("Zvoľte deň začiatku.");
             return null;
         }
 
@@ -548,7 +549,7 @@ public sealed class AgendaEditor : ObservableObject
         var end = EndDate is { } endDate ? DateOnly.FromDateTime(endDate) : (DateOnly?)null;
         if (end < start)
         {
-            Problem = "Koniec je pred začiatkom.";
+            Problem = Loc.T("Koniec je pred začiatkom.");
             return null;
         }
 
@@ -557,13 +558,13 @@ public sealed class AgendaEditor : ObservableObject
         {
             if (!TryHours(StartTimeText, out startTime) || startTime is null || !TryHours(EndTimeText, out endTime))
             {
-                Problem = "Čas napíšte ako 20:00 (alebo zaškrtnite Celý deň).";
+                Problem = Loc.T("Čas napíšte ako 20:00 (alebo zaškrtnite Celý deň).");
                 return null;
             }
 
             if (endTime is not null && (end ?? start) == start && endTime < startTime)
             {
-                Problem = "Koniec je pred začiatkom.";
+                Problem = Loc.T("Koniec je pred začiatkom.");
                 return null;
             }
         }
@@ -573,7 +574,7 @@ public sealed class AgendaEditor : ObservableObject
         {
             if (!int.TryParse(IntervalText, NumberStyles.None, CultureInfo.InvariantCulture, out var interval) || interval is < 1 or > 999)
             {
-                Problem = "Opakovanie: koľko (1 – 999).";
+                Problem = Loc.T("Opakovanie: koľko (1 – 999).");
                 return null;
             }
 

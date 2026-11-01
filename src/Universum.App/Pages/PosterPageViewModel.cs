@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Posters;
@@ -79,10 +80,10 @@ public sealed class ExtraPictureRow : ObservableObject
         Picture = picture;
         Thumb = thumb;
         IsRecommended = recommended;
-        var language = picture.Language is { Length: > 0 } l && l != "xx" ? l.ToUpperInvariant() switch { "CS" => "CZ", var other => other } : "bez textu";
+        var language = picture.Language is { Length: > 0 } l && l != "xx" ? l.ToUpperInvariant() switch { "CS" => "CZ", var other => other } : Loc.T("bez textu");
         Label = $"{language} · {picture.Width} × {picture.Height}";
-        ToolTip = $"{language}, {picture.Width} × {picture.Height} px, hodnotenie {picture.VoteAverage.ToString("0.0", CultureInfo.GetCultureInfo("sk-SK"))} ({picture.VoteCount} hlasov)" +
-                  (recommended ? "\nOdporúčaný" : "");
+        ToolTip = Loc.F("{0}, {1} × {2} px, hodnotenie {3} ({4} hlasov)", language, picture.Width, picture.Height, picture.VoteAverage.ToString("0.0", CultureInfo.GetCultureInfo("sk-SK")), picture.VoteCount) +
+                  (recommended ? "\n" + Loc.T("Odporúčaný") : "");
         SelectCommand = new RelayCommand(() => select(this));
     }
 
@@ -112,7 +113,7 @@ public sealed class SeasonPictureRow(TmdbSeasonPoster season, PosterThumb thumb)
     public PosterThumb Thumb { get; } = thumb;
 
     /// <summary>"1. séria".</summary>
-    public string Label => Season.Number == 0 ? "Špeciály" : $"{Season.Number}. séria";
+    public string Label => Season.Number == 0 ? Loc.T("Špeciály") : Loc.F("{0}. séria", Season.Number);
 
     public bool IsChecked { get => _checked; set => SetProperty(ref _checked, value); }
 }
@@ -187,17 +188,17 @@ public sealed class PosterPageViewModel : ObservableObject
         }
     }
 
-    public IReadOnlyList<VideoChoice<MediaKind?>> Kinds { get; } = [new(null, "Filmy aj seriály"), new(MediaKind.Movie, "Filmy"), new(MediaKind.Series, "Seriály")];
+    public IReadOnlyList<VideoChoice<MediaKind?>> Kinds { get; } = [new(null, Loc.T("Filmy aj seriály")), new(MediaKind.Movie, Loc.T("Filmy")), new(MediaKind.Series, Loc.T("Seriály"))];
 
     /// <summary>The height of folder.jpg (2:3): 1000 × 1500 by default – sharp on a TV, not too large.</summary>
     public IReadOnlyList<VideoChoice<int>> Heights { get; } =
-        [new(1000, "667 × 1000 (menší)"), new(1500, "1000 × 1500 (odporúčané)"), new(2250, "1500 × 2250"), new(3000, "2000 × 3000 (najväčší podľa TMDB)")];
+        [new(1000, Loc.T("667 × 1000 (menší)")), new(1500, Loc.T("1000 × 1500 (odporúčané)")), new(2250, "1500 × 2250"), new(3000, Loc.T("2000 × 3000 (najväčší podľa TMDB)"))];
 
     /// <summary>Why the page cannot work yet; empty when it can.</summary>
     public string Requirement =>
-        _services.PosterTmdb is null ? "Na hľadanie plagátov treba kľúč TMDB (Nastavenia → TMDB)."
-        : _services.Posters is null ? "Plagáty sú vypnuté v Nastaveniach – zapnite ich."
-        : _services.Library is null ? "Nastavte výstupný priečinok (Nastavenia) – plagáty sa ukladajú do jeho priečinka POSTER."
+        _services.PosterTmdb is null ? Loc.T("Na hľadanie plagátov treba kľúč TMDB (Nastavenia → TMDB).")
+        : _services.Posters is null ? Loc.T("Plagáty sú vypnuté v Nastaveniach – zapnite ich.")
+        : _services.Library is null ? Loc.T("Nastavte výstupný priečinok (Nastavenia) – plagáty sa ukladajú do jeho priečinka POSTER.")
         : "";
 
     public string Query
@@ -296,7 +297,7 @@ public sealed class PosterPageViewModel : ObservableObject
         }
     }
 
-    public string SelectedText => Selected is null ? "Vyberte plagát kliknutím." : "Vybraný: " + Selected.Label;
+    public string SelectedText => Selected is null ? Loc.T("Vyberte plagát kliknutím.") : Loc.T("Vybraný: ") + Selected.Label;
 
     /// <summary>JPEG quality 50–100 (90 by default: hardly any difference from the original, a few hundred kB).</summary>
     public int Quality
@@ -391,7 +392,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
     /// <summary>The sizes the other pictures are written in (by the poster's size step and quality).</summary>
     public string ExtrasSizeText =>
-        $"Podľa nastavení plagátu: pozadie a obrázky epizód najviac {ExtraHeight * 16 / 9} × {ExtraHeight}, plagáty sérií ako folder.jpg ({Height.Label}), kvalita JPEG {Quality}. Logo ostáva PNG (priehľadné).";
+        Loc.F("Podľa nastavení plagátu: pozadie a obrázky epizód najviac {0} × {1}, plagáty sérií ako folder.jpg ({2}), kvalita JPEG {3}. Logo ostáva PNG (priehľadné).", ExtraHeight * 16 / 9, ExtraHeight, Height.Label, Quality);
 
     /// <summary>The background as fanart.jpg (Kodi, Jellyfin, Plex).</summary>
     public bool ExtraBackdrop { get => _services.Settings.PosterBackdrop; set => Store(value, _services.Settings.PosterBackdrop, v => _services.Settings.PosterBackdrop = v); }
@@ -422,9 +423,9 @@ public sealed class PosterPageViewModel : ObservableObject
             var logo = PosterChoice.BestLogo(pictures.Logos, details.OriginalLanguage);
             return string.Join(" · ", new[]
             {
-                backdrop is null ? "pozadie: TMDB nemá" : $"pozadie: {backdrop.Width} × {backdrop.Height}{(backdrop.Language is null ? " bez textu" : "")}",
-                logo is null ? "logo: TMDB nemá" : $"logo: {(logo.Language is { Length: > 0 } l ? (l == "cs" ? "CZ" : l.ToUpperInvariant()) : "bez jazyka")}",
-                details.Kind == MediaKind.Series ? $"plagáty sérií: {details.SeasonPosters.Count}" : null,
+                backdrop is null ? Loc.T("pozadie: TMDB nemá") : Loc.F("pozadie: {0} × {1}", backdrop.Width, backdrop.Height) + (backdrop.Language is null ? " " + Loc.T("bez textu") : ""),
+                logo is null ? Loc.T("logo: TMDB nemá") : Loc.F("logo: {0}", logo.Language is { Length: > 0 } l ? (l == "cs" ? "CZ" : l.ToUpperInvariant()) : Loc.T("bez jazyka")),
+                details.Kind == MediaKind.Series ? Loc.F("plagáty sérií: {0}", details.SeasonPosters.Count) : null,
             }.OfType<string>());
         }
     }
@@ -447,8 +448,8 @@ public sealed class PosterPageViewModel : ObservableObject
 
     /// <summary>Which service draws and what is sent to it.</summary>
     public string DraftHint => _services.DraftKeys.Service is { } service
-        ? $"Kreslí {service}{(service == "OpenAI" ? " (platené, ~0,04 $ za návrh)" : " (zadarmo, denný limit)")}. Pošle sa len názov, rok, žánre a dej – nie herci ani iné údaje. Návrh je len pre vašu knižnicu – do TMDB sa nahrávať nesmie."
-        : "Na návrh cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené).";
+        ? Loc.F("Kreslí {0}{1}. Pošle sa len názov, rok, žánre a dej – nie herci ani iné údaje. Návrh je len pre vašu knižnicu – do TMDB sa nahrávať nesmie.", service, service == "OpenAI" ? Loc.T(" (platené, ~0,04 $ za návrh)") : Loc.T(" (zadarmo, denný limit)"))
+        : Loc.T("Na návrh cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené).");
 
     /// <summary>The posters of the title are offered (awaited by the self-test).</summary>
     public Task OfferReady { get; private set; } = Task.CompletedTask;
@@ -487,7 +488,7 @@ public sealed class PosterPageViewModel : ObservableObject
         Refresh();
         try
         {
-            SearchStatus = "Hľadám na TMDB…";
+            SearchStatus = Loc.T("Hľadám na TMDB…");
             var found = await finder.FindAsync(Query, Kind.Value);
             Results.Clear();
             foreach (var title in found)
@@ -495,7 +496,7 @@ public sealed class PosterPageViewModel : ObservableObject
                 Results.Add(new FoundTitleRow(title, new PosterThumb(_services, title.PosterPath, PosterSize.Small), row => _ = OpenAsync(row.Title.Kind, row.Title.Id)));
             }
 
-            SearchStatus = found.Count == 0 ? "TMDB nič také nenašlo – skúste iný názov, rok alebo TMDB či IMDb ID." : $"Nájdené: {found.Count}. Kliknite na titul.";
+            SearchStatus = found.Count == 0 ? Loc.T("TMDB nič také nenašlo – skúste iný názov, rok alebo TMDB či IMDb ID.") : Loc.F("Nájdené: {0}. Kliknite na titul.", found.Count);
             if (found.Count == 1)
             {
                 await OpenAsync(found[0].Kind, found[0].Id);
@@ -527,7 +528,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
         try
         {
-            OfferStatus = "Čítam plagáty z TMDB…";
+            OfferStatus = Loc.T("Čítam plagáty z TMDB…");
             var pictures = await tmdb.PicturesAsync(details.Kind, details.Id, details.OriginalLanguage, cancellationToken);
             _pictures = pictures;
             OnPropertyChanged(nameof(ExtrasText));
@@ -540,7 +541,7 @@ public sealed class PosterPageViewModel : ObservableObject
                     .Where(p => PosterChoice.Tier(p.Language, details.OriginalLanguage) <= 3 || p.Language == "sk")
                     .OrderBy(p => PosterChoice.Tier(p.Language, details.OriginalLanguage)).ThenByDescending(p => p.VoteAverage)
                     .Take(MeasuredAtMost).ToList();
-                OfferStatus = $"Posudzujem farby plagátov ({measured.Count})…";
+                OfferStatus = Loc.F("Posudzujem farby plagátov ({0})…", measured.Count);
                 var tasks = measured.Select(async p =>
                 {
                     if (await cache.GetAsync(p.Path, PosterSize.Small, cancellationToken) is { } file && await Task.Run(() => PictureTools.Look(file), cancellationToken) is { } look)
@@ -571,8 +572,8 @@ public sealed class PosterPageViewModel : ObservableObject
             Selected = Recommended;
             NoPosters = posters.Count == 0;
             OnPropertyChanged(nameof(NoPosters));
-            OfferStatus = posters.Count == 0 ? "TMDB k titulu nemá žiadny plagát – môžete dať navrhnúť plagát cez AI."
-                : $"Plagáty na TMDB: {posters.Count} (v ponuke CZ, SK, EN a pôvodný jazyk v latinke).";
+            OfferStatus = posters.Count == 0 ? Loc.T("TMDB k titulu nemá žiadny plagát – môžete dať navrhnúť plagát cez AI.")
+                : Loc.F("Plagáty na TMDB: {0} (v ponuke CZ, SK, EN a pôvodný jazyk v latinke).", posters.Count);
         }
         catch (OperationCanceledException)
         {
@@ -591,11 +592,11 @@ public sealed class PosterPageViewModel : ObservableObject
     private PosterOptionRow Row(PosterCandidate candidate, bool recommended)
     {
         var p = candidate.Picture;
-        var language = p.Language is { Length: > 0 } l ? l.ToUpperInvariant() switch { "CS" => "CZ", var other => other } : "bez textu";
+        var language = p.Language is { Length: > 0 } l ? l.ToUpperInvariant() switch { "CS" => "CZ", var other => other } : Loc.T("bez textu");
         var votes = p.VoteCount > 0 ? $" · {p.VoteAverage.ToString("0.0", CultureInfo.GetCultureInfo("sk-SK"))}" : "";
         return new PosterOptionRow(candidate, new PosterThumb(_services, p.Path, PosterSize.Small), null, $"{language} · {p.Width} × {p.Height}{votes}",
-            $"{language}, {p.Width} × {p.Height} px, hodnotenie {p.VoteAverage.ToString("0.0", CultureInfo.GetCultureInfo("sk-SK"))} ({p.VoteCount} hlasov)" +
-            (candidate.Acceptable ? "" : " – menší alebo iných rozmerov, ako TMDB odporúča") + (recommended ? "\nOdporúčaný" : ""),
+            Loc.F("{0}, {1} × {2} px, hodnotenie {3} ({4} hlasov)", language, p.Width, p.Height, p.VoteAverage.ToString("0.0", CultureInfo.GetCultureInfo("sk-SK")), p.VoteCount) +
+            (candidate.Acceptable ? "" : Loc.T(" – menší alebo iných rozmerov, ako TMDB odporúča")) + (recommended ? "\n" + Loc.T("Odporúčaný") : ""),
             row => Selected = row)
         {
             IsRecommended = recommended,
@@ -627,7 +628,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
         if (details.Title is not { } title)
         {
-            Result = "Titul nemá názov, podľa ktorého by sa dal pomenovať priečinok.";
+            Result = Loc.T("Titul nemá názov, podľa ktorého by sa dal pomenovať priečinok.");
             return;
         }
 
@@ -635,7 +636,7 @@ public sealed class PosterPageViewModel : ObservableObject
         Refresh();
         try
         {
-            Result = "Sťahujem plagát v plnej veľkosti…";
+            Result = Loc.T("Sťahujem plagát v plnej veľkosti…");
             byte[] picture;
             if (chosen.Draft is { } draft)
             {
@@ -647,7 +648,7 @@ public sealed class PosterPageViewModel : ObservableObject
             }
             else
             {
-                Result = "Plagát sa nedá stiahnuť z TMDB – skúste to znova.";
+                Result = Loc.T("Plagát sa nedá stiahnuť z TMDB – skúste to znova.");
                 return;
             }
 
@@ -667,21 +668,22 @@ public sealed class PosterPageViewModel : ObservableObject
                 return;
             }
 
-            Result = "Hľadám film alebo seriál na vstupe…";
+            Result = Loc.T("Hľadám film alebo seriál na vstupe…");
             if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 _services.WaitingPosters.Add(title, details.Id, jpeg);
-                Result = $"{(details.Kind == MediaKind.Movie ? "Film" : "Seriál")} je na vstupe ({Path.GetFileName(input)}), ešte nie je spracovaný – plagát čaká. " +
-                         $"Keď ho UNIVERSUM spracuje, dá {PosterPlaces.FileName} do jeho priečinka v {(details.Kind == MediaKind.Movie ? LibraryNames.MoviesFolder : LibraryNames.ShowsFolder)}.";
+                Result = Loc.F("{0} je na vstupe ({1}), ešte nie je spracovaný – plagát čaká. Keď ho UNIVERSUM spracuje, dá {2} do jeho priečinka v {3}.",
+                         details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"), Path.GetFileName(input), PosterPlaces.FileName,
+                         details.Kind == MediaKind.Movie ? LibraryNames.MoviesFolder : LibraryNames.ShowsFolder);
                 return;
             }
 
-            Result = $"{(details.Kind == MediaKind.Movie ? "Film" : "Seriál")} sa nenašiel ani vo výstupe ({LibraryNames.MoviesFolder}, {LibraryNames.ShowsFolder}), ani na vstupe. " +
-                     "Nič sa nezapísalo – vypnite Zlúčiť poster s filmom/seriálom a plagát sa uloží do POSTER.";
+            Result = Loc.F("{0} sa nenašiel ani vo výstupe ({1}, {2}), ani na vstupe. Nič sa nezapísalo – vypnite Zlúčiť poster s filmom/seriálom a plagát sa uloží do POSTER.",
+                     details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"), LibraryNames.MoviesFolder, LibraryNames.ShowsFolder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException)
         {
-            Result = "Plagát sa nedá spracovať: " + ex.Message;
+            Result = Loc.T("Plagát sa nedá spracovať: ") + ex.Message;
         }
         finally
         {
@@ -701,14 +703,14 @@ public sealed class PosterPageViewModel : ObservableObject
 
         if (details.Title is not { } title)
         {
-            ExtrasResult = "Titul nemá názov, podľa ktorého by sa dal pomenovať priečinok.";
+            ExtrasResult = Loc.T("Titul nemá názov, podľa ktorého by sa dal pomenovať priečinok.");
             return;
         }
 
         var stills = details.Kind == MediaKind.Series && ExtraEpisodes;
         if (!ExtraBackdrop && !ExtraLogo && !(details.Kind == MediaKind.Series && ExtraSeasons) && !stills)
         {
-            ExtrasResult = "Zaškrtnite, ktoré obrázky sa majú spracovať.";
+            ExtrasResult = Loc.T("Zaškrtnite, ktoré obrázky sa majú spracovať.");
             return;
         }
 
@@ -717,7 +719,7 @@ public sealed class PosterPageViewModel : ObservableObject
         try
         {
             var places = new PosterPlaces(library, _services.InputDirectory);
-            var kind = details.Kind == MediaKind.Movie ? "Film" : "Seriál";
+            var kind = details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál");
             if (!ExtrasMerge)
             {
                 var folder = places.PosterFolder(title);
@@ -731,29 +733,29 @@ public sealed class PosterPageViewModel : ObservableObject
                 return;
             }
 
-            ExtrasResult = "Hľadám film alebo seriál na vstupe…";
+            ExtrasResult = Loc.T("Hľadám film alebo seriál na vstupe…");
             if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 var pictures = await MainFolderExtrasAsync(details, text => ExtrasResult = text);
                 if (pictures.Count == 0 && !stills)
                 {
-                    ExtrasResult = "TMDB nemá nič z vybraných obrázkov.";
+                    ExtrasResult = Loc.T("TMDB nemá nič z vybraných obrázkov.");
                     return;
                 }
 
                 _services.WaitingPosters.Add(title, details.Id, null, pictures);
-                ExtrasResult = $"{kind} je na vstupe ({Path.GetFileName(input)}), ešte nie je spracovaný – " +
-                               (pictures.Count > 0 ? $"obrázky ({string.Join(", ", pictures.Keys)}) čakajú; keď ho UNIVERSUM spracuje, dá ich do jeho priečinka v {(details.Kind == MediaKind.Movie ? LibraryNames.MoviesFolder : LibraryNames.ShowsFolder)}." : "") +
-                               (stills ? " Obrázky epizód potrebujú spracované epizódy – spustite ich znova, keď bude seriál v TVSHOWS." : "");
+                ExtrasResult = Loc.F("{0} je na vstupe ({1}), ešte nie je spracovaný – ", kind, Path.GetFileName(input)) +
+                               (pictures.Count > 0 ? Loc.F("obrázky ({0}) čakajú; keď ho UNIVERSUM spracuje, dá ich do jeho priečinka v {1}.", string.Join(", ", pictures.Keys), details.Kind == MediaKind.Movie ? LibraryNames.MoviesFolder : LibraryNames.ShowsFolder) : "") +
+                               (stills ? Loc.T(" Obrázky epizód potrebujú spracované epizódy – spustite ich znova, keď bude seriál v TVSHOWS.") : "");
                 return;
             }
 
-            ExtrasResult = $"{kind} sa nenašiel ani vo výstupe ({LibraryNames.MoviesFolder}, {LibraryNames.ShowsFolder}), ani na vstupe. " +
-                           "Nič sa nezapísalo – vypnite Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom a obrázky sa uložia do POSTER.";
+            ExtrasResult = Loc.F("{0} sa nenašiel ani vo výstupe ({1}, {2}), ani na vstupe. Nič sa nezapísalo – vypnite Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom a obrázky sa uložia do POSTER.",
+                           kind, LibraryNames.MoviesFolder, LibraryNames.ShowsFolder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException or TitleServiceException)
         {
-            ExtrasResult = "Obrázky sa nedajú spracovať: " + ex.Message;
+            ExtrasResult = Loc.T("Obrázky sa nedajú spracovať: ") + ex.Message;
         }
         finally
         {
@@ -772,7 +774,7 @@ public sealed class PosterPageViewModel : ObservableObject
             var saved = PosterPlaces.Save(folder, bytes, name);
             if (saved.Done)
             {
-                written.Add(saved.KeptAs is { } kept ? $"{name} (pôvodný premenovaný na {kept})" : name);
+                written.Add(saved.KeptAs is { } kept ? Loc.F("{0} (pôvodný premenovaný na {1})", name, kept) : name);
             }
             else if (saved.Problem is { } problem)
             {
@@ -782,11 +784,11 @@ public sealed class PosterPageViewModel : ObservableObject
 
         if (written.Count == 0 && episodes == 0 && problems.Count == 0)
         {
-            return "TMDB nemá nič z vybraných obrázkov – nič sa nezapísalo.";
+            return Loc.T("TMDB nemá nič z vybraných obrázkov – nič sa nezapísalo.");
         }
 
-        return (written.Count > 0 ? $"Uložené do {folder}: " + string.Join(", ", written) + "." : "") +
-               (episodes > 0 ? $" Obrázky epizód: {episodes}." : "") +
+        return (written.Count > 0 ? Loc.F("Uložené do {0}: ", folder) + string.Join(", ", written) + "." : "") +
+               (episodes > 0 ? Loc.F(" Obrázky epizód: {0}.", episodes) : "") +
                (problems.Count > 0 ? " " + string.Join(" ", problems) : "");
     }
 
@@ -859,7 +861,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
         if (ExtraBackdrop && (SelectedBackdrop?.Picture ?? PosterChoice.BestBackdrop(pictures.Backdrops)) is { } backdrop)
         {
-            progress("Sťahujem pozadie…");
+            progress(Loc.T("Sťahujem pozadie…"));
             if (await Original(backdrop.Path) is { } background)
             {
                 extras["fanart.jpg"] = PictureTools.ToJpeg(background, ExtraHeight, Quality);
@@ -868,7 +870,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
         if (ExtraLogo && (SelectedLogo?.Picture ?? PosterChoice.BestLogo(pictures.Logos, details.OriginalLanguage)) is { } logo)
         {
-            progress("Sťahujem logo…");
+            progress(Loc.T("Sťahujem logo…"));
             if (await Original(logo.Path) is { Length: > 8 } png && png[0] == 0x89 && png[1] == 0x50)
             {
                 extras["clearlogo.png"] = png;
@@ -880,7 +882,7 @@ public sealed class PosterPageViewModel : ObservableObject
             var chosen = Seasons.Count > 0 ? Seasons.Where(s => s.IsChecked).Select(s => s.Season) : details.SeasonPosters;
             foreach (var season in chosen)
             {
-                progress($"Sťahujem plagát {season.Number}. série…");
+                progress(Loc.F("Sťahujem plagát {0}. série…", season.Number));
                 if (await Original(season.PosterPath) is { } poster)
                 {
                     extras[$"season{season.Number:00}-poster.jpg"] = PictureTools.ToJpeg(poster, Height.Value, Quality);
@@ -925,7 +927,7 @@ public sealed class PosterPageViewModel : ObservableObject
                     continue;
                 }
 
-                ExtrasResult = $"Sťahujem obrázky epizód ({++count})…";
+                ExtrasResult = Loc.F("Sťahujem obrázky epizód ({0})…", ++count);
                 if (await cache.GetAsync(still.Path, PosterSize.Original) is { } source)
                 {
                     PosterPlaces.Save(seasonFolder, PictureTools.ToJpeg(await File.ReadAllBytesAsync(source), ExtraHeight, Quality), name);
@@ -948,8 +950,8 @@ public sealed class PosterPageViewModel : ObservableObject
 
     private static string Done(PosterPlaces.Saved saved, string folder, string size) =>
         saved.Done
-            ? $"Uložené: {Path.Combine(folder, PosterPlaces.FileName)} ({size})." + (saved.KeptAs is { } kept ? $" Pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept}." : "")
-            : saved.Problem ?? "Nepodarilo sa.";
+            ? Loc.F("Uložené: {0} ({1}).", Path.Combine(folder, PosterPlaces.FileName), size) + (saved.KeptAs is { } kept ? Loc.F(" Pôvodný {0} tam už bol – premenovaný na {1}.", PosterPlaces.FileName, kept) : "")
+            : saved.Problem ?? Loc.T("Nepodarilo sa.");
 
     private async Task DrawAsync()
     {
@@ -963,7 +965,7 @@ public sealed class PosterPageViewModel : ObservableObject
         var card = Card;
         try
         {
-            DraftStatus = "AI kreslí návrh plagátu (môže to trvať do minúty)…";
+            DraftStatus = Loc.T("AI kreslí návrh plagátu (môže to trvať do minúty)…");
             var draft = await _services.Drafts.CreateAsync(details, _services.DraftKeys, _title.Token);
             if (!ReferenceEquals(card, Card))
             {
@@ -973,14 +975,14 @@ public sealed class PosterPageViewModel : ObservableObject
 
             if (draft.Picture is not { } picture)
             {
-                DraftStatus = draft.Problem ?? "Návrh sa nepodaril.";
+                DraftStatus = draft.Problem ?? Loc.T("Návrh sa nepodaril.");
                 return;
             }
 
-            var row = new PosterOptionRow(null, null, picture, $"Návrh AI ({draft.Service})", $"Návrh plagátu nakreslený cez {draft.Service} – len pre vašu knižnicu.", r => Selected = r);
-            var others = Groups.FirstOrDefault(g => g.Name == "Návrhy AI")?.Posters ?? [];
-            var index = Groups.ToList().FindIndex(g => g.Name == "Návrhy AI");
-            var group = new PosterGroupRow("Návrhy AI", [row, .. others]);
+            var row = new PosterOptionRow(null, null, picture, Loc.F("Návrh AI ({0})", draft.Service), Loc.F("Návrh plagátu nakreslený cez {0} – len pre vašu knižnicu.", draft.Service), r => Selected = r);
+            var others = Groups.FirstOrDefault(g => g.Name == Loc.T("Návrhy AI"))?.Posters ?? [];
+            var index = Groups.ToList().FindIndex(g => g.Name == Loc.T("Návrhy AI"));
+            var group = new PosterGroupRow(Loc.T("Návrhy AI"), [row, .. others]);
             if (index >= 0)
             {
                 Groups[index] = group;
@@ -991,7 +993,7 @@ public sealed class PosterPageViewModel : ObservableObject
             }
 
             Selected = row;
-            DraftStatus = $"Návrh je hotový ({draft.Service}). Vybraný – spracujete ho ako iný plagát; ďalší návrh vyzerá inak.";
+            DraftStatus = Loc.F("Návrh je hotový ({0}). Vybraný – spracujete ho ako iný plagát; ďalší návrh vyzerá inak.", draft.Service);
         }
         catch (OperationCanceledException)
         {

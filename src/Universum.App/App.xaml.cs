@@ -4,6 +4,7 @@ using Universum.App.SelfTesting;
 using Universum.App.Setup;
 using Universum.App.Shell;
 using Universum.Core.Shell;
+using Universum.App.Localization;
 
 namespace Universum.App;
 
@@ -64,7 +65,7 @@ public partial class App : Application
             catch (Exception ex)
             {
                 // nobody waits for this task: the error is shown here, as the first start's would be
-                MessageBox.Show(shown, "Súbor z Prieskumníka sa nepodarilo otvoriť.\n\n" + ex.Message, "UNIVERSUM", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(shown, Loc.T("Súbor z Prieskumníka sa nepodarilo otvoriť.\n\n") + ex.Message, "UNIVERSUM", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }));
 
@@ -90,7 +91,7 @@ public partial class App : Application
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         MessageBox.Show(
-            $"Nastala neočakávaná chyba. Program môže pokračovať, ale posledná akcia sa nemusela dokončiť.\n\n{e.Exception.Message}",
+            Loc.F("Nastala neočakávaná chyba. Program môže pokračovať, ale posledná akcia sa nemusela dokončiť.\n\n{0}", e.Exception.Message),
             "UNIVERSUM", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }

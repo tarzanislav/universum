@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.Core.Jobs;
+using Universum.App.Localization;
 
 namespace Universum.App.Jobs;
 
@@ -35,9 +36,9 @@ public sealed class JobOutputPageViewModel : ObservableObject
     public ObservableCollection<JobMessageRow> Messages { get; } = [];
 
     public string Summary => _job is null
-        ? "Vyberte úlohu. Počas behu fronty sa tu ukazuje práve spracovaná úloha."
-        : $"{char.ToUpper(_job.Status[0])}{_job.Status[1..]}. {_job.Outcome}".Trim() + (_job.Job.StartedUtc is null ? "" : $" Trvanie: {_job.Duration}.") +
-          $" Upozornenia: {_job.Job.Warnings}, chyby: {_job.Job.Errors}.";
+        ? Loc.T("Vyberte úlohu. Počas behu fronty sa tu ukazuje práve spracovaná úloha.")
+        : $"{char.ToUpper(_job.Status[0])}{_job.Status[1..]}. {_job.Outcome}".Trim() + (_job.Job.StartedUtc is null ? "" : Loc.F(" Trvanie: {0}.", _job.Duration)) +
+          Loc.F(" Upozornenia: {0}, chyby: {1}.", _job.Job.Warnings, _job.Job.Errors);
 
     public double Progress => _job?.Progress ?? 0;
 

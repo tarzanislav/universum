@@ -12,7 +12,7 @@ reduce the **height** or change the **codec**.
 ### Cutting
 1. Click [Open a video…] and choose e.g. *Vymyslený film (2026).mkv*.
 2. Play the film and, where the section should **start**, click [Start of section].
-3. Where the section should **end**, click [End of section] – the section is added to the list (*Od*, *Do*, *Dĺžka*).
+3. Where the section should **end**, click [End of section] – the section is added to the list (*From*, *To*, *Length*).
 4. Repeat for more sections. **Only the sections in the list are kept**; everything else is cut out.
 5. At the bottom, fill in [Title:] (or use [TMDB]) and click [Save].
 - **Double-click** a section to move the player to its start; [Remove] takes it off the list.
@@ -21,7 +21,7 @@ reduce the **height** or change the **codec**.
   to the nearest point where a cut is possible (usually a fraction of a second). An exact cut is frame-accurate but takes a long time.
 ### Picture
 - **Pomer strán** – how players display the picture; it is written without any loss of quality.
-- [Rotate:] *o 90° doprava*, *o 180°*, *o 90° doľava*; [Height (lines):] e.g. from 2160 to 1080.
+- [Rotate:] *90° clockwise*, *180°*, *90° counterclockwise*; [Height (lines):] e.g. from 2160 to 1080.
 - **Prekódovanie** – *H.264* or *H.265 (HEVC)* and the [Quality:] slider.
 !pozor Rotating, a different height, a different codec and an exact cut **write the picture again** with the Windows encoders – this takes a long time.
   Sound and subtitles stay unchanged.
@@ -41,7 +41,7 @@ and change the codec or the volume. The chosen sound plays with the picture **ex
 ### Manual changes to the chosen sound
 - **Posun** below the player: [−1000] [−100] [−10] … [+1000] ms – you hear the change straight away.
 - **Zmena FPS (PAL 25 ↔ 23,976)** – with [Preserve pitch] voices sound the same, just slower or faster.
-- **Kodek a hlasitosť** – [Codec:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (bezstratovo)*;
+- **Kodek a hlasitosť** – [Codec:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (lossless)*;
   [Stereo (downmix 5.1 to two channels)], [Normalize volume to −23 LUFS (EBU R128)], [Boost / reduce:].
 - [Language:] and [Track name:]; the **Ponechať** column decides whether the track stays in the result.
 - [Reset the changes] returns the chosen sound to its original state.
@@ -64,8 +64,8 @@ are **white at the bottom** of the picture; those chosen in [Compare with:] are 
 - **Synchronizácia podľa dvoch titulkov**: at a subtitle near the start of the film click [Point 1], at a subtitle near the end
   click [Point 2] – speed and shift are worked out automatically.
 ### Tabs
-- **Časy titulkov** – all subtitles with the time *Teraz* and *Po zmene*. Fix the text with the **F2** key;
-  the right mouse button offers *Odstrániť titulok* and *Vrátiť všetky úpravy textu*.
+- **Časy titulkov** – all subtitles with the time *Now* and *After change*. Fix the text with the **F2** key;
+  the right mouse button offers *Remove subtitle* and *Revert all text edits*.
 - **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com via the browser and translation via svsub.net.
   The result is saved next to the video, e.g. *Vymyslený film (2026).sk.srt*.
 - **Text z obrázkov (OCR)** – turns picture subtitles from Blu-ray (PGS) into text: choose the track and click
@@ -80,7 +80,7 @@ are **white at the bottom** of the picture; those chosen in [Compare with:] are 
 ## Using the studio from Batch processing
 You can edit a file from Batch processing in the studio **before the job starts**:
 1. In Batch processing, choose the file and click [Subtitles in studio] or [Audio in studio]
-   (or right-click: *Upraviť v štúdiu (titulky)* / *Upraviť v štúdiu (zvuk)*).
+   (or right-click: *Edit in studio (subtitles)* / *Edit in studio (audio)*).
 2. The file opens in Subtitle track editing or Audio track editing, with the changes made so far.
 3. Change what you need and click [Save to the job]. The changes are written **only when the job runs**.
 - [Back without saving] goes back without any changes.

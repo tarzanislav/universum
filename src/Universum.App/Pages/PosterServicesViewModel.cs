@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Posters;
 
@@ -29,29 +30,29 @@ public sealed class PosterServicesViewModel : ObservableObject
         {
             _services.SetCloudflare(null, null);
             Account = "";
-            Done("Účet Cloudflare odstránený.");
+            Done(Loc.T("Účet Cloudflare odstránený."));
         }, () => _services.Settings.CloudflareTokenProtected is not null);
         SaveOpenAiCommand = new RelayCommand(() =>
         {
             _services.SetOpenAiKey(OpenAi);
             OpenAi = "";
-            Done("Kľúč OpenAI uložený – návrhy kreslí OpenAI (platené).");
+            Done(Loc.T("Kľúč OpenAI uložený – návrhy kreslí OpenAI (platené)."));
         }, () => DraftKeys.IsOpenAiKey(OpenAi));
         RemoveOpenAiCommand = new RelayCommand(() =>
         {
             _services.SetOpenAiKey(null);
-            Done("Kľúč OpenAI odstránený.");
+            Done(Loc.T("Kľúč OpenAI odstránený."));
         }, () => _services.Settings.OpenAiKeyProtected is not null);
         SaveOmdbCommand = new RelayCommand(() =>
         {
             _services.SetOmdbKey(Omdb);
             Omdb = "";
-            Done("Kľúč OMDb uložený – karta titulu ukáže aj IMDb, Rotten Tomatoes a Metacritic.");
+            Done(Loc.T("Kľúč OMDb uložený – karta titulu ukáže aj IMDb, Rotten Tomatoes a Metacritic."));
         }, () => OmdbClient.IsValidKey(Omdb));
         RemoveOmdbCommand = new RelayCommand(() =>
         {
             _services.SetOmdbKey(null);
-            Done("Kľúč OMDb odstránený.");
+            Done(Loc.T("Kľúč OMDb odstránený."));
         }, () => _services.Settings.OmdbKeyProtected is not null);
     }
 
@@ -85,18 +86,18 @@ public sealed class PosterServicesViewModel : ObservableObject
         {
             _services.DraftKeys.Service switch
             {
-                "OpenAI" => "Návrhy plagátov kreslí OpenAI (platené).",
-                "Cloudflare" => "Návrhy plagátov kreslí Cloudflare (zadarmo).",
-                _ => "Návrhy plagátov cez AI nie sú nastavené.",
+                "OpenAI" => Loc.T("Návrhy plagátov kreslí OpenAI (platené)."),
+                "Cloudflare" => Loc.T("Návrhy plagátov kreslí Cloudflare (zadarmo)."),
+                _ => Loc.T("Návrhy plagátov cez AI nie sú nastavené."),
             },
-            _services.OmdbKey is null ? "OMDb nie je nastavené – hodnotenie len z TMDB (a HISTRA)." : "OMDb je nastavené.",
+            _services.OmdbKey is null ? Loc.T("OMDb nie je nastavené – hodnotenie len z TMDB (a HISTRA).") : Loc.T("OMDb je nastavené."),
         });
 
     private void SaveCloudflare()
     {
         _services.SetCloudflare(Account, Token);
         Token = "";
-        Done(_services.Settings.OpenAiKeyProtected is null ? "Účet Cloudflare uložený – návrhy kreslí Cloudflare (zadarmo)." : "Účet Cloudflare uložený (kreslí OpenAI, kým je nastavený jeho kľúč).");
+        Done(_services.Settings.OpenAiKeyProtected is null ? Loc.T("Účet Cloudflare uložený – návrhy kreslí Cloudflare (zadarmo).") : Loc.T("Účet Cloudflare uložený (kreslí OpenAI, kým je nastavený jeho kľúč)."));
     }
 
     private void Done(string message)

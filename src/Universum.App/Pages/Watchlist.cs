@@ -1,3 +1,4 @@
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.News;
 
@@ -41,7 +42,7 @@ public sealed class Watchlist(AppServices services)
     {
         if (services.Watch is not { } watch)
         {
-            return "Kde pozerať potrebuje kľúč TMDB v Nastaveniach.";
+            return Loc.T("Kde pozerať potrebuje kľúč TMDB v Nastaveniach.");
         }
 
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -83,7 +84,7 @@ public sealed class Watchlist(AppServices services)
         }
         catch (TitleServiceException ex)
         {
-            return "Kde pozerať: " + ex.Message;
+            return Loc.T("Kde pozerať: ") + ex.Message;
         }
         finally
         {
@@ -147,9 +148,9 @@ public sealed class InputWatch(AppServices services)
             var (foundEpisodes, foundFilms) = await Task.Run(() => (EpisodeFinder.Find(episodes, input, excluded), FilmFinder.Find(films, input, excluded)));
             var found = foundEpisodes.Where(f => f.Files.Count > 0).GroupBy(f => f.Episode.SeriesKey)
                 .Select(g => new FoundInFolder(g.First().Episode.Caption,
-                    string.Join(", ", g.Select(f => f.Episode.Code)) + " · " + Texts.Count(g.Sum(f => f.Files.Count), "súbor", "súbory", "súborov"),
+                    string.Join(", ", g.Select(f => f.Episode.Code)) + " · " + Texts.Count(g.Sum(f => f.Files.Count), Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")),
                     g.SelectMany(f => f.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList(), true, g.First().Episode.Code, g.Select(f => f.Episode).ToList()))
-                .Concat(foundFilms.Where(f => f.Files.Count > 0).Select(f => new FoundInFolder(f.Film.Caption, "film · " + Texts.Count(f.Files.Count, "súbor", "súbory", "súborov"),
+                .Concat(foundFilms.Where(f => f.Files.Count > 0).Select(f => new FoundInFolder(f.Film.Caption, Loc.T("film · ") + Texts.Count(f.Files.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")),
                     f.Files, false, "", [])))
                 .OrderBy(f => f.Title, StringComparer.Create(Texts.Slovak, true)).ToList();
             Set(found, foundEpisodes.Where(f => f.Files.Count > 0).Select(f => f.Episode));

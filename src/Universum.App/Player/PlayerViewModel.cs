@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Media;
 using Universum.Core.Playback;
 using Universum.Core.Subtitles.Pictures;
@@ -34,7 +35,7 @@ public sealed class PlayerViewModel : ObservableObject
     private (PictureCue? Cue, ImageSource? Image, Rect Place) _secondaryPicture;
     private string _primaryText = "";
     private string _secondaryText = "";
-    private string _message = "Otvorte video – prehrá sa tu s titulkami.";
+    private string _message = Loc.T("Otvorte video – prehrá sa tu s titulkami.");
     private string _time = "";
     private double _position;
     private double _start;
@@ -168,7 +169,7 @@ public sealed class PlayerViewModel : ObservableObject
     {
         await CloseAsync();
         var opening = ++_opening;
-        Message = "Otváram video…";
+        Message = Loc.T("Otváram video…");
         try
         {
             var ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
@@ -184,7 +185,7 @@ public sealed class PlayerViewModel : ObservableObject
             _session = session;
             Picture = new WriteableBitmap(session.Format.Width, session.Format.Height, 96, 96, PixelFormats.Bgr32, null);
             AudioTracks = file.TracksOf(TrackType.Audio).Select((t, i) => $"{i + 1}: {Pages.Texts.Language(t.Language)}, {t.Codec}" +
-                                                                         (t.AudioChannels is { } channels ? $" {channels} k." : "")).ToList();
+                                                                         (t.AudioChannels is { } channels ? Loc.F(" {0} k.", channels) : "")).ToList();
             _audioTrack = Math.Max(0, file.TracksOf(TrackType.Audio).ToList().FindIndex(t => t.Flags.Default));
             OnPropertyChanged(nameof(AudioTracks));
             OnPropertyChanged(nameof(AudioTrack));
@@ -217,14 +218,14 @@ public sealed class PlayerViewModel : ObservableObject
 
             if (opening == _opening)
             {
-                Message = !session.Source.HasVideo ? "Súbor nemá obraz – hrá sa zvuk a titulky." : session.Problem is { } problem ? "FFmpeg: " + problem : "";
+                Message = !session.Source.HasVideo ? Loc.T("Súbor nemá obraz – hrá sa zvuk a titulky.") : session.Problem is { } problem ? "FFmpeg: " + problem : "";
             }
         }
         catch (Exception ex) when (ex is Core.Speech.SpeechException or System.IO.IOException or UnauthorizedAccessException or Core.Processes.ProcessStartException)
         {
             if (opening == _opening)
             {
-                Message = "Prehrávač potrebuje FFmpeg z inštalácie UNIVERSUM: " + ex.Message;
+                Message = Loc.T("Prehrávač potrebuje FFmpeg z inštalácie UNIVERSUM: ") + ex.Message;
             }
         }
     }
@@ -277,7 +278,7 @@ public sealed class PlayerViewModel : ObservableObject
             await session.DisposeAsync();
         }
 
-        Message = "Otvorte video – prehrá sa tu s titulkami.";
+        Message = Loc.T("Otvorte video – prehrá sa tu s titulkami.");
     }
 
     /// <summary>The subtitles to show (as they are after their changes): edited, and compared with.</summary>

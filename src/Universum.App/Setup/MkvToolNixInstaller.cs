@@ -5,6 +5,7 @@ using System.Net.Http;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Security;
 using Universum.Platform.Windows;
+using Universum.App.Localization;
 
 namespace Universum.App.Setup;
 
@@ -28,7 +29,7 @@ public sealed class MkvToolNixInstaller
         }
         catch (Exception ex) when (ex is MkvToolNixException or InvalidDataException)
         {
-            throw new SetupException("Informácie o najnovšej verzii MKVToolNix sa nedajú prečítať.", ex);
+            throw new SetupException(Loc.T("Informácie o najnovšej verzii MKVToolNix sa nedajú prečítať."), ex);
         }
     }
 
@@ -40,7 +41,7 @@ public sealed class MkvToolNixInstaller
             await GetBytesAsync(MkvToolNixDownloads.WindowsSha256Sums(version), cancellationToken)));
         if (!sums.TryGetValue(fileName, out var expectedHash))
         {
-            throw new SetupException($"Oficiálny zoznam kontrolných súčtov neobsahuje súbor {fileName}.");
+            throw new SetupException(Loc.F("Oficiálny zoznam kontrolných súčtov neobsahuje súbor {0}.", fileName));
         }
 
         // a new folder with a random name: nothing can be prepared there in advance
@@ -52,22 +53,22 @@ public sealed class MkvToolNixInstaller
         if (!FileHashes.Matches(expectedHash, actualHash))
         {
             File.Delete(target);
-            throw new SetupException("Stiahnutý inštalátor MKVToolNix nemá správny kontrolný súčet SHA-256, preto sa zmazal.");
+            throw new SetupException(Loc.T("Stiahnutý inštalátor MKVToolNix nemá správny kontrolný súčet SHA-256, preto sa zmazal."));
         }
 
         var signature = AuthenticodeVerifier.Verify(target);
         if (signature.IsSignedBy(MkvToolNixDownloads.WindowsSignerName) && !signature.RevocationChecked)
         {
             File.Delete(target);
-            throw new SetupException("Nepodarilo sa overiť, či podpis inštalátora MKVToolNix nebol odvolaný (servery certifikátov sú nedostupné). Skúste to neskôr.");
+            throw new SetupException(Loc.T("Nepodarilo sa overiť, či podpis inštalátora MKVToolNix nebol odvolaný (servery certifikátov sú nedostupné). Skúste to neskôr."));
         }
 
         if (!signature.IsSignedBy(MkvToolNixDownloads.WindowsSignerName))
         {
             File.Delete(target);
             throw new SetupException(
-                $"Stiahnutý inštalátor MKVToolNix nemá platný podpis vydavateľa {MkvToolNixDownloads.WindowsSignerName}, preto sa zmazal. " +
-                $"(stav 0x{signature.Status:X8}, podpísal: {signature.SignerName ?? "nikto"})");
+                Loc.F("Stiahnutý inštalátor MKVToolNix nemá platný podpis vydavateľa {0}, preto sa zmazal. (stav 0x{1:X8}, podpísal: {2})",
+                    MkvToolNixDownloads.WindowsSignerName, signature.Status, signature.SignerName ?? Loc.T("nikto")));
         }
 
         return target;
@@ -80,7 +81,7 @@ public sealed class MkvToolNixInstaller
         using var locked = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (AuthenticodeVerifier.Verify(installerPath) is not { RevocationChecked: true } verified || !verified.IsSignedBy(MkvToolNixDownloads.WindowsSignerName))
         {
-            throw new SetupException("Inštalátor MKVToolNix sa po overení zmenil – nespustil sa.");
+            throw new SetupException(Loc.T("Inštalátor MKVToolNix sa po overení zmenil – nespustil sa."));
         }
 
         Process? process;
@@ -99,7 +100,7 @@ public sealed class MkvToolNixInstaller
 
         if (process is null)
         {
-            throw new SetupException("Inštalátor MKVToolNix sa nepodarilo spustiť.");
+            throw new SetupException(Loc.T("Inštalátor MKVToolNix sa nepodarilo spustiť."));
         }
 
         using (process)
@@ -122,7 +123,7 @@ public sealed class MkvToolNixInstaller
         }
         catch (HttpRequestException ex)
         {
-            throw new SetupException($"Stránka MKVToolNix nie je dostupná. Skontrolujte pripojenie na internet.\n({ex.Message})", ex);
+            throw new SetupException(Loc.F("Stránka MKVToolNix nie je dostupná. Skontrolujte pripojenie na internet.\n({0})", ex.Message), ex);
         }
     }
 
@@ -152,7 +153,7 @@ public sealed class MkvToolNixInstaller
         }
         catch (HttpRequestException ex)
         {
-            throw new SetupException($"Inštalátor MKVToolNix sa nepodarilo stiahnuť.\n({ex.Message})", ex);
+            throw new SetupException(Loc.F("Inštalátor MKVToolNix sa nepodarilo stiahnuť.\n({0})", ex.Message), ex);
         }
     }
 
@@ -160,7 +161,7 @@ public sealed class MkvToolNixInstaller
     {
         if (!MkvToolNixDownloads.IsOfficial(address))
         {
-            throw new SetupException($"Adresa {address} nie je oficiálna stránka MKVToolNix, sťahovanie sa zastavilo.");
+            throw new SetupException(Loc.F("Adresa {0} nie je oficiálna stránka MKVToolNix, sťahovanie sa zastavilo.", address));
         }
     }
 

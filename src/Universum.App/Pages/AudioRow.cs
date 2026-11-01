@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Audio;
 using Universum.Core.Media;
 using Universum.Core.Subtitles;
@@ -59,8 +60,8 @@ public sealed class AudioRow : ObservableObject
         _initialName = _name;
         _defaultName = _name;
         // the encoders of the FFmpeg UNIVERSUM installs (LGPL, FFmpeg's own encoders)
-        Codecs = [new(AudioCodec.Keep, $"Ponechať ({track.Codec})"), new(AudioCodec.Ac3, "AC-3"), new(AudioCodec.Eac3, "E-AC-3"), new(AudioCodec.Aac, "AAC"),
-            new(AudioCodec.Flac, "FLAC (bezstratovo)")];
+        Codecs = [new(AudioCodec.Keep, Loc.F("Ponechať ({0})", track.Codec)), new(AudioCodec.Ac3, "AC-3"), new(AudioCodec.Eac3, "E-AC-3"), new(AudioCodec.Aac, "AAC"),
+            new(AudioCodec.Flac, Loc.T("FLAC (bezstratovo)"))];
         _codec = Codecs[0];
         _bitrate = Bitrates[0];
         DelayStepCommand = new RelayCommand<string>(step =>
@@ -95,10 +96,10 @@ public sealed class AudioRow : ObservableObject
 
     public bool IsExternal => ExternalPath is not null;
 
-    public string Source => IsExternal ? $"{Path.GetFileName(ExternalPath)}, zvuk {Ordinal + 1}" : $"stopa {Track.Id} vo videu";
+    public string Source => IsExternal ? Loc.F("{0}, zvuk {1}", Path.GetFileName(ExternalPath), Ordinal + 1) : Loc.F("stopa {0} vo videu", Track.Id);
 
     /// <summary>"AC-3 6 k. 48 kHz".</summary>
-    public string Format => Track.Codec + (Track.AudioChannels is { } channels ? $" {channels} k." : "") +
+    public string Format => Track.Codec + (Track.AudioChannels is { } channels ? Loc.F(" {0} k.", channels) : "") +
                             (Track.AudioSamplingFrequency is { } rate ? $" {(rate / 1000.0).ToString("0.#", Slovak)} kHz" : "");
 
     public bool Include { get => _include; set => Set(ref _include, value); }
@@ -199,7 +200,7 @@ public sealed class AudioRow : ObservableObject
     public AudioCodecChoice Codec { get => _codec; set => Set(ref _codec, value); }
 
     public IReadOnlyList<BitrateChoice> Bitrates { get; } =
-        [new(null, "automaticky"), .. new[] { 128, 160, 192, 224, 256, 320, 384, 448, 640, 768 }.Select(k => new BitrateChoice(k, $"{k} kbit/s"))];
+        [new(null, Loc.T("automaticky")), .. new[] { 128, 160, 192, 224, 256, 320, 384, 448, 640, 768 }.Select(k => new BitrateChoice(k, $"{k} kbit/s"))];
 
     public BitrateChoice Bitrate { get => _bitrate; set => Set(ref _bitrate, value); }
 
@@ -231,7 +232,7 @@ public sealed class AudioRow : ObservableObject
 
     /// <summary>What is wrong with the values (null when nothing).</summary>
     public string? Problem => !Include ? null
-        : Gain is not { } gain || gain is < -30 or > 30 ? "Hlasitosť v dB: číslo od −30 do +30."
+        : Gain is not { } gain || gain is < -30 or > 30 ? Loc.T("Hlasitosť v dB: číslo od −30 do +30.")
         : Recipe.Problem(Track);
 
     /// <summary>The changes in words, for the list.</summary>
@@ -241,8 +242,8 @@ public sealed class AudioRow : ObservableObject
         {
             var recipe = Recipe;
             var changes = recipe.Describe(Track);
-            return (IsExternal ? "pridá sa" : "") + (changes == "bez zmeny" ? "" : (IsExternal ? ", " : "") + changes) +
-                   (recipe.NeedsEncoding ? " – zvuk sa zapíše znova" : "");
+            return (IsExternal ? Loc.T("pridá sa") : "") + (changes == "bez zmeny" ? "" : (IsExternal ? ", " : "") + changes) +
+                   (recipe.NeedsEncoding ? Loc.T(" – zvuk sa zapíše znova") : "");
         }
     }
 

@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Audio;
 using Universum.Core.Batch;
 using Universum.Core.Execution;
@@ -41,7 +42,7 @@ public sealed class AudioPageViewModel : ObservableObject
     private bool _useRules = true;
     private int _nextId = FirstExternalId;
     private string _fileName = "";
-    private string _summary = "Otvorte video – jeho zvukové stopy a zvuky odinakiaľ (dabing, iné vydanie) sa prehrajú s obrazom.";
+    private string _summary = Loc.T("Otvorte video – jeho zvukové stopy a zvuky odinakiaľ (dabing, iné vydanie) sa prehrajú s obrazom.");
     private string _result = "";
     private string _syncStatus = "";
     private double _progress;
@@ -71,7 +72,7 @@ public sealed class AudioPageViewModel : ObservableObject
             if (_proposal is { } proposal)
             {
                 proposal.Row.SetTiming(proposal.Result.Timing, proposal.Result.Rates);
-                SyncStatus = $"Návrh použitý: {proposal.Result.Detail}. Overte ho prehraním.";
+                SyncStatus = Loc.F("Návrh použitý: {0}. Overte ho prehraním.", proposal.Result.Detail);
                 _proposal = null;
                 OnPropertyChanged(nameof(HasProposal));
                 RefreshCommands();
@@ -81,7 +82,7 @@ public sealed class AudioPageViewModel : ObservableObject
         {
             Clear();
             FileName = "";
-            Summary = "Otvorte video – jeho zvukové stopy a zvuky odinakiaľ (dabing, iné vydanie) sa prehrajú s obrazom.";
+            Summary = Loc.T("Otvorte video – jeho zvukové stopy a zvuky odinakiaľ (dabing, iné vydanie) sa prehrajú s obrazom.");
             RefreshCommands();
         }, () => !_busy && _file is not null);
         SaveToTaskCommand = new RelayCommand(SaveToTask, () => !_busy && _task is not null);
@@ -98,7 +99,7 @@ public sealed class AudioPageViewModel : ObservableObject
             {
                 _services.AudioWork.Delete(_file.Path);
                 HasWork = false;
-                WorkNote = "Uložená práca je zahodená – hodnoty na stránke ostali.";
+                WorkNote = Loc.T("Uložená práca je zahodená – hodnoty na stránke ostali.");
                 RefreshCommands();
             }
         }, () => _hasWork && _task is null);
@@ -158,7 +159,7 @@ public sealed class AudioPageViewModel : ObservableObject
     public bool IsTask => _task is not null;
 
     public string TaskText => _task is { } task
-        ? $"Úloha Hromadného spracovania: {Path.GetFileName(task.Path)}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia do úlohy – zapíšu sa pri jej behu."
+        ? Loc.F("Úloha Hromadného spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia do úlohy – zapíšu sa pri jej behu.", Path.GetFileName(task.Path))
         : "";
 
     /// <summary>Work is saved for the video.</summary>
@@ -207,15 +208,15 @@ public sealed class AudioPageViewModel : ObservableObject
 
     /// <summary>Why the video cannot be written by the rules (a track of an undetermined language …); empty when it can.</summary>
     public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
-        : "Pravidlá UNIVERSUM: " + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
+        : Loc.T("Pravidlá UNIVERSUM: ") + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
         {
             RuleIssueKind.UndeterminedLanguage => _file.Tracks.FirstOrDefault(t => t.Id == i.TrackId)?.Type == TrackType.Subtitles
-                ? $"titulková stopa {i.TrackId} má neurčený jazyk (určte ho v Úprave titulkostopy alebo hlavičky)."
-                : $"stopa {i.TrackId} má neurčený jazyk.",
-            RuleIssueKind.MultipleVideoTracks => "súbor má viac video stôp.",
-            RuleIssueKind.NoAudio => "súbor nemá zvukovú stopu.",
+                ? Loc.F("titulková stopa {0} má neurčený jazyk (určte ho v Úprave titulkostopy alebo hlavičky).", i.TrackId)
+                : Loc.F("stopa {0} má neurčený jazyk.", i.TrackId),
+            RuleIssueKind.MultipleVideoTracks => Loc.T("súbor má viac video stôp."),
+            RuleIssueKind.NoAudio => Loc.T("súbor nemá zvukovú stopu."),
             _ => i.Kind.ToString(),
-        }).Distinct()) + " Určte jazyk – alebo vypnite pravidlá (stopy ostanú, ako sú).";
+        }).Distinct()) + Loc.T(" Určte jazyk – alebo vypnite pravidlá (stopy ostanú, ako sú).");
 
     /// <summary>Nothing is fitted or written now: the sounds can be changed.</summary>
     public bool IsIdle => !_busy;
@@ -225,7 +226,7 @@ public sealed class AudioPageViewModel : ObservableObject
     {
         if (_busy)
         {
-            Result = "Práve sa napasováva alebo zapisuje – súbory pridajte potom.";
+            Result = Loc.T("Práve sa napasováva alebo zapisuje – súbory pridajte potom.");
             return;
         }
 
@@ -234,7 +235,7 @@ public sealed class AudioPageViewModel : ObservableObject
         {
             if (video is null)
             {
-                Summary = "Najprv otvorte video – zvuky sa pridávajú k nemu.";
+                Summary = Loc.T("Najprv otvorte video – zvuky sa pridávajú k nemu.");
                 return;
             }
 
@@ -253,7 +254,7 @@ public sealed class AudioPageViewModel : ObservableObject
 
     private async Task OpenVideoAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = "Video|*.mkv;*.mp4;*.m4v;*.avi;*.ts;*.m2ts;*.mov;*.webm|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadVideoAsync(dialog.FileName);
@@ -265,7 +266,7 @@ public sealed class AudioPageViewModel : ObservableObject
         var dialog = new OpenFileDialog
         {
             Multiselect = true,
-            Filter = "Zvuk a filmy|" + string.Join(";", SoundExtensions.Select(e => "*" + e)) + "|Všetky súbory|*.*",
+            Filter = Loc.T("Zvuk a filmy") + "|" + string.Join(";", SoundExtensions.Select(e => "*" + e)) + "|" + Loc.T("Všetky súbory") + "|*.*",
         };
         if (dialog.ShowDialog() == true)
         {
@@ -280,7 +281,7 @@ public sealed class AudioPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             return;
         }
 
@@ -298,7 +299,7 @@ public sealed class AudioPageViewModel : ObservableObject
             Reference = Rows.FirstOrDefault(r => r.Track.Flags.Default) ?? Rows.FirstOrDefault();
             SelectedRow = Reference;
             OnPropertyChanged(nameof(References));
-            Summary = $"{_file.ContainerName}, zvukové stopy: {Rows.Count}" +
+            Summary = Loc.F("{0}, zvukové stopy: {1}", _file.ContainerName, Rows.Count) +
                       (_file.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond is { } fps ? $", video {fps.ToString("0.###", System.Globalization.CultureInfo.GetCultureInfo("sk-SK"))} FPS" : "");
             Library.Guess(path);
             PlayerOpening = Player.OpenAsync(_file);
@@ -328,7 +329,7 @@ public sealed class AudioPageViewModel : ObservableObject
     {
         if (_busy)
         {
-            SyncStatus = "Štúdio práve pracuje (napasováva alebo zapisuje) – skúste Zvuk v štúdiu o chvíľu.";
+            SyncStatus = Loc.T("Štúdio práve pracuje (napasováva alebo zapisuje) – skúste Zvuk v štúdiu o chvíľu.");
             return false;
         }
 
@@ -442,7 +443,7 @@ public sealed class AudioPageViewModel : ObservableObject
 
         await RestoreAsync(work.Sounds, null);
         HasWork = true;
-        WorkNote = $"Obnovená uložená práca z {work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}.";
+        WorkNote = Loc.F("Obnovená uložená práca z {0:d. M. yyyy H:mm}.", work.SavedUtc.ToLocalTime());
         RefreshCommands();
     }
 
@@ -457,11 +458,11 @@ public sealed class AudioPageViewModel : ObservableObject
         {
             var work = _services.AudioWork.Save(new AudioWork { Video = _file.Path, SavedUtc = DateTime.UtcNow, Sounds = [.. Rows.Select(r => r.State())] });
             HasWork = true;
-            WorkNote = $"Práca je uložená ({work.SavedUtc.ToLocalTime():d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.";
+            WorkNote = Loc.F("Práca je uložená ({0:d. M. yyyy H:mm}) – pri ďalšom otvorení tohto videa sa obnoví.", work.SavedUtc.ToLocalTime());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            WorkNote = "Prácu sa nepodarilo uložiť: " + ex.Message;
+            WorkNote = Loc.T("Prácu sa nepodarilo uložiť: ") + ex.Message;
         }
 
         RefreshCommands();
@@ -476,7 +477,7 @@ public sealed class AudioPageViewModel : ObservableObject
 
         if (!Core.IO.Paths.Same(_file.Path, task.Path))
         {
-            SyncStatus = "V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Zvuk v štúdiu.";
+            SyncStatus = Loc.T("V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Zvuk v štúdiu.");
             EndTask();
             return;
         }
@@ -577,7 +578,7 @@ public sealed class AudioPageViewModel : ObservableObject
 
                     if (added == 0)
                     {
-                        problems.Add($"{Path.GetFileName(path)}: nemá zvuk");
+                        problems.Add(Loc.F("{0}: nemá zvuk", Path.GetFileName(path)));
                     }
                 }
                 catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException)
@@ -589,7 +590,7 @@ public sealed class AudioPageViewModel : ObservableObject
         finally
         {
             _busy = false;
-            Result = problems.Count == 0 ? "" : "Nepridané: " + string.Join("; ", problems);
+            Result = problems.Count == 0 ? "" : Loc.T("Nepridané: ") + string.Join("; ", problems);
             Changed();
         }
     }
@@ -771,7 +772,7 @@ public sealed class AudioPageViewModel : ObservableObject
             var written = rows.ToDictionary(r => r, r => r.Include && r.Recipe.NeedsEncoding
                 ? new SoundEncoding(r.ExternalPath ?? file.Path, r.Ordinal, r.Track, r.Recipe).ToTrack(r.IsExternal ? r.Track.Id : _nextId++)
                 : r.Track);
-            Result = rows.Any(r => r is { Include: true, Recipe.NeedsEncoding: true }) ? "Zapisujem zvuk znova a potom nový súbor…" : "Zapisujem nový súbor…";
+            Result = rows.Any(r => r is { Include: true, Recipe.NeedsEncoding: true }) ? Loc.T("Zapisujem zvuk znova a potom nový súbor…") : Loc.T("Zapisujem nový súbor…");
             var plan = EditPlan.For(Build(file, written, rows));
             var started = DateTime.UtcNow;
             var result = await _services.Processor(installation).ProcessAsync(plan, placement, new OutputOptions(OriginalHandling.Keep),
@@ -780,18 +781,18 @@ public sealed class AudioPageViewModel : ObservableObject
             Progress = 1;
             Result = result.Status switch
             {
-                ProcessingStatus.Done => $"Uložené do knižnice: {result.OutputPath}. Originály ostali nezmenené.",
-                ProcessingStatus.AlreadyInLibrary => $"Rovnaký výsledok už v knižnici je: {result.OutputPath}. Nič sa nezapísalo.",
-                _ => "Nepodarilo sa – nič sa nezmenilo.\n" + string.Join("\n", result.Messages),
+                ProcessingStatus.Done => Loc.F("Uložené do knižnice: {0}. Originály ostali nezmenené.", result.OutputPath),
+                ProcessingStatus.AlreadyInLibrary => Loc.F("Rovnaký výsledok už v knižnici je: {0}. Nič sa nezapísalo.", result.OutputPath),
+                _ => Loc.T("Nepodarilo sa – nič sa nezmenilo.") + "\n" + string.Join("\n", result.Messages),
             };
         }
         catch (OperationCanceledException)
         {
-            Result = "Zastavené – nič sa nezapísalo.";
+            Result = Loc.T("Zastavené – nič sa nezapísalo.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or MkvToolNixException or ProcessStartException or TimeoutException or Core.Speech.SpeechException)
         {
-            Result = "Nepodarilo sa: " + ex.Message;
+            Result = Loc.T("Nepodarilo sa: ") + ex.Message;
         }
         finally
         {
@@ -817,43 +818,43 @@ public sealed class AudioPageViewModel : ObservableObject
         try
         {
             var ffmpeg = (await _services.SpeechAsync()).Ffmpeg;
-            var film = await EnvelopeAsync(ffmpeg, file.Path, reference.Ordinal, file.Duration, "zvuk filmu", 0, work.Token);
+            var film = await EnvelopeAsync(ffmpeg, file.Path, reference.Ordinal, file.Duration, Loc.T("zvuk filmu"), 0, work.Token);
             var other = film is null ? null : await EnvelopeAsync(ffmpeg, row.ExternalPath ?? file.Path, row.Ordinal, file.Duration, row.Source, 0.5, work.Token);
             if (film is null || other is null)
             {
                 return;
             }
 
-            SyncStatus = "Porovnávam zvuky…";
+            SyncStatus = Loc.T("Porovnávam zvuky…");
             var fps = file.TracksOf(TrackType.Video).FirstOrDefault()?.FramesPerSecond;
             var result = await Task.Run(() => AudioSync.Align(film, other, fps, work.Token), work.Token);
             Progress = 1;
             if (result is null)
             {
-                SyncStatus = "Zvuky sa nedajú porovnať (príliš krátke alebo tiché).";
+                SyncStatus = Loc.T("Zvuky sa nedajú porovnať (príliš krátke alebo tiché).");
             }
             else if (result.Reliable)
             {
                 row.SetTiming(result.Timing, result.Rates);
-                SyncStatus = $"Napasované: {result.Detail}. Overte prehraním.";
+                SyncStatus = Loc.F("Napasované: {0}. Overte prehraním.", result.Detail);
             }
             else if (result.Parts.Count(p => p.IsClear) >= 2)
             {
                 _proposal = (row, result);
-                SyncStatus = $"Neistý návrh: {result.Detail}. Použite ho tlačidlom Použiť návrh a overte prehraním.";
+                SyncStatus = Loc.F("Neistý návrh: {0}. Použite ho tlačidlom Použiť návrh a overte prehraním.", result.Detail);
             }
             else
             {
-                SyncStatus = "Zvuk sa k filmu nenašiel – zrejme iný strih alebo iný film.";
+                SyncStatus = Loc.T("Zvuk sa k filmu nenašiel – zrejme iný strih alebo iný film.");
             }
         }
         catch (OperationCanceledException)
         {
-            SyncStatus = "Zastavené.";
+            SyncStatus = Loc.T("Zastavené.");
         }
         catch (Exception ex) when (ex is IOException or ProcessStartException or Core.Speech.SpeechException)
         {
-            SyncStatus = "Nepodarilo sa: " + ex.Message;
+            SyncStatus = Loc.T("Nepodarilo sa: ") + ex.Message;
         }
         finally
         {
@@ -871,7 +872,7 @@ public sealed class AudioPageViewModel : ObservableObject
             return known;
         }
 
-        SyncStatus = $"Čítam {label} (celý)…";
+        SyncStatus = Loc.F("Čítam {0} (celý)…", label);
         var progress = new Progress<double>(share => Progress = from + (share * 0.5));
         var (envelope, problem) = await AudioEnvelope.ReadAsync(ffmpeg, path, ordinal, duration, progress, cancellationToken);
         if (envelope is null)

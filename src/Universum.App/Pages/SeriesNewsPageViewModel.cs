@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.News;
 using Universum.Core.Text;
@@ -43,8 +44,8 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         _opener = new TitleOpener(services);
         Tabs =
         [
-            new(NewsRegion.Domestic, "SERIÁL – CZ/SK", Color.FromRgb(0x63, 0xC4, 0x8F)),
-            new(NewsRegion.World, "SERIÁL – SVET", Color.FromRgb(0x6F, 0xA8, 0xE8)),
+            new(NewsRegion.Domestic, Loc.T("SERIÁL – CZ/SK"), Color.FromRgb(0x63, 0xC4, 0x8F)),
+            new(NewsRegion.World, Loc.T("SERIÁL – SVET"), Color.FromRgb(0x6F, 0xA8, 0xE8)),
         ];
         _selected = Tabs[0];
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(refresh: true), () => !Busy);
@@ -65,9 +66,9 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         };
         services.InputDirectoryChanged += () =>
         {
-            if (Status == NoInputFolder && services.InputDirectory is not null)
+            if (Status == Loc.T(NoInputFolder) && services.InputDirectory is not null)
             {
-                Status = "Vstupný priečinok je nastavený – epizódy môžete odoslať.";
+                Status = Loc.T("Vstupný priečinok je nastavený – epizódy môžete odoslať.");
             }
         };
         services.Marks.Changed += key =>
@@ -253,13 +254,13 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     /// <summary>Why the chosen table is empty.</summary>
     public string EmptyText =>
         SelectedTab.Region == NewsRegion.Domestic && !HasDomesticSource
-            ? "České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja)."
-            : OnlyChosen ? "Žiadne vybrané seriály – výber zaškrtnete v stĺpci Vybrané."
-            : Filter.Length > 0 || OnlyMyLists ? "Nič nezodpovedá hľadaniu."
-            : _view == NewsView.Upcoming ? "Žiadne nadchádzajúce epizódy – skúste Obnoviť."
-            : ShowHistory ? (_history is null ? "Načítavam históriu…" : "História je zatiaľ prázdna – epizódy sem prechádzajú po týždni.")
-            : ShowAll && _history is null ? "Načítavam históriu…"
-            : Busy ? "Načítavam…" : "Žiadne nové epizódy – skúste Obnoviť.";
+            ? Loc.T("České a slovenské seriály potrebujú zdroj so stanicami CZ/SK.\nPridajte ho v Nastaveniach → Zdroje noviniek → Importovať zdroj… (súbor pravidiel zdroja).")
+            : OnlyChosen ? Loc.T("Žiadne vybrané seriály – výber zaškrtnete v stĺpci Vybrané.")
+            : Filter.Length > 0 || OnlyMyLists ? Loc.T("Nič nezodpovedá hľadaniu.")
+            : _view == NewsView.Upcoming ? Loc.T("Žiadne nadchádzajúce epizódy – skúste Obnoviť.")
+            : ShowHistory ? (_history is null ? Loc.T("Načítavam históriu…") : Loc.T("História je zatiaľ prázdna – epizódy sem prechádzajú po týždni."))
+            : ShowAll && _history is null ? Loc.T("Načítavam históriu…")
+            : Busy ? Loc.T("Načítavam…") : Loc.T("Žiadne nové epizódy – skúste Obnoviť.");
 
     public bool IsEmpty => SelectedTab.Rows.Count == 0;
 
@@ -310,10 +311,10 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
 
     public AsyncRelayCommand CheckAgainCommand { get; }
 
-    public string SendText => $"Odoslať na spracovanie ({Checked.Count()})";
+    public string SendText => Loc.F("Odoslať na spracovanie ({0})", Checked.Count());
 
     public string Attribution =>
-        "Zdroje: " + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled && s.Kind != NewsSourceKind.TmdbFilms)
+        Loc.T("Zdroje: ") + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled && s.Kind != NewsSourceKind.TmdbFilms)
             .Select(s => s.Kind == NewsSourceKind.TvMaze ? TvMazeClient.Attribution : s.Name)) + ".";
 
     /// <summary>Opens Single spracovanie with a file and the series' title; false when it is busy. Set by the main window.</summary>
@@ -369,11 +370,11 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             Build();
             _readAt = DateTime.Now;
             var recent = _all.Count(e => e.AirDate <= today && e.AirDate >= today.AddDays(-RecentDays));
-            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm}: {Texts.Count(recent, "epizóda", "epizódy", "epizód")} za posledný týždeň · staršie sú v Histórii.";
+            Status = Loc.F("Aktuálne k {0:d. M. yyyy H:mm}: {1} za posledný týždeň · staršie sú v Histórii.", DateTime.Now, Texts.Count(recent, Loc.T("epizóda"), Loc.T("epizódy"), Loc.T("epizód")));
         }
         catch (OperationCanceledException)
         {
-            Status = "Zastavené.";
+            Status = Loc.T("Zastavené.");
         }
         finally
         {
@@ -430,12 +431,12 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     {
         if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
         {
-            Status = NoInputFolder;
+            Status = Loc.T(NoInputFolder);
             return null;
         }
 
         Busy = true;
-        Status = $"Hľadám {Texts.Count(episodes.Count, "epizódu", "epizódy", "epizód")} vo vstupnom priečinku…";
+        Status = Loc.F("Hľadám {0} vo vstupnom priečinku…", Texts.Count(episodes.Count, Loc.T("epizódu"), Loc.T("epizódy"), Loc.T("epizód")));
         try
         {
             var excluded = _services.Library?.ResultFolders;
@@ -443,7 +444,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
-            Status = "Vstupný priečinok sa nedá prečítať: " + ex.Message;
+            Status = Loc.T("Vstupný priečinok sa nedá prečítať: ") + ex.Message;
             return null;
         }
         finally
@@ -472,17 +473,17 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
             .Select(g => (Title: g.First().Episode.Caption, Episode: g.First().Episode.Code, Files: g.SelectMany(f => f.Files).Distinct(StringComparer.OrdinalIgnoreCase).ToList()))
             .ToList();
         var files = bySeries.Sum(s => s.Files.Count);
-        var waitingNote = missing.Count > 0 ? $" Ešte nie sú vo vstupnom priečinku: {missing.Count} (čakajú nižšie)." : "";
+        var waitingNote = missing.Count > 0 ? Loc.F(" Ešte nie sú vo vstupnom priečinku: {0} (čakajú nižšie).", missing.Count) : "";
         if (files == 0)
         {
-            Status = "Žiadna z epizód zatiaľ nie je vo vstupnom priečinku." + waitingNote;
+            Status = Loc.T("Žiadna z epizód zatiaľ nie je vo vstupnom priečinku.") + waitingNote;
         }
         else if (files == 1)
         {
             var only = bySeries[0];
             Status = await SendToSingle(only.Files[0], only.Title, only.Episode)
-                ? $"Odoslané do Single spracovania: {System.IO.Path.GetFileName(only.Files[0])}." + waitingNote
-                : "Single spracovanie práve pracuje – súbor pošlite znova po jeho skončení." + waitingNote;
+                ? Loc.F("Odoslané do Single spracovania: {0}.", System.IO.Path.GetFileName(only.Files[0])) + waitingNote
+                : Loc.T("Single spracovanie práve pracuje – súbor pošlite znova po jeho skončení.") + waitingNote;
         }
         else
         {
@@ -499,9 +500,9 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
                 }
 
                 Status = bySeries.Count == 1
-                    ? $"Odoslané do Hromadného spracovania: {first.Title} ({Texts.Count(first.Files.Count, "súbor", "súbory", "súborov")})." + waitingNote
-                    : $"Odoslané do Hromadného spracovania: {Texts.Count(bySeries.Count, "seriál", "seriály", "seriálov")}, {Texts.Count(files, "súbor", "súbory", "súborov")} " +
-                      $"({string.Join(", ", bySeries.Select(b => b.Title))})." + waitingNote;
+                    ? Loc.F("Odoslané do Hromadného spracovania: {0} ({1}).", first.Title, Texts.Count(first.Files.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov"))) + waitingNote
+                    : Loc.F("Odoslané do Hromadného spracovania: {0}, {1} ({2}).", Texts.Count(bySeries.Count, Loc.T("seriál"), Loc.T("seriály"), Loc.T("seriálov")),
+                          Texts.Count(files, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")), string.Join(", ", bySeries.Select(b => b.Title))) + waitingNote;
             }
             else
             {
@@ -510,7 +511,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
                     Ready.Add(new ReadySeriesRow(series.Title, series.Files, this));
                 }
 
-                Status = "Hromadné spracovanie práve pracuje – seriály sú pripravené nižšie, odošlite ich po jeho skončení." + waitingNote;
+                Status = Loc.T("Hromadné spracovanie práve pracuje – seriály sú pripravené nižšie, odošlite ich po jeho skončení.") + waitingNote;
             }
         }
 
@@ -522,11 +523,11 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         if (await SendToBatch([(row.Title, row.Files)]))
         {
             Ready.Remove(row);
-            Status = $"Odoslané do Hromadného spracovania: {row.Title}.";
+            Status = Loc.F("Odoslané do Hromadného spracovania: {0}.", row.Title);
         }
         else
         {
-            Status = "Hromadné spracovanie práve pracuje – odošlite seriál po jeho skončení.";
+            Status = Loc.T("Hromadné spracovanie práve pracuje – odošlite seriál po jeho skončení.");
         }
 
         RefreshCommands();
@@ -750,7 +751,7 @@ public sealed class NewsSeriesRow : MarkedRow
 
     public string NearestCode => Nearest.Code;
 
-    public string NearestNote => string.Join(" · ", new[] { Nearest.Mark, Texts.Count(Episodes.Count, "epizóda", "epizódy", "epizód") }.Where(t => t.Length > 0));
+    public string NearestNote => string.Join(" · ", new[] { Nearest.Mark, Texts.Count(Episodes.Count, Loc.T("epizóda"), Loc.T("epizódy"), Loc.T("epizód")) }.Where(t => t.Length > 0));
 
     public string Day => Nearest.Day;
 
@@ -811,7 +812,7 @@ public sealed class NewsSeriesRow : MarkedRow
         get
         {
             var count = Episodes.Count(e => e.InFolder);
-            return count == 0 ? "" : $"✓ v priečinku: {count}";
+            return count == 0 ? "" : Loc.F("✓ v priečinku: {0}", count);
         }
     }
 
@@ -861,12 +862,12 @@ public sealed class NewsEpisodeRow : ObservableObject
 
     public string Production => string.Join(" · ", new[] { Episode.Channel, Episode.Country.Length > 0 ? CountryNames.Name(Episode.Country) : "" }.Where(p => p.Length > 0));
 
-    public string Code => Episode.Code.Length > 0 ? Episode.Code : "nová epizóda";
+    public string Code => Episode.Code.Length > 0 ? Episode.Code : Loc.T("nová epizóda");
 
     public string Mark => Episode.Kind switch
     {
-        EpisodeKind.SeriesPremiere => "nový seriál",
-        EpisodeKind.SeasonPremiere => "nová séria",
+        EpisodeKind.SeriesPremiere => Loc.T("nový seriál"),
+        EpisodeKind.SeasonPremiere => Loc.T("nová séria"),
         _ => "",
     };
 
@@ -891,7 +892,7 @@ public sealed class NewsEpisodeRow : ObservableObject
     }
 
     /// <summary>"odvysielaná" or "nadchádzajúca".</summary>
-    public string State => InFolder ? "✓ vo vstupnom priečinku" : Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? "odvysielaná" : "nadchádzajúca";
+    public string State => InFolder ? Loc.T("✓ vo vstupnom priečinku") : Episode.AirDate <= DateOnly.FromDateTime(DateTime.Now) ? Loc.T("odvysielaná") : Loc.T("nadchádzajúca");
 }
 
 /// <summary>An episode sent to processing that is not in the input folder yet.</summary>
@@ -913,7 +914,7 @@ public sealed class ReadySeriesRow(string title, IReadOnlyList<string> files, Se
 
     public IReadOnlyList<string> Files { get; } = files;
 
-    public string Text => $"{Title} · {Texts.Count(Files.Count, "súbor", "súbory", "súborov")}";
+    public string Text => $"{Title} · {Texts.Count(Files.Count, Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov"))}";
 
     public AsyncRelayCommand SendCommand => _send ??= new AsyncRelayCommand(() => page.SendReadyAsync(this));
 

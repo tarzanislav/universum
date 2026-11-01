@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.News;
 using Universum.Core.Text;
 
@@ -169,18 +170,18 @@ public sealed class InterestsPageViewModel : ObservableObject
     public bool IsEmpty => Cards.Count == 0 && Featured is null;
 
     public string EmptyText =>
-        !HasSources ? "Zatiaľ tu nie je žiadny zdroj.\nPridajte ho v Nastaveniach → Zaujímavosti (adresa stránky alebo jej kanála RSS, alebo súbor zdrojov)."
-        : Busy ? "Načítavam zaujímavosti…"
-        : OnlyFavorites ? "Žiadne obľúbené články – označíte ich hviezdičkou."
-        : Filter.Length > 0 ? "Nič nezodpovedá hľadaniu."
-        : _period == InterestPeriod.Today ? "Dnes zatiaľ nič nové – pozrite Tento týždeň alebo Všetko."
-        : "Žiadne články – skúste Obnoviť.";
+        !HasSources ? Loc.T("Zatiaľ tu nie je žiadny zdroj.\nPridajte ho v Nastaveniach → Zaujímavosti (adresa stránky alebo jej kanála RSS, alebo súbor zdrojov).")
+        : Busy ? Loc.T("Načítavam zaujímavosti…")
+        : OnlyFavorites ? Loc.T("Žiadne obľúbené články – označíte ich hviezdičkou.")
+        : Filter.Length > 0 ? Loc.T("Nič nezodpovedá hľadaniu.")
+        : _period == InterestPeriod.Today ? Loc.T("Dnes zatiaľ nič nové – pozrite Tento týždeň alebo Všetko.")
+        : Loc.T("Žiadne články – skúste Obnoviť.");
 
     /// <summary>Under the cards: the sources and the translator.</summary>
     public string Attribution =>
-        "Zdroje: " + (HasSources ? string.Join(" · ", _services.FeedSources.Where(s => s.Enabled).Select(s => s.Name)) : "žiadne") +
-        (_services.Translator is not null ? " · " + DeepLClient.Attribution : " · bez prekladu (kľúč DeepL v Nastaveniach)") +
-        ". Celé články sú na stránkach ich autorov.";
+        Loc.T("Zdroje: ") + (HasSources ? string.Join(" · ", _services.FeedSources.Where(s => s.Enabled).Select(s => s.Name)) : Loc.T("žiadne")) +
+        (_services.Translator is not null ? " · " + DeepLClient.Attribution : Loc.T(" · bez prekladu (kľúč DeepL v Nastaveniach)")) +
+        Loc.T(". Celé články sú na stránkach ich autorov.");
 
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
 
@@ -230,7 +231,7 @@ public sealed class InterestsPageViewModel : ObservableObject
             _archive = _services.Interests.Load();
             if (_archive.ReadAt is { } read)
             {
-                Status = $"Uložené zaujímavosti z {read:d. M. yyyy H:mm}.";
+                Status = Loc.F("Uložené zaujímavosti z {0:d. M. yyyy H:mm}.", read);
             }
 
             Build();
@@ -261,12 +262,12 @@ public sealed class InterestsPageViewModel : ObservableObject
             _archive = archive;
             Problems = string.Join("\n", problems);
             var added = archive.Items.Count(i => !before.Contains(i.Link));
-            Status = $"Aktuálne k {DateTime.Now:d. M. yyyy H:mm}: {Texts.Count(added, "nový článok", "nové články", "nových článkov")}.";
+            Status = Loc.F("Aktuálne k {0:d. M. yyyy H:mm}: {1}.", DateTime.Now, Texts.Count(added, Loc.T("nový článok"), Loc.T("nové články"), Loc.T("nových článkov")));
             Build();
         }
         catch (OperationCanceledException)
         {
-            Status = "Zastavené.";
+            Status = Loc.T("Zastavené.");
         }
         finally
         {
@@ -415,7 +416,7 @@ public sealed class InterestCard : ObservableObject
     public string Summary => !ShowOriginal && _translation is { } t && t.Summary.Length > 0 ? t.Summary : Item.Summary;
 
     /// <summary>"preložené z EN", "originál EN" or the language.</summary>
-    public string LanguageText => IsTranslated ? (ShowOriginal ? $"originál {Item.Language.ToUpperInvariant()}" : $"preložené z {Item.Language.ToUpperInvariant()}") : Item.Language.ToUpperInvariant();
+    public string LanguageText => IsTranslated ? (ShowOriginal ? Loc.F("originál {0}", Item.Language.ToUpperInvariant()) : Loc.F("preložené z {0}", Item.Language.ToUpperInvariant())) : Item.Language.ToUpperInvariant();
 
     public string Source => Item.Source;
 
@@ -426,9 +427,9 @@ public sealed class InterestCard : ObservableObject
         {
             var local = Item.Published.LocalDateTime;
             var ago = DateTime.Now - local;
-            return ago < TimeSpan.FromMinutes(60) ? $"pred {Math.Max(1, (int)ago.TotalMinutes)} min"
-                : ago < TimeSpan.FromHours(24) && local.Date == DateTime.Today ? $"pred {(int)ago.TotalHours} h"
-                : local.Date == DateTime.Today.AddDays(-1) ? $"včera {local:H:mm}"
+            return ago < TimeSpan.FromMinutes(60) ? Loc.F("pred {0} min", Math.Max(1, (int)ago.TotalMinutes))
+                : ago < TimeSpan.FromHours(24) && local.Date == DateTime.Today ? Loc.F("pred {0} h", (int)ago.TotalHours)
+                : local.Date == DateTime.Today.AddDays(-1) ? Loc.F("včera {0:H:mm}", local)
                 : $"{local.Day}. {local.Month}. {local.Year}";
         }
     }

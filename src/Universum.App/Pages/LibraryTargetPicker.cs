@@ -2,6 +2,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 using Universum.Core.Rules;
@@ -62,7 +63,7 @@ public sealed class LibraryTargetPicker : ObservableObject
     /// <summary>Raised when the place changes (the page refreshes its commands).</summary>
     public event Action? Changed;
 
-    public string OutputDescription => _services.Library?.Root ?? "nie je nastavený – zvoľte ho tlačidlom Priečinok…";
+    public string OutputDescription => _services.Library?.Root ?? Loc.T("nie je nastavený – zvoľte ho tlačidlom Priečinok…");
 
     public bool IsMovie { get => _kind == MediaKind.Movie; set => SetKind(value, MediaKind.Movie); }
 
@@ -159,7 +160,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         _titleByUser = false;
         _addition = "";
         OnPropertyChanged(nameof(Addition));
-        TitleNote = remembered is null ? "" : "Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).";
+        TitleNote = remembered is null ? "" : Loc.T("Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).");
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
@@ -209,15 +210,15 @@ public sealed class LibraryTargetPicker : ObservableObject
         }
         else if (layout is null)
         {
-            Description = "Najprv nastavte výstupný priečinok (knižnicu).";
+            Description = Loc.T("Najprv nastavte výstupný priečinok (knižnicu).");
         }
         else if (title is null)
         {
-            Description = "Zadajte názov titulu, napr. Creep (2004).";
+            Description = Loc.T("Zadajte názov titulu, napr. Creep (2004).");
         }
         else if (title.Problem is { } problem)
         {
-            Description = $"Názov titulu: {problem} – napr. Creep (2004).";
+            Description = Loc.F("Názov titulu: {0} – napr. Creep (2004).", problem);
         }
         else if (Tmdb.NeedsConfirmation)
         {
@@ -225,15 +226,15 @@ public sealed class LibraryTargetPicker : ObservableObject
         }
         else if (_kind == MediaKind.Series && episode is null)
         {
-            Description = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : "Zadajte epizódu, napr. S01E04.";
+            Description = _episodeNote.StartsWith("OTÁZKA", StringComparison.Ordinal) ? _episodeNote : Loc.T("Zadajte epizódu, napr. S01E04.");
         }
         else
         {
             _placement = layout.Place(target, title, episode, _services.Profile).WithAddition(_addition);
             var size = File.Exists(target.Source.Path) ? new FileInfo(target.Source.Path).Length : 0;
             Description = Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
-                          (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? "  – cesta je príliš dlhá pre Windows" : "") +
-                          (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? "  – TMDB takú epizódu nepozná" : "") +
+                          (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? Loc.T("  – cesta je príliš dlhá pre Windows") : "") +
+                          (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? Loc.T("  – TMDB takú epizódu nepozná") : "") +
                           (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");
             if (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength)
             {
@@ -249,8 +250,8 @@ public sealed class LibraryTargetPicker : ObservableObject
     public static string EpisodeNote(EpisodeMatch? episode) => episode switch
     {
         { IsSeasonQuestion: true } question => SeasonQuestion(question),
-        { FolderSeason: { } folder } found => $"sezóna v mene ({found.Number.Season}) a v priečinku ({folder}) sa líšia – skontrolujte epizódu",
-        { SeasonAssumed: true } => "sezóna nie je v mene ani v priečinku – predpokladá sa 1",
+        { FolderSeason: { } folder } found => Loc.F("sezóna v mene ({0}) a v priečinku ({1}) sa líšia – skontrolujte epizódu", found.Number.Season, folder),
+        { SeasonAssumed: true } => Loc.T("sezóna nie je v mene ani v priečinku – predpokladá sa 1"),
         _ => "",
     };
 
@@ -299,13 +300,13 @@ public sealed class LibraryTargetPicker : ObservableObject
         _placement = null;
         if (_services.Tmdb is not null)
         {
-            Description = "Hľadám titul na TMDB…";
+            Description = Loc.T("Hľadám titul na TMDB…");
             _ = Tmdb.SearchAsync();
         }
         else
         {
-            TitleNote = "Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).";
-            Description = "Zadajte názov titulu, napr. Creep (2004).";
+            TitleNote = Loc.T("Adresa TMDB: na načítanie názvu treba kľúč TMDB v Nastaveniach – alebo napíšte Názov (rok).");
+            Description = Loc.T("Zadajte názov titulu, napr. Creep (2004).");
         }
 
         OnPropertyChanged(nameof(Placement));
@@ -333,7 +334,7 @@ public sealed class LibraryTargetPicker : ObservableObject
 
     private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
         if (dialog.ShowDialog() == true)
         {
             _services.SetOutputDirectory(dialog.FolderName);

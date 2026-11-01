@@ -8,6 +8,7 @@ using Universum.Core.Library.Tmdb;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 using Universum.Core.Weather;
+using Universum.App.Localization;
 
 namespace Universum.App.Pages;
 
@@ -49,7 +50,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         ClearPreviewsCommand = new RelayCommand(() =>
         {
             var cleared = _services.ClearOldPreviews(TimeSpan.Zero);
-            PreviewFolderNote = $"Vymazané náhľady: {cleared}. " + PreviewNote();
+            PreviewFolderNote = Loc.F("Vymazané náhľady: {0}. ", cleared) + PreviewNote();
         });
         SaveTmdbKeyCommand = new AsyncRelayCommand(SaveTmdbKeyAsync, () => TmdbKeyInput.Trim().Length > 0);
         RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
@@ -98,14 +99,14 @@ public sealed class SettingsPageViewModel : ObservableObject
     // the size of the previews there and the free space of the disk
     private string PreviewNote()
     {
-        var text = "Zlučovanie sem zapisuje náhľady výsledkov (nikdy nie do výstupných priečinkov); náhľad sa vymaže so svojou kartou alebo po týždni.";
+        var text = Loc.T("Zlučovanie sem zapisuje náhľady výsledkov (nikdy nie do výstupných priečinkov); náhľad sa vymaže so svojou kartou alebo po týždni.");
         try
         {
             var folder = _services.PreviewFolder;
             var size = Directory.Exists(folder) ? Universum.Core.Muxing.MuxPreview.Old(folder, TimeSpan.Zero, DateTime.Now.AddSeconds(1)).Sum(f => new FileInfo(f).Length) : 0;
             var root = Path.GetPathRoot(Path.GetFullPath(folder));
             var free = root is { Length: > 0 } ? new DriveInfo(root).AvailableFreeSpace : -1;
-            return text + $" Náhľady teraz: {size / (1024 * 1024.0):0.#} MB" + (free >= 0 ? $" · voľné miesto na disku: {free / (1024 * 1024 * 1024.0):0.#} GB." : ".");
+            return text + Loc.F(" Náhľady teraz: {0:0.#} MB", size / (1024 * 1024.0)) + (free >= 0 ? Loc.F(" · voľné miesto na disku: {0:0.#} GB.", free / (1024 * 1024 * 1024.0)) : ".");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -115,7 +116,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     private void ChoosePreviewFolder()
     {
-        var dialog = new OpenFolderDialog { Title = "Priečinok náhľadov Zlučovania (nie výstupný ani vstupný priečinok)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Priečinok náhľadov Zlučovania (nie výstupný ani vstupný priečinok)") };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -127,7 +128,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         static bool SameFolder(string a, string b) => string.Equals(a.TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
         if (Inside(chosen, _services.Library?.Root) || Inside(chosen, _services.Settings.InputDirectory))
         {
-            PreviewFolderNote = "Náhľady nesmú byť vo výstupnom priečinku (knižnici) ani vo vstupnom priečinku – zvoľte iný. " + PreviewNote();
+            PreviewFolderNote = Loc.T("Náhľady nesmú byť vo výstupnom priečinku (knižnici) ani vo vstupnom priečinku – zvoľte iný. ") + PreviewNote();
             return;
         }
 
@@ -221,11 +222,11 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// <summary>The remembered action, if any.</summary>
     public string MuxAddNote => _services.Settings.MuxAddAction switch
     {
-        null => "Pri pridaní viacerých súborov sa Zlučovanie opýta, čo s nimi.",
-        nameof(MuxAddAction.AddToCurrent) => "Zapamätané: pridať do aktuálnych nastavení zlučovania.",
-        nameof(MuxAddAction.NewSettingsForAll) => "Zapamätané: nové nastavenia zlučovania pre všetky súbory.",
-        _ => "Zapamätané: nové nastavenia zlučovania pre každý súbor.",
-    } + (_services.Settings.MuxAddAction is not null && _services.Settings.MuxNewSettingsForVideo ? " Súbory s videom vždy do nových nastavení." : "");
+        null => Loc.T("Pri pridaní viacerých súborov sa Zlučovanie opýta, čo s nimi."),
+        nameof(MuxAddAction.AddToCurrent) => Loc.T("Zapamätané: pridať do aktuálnych nastavení zlučovania."),
+        nameof(MuxAddAction.NewSettingsForAll) => Loc.T("Zapamätané: nové nastavenia zlučovania pre všetky súbory."),
+        _ => Loc.T("Zapamätané: nové nastavenia zlučovania pre každý súbor."),
+    } + (_services.Settings.MuxAddAction is not null && _services.Settings.MuxNewSettingsForVideo ? Loc.T(" Súbory s videom vždy do nových nastavení.") : "");
 
     /// <summary>Check for updates at start and then once a day.</summary>
     public bool AutoCheckUpdates
@@ -258,9 +259,9 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string TmdbStatus => _tmdbStatus.Length > 0
         ? _tmdbStatus
-        : _services.TmdbKey is null ? "Kľúč nie je zadaný – názvy sa zadávajú ručne."
-        : TmdbEnabled ? "Kľúč je uložený (chránený pre vaše konto Windows)."
-        : "Kľúč je uložený, pripájanie je vypnuté – na TMDB sa nič neposiela.";
+        : _services.TmdbKey is null ? Loc.T("Kľúč nie je zadaný – názvy sa zadávajú ručne.")
+        : TmdbEnabled ? Loc.T("Kľúč je uložený (chránený pre vaše konto Windows).")
+        : Loc.T("Kľúč je uložený, pripájanie je vypnuté – na TMDB sa nič neposiela.");
 
     /// <summary>Connect to TMDB; switching it off keeps the key.</summary>
     public bool TmdbEnabled
@@ -303,7 +304,7 @@ public sealed class SettingsPageViewModel : ObservableObject
             if (value != _services.Settings.PostersEnabled)
             {
                 _services.SetPosters(value, PosterCache.ParseServer(_services.Settings.PosterServer));
-                _posterStatus = value ? "Plagáty sa zobrazujú." : "Plagáty sa nezobrazujú a nič sa kvôli nim nesťahuje.";
+                _posterStatus = value ? Loc.T("Plagáty sa zobrazujú.") : Loc.T("Plagáty sa nezobrazujú a nič sa kvôli nim nesťahuje.");
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(PosterStatus));
             }
@@ -321,19 +322,19 @@ public sealed class SettingsPageViewModel : ObservableObject
     private string _posterStatus = "";
 
     public string PosterStatus => _posterStatus.Length > 0 ? _posterStatus
-        : _services.Settings.PosterServer is null ? "Plagáty sú zo servera TMDB (HISTRA uvádza plagáty v tvare TMDB)." : $"Plagáty sú zo servera {_services.Settings.PosterServer}.";
+        : _services.Settings.PosterServer is null ? Loc.T("Plagáty sú zo servera TMDB (HISTRA uvádza plagáty v tvare TMDB).") : Loc.F("Plagáty sú zo servera {0}.", _services.Settings.PosterServer);
 
     public RelayCommand SavePosterServerCommand => _savePosterServer ??= new RelayCommand(() =>
     {
         if (PosterCache.ParseServer(PosterServerInput) is not { } server)
         {
-            _posterStatus = "Adresa sa neuložila – musí to byť https://… bez mena a hesla, napr. " + PosterCache.DefaultServer.AbsoluteUri;
+            _posterStatus = Loc.T("Adresa sa neuložila – musí to byť https://… bez mena a hesla, napr. ") + PosterCache.DefaultServer.AbsoluteUri;
         }
         else
         {
             _services.SetPosters(PostersEnabled, server);
             PosterServerInput = server.AbsoluteUri;
-            _posterStatus = $"Uložené – plagáty budú zo servera {server.Host} (stiahnuté plagáty ostávajú).";
+            _posterStatus = Loc.F("Uložené – plagáty budú zo servera {0} (stiahnuté plagáty ostávajú).", server.Host);
         }
 
         OnPropertyChanged(nameof(PosterStatus));
@@ -352,10 +353,10 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     /// <summary>What happens with TMDB and HISTRA together.</summary>
     public string SyncStatus =>
-        _services.SyncActive ? "TMDB aj HISTRA sú zapnuté – názvy sa hľadajú na TMDB a overujú v katalógu HISTRA (čo TMDB nenájde, hľadá sa v HISTRA); titul, ktorý HISTRA nepotvrdí, čaká na vaše potvrdenie."
-        : _services.Tmdb is not null ? "Zapnuté je len TMDB."
-        : _services.HistraActive ? "Zapnutá je len HISTRA – názvy sa hľadajú v jej katalógu (podľa názvu a roku; ID a adresy TMDB a epizódy overí len TMDB)."
-        : "TMDB ani HISTRA sa nepripájajú – názvy sa zadávajú ručne.";
+        _services.SyncActive ? Loc.T("TMDB aj HISTRA sú zapnuté – názvy sa hľadajú na TMDB a overujú v katalógu HISTRA (čo TMDB nenájde, hľadá sa v HISTRA); titul, ktorý HISTRA nepotvrdí, čaká na vaše potvrdenie.")
+        : _services.Tmdb is not null ? Loc.T("Zapnuté je len TMDB.")
+        : _services.HistraActive ? Loc.T("Zapnutá je len HISTRA – názvy sa hľadajú v jej katalógu (podľa názvu a roku; ID a adresy TMDB a epizódy overí len TMDB).")
+        : Loc.T("TMDB ani HISTRA sa nepripájajú – názvy sa zadávajú ručne.");
 
     public string TmdbAttribution => TmdbClient.Attribution;
 
@@ -402,9 +403,8 @@ public sealed class SettingsPageViewModel : ObservableObject
     public string WeatherStatus => _weatherStatus.Length > 0
         ? _weatherStatus
         : _services.Settings.WeatherPlace is { } place
-            ? string.Create(System.Globalization.CultureInfo.CurrentCulture,
-                $"Počasie pre: {place.FullDisplay} (súradnice {place.Latitude:0.00}, {place.Longitude:0.00}).")
-            : "Mesto nie je zadané – počasie sa nezisťuje a na Open-Meteo sa nič neposiela.";
+            ? Loc.F("Počasie pre: {0} (súradnice {1:0.00}, {2:0.00}).", place.FullDisplay, place.Latitude, place.Longitude)
+            : Loc.T("Mesto nie je zadané – počasie sa nezisťuje a na Open-Meteo sa nič neposiela.");
 
     public string WeatherAttribution => OpenMeteo.Attribution;
 
@@ -419,7 +419,7 @@ public sealed class SettingsPageViewModel : ObservableObject
             var found = await _services.Weather.SearchAsync(town);
             if (found.Count == 0)
             {
-                _weatherStatus = $"Mesto „{town}“ Open-Meteo nenašlo – skúste iný zápis (napr. bez skratiek).";
+                _weatherStatus = Loc.F("Mesto „{0}“ Open-Meteo nenašlo – skúste iný zápis (napr. bez skratiek).", town);
             }
             else if (found.Count == 1)
             {
@@ -433,12 +433,12 @@ public sealed class SettingsPageViewModel : ObservableObject
                 }
 
                 SelectedWeatherChoice = WeatherChoices[0];
-                _weatherStatus = $"Miest s týmto menom je viac ({found.Count}) – vyberte to správne a kliknite Použiť.";
+                _weatherStatus = Loc.F("Miest s týmto menom je viac ({0}) – vyberte to správne a kliknite Použiť.", found.Count);
             }
         }
         catch (WeatherException ex)
         {
-            _weatherStatus = "Mesto sa neuložilo: " + ex.Message;
+            _weatherStatus = Loc.T("Mesto sa neuložilo: ") + ex.Message;
         }
 
         OnPropertyChanged(nameof(HasWeatherChoices));
@@ -500,13 +500,13 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string HistraStatus => _histraStatus.Length > 0
         ? _histraStatus
-        : _services.HistraToken is null ? "Token nie je zadaný."
-        : HistraEnabled ? "Token je uložený (chránený pre vaše konto Windows)."
-        : "Token je uložený, pripájanie je vypnuté – na HISTRA sa nič neposiela.";
+        : _services.HistraToken is null ? Loc.T("Token nie je zadaný.")
+        : HistraEnabled ? Loc.T("Token je uložený (chránený pre vaše konto Windows).")
+        : Loc.T("Token je uložený, pripájanie je vypnuté – na HISTRA sa nič neposiela.");
 
     public string OutputDescription => _services.Library is { } library
-        ? $"{library.Root}\nFilmy: {library.Movies}\nSeriály: {library.Shows}"
-        : "Nie je nastavený. Bez neho pracuje len Zlučovanie (výstup vedľa zdroja); ostatné nástroje zapisujú do knižnice.";
+        ? Loc.F("{0}\nFilmy: {1}\nSeriály: {2}", library.Root, library.Movies, library.Shows)
+        : Loc.T("Nie je nastavený. Bez neho pracuje len Zlučovanie (výstup vedľa zdroja); ostatné nástroje zapisujú do knižnice.");
 
     /// <summary>Upper limits of SMALL, BIG and BluRay for films in GB, e.g. "2; 14; 30".</summary>
     public string MovieSizes { get => _movieSizes; set => SetProperty(ref _movieSizes, value); }
@@ -538,7 +538,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     public string Message { get => _message; private set => SetProperty(ref _message, value); }
 
-    public string Folders => $"Nastavenia a šablóny: {AppSettings.Directory}\nZáznamy pre Vrátiť späť: {AppSettings.JournalDirectory}";
+    public string Folders => Loc.F("Nastavenia a šablóny: {0}\nZáznamy pre Vrátiť späť: {1}", AppSettings.Directory, AppSettings.JournalDirectory);
 
     private void Load(RuleProfile profile)
     {
@@ -576,11 +576,11 @@ public sealed class SettingsPageViewModel : ObservableObject
             var title = await new TmdbClient(http, key).GetAsync(MediaKind.Movie, 8555);
             _services.SetTmdbKey(key);
             TmdbKeyInput = "";
-            _tmdbStatus = title is null ? "Kľúč je uložený." : $"Kľúč funguje a je uložený (skúška: {title.Display}).";
+            _tmdbStatus = title is null ? Loc.T("Kľúč je uložený.") : Loc.F("Kľúč funguje a je uložený (skúška: {0}).", title.Display);
         }
         catch (TmdbException ex)
         {
-            _tmdbStatus = "Kľúč sa neuložil: " + ex.Message;
+            _tmdbStatus = Loc.T("Kľúč sa neuložil: ") + ex.Message;
         }
 
         OnPropertyChanged(nameof(TmdbStatus));
@@ -604,13 +604,13 @@ public sealed class SettingsPageViewModel : ObservableObject
         var token = HistraTokenInput.Trim();
         if (!HistraApi.IsValidToken(token))
         {
-            _histraStatus = "Token sa neuložil: nevyzerá ako token HISTRA (len písmená, číslice a - . _ ~ + / =, bez medzier, aspoň 8 znakov).";
+            _histraStatus = Loc.T("Token sa neuložil: nevyzerá ako token HISTRA (len písmená, číslice a - . _ ~ + / =, bez medzier, aspoň 8 znakov).");
         }
         else
         {
             _services.SetHistraToken(token);
             HistraTokenInput = "";
-            _histraStatus = "Token je uložený (chránený pre vaše konto Windows).";
+            _histraStatus = Loc.T("Token je uložený (chránený pre vaše konto Windows).");
         }
 
         OnPropertyChanged(nameof(HistraStatus));
@@ -639,7 +639,7 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     private void ChooseOutputDirectory()
     {
-        var dialog = new OpenFolderDialog { Title = "Výstupný priečinok (knižnica s MOVIES a TVSHOWS)" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
         if (dialog.ShowDialog() == true)
         {
             _services.SetOutputDirectory(dialog.FolderName);
@@ -651,19 +651,19 @@ public sealed class SettingsPageViewModel : ObservableObject
         var languages = List(PreferredLanguages).Select(code => Languages.Find(code)?.Ietf ?? code.ToLowerInvariant()).Distinct().ToList();
         if (languages.Count == 0)
         {
-            Message = "Zadajte aspoň jeden preferovaný jazyk (napr. cs, sk).";
+            Message = Loc.T("Zadajte aspoň jeden preferovaný jazyk (napr. cs, sk).");
             return;
         }
 
         if (VideoNameLength is < 4 or > 32)
         {
-            Message = "Dĺžka názvu videa musí byť 4 až 32 znakov.";
+            Message = Loc.T("Dĺžka názvu videa musí byť 4 až 32 znakov.");
             return;
         }
 
         if (ParseSizes(MovieSizes) is not { } movieSizes || ParseSizes(SeriesSizes) is not { } seriesSizes)
         {
-            Message = "Hranice veľkosti zadajte ako tri rastúce čísla v GB oddelené bodkočiarkou, napr. 2; 14; 30.";
+            Message = Loc.T("Hranice veľkosti zadajte ako tri rastúce čísla v GB oddelené bodkočiarkou, napr. 2; 14; 30.");
             return;
         }
 
@@ -683,7 +683,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         _services.Settings.Profile = IsDefault(profile) ? null : profile;
         _services.Settings.Save();
         Load(_services.Profile);
-        Message = "Uložené. Platí pre Pravidlá aj Hromadné spracovanie (pri ďalšom otvorení súboru alebo analýze).";
+        Message = Loc.T("Uložené. Platí pre Pravidlá aj Hromadné spracovanie (pri ďalšom otvorení súboru alebo analýze).");
     }
 
     private void ClearCache()
@@ -691,7 +691,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         try
         {
             File.Delete(AppSettings.IdentificationCacheFile);
-            Message = "Vyrovnávacia pamäť analýzy je vymazaná.";
+            Message = Loc.T("Vyrovnávacia pamäť analýzy je vymazaná.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

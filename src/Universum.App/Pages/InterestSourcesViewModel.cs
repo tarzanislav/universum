@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.News;
 
 namespace Universum.App.Pages;
@@ -36,10 +37,10 @@ public sealed class InterestSourcesViewModel : ObservableObject
         }, () => _services.DeepLKey is not null);
         ClearCommand = new RelayCommand(() =>
         {
-            if (Confirm("Vymazať všetky uložené články Zaujímavostí (aj históriu)?\n\nObľúbené značky ostanú. Zdroje sa pri ďalšej aktualizácii načítajú znova."))
+            if (Confirm(Loc.T("Vymazať všetky uložené články Zaujímavostí (aj históriu)?\n\nObľúbené značky ostanú. Zdroje sa pri ďalšej aktualizácii načítajú znova.")))
             {
                 new InterestStore(AppSettings.InterestsFile).Clear();
-                Status = "Uložené články sú vymazané.";
+                Status = Loc.T("Uložené články sú vymazané.");
             }
         });
         Reload();
@@ -48,9 +49,9 @@ public sealed class InterestSourcesViewModel : ObservableObject
     public ObservableCollection<InterestSourceRow> Rows { get; } = [];
 
     public IReadOnlyList<Choice<string>> Languages { get; } =
-        [new("en", "angličtina"), new("cs", "čeština"), new("sk", "slovenčina"), new("de", "nemčina"), new("fr", "francúzština")];
+        [new("en", Loc.T("angličtina")), new("cs", Loc.T("čeština")), new("sk", Loc.T("slovenčina")), new("de", Loc.T("nemčina")), new("fr", Loc.T("francúzština"))];
 
-    public IReadOnlyList<Choice<string>> Targets { get; } = [new("sk", "slovenčiny"), new("cs", "češtiny"), new("en", "angličtiny")];
+    public IReadOnlyList<Choice<string>> Targets { get; } = [new("sk", Loc.T("slovenčiny")), new("cs", Loc.T("češtiny")), new("en", Loc.T("angličtiny"))];
 
     public string NewName { get => _newName; set { if (SetProperty(ref _newName, value ?? "")) { AddCommand.NotifyCanExecuteChanged(); } } }
 
@@ -86,8 +87,8 @@ public sealed class InterestSourcesViewModel : ObservableObject
     public string KeyInput { get => _keyInput; set { if (SetProperty(ref _keyInput, value ?? "")) { SaveKeyCommand.NotifyCanExecuteChanged(); } } }
 
     public string KeyStatus => _keyStatus.Length > 0 ? _keyStatus
-        : _services.DeepLKey is null ? "Kľúč nie je zadaný – články sa ukazujú v origináli. Bezplatný kľúč: DeepL API Free (500 000 znakov mesačne)."
-        : $"Kľúč je uložený (chránený pre vaše konto Windows). {Usage}";
+        : _services.DeepLKey is null ? Loc.T("Kľúč nie je zadaný – články sa ukazujú v origináli. Bezplatný kľúč: DeepL API Free (500 000 znakov mesačne).")
+        : Loc.F("Kľúč je uložený (chránený pre vaše konto Windows). {0}", Usage);
 
     /// <summary>The characters translated this month.</summary>
     public string Usage
@@ -96,7 +97,7 @@ public sealed class InterestSourcesViewModel : ObservableObject
         {
             var month = DateTime.Now.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
             var used = new InterestStore(AppSettings.InterestsFile).Load().Translated.GetValueOrDefault(month);
-            return $"Tento mesiac preložené: {used.ToString("N0", Texts.Slovak)} z {Interests.MonthBudget.ToString("N0", Texts.Slovak)} znakov.";
+            return Loc.F("Tento mesiac preložené: {0} z {1} znakov.", used.ToString("N0", Texts.Slovak), Interests.MonthBudget.ToString("N0", Texts.Slovak));
         }
     }
 
@@ -125,12 +126,12 @@ public sealed class InterestSourcesViewModel : ObservableObject
             var names = added.Select(a => a.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _services.SetFeedSources(_services.FeedSources.Where(s => !names.Contains(s.Name)).Concat(added));
             Reload();
-            Status = $"Pridané zdroje: {added.Count}. Načítajú sa pri ďalšej aktualizácii (alebo tlačidlom Obnoviť v Zaujímavostiach).";
+            Status = Loc.F("Pridané zdroje: {0}. Načítajú sa pri ďalšej aktualizácii (alebo tlačidlom Obnoviť v Zaujímavostiach).", added.Count);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
         {
-            Status = "Zdroje sa nepridali: " + ex.Message;
+            Status = Loc.T("Zdroje sa nepridali: ") + ex.Message;
             return false;
         }
     }
@@ -141,27 +142,27 @@ public sealed class InterestSourcesViewModel : ObservableObject
         var source = new FeedSource { Name = name.Trim(), Url = url.Trim(), Language = language };
         if (source.Address is null)
         {
-            Status = "Adresa musí začínať https:// (napr. https://stránka/feed/).";
+            Status = Loc.T("Adresa musí začínať https:// (napr. https://stránka/feed/).");
             return false;
         }
 
         _services.SetFeedSources(_services.FeedSources.Where(s => !string.Equals(s.Name, source.Name, StringComparison.OrdinalIgnoreCase)).Append(source));
         Reload();
-        Status = $"Zdroj „{source.Name}“ je pridaný.";
+        Status = Loc.F("Zdroj „{0}“ je pridaný.", source.Name);
         return true;
     }
 
     internal void SetEnabled(InterestSourceRow row, bool enabled)
     {
         _services.SetFeedSources(_services.FeedSources.Select(s => s.Name == row.Name ? s with { Enabled = enabled } : s));
-        Status = enabled ? $"Zdroj „{row.Name}“ je zapnutý." : $"Zdroj „{row.Name}“ je vypnutý.";
+        Status = enabled ? Loc.F("Zdroj „{0}“ je zapnutý.", row.Name) : Loc.F("Zdroj „{0}“ je vypnutý.", row.Name);
     }
 
     internal void Remove(InterestSourceRow row)
     {
         _services.SetFeedSources(_services.FeedSources.Where(s => s.Name != row.Name));
         Reload();
-        Status = $"Zdroj „{row.Name}“ je odstránený (jeho uložené články ostali).";
+        Status = Loc.F("Zdroj „{0}“ je odstránený (jeho uložené články ostali).", row.Name);
     }
 
     private void Add()
@@ -175,7 +176,7 @@ public sealed class InterestSourcesViewModel : ObservableObject
 
     private void Import()
     {
-        var dialog = new OpenFileDialog { Title = "Zdroje Zaujímavostí", Filter = "Zdroje (*.json)|*.json" };
+        var dialog = new OpenFileDialog { Title = Loc.T("Zdroje Zaujímavostí"), Filter = Loc.T("Zdroje") + " (*.json)|*.json" };
         if (dialog.ShowDialog() == true)
         {
             ImportFile(dialog.FileName);
@@ -187,7 +188,7 @@ public sealed class InterestSourcesViewModel : ObservableObject
         var key = KeyInput.Trim();
         if (!DeepLClient.IsValidKey(key))
         {
-            _keyStatus = "Toto nevyzerá ako kľúč DeepL.";
+            _keyStatus = Loc.T("Toto nevyzerá ako kľúč DeepL.");
             Refresh();
             return;
         }

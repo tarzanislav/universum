@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Universum.App.Localization;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
 
@@ -67,11 +68,11 @@ public sealed class TmdbPicker : ObservableObject
 
     public string Tooltip =>
         _services.Tmdb is not null
-            ? "Nájde titul na TMDB podľa ID, adresy alebo názvu a roku" +
-              (_services.Histra is not null ? "; overí ho v katalógu HISTRA (čo TMDB nenájde, hľadá v HISTRA)" : "")
-        : _services.Histra is not null ? "Nájde titul v katalógu HISTRA podľa názvu a roku (ID a adresy TMDB načíta len TMDB s kľúčom)"
-        : _services.TmdbKey is null ? "Vyhľadávanie titulov: zadajte v Nastaveniach kľúč TMDB alebo token HISTRA"
-        : "Pripájanie k TMDB je vypnuté v Nastaveniach";
+            ? Loc.T("Nájde titul na TMDB podľa ID, adresy alebo názvu a roku") +
+              (_services.Histra is not null ? Loc.T("; overí ho v katalógu HISTRA (čo TMDB nenájde, hľadá v HISTRA)") : "")
+        : _services.Histra is not null ? Loc.T("Nájde titul v katalógu HISTRA podľa názvu a roku (ID a adresy TMDB načíta len TMDB s kľúčom)")
+        : _services.TmdbKey is null ? Loc.T("Vyhľadávanie titulov: zadajte v Nastaveniach kľúč TMDB alebo token HISTRA")
+        : Loc.T("Pripájanie k TMDB je vypnuté v Nastaveniach");
 
     public TmdbTitle? Selected
     {
@@ -92,7 +93,7 @@ public sealed class TmdbPicker : ObservableObject
                     Apply(value, value);
                     if (value is { Kind: MediaKind.Series, Seasons.Count: 0 } && !NeedsConfirmation)
                     {
-                        Message = Join(Message, "Bez kľúča TMDB sa neoverí, či sezóna a epizóda existujú.");
+                        Message = Join(Message, Loc.T("Bez kľúča TMDB sa neoverí, či sezóna a epizóda existujú."));
                     }
                 }
             }
@@ -169,8 +170,8 @@ public sealed class TmdbPicker : ObservableObject
         _found = null;
         OnPropertyChanged(nameof(Selected));
         var text = _text();
-        Message = titles.Tmdb is not null ? "Hľadám na TMDB…" : "Hľadám v katalógu HISTRA…";
-        void OnWaiting(TimeSpan delay) => Message = $"Služba žiada spomaliť – čakám {Math.Ceiling(delay.TotalSeconds):0} s…";
+        Message = titles.Tmdb is not null ? Loc.T("Hľadám na TMDB…") : Loc.T("Hľadám v katalógu HISTRA…");
+        void OnWaiting(TimeSpan delay) => Message = Loc.F("Služba žiada spomaliť – čakám {0:0} s…", Math.Ceiling(delay.TotalSeconds));
         titles.Waiting += OnWaiting;
         try
         {
@@ -205,31 +206,31 @@ public sealed class TmdbPicker : ObservableObject
             }
 
             var fromTmdb = found.Source == "TMDB";
-            var many = $"{(fromTmdb ? "TMDB našlo" : "Katalóg HISTRA našiel")} {results.Count} titulov";
+            var many = fromTmdb ? Loc.F("TMDB našlo {0} titulov", results.Count) : Loc.F("Katalóg HISTRA našiel {0} titulov", results.Count);
             // chosen by its name and year (also a translation), by its name a year off (the release here), or by HISTRA
             var byName = typed is not null && best is not null && ReferenceEquals(TmdbClient.ExactMatch(results, typed.Name, typed.Year), best);
             var yearOff = !byName && typed is not null && best is not null && best.IsNamed(typed.Name) &&
                           typed.Year is { } typedYear && best.Year is { } bestYear && Math.Abs(typedYear - bestYear) == 1;
-            Message = found.Loosened is { } how ? $"{(fromTmdb ? "TMDB" : "Katalóg HISTRA")} našlo tituly ({results.Count}) až keď sa {how.Replace("hľadané", "hľadalo")} – vyberte správny (názov sa môže líšiť)."
+            Message = found.Loosened is { } how ? Loc.F("{0} našlo tituly ({1}) až keď sa {2} – vyberte správny (názov sa môže líšiť).", fromTmdb ? "TMDB" : Loc.T("Katalóg HISTRA"), results.Count, how.Replace("hľadané", "hľadalo"))
                 : results.Count switch
             {
                 0 when found.FoundNowhere => "",
                 0 when found.Note.Length > 0 => found.Note,
-                0 => fromTmdb ? "TMDB nič nenašlo – skúste iný názov alebo zadajte ID." : "Katalóg HISTRA nič nenašiel – skúste iný názov alebo rok.",
+                0 => fromTmdb ? Loc.T("TMDB nič nenašlo – skúste iný názov alebo zadajte ID.") : Loc.T("Katalóg HISTRA nič nenašiel – skúste iný názov alebo rok."),
                 1 => found.Note,
-                _ when best is not null && yearOff => Join(many + $", vybraný je ten s rovnakým názvom, rok {best.Year} (o rok iný – možno rok uvedenia u nás).", found.Note),
-                _ when best is not null && byName => Join(many + ", vybraný je ten s presným názvom a rokom.", found.Note),
-                _ when best is not null => Join(many + ", vybraný je ten, ktorý potvrdzuje katalóg HISTRA.", found.Note),
-                _ => Join(many + " – vyberte správny.", found.Note),
+                _ when best is not null && yearOff => Join(many + Loc.F(", vybraný je ten s rovnakým názvom, rok {0} (o rok iný – možno rok uvedenia u nás).", best.Year), found.Note),
+                _ when best is not null && byName => Join(many + Loc.T(", vybraný je ten s presným názvom a rokom."), found.Note),
+                _ when best is not null => Join(many + Loc.T(", vybraný je ten, ktorý potvrdzuje katalóg HISTRA."), found.Note),
+                _ => Join(many + Loc.T(" – vyberte správny."), found.Note),
             };
 
             // found nowhere: the suggestion in the field (from the file's name, or typed) waits for confirmation
             if (found.FoundNowhere && text.Trim().Length > 0)
             {
-                var nobody = found.TmdbProblem is { } problem ? problem + " Katalóg HISTRA titul nenašiel"
-                    : titles.Tmdb is not null ? "TMDB ani HISTRA titul nenašli"
-                    : "Katalóg HISTRA titul nenašiel";
-                Wait($"{nobody} – ponechaný je návrh „{text.Trim()}“. Skontrolujte ho a potvrďte (alebo ho opravte).", text.Trim());
+                var nobody = found.TmdbProblem is { } problem ? problem + Loc.T(" Katalóg HISTRA titul nenašiel")
+                    : titles.Tmdb is not null ? Loc.T("TMDB ani HISTRA titul nenašli")
+                    : Loc.T("Katalóg HISTRA titul nenašiel");
+                Wait(Loc.F("{0} – ponechaný je návrh „{1}“. Skontrolujte ho a potvrďte (alebo ho opravte).", nobody, text.Trim()), text.Trim());
             }
 
             if (best is not null)
@@ -260,7 +261,7 @@ public sealed class TmdbPicker : ObservableObject
         }
 
         var year = title.Year is { } y ? $"({y}) " : "";
-        return ($"{year}[tmdbid-{title.Id}]", "TMDB nemá anglický názov – napíšte ho pred rok.");
+        return ($"{year}[tmdbid-{title.Id}]", Loc.T("TMDB nemá anglický názov – napíšte ho pred rok."));
     }
 
     internal static void TrySaveCache(TmdbClient tmdb) => TrySave(tmdb.SaveCache);
@@ -270,11 +271,11 @@ public sealed class TmdbPicker : ObservableObject
     /// <summary>How the HISTRA check of a title reads (for messages of the batch).</summary>
     public static string Describe(TitleResults found, TmdbTitle title) => found.Check(title) switch
     {
-        TitleCheck.Confirmed => "HISTRA titul potvrdila.",
-        TitleCheck.NotFound => "HISTRA tento titul nenašla – skontrolujte ho a potvrďte.",
-        TitleCheck.Different when found.Alternative(title) is { } other => $"HISTRA našla iný titul: {other.Display} (TMDB {other.Id}) – skontrolujte a potvrďte.",
-        TitleCheck.Different => "HISTRA našla iný titul – skontrolujte a potvrďte.",
-        TitleCheck.Unavailable => (found.Note.Length > 0 ? found.Note : "HISTRA sa nedala opýtať – titul nie je overený.") + " Skontrolujte ho a potvrďte.",
+        TitleCheck.Confirmed => Loc.T("HISTRA titul potvrdila."),
+        TitleCheck.NotFound => Loc.T("HISTRA tento titul nenašla – skontrolujte ho a potvrďte."),
+        TitleCheck.Different when found.Alternative(title) is { } other => Loc.F("HISTRA našla iný titul: {0} (TMDB {1}) – skontrolujte a potvrďte.", other.Display, other.Id),
+        TitleCheck.Different => Loc.T("HISTRA našla iný titul – skontrolujte a potvrďte."),
+        TitleCheck.Unavailable => (found.Note.Length > 0 ? found.Note : Loc.T("HISTRA sa nedala opýtať – titul nie je overený.")) + Loc.T(" Skontrolujte ho a potvrďte."),
         _ => "",
     };
 
@@ -286,7 +287,7 @@ public sealed class TmdbPicker : ObservableObject
         if (Check.NeedsConfirmation())
         {
             var (text, _) = TitleText(chosen);
-            Wait($"Titul z TMDB {judged.Display} (TMDB {judged.Id}): {description}", text);
+            Wait(Loc.F("Titul z TMDB {0} (TMDB {1}): {2}", judged.Display, judged.Id, description), text);
         }
         else
         {
@@ -332,7 +333,7 @@ public sealed class TmdbPicker : ObservableObject
         _pendingText = null;
         NeedsConfirmation = false;
         Warning = "";
-        Message = "Titul je potvrdený.";
+        Message = Loc.T("Titul je potvrdený.");
         ConfirmationChanged?.Invoke();
     }
 
@@ -342,13 +343,13 @@ public sealed class TmdbPicker : ObservableObject
         var problem = "";
         try
         {
-            Message = "Načítavam sezóny z TMDB…";
+            Message = Loc.T("Načítavam sezóny z TMDB…");
             chosen = await tmdb.GetAsync(MediaKind.Series, title.Id) ?? title;
             TrySaveCache(tmdb);
         }
         catch (TmdbException ex)
         {
-            problem = "Sezóny seriálu sa nenačítali (epizódy sa nedajú overiť): " + ex.Message;
+            problem = Loc.T("Sezóny seriálu sa nenačítali (epizódy sa nedajú overiť): ") + ex.Message;
         }
 
         // the text edited, another file opened or another title chosen meanwhile: this one is not applied

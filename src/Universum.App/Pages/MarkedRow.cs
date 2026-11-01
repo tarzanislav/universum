@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Universum.App.Localization;
 using Universum.Core.News;
 using Universum.Core.Text;
 
@@ -67,7 +68,7 @@ public sealed class NoteLinkItem(NamedLink link, MarkedRow row)
 {
     public string Name => link.Name;
 
-    public string ToolTip => link.Address.AbsoluteUri + " – kliknutím otvoríte stránku";
+    public string ToolTip => link.Address.AbsoluteUri + Loc.T(" – kliknutím otvoríte stránku");
 
     public CommunityToolkit.Mvvm.Input.RelayCommand OpenCommand => new(() => NoteLinks.Open(link.Address));
 
@@ -92,13 +93,13 @@ public static class NewsTexts
         var days = day.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
         return days switch
         {
-            0 => "DNES",
-            1 => "zajtra",
-            -1 => "včera",
-            7 => "o týždeň",
-            -7 => "pred týždňom",
-            > 1 => $"o {Texts.Count(days, "deň", "dni", "dní")}",
-            _ => $"pred {-days} dňami",
+            0 => Loc.T("DNES"),
+            1 => Loc.T("zajtra"),
+            -1 => Loc.T("včera"),
+            7 => Loc.T("o týždeň"),
+            -7 => Loc.T("pred týždňom"),
+            > 1 => Loc.F("o {0}", Texts.Count(days, Loc.T("deň"), Loc.T("dni"), Loc.T("dní"))),
+            _ => Loc.F("pred {0} dňami", -days),
         };
     }
 }

@@ -2407,7 +2407,7 @@
                                     <DataTrigger Binding="{Binding IsNew}" Value="True">
                                         <Setter Property="Background" Value="#DDF3E4" />
                                         <Setter Property="Foreground" Value="#1B1B1B" />
-                                        <Setter Property="ToolTip" Value="Nové súbory od predchádzajúcej analýzy" />
+                                        <Setter Property="ToolTip" Value="{loc:T 'Nové súbory od predchádzajúcej analýzy'}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

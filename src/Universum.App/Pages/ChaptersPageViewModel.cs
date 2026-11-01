@@ -3,6 +3,7 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using Universum.App.Localization;
 using Universum.Core.Chapters;
 using Universum.Core.Execution;
 using Universum.Core.Planning;
@@ -58,7 +59,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
     private MediaFile? _file;
     private ChapterRow? _selected;
     private string _fileName = "";
-    private string _summary = "Otvorte súbor MKV alebo ho sem pretiahnite myšou.";
+    private string _summary = Loc.T("Otvorte súbor MKV alebo ho sem pretiahnite myšou.");
     private string _problems = "";
     private string _result = "";
     private string _interval = "10";
@@ -149,19 +150,19 @@ public sealed class ChaptersPageViewModel : ObservableObject
         if (_file?.Duration is not { } duration ||
             !double.TryParse(Interval.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var minutes) || minutes <= 0)
         {
-            Result = "Zadajte interval v minútach (napríklad 10).";
+            Result = Loc.T("Zadajte interval v minútach (napríklad 10).");
             return;
         }
 
         Fill(ChapterChecks.Every(TimeSpan.FromMinutes(minutes), duration, Language()), dirty: true);
-        Result = $"Vygenerované: {Count(Rows.Count)} každých {minutes} min.";
+        Result = Loc.F("Vygenerované: {0} každých {1} min.", Count(Rows.Count), minutes);
     }
 
     private static string Count(int chapters) => chapters switch
     {
-        1 => "1 kapitola",
-        >= 2 and <= 4 => $"{chapters} kapitoly",
-        _ => $"{chapters} kapitol",
+        1 => Loc.T("1 kapitola"),
+        >= 2 and <= 4 => Loc.F("{0} kapitoly", chapters),
+        _ => Loc.F("{0} kapitol", chapters),
     };
 
     private LanguageTag Language() => LanguageTag.FromCode(_services.Profile.PreferredLanguages.FirstOrDefault() ?? "cs");
@@ -175,7 +176,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
-            Summary = "MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.";
+            Summary = Loc.T("MKVToolNix nie je k dispozícii. Nastavte ho tlačidlom MKVToolNix dole.");
             RefreshCommands();
             return;
         }
@@ -186,8 +187,8 @@ public sealed class ChaptersPageViewModel : ObservableObject
             _file = await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path);
             var set = await Editor(installation).ReadAsync(path);
             _complex = set.Complex;
-            Summary = $"Trvanie {(_file.Duration is { } d ? ChapterTime.Format(d) : "neznáme")}, kapitoly: {set.Chapters.Count}" +
-                      (set.Complex ? ". Súbor má viac vydaní alebo vnorené kapitoly – upravte ich v MKVToolNix GUI (UNIVERSUM ich nemení)." : ".");
+            Summary = Loc.F("Trvanie {0}, kapitoly: {1}", _file.Duration is { } d ? ChapterTime.Format(d) : Loc.T("neznáme"), set.Chapters.Count) +
+                      (set.Complex ? Loc.T(". Súbor má viac vydaní alebo vnorené kapitoly – upravte ich v MKVToolNix GUI (UNIVERSUM ich nemení).") : ".");
             Fill(set.Chapters, dirty: false);
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException or System.Xml.XmlException)
@@ -228,7 +229,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
             Rows[i].Number = i + 1;
         }
 
-        var problems = Rows.Where(r => !r.IsValid).Select(r => $"Kapitola {r.Number}: čas „{r.Start}“ nie je v tvare HH:MM:SS.mmm.").ToList();
+        var problems = Rows.Where(r => !r.IsValid).Select(r => Loc.F("Kapitola {0}: čas „{1}“ nie je v tvare HH:MM:SS.mmm.", r.Number, r.Start)).ToList();
         problems.AddRange(ChapterChecks.Problems(Rows.Select(r => r.ToChapter()).OfType<Chapter>().ToList(), _file?.Duration));
         Problems = string.Join("\n", problems);
         Library?.Update();
@@ -265,7 +266,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
     {
         Rows.Clear();
         Changed();
-        Result = "Po uložení súbor nebude mať žiadne kapitoly.";
+        Result = Loc.T("Po uložení súbor nebude mať žiadne kapitoly.");
     }
 
     private void Sort()
@@ -284,7 +285,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
     {
         if (!double.TryParse(Shift.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var seconds) || seconds == 0)
         {
-            Result = "Zadajte posun v sekundách (napríklad 2,5 alebo -1).";
+            Result = Loc.T("Zadajte posun v sekundách (napríklad 2,5 alebo -1).");
             return;
         }
 
@@ -294,12 +295,12 @@ public sealed class ChaptersPageViewModel : ObservableObject
             row.Start = ChapterTime.Format(moved < TimeSpan.Zero ? TimeSpan.Zero : moved);
         }
 
-        Result = $"Všetky kapitoly sú posunuté o {seconds} s.";
+        Result = Loc.F("Všetky kapitoly sú posunuté o {0} s.", seconds);
     }
 
     private void Import()
     {
-        var dialog = new OpenFileDialog { Filter = "Kapitoly (*.xml;*.txt)|*.xml;*.txt|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Kapitoly") + " (*.xml;*.txt)|*.xml;*.txt|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() != true)
         {
             return;
@@ -312,11 +313,11 @@ public sealed class ChaptersPageViewModel : ObservableObject
                 ? ChapterFormats.ParseXml(text).Chapters
                 : ChapterFormats.ParseOgm(text, Language());
             Fill(chapters, dirty: true);
-            Result = $"Načítané zo súboru: {Count(chapters.Count)}.";
+            Result = Loc.F("Načítané zo súboru: {0}.", Count(chapters.Count));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException or FormatException)
         {
-            Result = "Súbor s kapitolami sa nepodarilo prečítať: " + ex.Message;
+            Result = Loc.T("Súbor s kapitolami sa nepodarilo prečítať: ") + ex.Message;
         }
     }
 
@@ -343,16 +344,16 @@ public sealed class ChaptersPageViewModel : ObservableObject
                 case ProcessingStatus.Done:
                     _undoRecord = result.UndoRecordPath;
                     await ReadAsync(result.OutputPath!);
-                    Result = $"Uložené do knižnice ({count}): {LibraryPath(result.OutputPath)}." +
-                             (_undoRecord is null ? " Originál ostal nezmenený." : " Zmenu súboru v knižnici je možné vrátiť späť.");
+                    Result = Loc.F("Uložené do knižnice ({0}): {1}.", count, LibraryPath(result.OutputPath)) +
+                             (_undoRecord is null ? Loc.T(" Originál ostal nezmenený.") : Loc.T(" Zmenu súboru v knižnici je možné vrátiť späť."));
                     break;
                 case ProcessingStatus.AlreadyInLibrary:
-                    Result = $"Rovnaký výsledok už v knižnici je: {LibraryPath(result.OutputPath)}. Nič sa nezapísalo.";
+                    Result = Loc.F("Rovnaký výsledok už v knižnici je: {0}. Nič sa nezapísalo.", LibraryPath(result.OutputPath));
                     break;
                 default:
                     Result = (FileProcessor.NeedsAttention(result)
-                        ? "POZOR: nepodarilo sa a súbor v knižnici sa nepodarilo úplne vrátiť – záznam: " + result.UndoRecordPath
-                        : "Nepodarilo sa – nič sa nezmenilo.") + "\n" + string.Join("\n", result.Messages);
+                        ? Loc.T("POZOR: nepodarilo sa a súbor v knižnici sa nepodarilo úplne vrátiť – záznam: ") + result.UndoRecordPath
+                        : Loc.T("Nepodarilo sa – nič sa nezmenilo.")) + "\n" + string.Join("\n", result.Messages);
                     break;
             }
         }
@@ -381,17 +382,17 @@ public sealed class ChaptersPageViewModel : ObservableObject
         {
             _undoRecord = null;
             await ReadAsync(path);
-            Result = "Pôvodné kapitoly sú vrátené.";
+            Result = Loc.T("Pôvodné kapitoly sú vrátené.");
         }
         else
         {
-            Result = "Vrátenie sa nepodarilo:\n" + string.Join("\n", problems);
+            Result = Loc.T("Vrátenie sa nepodarilo:") + "\n" + string.Join("\n", problems);
         }
     }
 
     private async Task OpenAsync()
     {
-        var dialog = new OpenFileDialog { Filter = "Súbory Matroska (*.mkv;*.mka;*.mks)|*.mkv;*.mka;*.mks|Všetky súbory|*.*" };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Súbory Matroska") + " (*.mkv;*.mka;*.mks)|*.mkv;*.mka;*.mks|" + Loc.T("Všetky súbory") + "|*.*" };
         if (dialog.ShowDialog() == true)
         {
             await LoadAsync(dialog.FileName);

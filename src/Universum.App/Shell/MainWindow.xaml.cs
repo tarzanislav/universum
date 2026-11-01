@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Universum.App.Pages;
+using Universum.App.Localization;
 
 namespace Universum.App.Shell;
 
@@ -54,7 +55,7 @@ public partial class MainWindow : Window
 
         _stopping = true;
         IsEnabled = false;
-        Title = "UNIVERSUM – zastavujem prácu…";
+        Title = Loc.T("UNIVERSUM – zastavujem prácu…");
         await Model.StopWorkAsync(TimeSpan.FromSeconds(20));
         _stopped = true;
 

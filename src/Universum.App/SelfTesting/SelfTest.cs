@@ -520,7 +520,7 @@ internal static class SelfTest
             await Task.Delay(100);
         }
 
-        Check(batch.Files.All(f => f.State == Core.Mega.MegaFileState.Done && f.ResultPath is { } result && File.Exists(result) && result.StartsWith(services.Library.Root, StringComparison.OrdinalIgnoreCase)) &&
+        Check(batch.Files.All(f => f.State == Core.Mega.MegaFileState.Done && f.ResultPath is { } result && File.Exists(result) && result.StartsWith(services.Library!.Root, StringComparison.OrdinalIgnoreCase)) &&
               File.Exists(single) && File.Exists(film),
             "mega: the result of Zlučovanie and the file of Single written into the library, originals kept – " + string.Join(" | ", batch.Files.Select(f => $"{f.State}: {f.Note}")));
 

@@ -69,7 +69,7 @@ public sealed class PreviewViewModel : ObservableObject
             OnPropertyChanged(nameof(Subtitles));
             Status = $"{_file.TracksOf(TrackType.Audio).Count()} zvuk(y), {_file.TracksOf(TrackType.Subtitles).Count()} titulky – zvuk prepnete pod obrazom, titulky vpravo hore.";
             // the subtitles a player shows by themselves: the default (or forced) track
-            if (_file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Default) ?? _file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Forced) is { } shown)
+            if ((_file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Default) ?? _file.TracksOf(TrackType.Subtitles).FirstOrDefault(t => t.Flags.Forced)) is { } shown)
             {
                 Subtitle = Subtitles.First(s => s.Value == shown.Id);
             }

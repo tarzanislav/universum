@@ -195,7 +195,7 @@ public sealed partial class SubtitlesPageViewModel
                 if (row.ExternalPath is { } external)
                 {
                     OcrStatus = Loc.T("Čítam obrázkové titulky súboru…");
-                    cues = await PgsReader.ReadFileAsync(external, stop);
+                    cues = await PictureSubtitles.ReadFileAsync(external, stop);
                 }
                 else if (file is not null && _services.CurrentMkvToolNix is { } installation)
                 {
@@ -606,7 +606,7 @@ public sealed partial class SubtitlesPageViewModel
                 : [];
             return languages.Count == 0
                 ? Loc.T("Slovník je zatiaľ prázdny – oprava podľa jazyka použije len slová, ktoré UNIVERSUM vo filme prečíta isto. Naučte ho z priečinka s vašimi titulkami.")
-                : Loc.T("Slovník z vašich titulkov: ") + string.Join(", ", languages.Select(l => _lexicons.TryGetValue(l, out var lexicon) ? Loc.F("{0} {1:N0} slov", l, lexicon.Count) : l)) +
+                : Loc.T("Slovník z vašich titulkov: ") + string.Join(", ", languages.Select(l => _lexicons.TryGetValue(l, out var lexicon) ? Loc.F("{0} {1:N0} slov, {2:N0} dvojíc slov", l, lexicon.Count, lexicon.PairCount) : l)) +
                   Loc.T(" (len v tomto počítači).");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

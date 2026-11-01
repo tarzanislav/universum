@@ -6,9 +6,9 @@ processing, and the Dashboard also draws on your picks.
 !info The sources are asked **only at the first start of the day** or with the [Refresh] button. Stored data is shown at once.
 
 ## Premieres
-Four colored cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** and
-**SERIÁL – SVET premiéry**. The number on a card is the number of titles. *SK/CZ* are only Czech and Slovak titles, *SVET* all the others.
-1. Click a card, e.g. **FILM – SK/CZ premiéry**.
+Four colored cards: **FILM – SK/CZ premieres**, **FILM – WORLD premieres**, **SERIES – SK/CZ premieres** and
+**SERIES – WORLD premieres**. The number on a card is the number of titles. *SK/CZ* are only Czech and Slovak titles, *SVET* all the others.
+1. Click a card, e.g. **FILM – SK/CZ premieres**.
 2. Choose a view: [Past week], [Upcoming], [History] or [Show everything] (history, last week
   and upcoming at once).
 3. Tick a title you look forward to in the **Selected** column. The [Show selected] option then shows only the selected ones.
@@ -16,14 +16,14 @@ Four colored cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, *
 - Films have the columns **Film title**, **Genre**, **Production**, **Premiere**, **When**, **Day**, **VOD / TV / cinema**.
 - Series also have **Season · episode**, **Frequency** and **Episodes**.
 - Next to the title are the links [TMDB] and [HISTRA]; the green line **▶ service (country)** tells where the title can be watched legally.
-- [Show posters too] adds posters, the **Veľkosť POSTERU** slider makes them up to 2× bigger. The [Search:] field also searches without accents.
+- [Show posters too] adds posters, the **POSTER size** slider makes them up to 2× bigger. The [Search:] field also searches without accents.
 !tip A premiere moves to **History** the day after its date and stays there for good.
 !pozor Czech and Slovak series need a source – add it in **Settings → News sources**.
 ![Premieres – films](premieres-films.jpg)
 @otvorit Premieres Open Premieres
 
 ## News – Series
-Episodes of running series from the last week, on the **SERIÁL – CZ/SK** and **SERIÁL – SVET** cards. The series are
+Episodes of running series from the last week, on the **SERIES – CZ/SK** and **SERIES – WORLD** cards. The series are
 sorted alphabetically with the next episode; the arrow on the left expands the **episode tree**.
 1. Check the **Input folder** at the top – that is where UNIVERSUM looks for downloaded episodes ([Change…], [Open]).
 2. Tick episodes in the tree or the box in the **Process** column (all aired episodes of the series).

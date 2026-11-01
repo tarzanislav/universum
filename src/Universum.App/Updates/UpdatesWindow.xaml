@@ -31,7 +31,7 @@
                         <TextBlock Text="{Binding MkvToolNixLine}" TextWrapping="Wrap" Margin="0,4,0,0" />
                         <TextBox Text="{Binding MkvNews, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Margin="0,8,0,0"
                                  Visibility="{Binding HasMkvNews, Converter={StaticResource BoolToVisibility}}"
-                                 MaxHeight="220" VerticalScrollBarVisibility="Auto" ToolTip="Zoznam zmien z NEWS.md (anglicky, ako ho vydáva autor MKVToolNix)" />
+                                 MaxHeight="220" VerticalScrollBarVisibility="Auto" ToolTip="{loc:T 'Zoznam zmien z NEWS.md (anglicky, ako ho vydáva autor MKVToolNix)'}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
@@ -59,7 +59,7 @@
         <DockPanel Grid.Row="4" Margin="0,6,0,0">
             <Button DockPanel.Dock="Right" Content="{loc:T 'Zavrieť'}" IsCancel="True" Click="OnClose" Padding="16,6" />
             <StackPanel Orientation="Horizontal">
-                <Button Content="{loc:T 'Pripomenúť neskôr'}" Command="{Binding RemindLaterCommand}" Margin="0,0,8,0" Padding="12,6" ToolTip="Znova o 3 dni (bezpečnostné opravy MKVToolNix aj skôr)" />
+                <Button Content="{loc:T 'Pripomenúť neskôr'}" Command="{Binding RemindLaterCommand}" Margin="0,0,8,0" Padding="12,6" ToolTip="{loc:T 'Znova o 3 dni (bezpečnostné opravy MKVToolNix aj skôr)'}" />
                 <Button Content="{loc:T 'Preskočiť túto verziu'}" Command="{Binding SkipCommand}" Margin="0,0,8,0" Padding="12,6" />
                 <Button Content="{loc:T 'Skontrolovať znova'}" Command="{Binding CheckCommand}" Padding="12,6" />
             </StackPanel>

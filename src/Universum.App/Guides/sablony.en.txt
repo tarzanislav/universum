@@ -7,17 +7,17 @@ The **TEMPLATES** group adjusts a video according to the *UNIVERSUM rules* – l
 One file according to the UNIVERSUM rules. Handy for a quick edit of one film or one episode.
 
 1. Click [Open file…] and choose a video (MKV, MP4, AVI, TS…). The dialog starts in the input folder.
-2. In the track table, check the **Jazyk (pred → po)** and **Názov (pred → po)** columns. Choose an undetermined or wrong language from the menu; you can rewrite the track name.
-3. Change the order of audio and subtitle tracks in the **Poradie** column – drag a track, or use the arrows.
-4. Choose *film* or *series*, type *Title (year)* in the **Titul** field and click [TMDB]. If [Confirm the title] appears, check the suggestion and confirm it.
-5. For a series, fill in **Epizóda** (e.g. S01E04). If needed, choose a **Doplnok** (e.g. Directors Cut).
-6. Check the **Cieľ** line and click [Apply the rules]. If you want to run the processing later, click [Add to queue].
+2. In the track table, check the **Language (before → after)** and **Name (before → after)** columns. Choose an undetermined or wrong language from the menu; you can rewrite the track name.
+3. Change the order of audio and subtitle tracks in the **Order** column – drag a track, or use the arrows.
+4. Choose *film* or *series*, type *Title (year)* in the **Title** field and click [TMDB]. If [Confirm the title] appears, check the suggestion and confirm it.
+5. For a series, fill in **Episode** (e.g. S01E04). If needed, choose a **Addition** (e.g. Directors Cut).
+6. Check the **Target** line and click [Apply the rules]. If you want to run the processing later, click [Add to queue].
 
 ![Single processing – tracks, title and library target before writing](rules-preview.jpg)
 
 - **Forced** – tick it to mark subtitles as forced. UNIVERSUM sometimes suggests this by itself, for example when there are only a few subtitles.
 - [Revision] – appears when the result is already in the library. The file is processed again as a new version: the new one is written and verified, and only then does the current one go to the Recycle Bin.
-- [Folder…] next to **Knižnica:** changes where the results are written.
+- [Folder…] next to **Library:** changes where the results are written.
 - [Clear the queue] forgets the open file that has not been processed yet. Nothing changes on the disk.
 
 !pozor In Single processing the **Originál: vymazať** option is switched off – the original is always kept here.
@@ -29,23 +29,23 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 ## Batch processing
 A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows the *simulation result* – before anything is written, you can see what each file will become.
 
-1. Click [Folder…], tick **aj podpriečinky** if needed, and click [Analyze].
+1. Click [Folder…], tick **subfolders too** if needed, and click [Analyze].
 2. On the left, choose a group – series are at the top in the **Series groups** list, films below in the **Film groups** list. On the right you will see its files and, below them, **Group tracks**.
-3. Choose the kind, *films* or *series*. For a series, fill in **Seriál:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
+3. Choose the kind, *films* or *series*. For a series, fill in **Series:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
 4. Check and accept the suggested names: [Refine the titles], [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
-5. In **Group tracks**, set **Jazyk**, **Názov stopy**, **Forced** and the order. The decision applies to all files in the group.
-6. At **Originál:**, choose *keep*, *delete automatically* or *delete manually*.
+5. In **Group tracks**, set **Language**, **Track name**, **Forced** and the order. The decision applies to all files in the group.
+6. At **Original:**, choose *keep*, *delete automatically* or *delete manually*.
 7. Click [Start]. You can follow the progress in the Job queue too; a prominent bar shows when it has finished.
 
 ![Batch processing ready to start](batch-ready.jpg)
 
 ### Important file columns
-- **Film / epizóda** – the film name *Title (year)* or the episode number (S01E04). If the suggestion is not certain, confirm it with [Confirm the suggestion] or choose another title that was found.
-- **Jazyk audia** – the language of the audio track for this file only. It takes priority over the setting for the group.
-- **Cieľ v knižnici** – where and under what name the result is written.
-- **Doplnok k názvu** – another version of the title (Directors Cut, Remaster, 2…).
-- **Aj tak** – the file is processed even without a track the template requires.
-- **Revízia** – the result is already in the library; the file is processed again as a new version.
+- **Film / episode** – the film name *Title (year)* or the episode number (S01E04). If the suggestion is not certain, confirm it with [Confirm the suggestion] or choose another title that was found.
+- **Audio language** – the language of the audio track for this file only. It takes priority over the setting for the group.
+- **Target in the library** – where and under what name the result is written.
+- **Name addition** – another version of the title (Directors Cut, Remaster, 2…).
+- **Anyway** – the file is processed even without a track the template requires.
+- **Revision** – the result is already in the library; the file is processed again as a new version.
 
 ### Speech language detection
 If an audio track has no language, click [Recognize the audio languages ▾] and choose *Selected files*, *Whole group* or *All groups*. UNIVERSUM listens to several sections from different parts of the film and suggests the language. Everything happens **only on your computer**. Accept the suggestions with [Confirm the suggestions].
@@ -55,8 +55,8 @@ If an audio track has no language, click [Recognize the audio languages ▾] and
 !tip UNIVERSUM reads the language of text subtitles by itself after the analysis. If needed, repeat it with [Read the subtitles again].
 
 ### Template and other buttons
-- **Šablóna:** – [From the group] makes a template from the chosen group, [No template] uses only the UNIVERSUM rules. Use [Save…] and [Load…] to save a template or use it again.
-- **stopy mimo šablóny odstrániť** – tracks the template doesn't know are left out of the result.
+- **Template:** – [From the group] makes a template from the chosen group, [No template] uses only the UNIVERSUM rules. Use [Save…] and [Load…] to save a template or use it again.
+- **remove tracks outside the template** – tracks the template doesn't know are left out of the result.
 - [Audio in studio] and [Subtitles in studio] – more detailed editing of one track. The changes are saved to the job.
 - [Save the report…] saves an overview of the run; [Pozastaviť] and [Stop] control the run.
 - [Clean up leftovers] moves temporary files left over from interrupted processing to the Recycle Bin.
@@ -72,13 +72,13 @@ Batches prepared in Batch processing, Single processing or Merging that are writ
 
 1. In Batch processing, prepare the files and, in the menu next to the button, choose a *new batch* or adding to a waiting batch.
 2. Click [Send to MEGA]. The files are saved to the batch with all the decisions, the template and the choice for the originals.
-3. In MEGA processing, use the **Spustiť** column to set when the batch starts: *when I start it*, *after the previous batch* or *at a date and time* (a date and time, e.g. 2:00).
+3. In MEGA processing, use the **Start** column to set when the batch starts: *when I start it*, *after the previous batch* or *at a date and time* (a date and time, e.g. 2:00).
 4. Change the order of the batches with the [▲] and [▼] arrows. Start a batch immediately with [Start now].
 
 ![List of MEGA processing batches](mega.jpg)
 
-- Batch columns: **Dávka**, **Čo obsahuje**, **Súbory**, **Originály** (*keep*, *delete automatically*, *delete manually*), **Spustiť**, **Stav**, **Výsledok**.
-- **Súbory vybranej dávky** shows the **Cieľ v knižnici**, **Stav** and **Poznámka** of each file.
+- Batch columns: **Batch**, **What it contains**, **Files**, **Originals** (*keep*, *delete automatically*, *delete manually*), **Start**, **Status**, **Result**.
+- **Files of the selected batch** shows the **Target in the library**, **Status** and **Note** of each file.
 - [Edit in Batch processing] – opens the batch with all its decisions. After making changes, click the button with the batch number, e.g. [Uložiť do Dávka 1]. While a batch is being edited, it does not start.
 - [Again the skipped and failed] – files of a finished batch that were skipped, failed or were cancelled are checked and written again.
 - [Delete the originals] – for a batch sent with *delete manually*, sends the originals of the written files to the Windows Recycle Bin.
@@ -90,7 +90,7 @@ Batches prepared in Batch processing, Single processing or Merging that are writ
 !info Before writing, every file is checked again. A missing or changed file, or one that is already in the library, is **skipped** and nothing breaks.
 
 ### Where the files come from
-A batch takes files from **Batch processing**, **Single processing** and results of **Merging** – the column **Odkiaľ** shows where from.
+A batch takes files from **Batch processing**, **Single processing** and results of **Merging** – the column **From** shows where from.
 - A file of Single processing and a result of Merging **always keep their originals**, whatever the batch has chosen.
 - A result of Merging is written whole by its settings; if one of its files changes meanwhile, it is **skipped**.
 - [Edit in Batch processing] opens only the files that came from Batch processing.
@@ -102,7 +102,7 @@ Results are written to a library prepared for Jellyfin:
 - films go to the **MOVIES** folder, e.g. MOVIES\\Vymyslený film (2026)
 - series go to the **TVSHOWS** folder by season, e.g. TVSHOWS\\Vymyslený seriál (2024)\\Season 01. Specials always go to *Season 00*.
 
-The file name contains the title, year, languages, resolution, codec and size class, e.g. *Vymyslený film (2026) - CZ EN FHD H264 BIG.mkv*. The **Doplnok k názvu** is added before the size class: *… H264 Directors Cut BIG.mkv*. Jellyfin shows it as the version name.
+The file name contains the title, year, languages, resolution, codec and size class, e.g. *Vymyslený film (2026) - CZ EN FHD H264 BIG.mkv*. The **Name addition** is added before the size class: *… H264 Directors Cut BIG.mkv*. Jellyfin shows it as the version name.
 
 !info A title in Latin script gets its original name; a title in another script gets its English name. The name is checked via TMDB.
 

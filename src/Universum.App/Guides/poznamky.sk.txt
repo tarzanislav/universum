@@ -6,7 +6,7 @@ automaticky aj v Kalendári, poznámka k dňu aj v Poznámkach. Nič sa nikam ne
 Kalendár ukazuje vaše záznamy spolu s premiérami, epizódami, sviatkami, menami a prácou UNIVERSUM.
 ![Kalendár – mesiac](calendar-month.jpg)
 ### Zobrazenia
-- **Mesiac**, **Týždeň**, **Týždeň ako zoznam**, **Mesiac ako zoznam**, **Rok – 12 mesiacov**, **Rok v riadkoch** a **Agenda**
+- **Mesiac**, **Týždeň**, **Týždeň – zoznam**, **Mesiac – zoznam**, **Rok – mesiace**, **Rok – riadky** a **Agenda**
   (len dni, v ktorých niečo je).
 - Šípkami sa posúvate o obdobie, tlačidlo [Dnes] vás vráti na dnešok.
 - **Klik na deň** ukáže vľavo všetko o ňom: sviatky, mená, záznamy, premiéry a epizódy.

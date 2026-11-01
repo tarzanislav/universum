@@ -25,6 +25,124 @@ public sealed class OcrTests
     }
 
     [Test]
+    public void PunctuationAndSpellingOfReadText()
+    {
+        // owner, 1. 11. 2026 (O3): what the reading of pictures typically gets wrong in punctuation
+        string Mended(string line, string language, List<(string Before, string After, string Why)>? changes = null) =>
+            OcrPunctuation.Mend(line, language, changes ?? []);
+        Assert.Equal("- Ahoj, Peter.", Mended("-Ahoj, Peter.", "sk"), "a dialogue dash gets its space");
+        Assert.Equal("Áno, ale nie dnes.", Mended("Áno. ale nie dnes.", "sk"), "a dot before a small letter is a comma");
+        Assert.Equal("Napr. pes a mačka.", Mended("Napr. pes a mačka.", "sk"), "not after an abbreviation");
+        Assert.Equal("Áno. Nie, nechcem.", Mended("Áno.Nie,nechcem.", "sk"), "a sentence and a comma glued to the next word");
+        Assert.Equal("Stálo 1,5 eura a 3.20 dolára.", Mended("Stálo 1,5 eura a 3.20 dolára.", "sk"), "numbers stay");
+        Assert.Equal("Čo? Počkaj… teraz!", Mended("Čo?. Počkaj. . . teraz !", "sk"), "doubled marks, a spaced ellipsis, a space before a mark");
+        Assert.Equal("I think I'm right, and I'll go.", Mended("l think l'm right, and l'll go.", "en"), "English: the pronoun I");
+        Assert.Equal("l ako list", Mended("l ako list", "sk"), "a Slovak l stays");
+
+        var changes = new List<(string Before, string After, string Why)>();
+        var line = Mended("-Áno. ale", "sk", changes);
+        Assert.True(changes.Count == 2 && changes.All(c => c.Why == "interpunkcia"), "two changes noted: " + string.Join(" | ", changes));
+        var back = changes.Aggregate(line, (text, c) => OcrWords.ReplaceWord(text, c.After, c.Before) ?? text);
+        Assert.Equal("-Áno. ale", back, "each change can be taken back by its words");
+    }
+
+    [Test]
+    public void LexiconKnowsPairsOfWords()
+    {
+        var lexicon = new OcrLexicon();
+        lexicon.Learn("- To je pes, to je mačka.\nTo je.");
+        Assert.True(lexicon.Pair("to", "je") == 3 && lexicon.Pair("je", "pes") == 1 && lexicon.Pair("pes", "to") == 1 && lexicon.Pair("mačka", "to") == 0,
+            "pairs within a sentence (a comma keeps it, a dot or a new line ends it)");
+        var folder = Directory.CreateTempSubdirectory("universum-pairs-").FullName;
+        try
+        {
+            var file = Path.Combine(folder, "slovnik.json");
+            lexicon.Save(file);
+            var again = OcrLexicon.Load(file);
+            Assert.True(again.Pair("To", "JE") == 3 && again.Frequency("je") == 3 && again.Count == lexicon.Count && again.PairCount == lexicon.PairCount, "kept in the file");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Test]
+    public void NeighboursDecideBetweenTwoWords()
+    {
+        // owner, 1. 11. 2026 (O2): "ta" and "to" are both words; read with a doubtful letter, the neighbours decide
+        var lexicon = new OcrLexicon();
+        var random = new Random(5);
+        string Word() => new(Enumerable.Range(0, random.Next(3, 7)).Select(_ => (char)('a' + random.Next(26))).ToArray());
+        for (var i = 0; i < 1200; i++)
+        {
+            lexicon.Learn($"{Word()} {Word()} {Word()}.");
+        }
+
+        for (var i = 0; i < 20; i++)
+        {
+            lexicon.Learn("Áno, to je dobré.");
+        }
+
+        for (var i = 0; i < 6; i++)
+        {
+            lexicon.Learn("Ta žena spí.");
+        }
+
+        var clusters = new Dictionary<string, OcrCluster>();
+        OcrCluster Sure(string letter)
+        {
+            if (!clusters.TryGetValue(letter, out var cluster))
+            {
+                clusters[letter] = cluster = new OcrCluster(default, new InkBitmap(1, 1, [0]), 0, 20) { Text = letter, Distance = 0.05f, Candidates = [(letter, 0.05f), ("#", 0.4f)] };
+            }
+
+            return cluster;
+        }
+
+        // the "a" of this film looks almost as much like an "o"
+        var doubtful = new OcrCluster(default, new InkBitmap(1, 1, [0]), 0, 20) { Text = "a", Distance = 0.15f, Candidates = [("a", 0.15f), ("o", 0.17f)] };
+        List<(OcrCluster, FoundGlyph)> Line(params string[] words)
+        {
+            var line = new List<(OcrCluster, FoundGlyph)>();
+            var x = 0;
+            foreach (var word in words)
+            {
+                foreach (var letter in word)
+                {
+                    var cluster = letter == '@' ? doubtful : Sure(letter.ToString());
+                    line.Add((cluster, new FoundGlyph(x, 0, x + 10, 20, [])));
+                    x += 12;
+                }
+
+                x += 10;
+            }
+
+            return line;
+        }
+
+        var placed = new List<List<List<(OcrCluster, FoundGlyph)>>>
+        {
+            new() { Line("t@", "je", "dobré") },
+            new() { Line("t@", "žena", "spí") },
+            new() { Line("dobré", "je", "to") },
+        };
+        var times = placed.Select((_, i) => (TimeSpan.FromSeconds(i * 3), TimeSpan.FromSeconds((i * 3) + 2))).ToList();
+        var caps = placed.Select(c => c.Select(_ => 20f).ToArray()).ToList();
+        foreach (var cluster in clusters.Values.Append(doubtful))
+        {
+            cluster.Count = 1;
+        }
+
+        var run = new OcrRun(times, caps, placed, [.. clusters.Values, doubtful], null, "sk");
+        run.Check(lexicon);
+        var read = run.Document().Cues.Select(c => c.Text).ToList();
+        Assert.Equal("to je dobré", read[0], "\"ta je\" never, \"to je\" often: to");
+        Assert.Equal("ta žena spí", read[1], "\"ta žena\" seen: stays ta");
+        Assert.True(run.Corrections.Any(c => c is { Before: "ta", After: "to", Why: "slovo podľa susedných slov" }), string.Join(" | ", run.Corrections));
+    }
+
+    [Test]
     public void TaughtLettersAreRememberedForOtherFilms()
     {
         // an invented shape (a small hook) told once is found again by a new memory read from the file
@@ -394,6 +512,46 @@ public sealed class OcrTests
     }
 
     // FFmpeg with drawtext (FreeType) and the DejaVu Sans font, when this computer has them
+    [Test]
+    public async Task DvdLettersNarrowerThanTheFontsAreRead()
+    {
+        // owner, 1. 11. 2026 (VobSub): a 16:9 DVD keeps its picture 720 pixels wide – the letters are narrower than the fonts'
+        if (Tools() is not { } tools)
+        {
+            Assert.Skip("FFmpeg with drawtext and the DejaVu font are not here");
+            return;
+        }
+
+        var (ffmpeg, font) = tools;
+        var folder = Directory.CreateTempSubdirectory("universum-ocr-dvd-").FullName;
+        try
+        {
+            var templates = OcrTemplates.From(await DrawAlphabetAsync(ffmpeg, font, folder));
+            string[] lines = ["Vymyslený titulok z DVD, číslo 7.", "Kôň ťahá ďalší voz – áno!", "Malá žltá ryba pláva po rieke."];
+            var pictures = new List<OcrPicture>();
+            for (var i = 0; i < lines.Length; i++)
+            {
+                pictures.Add(new OcrPicture(TimeSpan.FromSeconds(i * 3), TimeSpan.FromSeconds((i * 3) + 2), await DrawSubtitleAsync(ffmpeg, font, folder, lines[i], 40, squeeze: 720f / 1024)));
+            }
+
+            var ocr = new SubtitleOcr(templates, new OcrMemory(Path.Combine(folder, "pamat.json")), "sk");
+            var run = ocr.Read(pictures);
+            foreach (var unknown in run.Unknown)
+            {
+                run.Teach(unknown, "?");
+            }
+
+            run.Check(null);
+            var read = run.Document().Cues.Select(c => c.Text).ToList();
+            Assert.True(MathF.Abs(ocr.Stretch - (1024f / 720)) < 0.01f, $"the letters taken 1,42 times wider ({ocr.Stretch:0.###})");
+            Assert.True(read.SequenceEqual(lines), $"read back: {string.Join(" | ", read)}");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private static (string Ffmpeg, string Font)? Tools()
     {
         var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
@@ -448,14 +606,16 @@ public sealed class OcrTests
     }
 
     // a subtitle as a Blu-ray draws it: white letters with a black outline (here on black)
-    private static async Task<InkBitmap> DrawSubtitleAsync(string ffmpeg, string font, string folder, string text, int size)
+    private static async Task<InkBitmap> DrawSubtitleAsync(string ffmpeg, string font, string folder, string text, int size, float squeeze = 1)
     {
-        var file = Path.Combine(folder, $"t{size}.txt");
+        var file = Path.Combine(folder, $"t{size}-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(file, text);
         const int width = 1100, height = 120;
+        var shown = (int)MathF.Round(width * squeeze);
         var bgra = await DrawAsync(ffmpeg, folder, width, height,
-            $"drawtext=fontfile={font}:textfile={file}:fontsize={size}:fontcolor=white:borderw=3:bordercolor=black:x=20:y=80-ascent", "bgra");
-        return InkBitmap.FromBgra(bgra, width, height, width * 4);
+            $"drawtext=fontfile={font}:textfile={file}:fontsize={size}:fontcolor=white:borderw=3:bordercolor=black:x=20:y=80-ascent" +
+            (squeeze == 1 ? "" : $",scale={shown}:{height}"), "bgra");
+        return InkBitmap.FromBgra(bgra, shown, height, shown * 4);
     }
 
     private static async Task<byte[]> DrawAsync(string ffmpeg, string folder, int width, int height, string filter, string format)

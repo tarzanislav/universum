@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
 namespace Universum.App.Shell;
 
@@ -13,10 +14,19 @@ namespace Universum.App.Shell;
 internal static class QuickDropDowns
 {
     /// <summary>For every drop-down list of the application (once, at the start).</summary>
-    public static void Register() =>
-        EventManager.RegisterClassHandler(typeof(ComboBox), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnLoaded));
+    /// <remarks>
+    /// Loaded cannot be used: WPF raises it only on elements that have their own handler of it (a class handler is not
+    /// enough – the self-test found the lists unchanged). The first layout of a drop-down, and a click or the focus before
+    /// it opens, come to every one of them.
+    /// </remarks>
+    public static void Register()
+    {
+        EventManager.RegisterClassHandler(typeof(ComboBox), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler((sender, _) => Prepare(sender)));
+        EventManager.RegisterClassHandler(typeof(ComboBox), UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((sender, _) => Prepare(sender)), true);
+        EventManager.RegisterClassHandler(typeof(ComboBox), UIElement.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler((sender, _) => Prepare(sender)), true);
+    }
 
-    private static void OnLoaded(object sender, RoutedEventArgs e)
+    private static void Prepare(object sender)
     {
         if (sender is not ComboBox combo)
         {
@@ -47,9 +57,13 @@ internal static class QuickDropDowns
         }
 
         // the drop-down itself (a template that passes it on to its list) and the list's own scrolling (one that does not)
-        combo.SetValue(ScrollViewer.CanContentScrollProperty, true);
-        combo.SetValue(VirtualizingPanel.IsVirtualizingProperty, true);
-        combo.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+        if (!ScrollViewer.GetCanContentScroll(combo))
+        {
+            combo.SetValue(ScrollViewer.CanContentScrollProperty, true);
+            combo.SetValue(VirtualizingPanel.IsVirtualizingProperty, true);
+            combo.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+        }
+
         if (Scroller(combo) is not { } scroller)
         {
             return false;

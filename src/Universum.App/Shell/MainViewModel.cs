@@ -311,6 +311,9 @@ public sealed class MainViewModel : ObservableObject
     public bool HasArrivals => _services.Arrivals.Count > 0;
 
     private readonly System.Windows.Threading.DispatcherTimer _reminderTimer;
+
+    /// <summary>No more checks of reminders and actions (a window of the self-test that is closed).</summary>
+    internal void StopTimers() => _reminderTimer.Stop();
     private DateTime _reminderCheck;
     private DateTime _actionCheck;
     private bool _actionsRunning;

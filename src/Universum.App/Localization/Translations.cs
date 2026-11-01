@@ -237,6 +237,12 @@ internal static class Translations
         ["Žiadna otvorená úloha na najbližších 7 dní."] = "Žádný otevřený úkol na nejbližších 7 dní.",
         ["Hotovo"] = "Hotovo",
         ["Pripnuté poznámky"] = "Připnuté poznámky",
+        ["Dnešné záznamy"] = "Dnešní záznamy",
+        ["Úlohy po termíne"] = "Úkoly po termínu",
+        ["Dnešné úlohy"] = "Dnešní úkoly",
+        ["Nová akcia UNIVERSUM…"] = "Nová akce UNIVERSUM…",
+        ["UNIVERSUM vykoná sám"] = "UNIVERSUM provede sám",
+        ["Upraviť"] = "Upravit",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -470,5 +476,11 @@ internal static class Translations
         ["Žiadna otvorená úloha na najbližších 7 dní."] = "No open task for the next 7 days.",
         ["Hotovo"] = "Done",
         ["Pripnuté poznámky"] = "Pinned notes",
+        ["Dnešné záznamy"] = "Today's records",
+        ["Úlohy po termíne"] = "Overdue tasks",
+        ["Dnešné úlohy"] = "Today's tasks",
+        ["Nová akcia UNIVERSUM…"] = "New UNIVERSUM action…",
+        ["UNIVERSUM vykoná sám"] = "UNIVERSUM does by itself",
+        ["Upraviť"] = "Edit",
     };
 }

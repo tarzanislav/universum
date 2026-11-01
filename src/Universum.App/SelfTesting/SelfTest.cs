@@ -1283,6 +1283,7 @@ internal static class SelfTest
         await TestNotesAsync(model, window, services);
         await TestReportsAsync(model, services);
         await TestDashboardAgendaAsync(model, window, services);
+        await TestActionsAsync(model, window, services);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
@@ -1385,6 +1386,76 @@ internal static class SelfTest
         }
 
         store.EmptyBin();
+    }
+
+    /// <summary>
+    /// POZNÁMKY, stage P4 (owner, 31. 10. 2026): an action of UNIVERSUM planned in Plánované úlohy (every night at three),
+    /// done by itself at its time and told, shown in Kalendár; an action needs an hour; an iCalendar file of another
+    /// program read (twice – nothing comes twice); the live counts in the left rail; invented texts only.
+    /// </summary>
+    private static async Task TestActionsAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var store = services.Agenda;
+        var tasks = model.AgendaTasks;
+        model.Open(tasks);
+        tasks.NewAction(Core.Agenda.AgendaActionKind.SyncHistra);
+        var editor = tasks.Editor!;
+        Check(editor is { IsEvent: true, HasAction: true, AllDay: false, StartTimeText: "03:00" } && editor.Repeat.Value == Core.Agenda.RepeatEvery.Day && editor.Title.Length > 0,
+            "actions: a new action of UNIVERSUM – every night at three – " + editor.Title);
+        editor.AllDay = true;
+        editor.SaveCommand.Execute(null);
+        Check(tasks.HasEditor && editor.Problem.Contains("čas", StringComparison.Ordinal), "actions: an action needs an hour – " + editor.Problem);
+        editor.AllDay = false;
+        editor.Title = "Vymyslená nočná synchronizácia";
+        await Screenshot(window, "actions-editor.png");
+        editor.SaveCommand.Execute(null);
+        var nightly = store.Items.SingleOrDefault(i => i.Title == "Vymyslená nočná synchronizácia");
+        Check(nightly?.Action is { Kind: Core.Agenda.AgendaActionKind.SyncHistra } && nightly.Time is { StartTime.Hour: 3 } && tasks.Actions.Any(a => a.Item == nightly && a.Next.Contains("03:00", StringComparison.Ordinal)),
+            "actions: kept, listed with its next time – " + string.Join(" | ", tasks.Actions.Select(a => a.Title + " " + a.Next)));
+
+        // the next night: UNIVERSUM does it by itself and tells it
+        var night = today.AddDays(1).ToDateTime(new TimeOnly(3, 0, 10));
+        await model.CheckActionsAsync(night);
+        Check(nightly!.Action!.LastRun is not null && nightly.Action.LastOutcome.Length > 0 && model.ReminderText.StartsWith("⚙ UNIVERSUM vykonal", StringComparison.Ordinal),
+            "actions: done at its time and told – " + model.ReminderText);
+        await model.CheckActionsAsync(night.AddSeconds(30));
+        Check(store.Find(nightly.Id)?.Action?.LastRun == nightly.Action.LastRun, "actions: done once");
+        Check(tasks.Actions.Any(a => a.Item.Id == nightly.Id && a.HasLast), "actions: the last outcome listed");
+        await Screenshot(window, "actions-tasks.png");
+        model.DismissReminderCommand.Execute(null);
+        model.Calendar.Select(today.AddDays(1));
+        Check(model.Calendar.DetailSections.Any(s => s.Title == "UNIVERSUM" && s.Entries.Any(e => e.Layer == CalendarLayer.Actions && e.Title.StartsWith("⚙ ", StringComparison.Ordinal))),
+            "actions: in Kalendár in the layer UNIVERSUM");
+
+        // an iCalendar file of another program, read twice
+        var ics = Path.Combine(_outputDirectory, "vymysleny-kalendar.ics");
+        var day = today.AddDays(5);
+        File.WriteAllText(ics, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Vymyslený program//EN\r\n" +
+                               $"BEGIN:VEVENT\r\nUID:vymysleny-1@example.invalid\r\nDTSTART:{day:yyyyMMdd}T180000\r\nDTEND:{day:yyyyMMdd}T193000\r\nSUMMARY:Vymyslený koncert z iného programu\r\n" +
+                               "BEGIN:VALARM\r\nTRIGGER:-PT30M\r\nACTION:DISPLAY\r\nEND:VALARM\r\nEND:VEVENT\r\n" +
+                               $"BEGIN:VTODO\r\nUID:vymysleny-2@example.invalid\r\nDUE;VALUE=DATE:{day:yyyyMMdd}\r\nPRIORITY:1\r\nSUMMARY:Vymyslená úloha z iného programu\r\nEND:VTODO\r\nEND:VCALENDAR\r\n");
+        var first = model.Calendar.ImportIcs(ics);
+        var again = model.Calendar.ImportIcs(ics);
+        var concert = store.Items.SingleOrDefault(i => i.Title == "Vymyslený koncert z iného programu");
+        Check(first.Contains("2 z 2", StringComparison.Ordinal) && again.Contains("0 z 2", StringComparison.Ordinal) && concert?.Time is { StartTime.Hour: 18, ReminderMinutes: 30 } &&
+              store.Items.Any(i => i.Title == "Vymyslená úloha z iného programu" && i.Task is { Priority: 2, Due: { } due } && due == day),
+            $"actions: an iCalendar file read, the second time nothing added – {first} / {again}");
+
+        // the live counts of POZNÁMKY in the left rail
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená úloha po termíne", Task = new Core.Agenda.AgendaTask { Due = today.AddDays(-3) } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená poznámka", Note = new Core.Agenda.AgendaNote() });
+        Check(model.TasksBadge is { IsShown: true, Alert: true, Text: "1" } && model.NotesBadge.Text == "1" && model.Tools.First(t => t.Page == model.AgendaTasks).Badge == model.TasksBadge,
+            $"actions: the counts in the left rail – úlohy {model.TasksBadge.Text} (red), poznámky {model.NotesBadge.Text}");
+        await Screenshot(window, "rail-counts.png");
+
+        foreach (var record in store.Items.ToList())
+        {
+            store.Delete(record.Id);
+        }
+
+        store.EmptyBin();
+        Check(!model.TasksBadge.IsShown && !model.NotesBadge.IsShown, "actions: no counts without records");
     }
 
     /// <summary>

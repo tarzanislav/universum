@@ -71,6 +71,8 @@ public sealed class AgendaEditor : ObservableObject
     private bool _recordingNow;
     private string _voiceStatus = "";
     private VideoChoice<string> _voiceLanguage;
+    private VideoChoice<AgendaActionKind?> _action;
+    private VideoChoice<Guid?>? _megaBatch;
 
     public AgendaEditor(AgendaStore store, AgendaItem? item, DateOnly day, AgendaKind kind, Action closed)
     {
@@ -99,6 +101,7 @@ public sealed class AgendaEditor : ObservableObject
         _pinned = item?.Note?.Pinned ?? false;
         _onDay = item is null || item.Links.Any(l => l.Kind == LinkKind.Day);
         _color = Colors.FirstOrDefault(c => c.Value == item?.Color) ?? Colors[0];
+        _action = Actions.First(a => a.Value == item?.Action?.Kind);
         Day = day;
         _recording = item?.Note?.Recording;
         _voiceLanguage = VoiceLanguages.FirstOrDefault(l => l.Value == Localization.Loc.Language) ?? VoiceLanguages[0];
@@ -139,6 +142,81 @@ public sealed class AgendaEditor : ObservableObject
     /// <summary>Very light pastel colours of a record (owner: "jemné, príjemné").</summary>
     public static IReadOnlyList<VideoChoice<string?>> Colors { get; } =
         [new(null, "podľa druhu"), new("#E88AA6", "ružová"), new("#F2A65A", "oranžová"), new("#E6C84F", "žltá"), new("#7CC49A", "zelená"), new("#6FB7D9", "modrá"), new("#A58BE0", "fialová"), new("#9AA3AD", "sivá")];
+
+    /// <summary>What UNIVERSUM can do by itself at the time of an event (owner, 31. 10. 2026 – tasks for UNIVERSUM).</summary>
+    public static IReadOnlyList<VideoChoice<AgendaActionKind?>> Actions { get; } =
+    [
+        new(null, "nič – len udalosť"),
+        new(AgendaActionKind.RefreshNews, ActionText(AgendaActionKind.RefreshNews)),
+        new(AgendaActionKind.SyncHistra, ActionText(AgendaActionKind.SyncHistra)),
+        new(AgendaActionKind.AnalyzeInput, ActionText(AgendaActionKind.AnalyzeInput)),
+        new(AgendaActionKind.StartMega, ActionText(AgendaActionKind.StartMega)),
+    ];
+
+    /// <summary>"obnoviť Premiéry a Novinky" …</summary>
+    public static string ActionText(AgendaActionKind kind) => kind switch
+    {
+        AgendaActionKind.RefreshNews => Localization.Loc.Language switch { "cs" => "obnovit Premiéry a Novinky", "en" => "refresh Premiéry and Novinky", _ => "obnoviť Premiéry a Novinky" },
+        AgendaActionKind.SyncHistra => Localization.Loc.Language switch { "cs" => "synchronizovat listy HISTRA", "en" => "synchronise the HISTRA lists", _ => "synchronizovať listy HISTRA" },
+        AgendaActionKind.AnalyzeInput => Localization.Loc.Language switch { "cs" => "analyzovat složku Hromadného zpracování", "en" => "analyse the folder of Batch processing", _ => "analyzovať priečinok Hromadného spracovania" },
+        _ => Localization.Loc.Language switch { "cs" => "spustit MEGA dávku", "en" => "start a MEGA batch", _ => "spustiť MEGA dávku" },
+    };
+
+    /// <summary>The batches of MEGA spracovanie that wait for their start (the action "spustiť MEGA dávku").</summary>
+    public static IReadOnlyList<VideoChoice<Guid?>> MegaChoices(Core.Mega.MegaStore store, Guid? keep = null) =>
+        [.. store.Batches.Where(b => b.IsOpen || b.Id == keep).Select(b => new VideoChoice<Guid?>(b.Id, b.Label + (b.Name.Length > 0 ? ": " + b.Name : "") + $" ({b.Files.Count})"))];
+
+    /// <summary>The batches offered (set by the page opening the editor).</summary>
+    public IReadOnlyList<VideoChoice<Guid?>> MegaBatches { get; init; } = [];
+
+    /// <summary>What UNIVERSUM does at the time of the event.</summary>
+    public VideoChoice<AgendaActionKind?> Action
+    {
+        get => _action;
+        set
+        {
+            if (SetProperty(ref _action, value))
+            {
+                if (value.Value is not null)
+                {
+                    // an action needs an hour
+                    AllDay = false;
+                }
+
+                OnPropertyChanged(nameof(HasAction));
+                OnPropertyChanged(nameof(IsMegaAction));
+            }
+        }
+    }
+
+    public bool HasAction => Action.Value is not null;
+
+    public bool IsMegaAction => Action.Value == AgendaActionKind.StartMega;
+
+    public VideoChoice<Guid?>? MegaBatch
+    {
+        get => _megaBatch ?? MegaBatches.FirstOrDefault(b => b.Value == _item?.Action?.Batch) ?? MegaBatches.FirstOrDefault();
+        set => SetProperty(ref _megaBatch, value);
+    }
+
+    public bool NoMegaBatch => MegaBatches.Count == 0;
+
+    /// <summary>How the action works, and how it ended the last time.</summary>
+    public string ActionHint => "Vykoná sa len vtedy, keď UNIVERSUM beží (zmeškaný čas sa nedobieha); nič nezvratné sa samo nespúšťa." +
+                                (_item?.Action is { LastRun: { } last } action ? $"\nNaposledy {last.LocalDateTime:d. M. yyyy HH:mm}: {action.LastOutcome}" : "");
+
+    /// <summary>A new action of UNIVERSUM (Plánované úlohy): every night at three, the kind chosen.</summary>
+    public void PresetAction(AgendaActionKind kind)
+    {
+        IsEvent = true;
+        Action = Actions.First(a => a.Value == kind);
+        StartTimeText = "03:00";
+        Repeat = Repeats.First(r => r.Value == RepeatEvery.Day);
+        if (Title.Trim().Length == 0)
+        {
+            Title = char.ToUpper(ActionText(kind)[0], CultureInfo.CurrentCulture) + ActionText(kind)[1..];
+        }
+    }
 
     /// <summary>The day the editor was opened for.</summary>
     public DateOnly Day { get; }
@@ -378,6 +456,33 @@ public sealed class AgendaEditor : ObservableObject
                     return null;
                 }
 
+                if (Action.Value is { } kind)
+                {
+                    if (time.StartTime is null)
+                    {
+                        Problem = "Akcia UNIVERSUM potrebuje čas (zrušte Celý deň).";
+                        return null;
+                    }
+
+                    if (kind == AgendaActionKind.StartMega && MegaBatch?.Value is null)
+                    {
+                        Problem = "Zvoľte MEGA dávku, ktorá čaká na spustenie.";
+                        return null;
+                    }
+
+                    item.Action = new AgendaAction
+                    {
+                        Kind = kind,
+                        Batch = kind == AgendaActionKind.StartMega ? MegaBatch!.Value : null,
+                        LastRun = item.Action?.LastRun,
+                        LastOutcome = item.Action?.LastOutcome ?? "",
+                    };
+                }
+                else
+                {
+                    item.Action = null;
+                }
+
                 item.Time = time;
                 item.Task = AlsoTask ? MakeTask(item.Task, time.Start, time.StartTime) : null;
                 item.Note = null;
@@ -398,10 +503,12 @@ public sealed class AgendaEditor : ObservableObject
                 item.Time = null;
                 item.Task = MakeTask(item.Task, DueDate is { } due ? DateOnly.FromDateTime(due) : null, dueTime);
                 item.Note = null;
+                item.Action = null;
                 break;
             default:
                 item.Time = null;
                 item.Task = null;
+                item.Action = null;
                 item.Note = new AgendaNote { Pinned = Pinned, Recording = _recording };
                 if (OnDay)
                 {

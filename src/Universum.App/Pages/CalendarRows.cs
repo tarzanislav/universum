@@ -52,6 +52,9 @@ public enum CalendarLayer
 
     /// <summary>The runs of processing kept in the logs, on the day they ended.</summary>
     Processed,
+
+    /// <summary>The records with an action UNIVERSUM does by itself at their time.</summary>
+    Actions,
 }
 
 /// <summary>The colours of the layers: those of the tabs of Premiéry and Novinky, so nothing has to be learnt again.</summary>
@@ -75,6 +78,7 @@ public static class CalendarColors
         // the tints of the groups ŠABLÓNY (MEGA spracovanie) and MULTIPLEXING in the left rail
         [CalendarLayer.Mega] = Frozen(0x3E, 0xA8, 0x5F),
         [CalendarLayer.Processed] = Frozen(0x4A, 0x7B, 0xD9),
+        [CalendarLayer.Actions] = Frozen(0x7A, 0x6F, 0xC9),
     };
 
     /// <summary>The group POZNÁMKY in the left rail – a soft rose.</summary>
@@ -217,7 +221,7 @@ public sealed class CalendarEntry
         CalendarLayer.Events or CalendarLayer.Tasks or CalendarLayer.Notes => 3,
         CalendarLayer.FilmsDomestic or CalendarLayer.FilmsWorld => 4,
         CalendarLayer.SeriesDomestic or CalendarLayer.SeriesWorld => 5,
-        CalendarLayer.Mega or CalendarLayer.Processed => 7,
+        CalendarLayer.Mega or CalendarLayer.Processed or CalendarLayer.Actions => 7,
         _ => 6,
     };
 }

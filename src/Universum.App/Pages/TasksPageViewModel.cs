@@ -79,6 +79,36 @@ public sealed class TaskRow : ObservableObject
     public RelayCommand RightCommand { get; }
 }
 
+/// <summary>An action UNIVERSUM does by itself: what, when next, how it ended the last time; opened in the editor.</summary>
+public sealed class ActionRow
+{
+    public ActionRow(AgendaItem item, DateTime? next, TasksPageViewModel page)
+    {
+        Item = item;
+        Title = item.Title;
+        What = item.Action is { } action ? AgendaEditor.ActionText(action.Kind) : "";
+        var repeat = item.Time?.Repeat is { } r ? " · " + AgendaEditor.Repeats.FirstOrDefault(c => c.Value == r.Every)?.Label : "";
+        Next = (next is { } at ? Localization.Loc.Language switch { "cs" => "příště ", "en" => "next ", _ => "nabudúce " } + at.ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture)
+            : Localization.Loc.Language switch { "cs" => "už se neopakuje", "en" => "no more", _ => "už sa neopakuje" }) + repeat;
+        Last = item.Action?.LastRun is { } last ? $"{last.LocalDateTime:d. M. HH:mm}: {item.Action.LastOutcome}" : "";
+        EditCommand = new RelayCommand(() => page.Edit(item));
+    }
+
+    public AgendaItem Item { get; }
+
+    public string Title { get; }
+
+    public string What { get; }
+
+    public string Next { get; }
+
+    public string Last { get; }
+
+    public bool HasLast => Last.Length > 0;
+
+    public RelayCommand EditCommand { get; }
+}
+
 /// <summary>A group of the list: "Po termíne", "Dnes" …</summary>
 public sealed record TaskGroup(string Title, Brush Color, IReadOnlyList<TaskRow> Rows)
 {
@@ -137,6 +167,7 @@ public sealed class TasksPageViewModel : ObservableObject
         _services = services;
         AddCommand = new RelayCommand(Add);
         NewCommand = new RelayCommand(() => Edit(null));
+        NewActionCommand = new RelayCommand(() => NewAction());
         RefreshCommand = new AsyncRelayCommand(SuggestAsync);
         EmptyDoneCommand = new RelayCommand(EmptyDone);
         services.Agenda.Changed += () =>
@@ -281,6 +312,13 @@ public sealed class TasksPageViewModel : ObservableObject
 
     public bool HasSuggestions => Suggestions.Count > 0;
 
+    /// <summary>What UNIVERSUM does by itself (the records with an action), the next first.</summary>
+    public IReadOnlyList<ActionRow> Actions { get; private set; } = [];
+
+    public bool HasActions => Actions.Count > 0;
+
+    public RelayCommand NewActionCommand { get; }
+
     public bool IsEmpty => Groups.Count == 0 && ToDo.Count + InProgress.Count + Done.Count == 0;
 
     public string Summary { get; private set; } = "";
@@ -351,7 +389,18 @@ public sealed class TasksPageViewModel : ObservableObject
     }
 
     public void Edit(AgendaItem? item) =>
-        Editor = new AgendaEditor(_services.Agenda, item, item?.Task?.Due ?? Today, AgendaKind.Task, () => Editor = null) { Voice = _services.Voice };
+        Editor = new AgendaEditor(_services.Agenda, item, item?.Task?.Due ?? item?.Time?.Start ?? Today, AgendaKind.Task, () => Editor = null)
+        {
+            Voice = _services.Voice,
+            MegaBatches = AgendaEditor.MegaChoices(_services.Mega, item?.Action?.Batch),
+        };
+
+    /// <summary>A new action of UNIVERSUM: every night at three it refreshes Premiéry and Novinky (all can be changed).</summary>
+    public void NewAction(AgendaActionKind kind = AgendaActionKind.RefreshNews)
+    {
+        Edit(null);
+        Editor!.PresetAction(kind);
+    }
 
     internal void Delete(AgendaItem item)
     {
@@ -473,6 +522,14 @@ public sealed class TasksPageViewModel : ObservableObject
             {
                 Group(L("Hotové", "Hotové", "Done"), CalendarLayer.NameDays, i => !Open(i));
             }
+
+            var now = DateTime.Now;
+            Actions = [.. _services.Agenda.Items.Where(i => i.Action is not null)
+                .Select(i => (Item: i, Next: AgendaStore.NextStart(i, now)))
+                .OrderBy(a => a.Next ?? DateTime.MaxValue)
+                .Select(a => new ActionRow(a.Item, a.Next, this))];
+            OnPropertyChanged(nameof(Actions));
+            OnPropertyChanged(nameof(HasActions));
 
             Fill(ToDo, shown.Where(i => i.Task!.State == TaskState.Open).Select(Row));
             Fill(InProgress, shown.Where(i => i.Task!.State == TaskState.InProgress).Select(Row));

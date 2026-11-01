@@ -3715,6 +3715,16 @@
                     </Grid>
                     <TextBlock Text="Pripomienka" Style="{StaticResource Hint}" />
                     <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Reminders}}" SelectedItem="{Binding Reminder}" Margin="0,2,0,6" HorizontalAlignment="Stretch" />
+                    <!-- owner, 31. 10. 2026: what UNIVERSUM does by itself at this time -->
+                    <TextBlock Text="UNIVERSUM v tom čase vykoná" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:AgendaEditor.Actions}}" SelectedItem="{Binding Action}" Margin="0,2,0,6" HorizontalAlignment="Stretch" />
+                    <StackPanel Visibility="{Binding IsMegaAction, Converter={StaticResource BoolToVisibility}}">
+                        <ComboBox ItemsSource="{Binding MegaBatches}" SelectedItem="{Binding MegaBatch}" Margin="0,0,0,6" HorizontalAlignment="Stretch" />
+                        <TextBlock Text="V MEGA spracovaní nečaká žiadna dávka." Style="{StaticResource Hint}" Foreground="#D9534F" Margin="0,0,0,6"
+                                   Visibility="{Binding NoMegaBatch, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding ActionHint}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}" />
                     <CheckBox Content="Aj ako úloha (v Plánovaných úlohách)" IsChecked="{Binding AlsoTask}" Margin="0,0,0,6" />
                 </StackPanel>
                 <!-- a task: due day, priority, done -->
@@ -4409,6 +4419,37 @@
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding Detail}" Style="{StaticResource Hint}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <!-- owner, 31. 10. 2026: tasks for UNIVERSUM – what it does by itself at a time -->
+                    <Border Style="{StaticResource Card}" Padding="12,8" Margin="0,0,0,8" Background="#147A6FC9">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="{loc:T 'Nová akcia UNIVERSUM…'}" Command="{Binding NewActionCommand}" Padding="10,3"
+                                        ToolTip="Napríklad každú noc o 3:00 obnoviť Premiéry a Novinky alebo synchronizovať listy HISTRA" />
+                                <TextBlock Text="{loc:T 'UNIVERSUM vykoná sám'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock Text="Zatiaľ nič – akciu (obnoviť Premiéry a Novinky, synchronizovať HISTRA, analyzovať priečinok, spustiť MEGA dávku) naplánujete tlačidlom vpravo alebo v udalosti Kalendára."
+                                       Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Visibility="{Binding HasActions, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding Actions}" Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,2,0,2">
+                                            <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE713;" FontSize="15" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="#7A6FC9" />
+                                            <Button DockPanel.Dock="Right" Content="{loc:T 'Upraviť'}" Command="{Binding EditCommand}" Padding="10,3" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  ·  " /><Run Text="{Binding What, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Next}" Style="{StaticResource Hint}" FontSize="11.5" />
+                                                <TextBlock Text="{Binding Last}" Style="{StaticResource Hint}" FontSize="11.5" TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding HasLast, Converter={StaticResource BoolToVisibility}}" />
                                             </StackPanel>
                                         </DockPanel>
                                     </DataTemplate>
@@ -5919,6 +5960,31 @@
                         <StackPanel Orientation="Horizontal" Margin="2,0">
                             <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" Margin="0,0,12,0" />
                             <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <!-- the live counts of POZNÁMKY -->
+                            <Border Margin="8,0,0,0" CornerRadius="8" Padding="6,0" MinWidth="18" VerticalAlignment="Center" ToolTip="{Binding Badge.ToolTip}"
+                                    Visibility="{Binding Badge.IsShown, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#40D46A8C" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Badge.Alert}" Value="True">
+                                                <Setter Property="Background" Value="#D9534F" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding Badge.Text}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Badge.Alert}" Value="True">
+                                                    <Setter Property="Foreground" Value="White" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Universum.Core.Library;
 using Universum.Core.Media;
+using Universum.Core.Text;
 
 namespace Universum.Core.Muxing;
 
@@ -68,27 +69,27 @@ public sealed partial record MuxTrackOptions
     {
         if (DelayMs is { } delay && Math.Abs(delay) > 86_400_000)
         {
-            yield return where + ": oneskorenie najviac ± 24 hodín.";
+            yield return CoreText.F("{0}: oneskorenie najviac ± 24 hodín.", where);
         }
 
         if (!string.IsNullOrEmpty(DefaultDuration) && !DurationPattern().IsMatch(DefaultDuration))
         {
-            yield return where + ": predvolené trvanie / FPS zadajte napr. 25p, 24000/1001p, 50i alebo 40ms.";
+            yield return CoreText.F("{0}: predvolené trvanie / FPS zadajte napr. 25p, 24000/1001p, 50i alebo 40ms.", where);
         }
 
         if (!string.IsNullOrEmpty(AspectRatio) && !AspectPattern().IsMatch(AspectRatio))
         {
-            yield return where + ": pomer strán zadajte napr. 16/9 alebo 1.85.";
+            yield return CoreText.F("{0}: pomer strán zadajte napr. 16/9 alebo 1.85.", where);
         }
 
         if (!string.IsNullOrEmpty(Cropping) && !CroppingPattern().IsMatch(Cropping))
         {
-            yield return where + ": orez zadajte ako vľavo,hore,vpravo,dole v pixeloch, napr. 0,140,0,140.";
+            yield return CoreText.F("{0}: orez zadajte ako vľavo,hore,vpravo,dole v pixeloch, napr. 0,140,0,140.", where);
         }
 
         if (!string.IsNullOrEmpty(SubtitleCharset) && !CharsetPattern().IsMatch(SubtitleCharset))
         {
-            yield return where + ": kódovanie titulkov zadajte napr. cp1250 alebo iso-8859-2.";
+            yield return CoreText.F("{0}: kódovanie titulkov zadajte napr. cp1250 alebo iso-8859-2.", where);
         }
     }
 
@@ -177,34 +178,34 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
         var problems = new List<string>();
         if (Sources.Count == 0)
         {
-            problems.Add("Pridajte aspoň jeden vstupný súbor.");
+            problems.Add(CoreText.T("Pridajte aspoň jeden vstupný súbor."));
         }
 
         if (Tracks.Count == 0)
         {
-            problems.Add("Vyberte aspoň jednu stopu.");
+            problems.Add(CoreText.T("Vyberte aspoň jednu stopu."));
         }
 
         foreach (var track in Tracks)
         {
             if (track.Source < 0 || track.Source >= Sources.Count || Sources[track.Source].File.Tracks.All(t => t.Id != track.TrackId))
             {
-                problems.Add($"Stopa {track.TrackId} nie je v súbore {track.Source + 1}.");
+                problems.Add(CoreText.F("Stopa {0} nie je v súbore {1}.", track.TrackId, track.Source + 1));
                 continue;
             }
 
-            problems.AddRange(track.Options.Problems($"Stopa {Tracks.ToList().IndexOf(track) + 1}"));
+            problems.AddRange(track.Options.Problems(CoreText.F("Stopa {0}", Tracks.ToList().IndexOf(track) + 1)));
         }
 
         if (Tracks.Select(t => (t.Source, t.TrackId)).Distinct().Count() != Tracks.Count)
         {
-            problems.Add("Niektorá stopa je vybraná dvakrát.");
+            problems.Add(CoreText.T("Niektorá stopa je vybraná dvakrát."));
         }
 
         var allPaths = Sources.SelectMany(s => s.AllPaths).ToList();
         if (allPaths.Distinct(IO.Paths.Comparer).Count() != allPaths.Count)
         {
-            problems.Add("Ten istý súbor je pridaný dvakrát (ako vstup, časť alebo pripojený súbor).");
+            problems.Add(CoreText.T("Ten istý súbor je pridaný dvakrát (ako vstup, časť alebo pripojený súbor)."));
         }
 
         for (var index = 0; index < Sources.Count; index++)
@@ -212,7 +213,7 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
             var source = Sources[index];
             foreach (var part in source.AdditionalParts.Where(p => !File.Exists(p)))
             {
-                problems.Add("Časť súboru neexistuje: " + part);
+                problems.Add(CoreText.T("Časť súboru neexistuje: ") + part);
             }
 
             // appended files continue the tracks taken from this file: same IDs, same types and codecs
@@ -224,7 +225,7 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
                     var other = appended.Tracks.FirstOrDefault(t => t.Id == track.TrackId);
                     if (own is not null && (other is null || other.Type != own.Type || !string.Equals(other.CodecId ?? other.Codec, own.CodecId ?? own.Codec, StringComparison.Ordinal)))
                     {
-                        problems.Add($"Súbor {Path.GetFileName(appended.Path)} sa nedá pripojiť k {Path.GetFileName(source.File.Path)}: stopa {track.TrackId} v ňom chýba alebo je iná.");
+                        problems.Add(CoreText.F("Súbor {0} sa nedá pripojiť k {1}: stopa {2} v ňom chýba alebo je iná.", Path.GetFileName(appended.Path), Path.GetFileName(source.File.Path), track.TrackId));
                         break;
                     }
                 }
@@ -233,12 +234,12 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
 
         if (!string.IsNullOrEmpty(ChaptersFile) && !File.Exists(ChaptersFile))
         {
-            problems.Add("Súbor s kapitolami neexistuje.");
+            problems.Add(CoreText.T("Súbor s kapitolami neexistuje."));
         }
 
         foreach (var attachment in Attachments.Where(a => !File.Exists(a.Path)))
         {
-            problems.Add("Príloha neexistuje: " + attachment.Path);
+            problems.Add(CoreText.T("Príloha neexistuje: ") + attachment.Path);
         }
 
         if (Placement is not null)
@@ -255,22 +256,22 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
         var output = Path.GetFullPath(OutputPath);
         if (!OutputExtensions.Contains(Path.GetExtension(output), StringComparer.OrdinalIgnoreCase))
         {
-            problems.Add("Výstupný súbor musí mať príponu " + string.Join(", ", OutputExtensions) + ".");
+            problems.Add(CoreText.F("Výstupný súbor musí mať príponu {0}.", string.Join(", ", OutputExtensions)));
         }
 
         if (allPaths.Any(p => IO.Paths.Same(p, output)))
         {
-            problems.Add("Výstupný súbor nesmie byť jedným zo vstupných súborov.");
+            problems.Add(CoreText.T("Výstupný súbor nesmie byť jedným zo vstupných súborov."));
         }
 
         if (File.Exists(output))
         {
-            problems.Add("Výstupný súbor už existuje – zvoľte iný názov (UNIVERSUM nič neprepisuje).");
+            problems.Add(CoreText.T("Výstupný súbor už existuje – zvoľte iný názov (UNIVERSUM nič neprepisuje)."));
         }
 
         if (Path.GetDirectoryName(output) is not { } folder || !Directory.Exists(folder))
         {
-            problems.Add("Priečinok výstupného súboru neexistuje.");
+            problems.Add(CoreText.T("Priečinok výstupného súboru neexistuje."));
         }
 
         return problems;

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Universum.Core.Text;
 
 namespace Universum.Core.Html;
 
@@ -177,7 +178,7 @@ public static class HtmlParser
     {
         if (html.Length > MaxLength)
         {
-            throw new FormatException("Stránka je príliš veľká.");
+            throw new FormatException(CoreText.T("Stránka je príliš veľká."));
         }
 
         var root = new HtmlElement("#document", []);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Numerics;
+using Universum.Core.Text;
 
 namespace Universum.Core.Subtitles;
 
@@ -112,15 +113,16 @@ public sealed record SubtitleTiming(long DelayMilliseconds, long Numerator, long
         if (Numerator != Denominator)
         {
             var speed = ((double)Denominator / Numerator - 1) * 100;
-            parts.Add($"časy × {Factor.ToString("0.#####", sk)} ({subject} o {Math.Abs(speed).ToString("0.###", sk)} % {(speed > 0 ? "rýchlejšie" : "pomalšie")})");
+            parts.Add(CoreText.F(speed > 0 ? "časy × {0} ({1} o {2} % rýchlejšie)" : "časy × {0} ({1} o {2} % pomalšie)",
+                Factor.ToString("0.#####", sk), CoreText.T(subject), Math.Abs(speed).ToString("0.###", sk)));
         }
 
         if (DelayMilliseconds != 0)
         {
-            parts.Add($"posun {(DelayMilliseconds > 0 ? "+" : "−")}{Math.Abs(DelayMilliseconds).ToString("#,0", sk)} ms");
+            parts.Add(CoreText.F("posun {0}{1} ms", DelayMilliseconds > 0 ? "+" : "−", Math.Abs(DelayMilliseconds).ToString("#,0", sk)));
         }
 
-        return parts.Count == 0 ? "bez zmeny časov" : string.Join(", ", parts);
+        return parts.Count == 0 ? CoreText.T("bez zmeny časov") : string.Join(", ", parts);
     }
 
     // the smallest numbers mkvmerge gets (they fit a long: the rates and per cents above are small)

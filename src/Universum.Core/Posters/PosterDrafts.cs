@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
+using Universum.Core.Text;
 
 namespace Universum.Core.Posters;
 
@@ -89,7 +90,7 @@ public sealed class PosterDrafts(HttpClient http)
         var service = keys.Service;
         if (service is null)
         {
-            return new PosterDraft(null, "", "Na návrh plagátu cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené).");
+            return new PosterDraft(null, "", CoreText.T("Na návrh plagátu cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené)."));
         }
 
         try
@@ -100,15 +101,15 @@ public sealed class PosterDrafts(HttpClient http)
         }
         catch (HttpRequestException ex)
         {
-            return new PosterDraft(null, service, $"{service} nie je dostupné: {ex.Message}");
+            return new PosterDraft(null, service, CoreText.F("{0} nie je dostupné: {1}", service, ex.Message));
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new PosterDraft(null, service, $"{service} neodpovedá – skúste to neskôr.");
+            return new PosterDraft(null, service, CoreText.F("{0} neodpovedá – skúste to neskôr.", service));
         }
         catch (Exception ex) when (ex is JsonException or FormatException)
         {
-            return new PosterDraft(null, service, $"{service} vrátilo nečitateľnú odpoveď.");
+            return new PosterDraft(null, service, CoreText.F("{0} vrátilo nečitateľnú odpoveď.", service));
         }
     }
 
@@ -162,7 +163,7 @@ public sealed class PosterDrafts(HttpClient http)
     private static PosterDraft Checked(byte[]? picture, string service) =>
         picture is { Length: > 0 } && PosterCache.IsPicture(picture)
             ? new PosterDraft(picture, service, null)
-            : new PosterDraft(null, service, $"{service} nevrátilo obrázok JPEG ani PNG.");
+            : new PosterDraft(null, service, CoreText.F("{0} nevrátilo obrázok JPEG ani PNG.", service));
 
     // the service's own message (OpenAI: error.message; Cloudflare: errors[].message), shortened
     private static string Problem(string service, HttpStatusCode status, string body)
@@ -184,10 +185,10 @@ public sealed class PosterDrafts(HttpClient http)
 
         var reason = status switch
         {
-            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "kľúč alebo token nie je platný alebo nemá povolenie",
-            HttpStatusCode.TooManyRequests => "dnešný limit je vyčerpaný alebo prišlo priveľa požiadaviek – skúste to neskôr",
-            HttpStatusCode.PaymentRequired => "účet nemá kredit",
-            _ => $"chyba {(int)status}",
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => CoreText.T("kľúč alebo token nie je platný alebo nemá povolenie"),
+            HttpStatusCode.TooManyRequests => CoreText.T("dnešný limit je vyčerpaný alebo prišlo priveľa požiadaviek – skúste to neskôr"),
+            HttpStatusCode.PaymentRequired => CoreText.T("účet nemá kredit"),
+            _ => CoreText.F("chyba {0}", (int)status),
         };
         message = message is { Length: > 0 } ? (message.Length > 240 ? message[..240] + "…" : message) : null;
         return $"{service}: {reason}" + (message is null ? "." : $" ({message}).");

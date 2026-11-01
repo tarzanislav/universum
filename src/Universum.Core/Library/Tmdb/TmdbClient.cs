@@ -248,11 +248,11 @@ public sealed class TmdbClient
             }
             catch (HttpRequestException ex)
             {
-                throw new TmdbException("TMDB nie je dostupné: " + ex.Message, ex);
+                throw new TmdbException(CoreText.T("TMDB nie je dostupné: ") + ex.Message, ex);
             }
             catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new TmdbException("TMDB neodpovedá.", ex);
+                throw new TmdbException(CoreText.T("TMDB neodpovedá."), ex);
             }
 
             using (response)
@@ -265,8 +265,8 @@ public sealed class TmdbClient
                     if (attempt >= (limited ? MaxRetriesWhenLimited : MaxRetriesOnServerError))
                     {
                         throw new TmdbException(limited
-                            ? "TMDB obmedzilo počet otázok a ani po čakaní ich neprijíma – skúste to o niekoľko minút."
-                            : $"TMDB má problém ({(int)response.StatusCode}) – skúste to neskôr.");
+                            ? CoreText.T("TMDB obmedzilo počet otázok a ani po čakaní ich neprijíma – skúste to o niekoľko minút.")
+                            : CoreText.F("TMDB má problém ({0}) – skúste to neskôr.", (int)response.StatusCode));
                     }
 
                     var delay = RequestPacer.RetryDelay(response, attempt);
@@ -284,9 +284,9 @@ public sealed class TmdbClient
                     case HttpStatusCode.NotFound:
                         break;
                     case HttpStatusCode.Unauthorized:
-                        throw new TmdbException("Kľúč TMDB nie je platný – skontrolujte ho v Nastaveniach.");
+                        throw new TmdbException(CoreText.T("Kľúč TMDB nie je platný – skontrolujte ho v Nastaveniach."));
                     default:
-                        throw new TmdbException($"TMDB odpovedalo chybou {(int)response.StatusCode}.");
+                        throw new TmdbException(CoreText.F("TMDB odpovedalo chybou {0}.", (int)response.StatusCode));
                 }
 
                 JsonDocument? document;
@@ -302,7 +302,7 @@ public sealed class TmdbClient
                 }
                 catch (JsonException ex)
                 {
-                    throw new TmdbException("TMDB vrátilo nečitateľnú odpoveď.", ex);
+                    throw new TmdbException(CoreText.T("TMDB vrátilo nečitateľnú odpoveď."), ex);
                 }
 
                 lock (_cache)

@@ -1,5 +1,6 @@
 using System.Text;
 using Universum.Core.Subtitles.Pictures;
+using Universum.Core.Text;
 
 namespace Universum.Core.Subtitles.Ocr;
 
@@ -676,7 +677,7 @@ public sealed class OcrRun
 
         if (best is { } found)
         {
-            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, found.Raw, "slovo jazyka");
+            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, found.Raw, CoreText.T("slovo jazyka"));
             return;
         }
 
@@ -692,7 +693,7 @@ public sealed class OcrRun
             .OrderByDescending(v => v.Score).Take(2).ToList();
         if (guesses.Count > 0 && guesses[0].Score >= -3 && (guesses.Count == 1 || guesses[0].Score - guesses[1].Score >= 0.25))
         {
-            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, guesses[0].Raw, "podobnosť slovám jazyka");
+            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, guesses[0].Raw, CoreText.T("podobnosť slovám jazyka"));
         }
     }
 
@@ -821,7 +822,7 @@ public sealed class OcrRun
 
             var word = text[at..end];
             var capital = char.ToUpperInvariant(word[0]) + word[1..];
-            changes.Add((word, capital, "veľké písmeno na začiatku vety"));
+            changes.Add((word, capital, CoreText.T("veľké písmeno na začiatku vety")));
             text = text[..at] + capital + text[end..];
         }
 
@@ -932,7 +933,7 @@ public sealed class OcrRun
                 last = wordLast;
                 var now = Raw(arranged.Skip(i).Take(last - i + 1).Select(a => a.Cluster));
                 text.Append(now);
-                changes.Add((MendWord(Original(arranged, i, last)), MendWord(now), "tvar prečítaný inak v celom filme"));
+                changes.Add((MendWord(Original(arranged, i, last)), MendWord(now), CoreText.T("tvar prečítaný inak v celom filme")));
             }
             else
             {

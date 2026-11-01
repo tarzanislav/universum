@@ -191,18 +191,18 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
             }
             catch (HttpRequestException ex)
             {
-                throw new NewsSourceException("TVmaze nie je dostupné: " + ex.Message, ex);
+                throw new NewsSourceException(CoreText.T("TVmaze nie je dostupné: ") + ex.Message, ex);
             }
             catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new NewsSourceException("TVmaze neodpovedá.", ex);
+                throw new NewsSourceException(CoreText.T("TVmaze neodpovedá."), ex);
             }
 
             using (response)
             {
                 if (response.RequestMessage?.RequestUri is { } final && (final.Scheme != Uri.UriSchemeHttps || final.Host != BaseAddress.Host))
                 {
-                    throw new NewsSourceException($"TVmaze presmerovalo na inú adresu ({final.Host}) – odpoveď sa nepoužila.");
+                    throw new NewsSourceException(CoreText.F("TVmaze presmerovalo na inú adresu ({0}) – odpoveď sa nepoužila.", final.Host));
                 }
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < 3)
@@ -219,12 +219,12 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
 
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
-                    throw new NewsSourceException($"TVmaze odpovedalo chybou {(int)response.StatusCode}.");
+                    throw new NewsSourceException(CoreText.F("TVmaze odpovedalo chybou {0}.", (int)response.StatusCode));
                 }
 
                 if (response.Content.Headers.ContentLength > MaxBytes)
                 {
-                    throw new NewsSourceException("Odpoveď TVmaze je neprimerane veľká – nepoužila sa.");
+                    throw new NewsSourceException(CoreText.T("Odpoveď TVmaze je neprimerane veľká – nepoužila sa."));
                 }
 
                 await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -235,7 +235,7 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
                 {
                     if (buffer.Length + read > MaxBytes)
                     {
-                        throw new NewsSourceException("Odpoveď TVmaze je neprimerane veľká – nepoužila sa.");
+                        throw new NewsSourceException(CoreText.T("Odpoveď TVmaze je neprimerane veľká – nepoužila sa."));
                     }
 
                     buffer.Write(chunk, 0, read);
@@ -247,7 +247,7 @@ public sealed class TvMazeClient(HttpClient http, RequestPacer? pacer = null)
                 }
                 catch (JsonException ex)
                 {
-                    throw new NewsSourceException("TVmaze vrátilo nečitateľnú odpoveď.", ex);
+                    throw new NewsSourceException(CoreText.T("TVmaze vrátilo nečitateľnú odpoveď."), ex);
                 }
             }
         }

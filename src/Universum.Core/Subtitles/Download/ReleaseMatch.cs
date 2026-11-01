@@ -41,7 +41,7 @@ public static class ReleaseMatch
         var sk = CultureInfo.GetCultureInfo("sk-SK");
         if (subtitles is not { } fps || fps <= 0)
         {
-            return "FPS neuvedené";
+            return CoreText.T("FPS neuvedené");
         }
 
         if (film is not { } video)
@@ -49,7 +49,7 @@ public static class ReleaseMatch
             return $"FPS {fps.ToString("0.###", sk)}";
         }
 
-        return Math.Abs(fps - video) < 0.01 ? "FPS sedí" : $"FPS {fps.ToString("0.###", sk)} ≠ film {video.ToString("0.###", sk)} – treba zmenu FPS";
+        return Math.Abs(fps - video) < 0.01 ? CoreText.T("FPS sedí") : CoreText.F("FPS {0} ≠ film {1} – treba zmenu FPS", fps.ToString("0.###", sk), video.ToString("0.###", sk));
     }
 
     /// <summary>The frame rates agree (or the subtitles do not say theirs).</summary>

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using Universum.Core.Text;
 
 namespace Universum.Core.Library.Histra;
 
@@ -69,11 +70,11 @@ public sealed class HistraClient
             }
             catch (HttpRequestException ex)
             {
-                throw new HistraException("HISTRA nie je dostupná: " + ex.Message, ex);
+                throw new HistraException(CoreText.T("HISTRA nie je dostupná: ") + ex.Message, ex);
             }
             catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new HistraException("HISTRA neodpovedá.", ex);
+                throw new HistraException(CoreText.T("HISTRA neodpovedá."), ex);
             }
 
             using (response)
@@ -82,7 +83,7 @@ public sealed class HistraClient
                 if (response.RequestMessage?.RequestUri is { } final &&
                     (final.Scheme != Uri.UriSchemeHttps || final.Host != HistraApi.BaseAddress.Host))
                 {
-                    throw new HistraException($"HISTRA presmerovala na inú adresu ({final.Host}) – odpoveď sa nepoužila.");
+                    throw new HistraException(CoreText.F("HISTRA presmerovala na inú adresu ({0}) – odpoveď sa nepoužila.", final.Host));
                 }
 
                 if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway
@@ -92,8 +93,8 @@ public sealed class HistraClient
                     if (attempt >= (limited ? MaxRetriesWhenLimited : MaxRetriesOnServerError))
                     {
                         throw new HistraException(limited
-                            ? "HISTRA obmedzila počet požiadaviek a ani po čakaní ich neprijíma – skúste to o niekoľko minút."
-                            : $"HISTRA má problém ({(int)response.StatusCode}) – skúste to neskôr.");
+                            ? CoreText.T("HISTRA obmedzila počet požiadaviek a ani po čakaní ich neprijíma – skúste to o niekoľko minút.")
+                            : CoreText.F("HISTRA má problém ({0}) – skúste to neskôr.", (int)response.StatusCode));
                     }
 
                     var delay = RequestPacer.RetryDelay(response, attempt);
@@ -107,13 +108,13 @@ public sealed class HistraClient
                     case HttpStatusCode.NotFound or HttpStatusCode.NoContent:
                         return null;
                     case HttpStatusCode.Unauthorized:
-                        throw new HistraException("Token HISTRA nie je platný – skontrolujte ho v Nastaveniach.");
+                        throw new HistraException(CoreText.T("Token HISTRA nie je platný – skontrolujte ho v Nastaveniach."));
                     case HttpStatusCode.Forbidden:
-                        throw new HistraException("Token HISTRA na túto akciu nemá oprávnenie.");
+                        throw new HistraException(CoreText.T("Token HISTRA na túto akciu nemá oprávnenie."));
                     case >= HttpStatusCode.OK and < HttpStatusCode.Ambiguous:
                         return await ReadJsonAsync(response, cancellationToken).ConfigureAwait(false);
                     default:
-                        throw new HistraException($"HISTRA odpovedala chybou {(int)response.StatusCode}.");
+                        throw new HistraException(CoreText.F("HISTRA odpovedala chybou {0}.", (int)response.StatusCode));
                 }
             }
         }
@@ -123,7 +124,7 @@ public sealed class HistraClient
     {
         if (response.Content.Headers.ContentLength > MaxResponseBytes)
         {
-            throw new HistraException("Odpoveď HISTRA je neprimerane veľká – nepoužila sa.");
+            throw new HistraException(CoreText.T("Odpoveď HISTRA je neprimerane veľká – nepoužila sa."));
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -134,7 +135,7 @@ public sealed class HistraClient
         {
             if (buffer.Length + read > MaxResponseBytes)
             {
-                throw new HistraException("Odpoveď HISTRA je neprimerane veľká – nepoužila sa.");
+                throw new HistraException(CoreText.T("Odpoveď HISTRA je neprimerane veľká – nepoužila sa."));
             }
 
             buffer.Write(chunk, 0, read);
@@ -151,7 +152,7 @@ public sealed class HistraClient
         }
         catch (JsonException ex)
         {
-            throw new HistraException("HISTRA vrátila nečitateľnú odpoveď.", ex);
+            throw new HistraException(CoreText.T("HISTRA vrátila nečitateľnú odpoveď."), ex);
         }
     }
 }

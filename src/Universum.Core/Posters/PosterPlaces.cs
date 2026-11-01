@@ -120,7 +120,7 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
                 // a leftover part of UNIVERSUM's own write
             }
 
-            return new Saved(false, null, $"{name} sa nedá zapísať do {folder}: {ex.Message}");
+            return new Saved(false, null, CoreText.F("{0} sa nedá zapísať do {1}: {2}", name, folder, ex.Message));
         }
     }
 
@@ -263,7 +263,7 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException)
         {
-            return "čakajúci plagát sa nedal pridať: " + ex.Message;
+            return CoreText.T("čakajúci plagát sa nedal pridať: ") + ex.Message;
         }
     }
 
@@ -318,13 +318,13 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
                     var old = PosterPlaces.KeepOld(main, extraName);
                     File.Copy(file, Path.Combine(main, extraName), overwrite: false);
                     File.Delete(file);
-                    others.Add(old is null ? extraName : $"{extraName} (pôvodný premenovaný na {old})");
+                    others.Add(old is null ? extraName : CoreText.F("{0} (pôvodný premenovaný na {1})", extraName, old));
                 }
             }
 
-            var pictures = others.Count > 0 ? "ďalšie obrázky: " + string.Join(", ", others) : "";
-            return !poster ? $"{pictures} pridané do {main}"
-                : $"plagát {PosterPlaces.FileName} pridaný do {main}" + (kept is null ? "" : $" (pôvodný {PosterPlaces.FileName} tam už bol – premenovaný na {kept})") +
+            var pictures = others.Count > 0 ? CoreText.T("ďalšie obrázky: ") + string.Join(", ", others) : "";
+            return !poster ? CoreText.F("{0} pridané do {1}", pictures, main)
+                : CoreText.F("plagát {0} pridaný do {1}", PosterPlaces.FileName, main) + (kept is null ? "" : CoreText.F(" (pôvodný {0} tam už bol – premenovaný na {1})", PosterPlaces.FileName, kept)) +
                   (pictures.Length > 0 ? "; " + pictures : "");
         }
     }

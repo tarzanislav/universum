@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.Library.Tmdb;
 
 /// <summary>
@@ -53,7 +55,7 @@ public static class TmdbGenres
     public static string JoinEnglish(IEnumerable<int> ids) => string.Join(", ", ids.Select(id => English.GetValueOrDefault(id)).OfType<string>().Distinct(StringComparer.Ordinal));
 
     /// <summary>A genre number in Slovak; null for a number TMDB does not use.</summary>
-    public static string? Name(int id) => Names.GetValueOrDefault(id);
+    public static string? Name(int id) => Names.GetValueOrDefault(id) is { } name ? CoreText.T(name) : null;
 
     /// <summary>"akčný, sci-fi" from TMDB's genre numbers (each name once, in TMDB's order).</summary>
     public static string Join(IEnumerable<int> ids) =>
@@ -70,7 +72,7 @@ public static class TmdbGenres
         }
 
         var names = genres.Split([',', '/', '|', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(n => Other.GetValueOrDefault(Key(n)) ?? Other.GetValueOrDefault(Text.Words.Normalize(n)) ?? n.ToLowerInvariant())
+            .Select(n => (Other.GetValueOrDefault(Key(n)) ?? Other.GetValueOrDefault(Text.Words.Normalize(n))) is { } known ? CoreText.T(known) : n.ToLowerInvariant())
             .SelectMany(n => n.Split(", "))
             .Distinct(StringComparer.Ordinal);
         return string.Join(", ", names);

@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.Html;
 
 /// <summary>
@@ -17,7 +19,7 @@ public sealed class HtmlSelector
     {
         if (string.IsNullOrWhiteSpace(selector) || selector.Length > 500)
         {
-            throw new FormatException("Prázdny alebo príliš dlhý selektor.");
+            throw new FormatException(CoreText.T("Prázdny alebo príliš dlhý selektor."));
         }
 
         var groups = new List<List<(Compound, char)>>();
@@ -39,7 +41,7 @@ public sealed class HtmlSelector
                 {
                     if (parts.Count == 0)
                     {
-                        throw new FormatException($"Selektor „{selector}“ nemôže začínať znakom >.");
+                        throw new FormatException(CoreText.F("Selektor „{0}“ nemôže začínať znakom >.", selector));
                     }
 
                     combinator = '>';
@@ -55,7 +57,7 @@ public sealed class HtmlSelector
 
             if (parts.Count == 0 || combinator == '>')
             {
-                throw new FormatException($"Neúplný selektor „{selector}“.");
+                throw new FormatException(CoreText.F("Neúplný selektor „{0}“.", selector));
             }
 
             groups.Add(parts);
@@ -144,7 +146,7 @@ public sealed class HtmlSelector
                         i = Identifier(text, start);
                         if (i == start)
                         {
-                            throw new FormatException($"Chýba názov za „{kind}“ v selektore „{selector}“.");
+                            throw new FormatException(CoreText.F("Chýba názov za „{0}“ v selektore „{1}“.", kind, selector));
                         }
 
                         if (kind == '.')
@@ -161,14 +163,14 @@ public sealed class HtmlSelector
                         var close = text.IndexOf(']', i);
                         if (close < 0)
                         {
-                            throw new FormatException($"Chýba ] v selektore „{selector}“.");
+                            throw new FormatException(CoreText.F("Chýba ] v selektore „{0}“.", selector));
                         }
 
                         compound._attributes.Add(Attribute(text[(i + 1)..close], selector));
                         i = close + 1;
                         break;
                     default:
-                        throw new FormatException($"Selektor „{selector}“ obsahuje nepodporovanú časť pri „{text[i..]}“.");
+                        throw new FormatException(CoreText.F("Selektor „{0}“ obsahuje nepodporovanú časť pri „{1}“.", selector, text[i..]));
                 }
 
                 any = true;
@@ -176,7 +178,7 @@ public sealed class HtmlSelector
 
             if (!any)
             {
-                throw new FormatException($"Neplatný selektor „{selector}“.");
+                throw new FormatException(CoreText.F("Neplatný selektor „{0}“.", selector));
             }
 
             return (compound, i);
@@ -203,7 +205,7 @@ public sealed class HtmlSelector
 
         private static string Check(string name, string selector) =>
             name.Length > 0 && IsIdentifier(name[0]) && name.All(c => IsIdentifier(c) || char.IsAsciiDigit(c)) ? name.ToLowerInvariant()
-                : throw new FormatException($"Neplatný atribút v selektore „{selector}“.");
+                : throw new FormatException(CoreText.F("Neplatný atribút v selektore „{0}“.", selector));
 
         private static bool IsIdentifier(char c) => char.IsAsciiLetter(c) || c is '_' or '-';
 

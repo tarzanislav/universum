@@ -180,7 +180,7 @@ public sealed class InterestsPageViewModel : ObservableObject
     /// <summary>Under the cards: the sources and the translator.</summary>
     public string Attribution =>
         Loc.T("Zdroje: ") + (HasSources ? string.Join(" · ", _services.FeedSources.Where(s => s.Enabled).Select(s => s.Name)) : Loc.T("žiadne")) +
-        (_services.Translator is not null ? " · " + DeepLClient.Attribution : Loc.T(" · bez prekladu (kľúč DeepL v Nastaveniach)")) +
+        (_services.Translator is not null ? " · " + Loc.T(DeepLClient.Attribution) : Loc.T(" · bez prekladu (kľúč DeepL v Nastaveniach)")) +
         Loc.T(". Celé články sú na stránkach ich autorov.");
 
     public string Status { get => _status; private set => SetProperty(ref _status, value); }

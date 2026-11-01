@@ -38,7 +38,7 @@ public sealed record FeedSource
             if (!root.TryGetProperty("format", out var format) || format.GetString() != "UNIVERSUM-zaujimavosti 1" ||
                 !root.TryGetProperty("sources", out var sources) || sources.ValueKind != JsonValueKind.Array)
             {
-                throw new FormatException("súbor nie je zoznam zdrojov Zaujímavostí (UNIVERSUM-zaujimavosti 1).");
+                throw new FormatException(CoreText.T("súbor nie je zoznam zdrojov Zaujímavostí (UNIVERSUM-zaujimavosti 1)."));
             }
 
             var list = new List<FeedSource>();
@@ -52,7 +52,7 @@ public sealed record FeedSource
                 };
                 if (source.Name.Length == 0 || source.Address is null)
                 {
-                    throw new FormatException($"zdroj „{source.Name}“ nemá meno alebo bezpečnú adresu https.");
+                    throw new FormatException(CoreText.F("zdroj „{0}“ nemá meno alebo bezpečnú adresu https.", source.Name));
                 }
 
                 list.Add(source);
@@ -62,7 +62,7 @@ public sealed record FeedSource
         }
         catch (JsonException ex)
         {
-            throw new FormatException("súbor sa nedá prečítať: " + ex.Message, ex);
+            throw new FormatException(CoreText.T("súbor sa nedá prečítať: ") + ex.Message, ex);
         }
     }
 }
@@ -121,10 +121,10 @@ public static partial class FeedParser
         }
         catch (XmlException ex)
         {
-            throw new FormatException("zdroj nie je čitateľný kanál RSS ani Atom: " + ex.Message, ex);
+            throw new FormatException(CoreText.T("zdroj nie je čitateľný kanál RSS ani Atom: ") + ex.Message, ex);
         }
 
-        var root = document.Root ?? throw new FormatException("prázdny kanál.");
+        var root = document.Root ?? throw new FormatException(CoreText.T("prázdny kanál."));
         var items = root.Name == Atom + "feed"
             ? root.Elements(Atom + "entry").Select(e => Entry(e, source, language))
             : root.Descendants().Where(e => e.Name.LocalName == "item").Select(e => Item(e, source, language));

@@ -1,5 +1,6 @@
 using System.Text;
 using Universum.Core.MkvToolNix;
+using Universum.Core.Text;
 
 namespace Universum.Core.Updates;
 
@@ -61,7 +62,7 @@ public static class UpdateChecker
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                problems.Add("Zoznam zmien MKVToolNix sa nepodarilo načítať: " + ex.Message);
+                problems.Add(CoreText.T("Zoznam zmien MKVToolNix sa nepodarilo načítať: ") + ex.Message);
             }
 
             Compatibility? compatibility = null;
@@ -74,14 +75,14 @@ public static class UpdateChecker
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                problems.Add("Výsledok testu kompatibility sa nepodarilo načítať: " + ex.Message);
+                problems.Add(CoreText.T("Výsledok testu kompatibility sa nepodarilo načítať: ") + ex.Message);
             }
 
             mkvToolNix = new MkvToolNixUpdate(installedMkvToolNix, latest, news, compatibility);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            problems.Add("Najnovšiu verziu MKVToolNix sa nepodarilo zistiť: " + ex.Message);
+            problems.Add(CoreText.T("Najnovšiu verziu MKVToolNix sa nepodarilo zistiť: ") + ex.Message);
         }
 
         UniversumUpdate? universum = null;
@@ -96,7 +97,7 @@ public static class UpdateChecker
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            problems.Add("Najnovšiu verziu UNIVERSUM sa nepodarilo zistiť: " + ex.Message);
+            problems.Add(CoreText.T("Najnovšiu verziu UNIVERSUM sa nepodarilo zistiť: ") + ex.Message);
         }
 
         return new UpdateReport(mkvToolNix, universum, problems);

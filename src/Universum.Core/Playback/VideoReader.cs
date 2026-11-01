@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.Channels;
 using Universum.Core.Processes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Playback;
 
@@ -157,7 +158,7 @@ public sealed class VideoReader : IAsyncDisposable
             {
                 // let the error output arrive
                 await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
-                Problem = _process.ErrorText is { Length: > 0 } error ? error.Split('\n')[^1].Trim() : "FFmpeg nevrátil žiadny obraz.";
+                Problem = _process.ErrorText is { Length: > 0 } error ? error.Split('\n')[^1].Trim() : CoreText.T("FFmpeg nevrátil žiadny obraz.");
             }
 
             _frames.Writer.TryComplete();

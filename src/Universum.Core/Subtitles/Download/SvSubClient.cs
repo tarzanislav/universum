@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Universum.Core.Text;
 
 namespace Universum.Core.Subtitles.Download;
 
@@ -40,7 +41,7 @@ public sealed class SvSubClient(HttpClient http, string token)
     {
         if (Encoding.UTF8.GetByteCount(srt) > MaximumBytes)
         {
-            throw new SubtitleServiceException("svsub.net: titulky sú väčšie ako 5 MB.");
+            throw new SubtitleServiceException(CoreText.T("svsub.net: titulky sú väčšie ako 5 MB."));
         }
 
         var body = new JsonObject
@@ -61,10 +62,10 @@ public sealed class SvSubClient(HttpClient http, string token)
         }
 
         var created = await SendAsync(HttpMethod.Post, "jobs", body, cancellationToken).ConfigureAwait(false);
-        var id = Id(created) ?? throw new SubtitleServiceException("svsub.net: služba nevrátila číslo úlohy.");
+        var id = Id(created) ?? throw new SubtitleServiceException(CoreText.T("svsub.net: služba nevrátila číslo úlohy."));
         try
         {
-            progress?.Report("Preklad beží…");
+            progress?.Report(CoreText.T("Preklad beží…"));
             var started = DateTime.UtcNow;
             while (true)
             {
@@ -73,7 +74,7 @@ public sealed class SvSubClient(HttpClient http, string token)
                 var state = State(job);
                 if (state.Failed)
                 {
-                    throw new SubtitleServiceException("svsub.net: preklad sa nepodaril – " + (state.Message ?? state.Status ?? "neznáma chyba"));
+                    throw new SubtitleServiceException(CoreText.T("svsub.net: preklad sa nepodaril – ") + (state.Message ?? state.Status ?? CoreText.T("neznáma chyba")));
                 }
 
                 if (state.Done)
@@ -81,16 +82,16 @@ public sealed class SvSubClient(HttpClient http, string token)
                     break;
                 }
 
-                progress?.Report(state.Progress is { } done ? $"Preklad beží… {done:0} %" : "Preklad beží…");
+                progress?.Report(state.Progress is { } done ? CoreText.F("Preklad beží… {0:0} %", done) : CoreText.T("Preklad beží…"));
                 if (DateTime.UtcNow - started > TimeSpan.FromHours(2))
                 {
-                    throw new SubtitleServiceException("svsub.net: preklad trvá viac ako dve hodiny – skúste ho stiahnuť neskôr na stránke služby.");
+                    throw new SubtitleServiceException(CoreText.T("svsub.net: preklad trvá viac ako dve hodiny – skúste ho stiahnuť neskôr na stránke služby."));
                 }
 
                 await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
             }
 
-            progress?.Report("Sťahujem preklad…");
+            progress?.Report(CoreText.T("Sťahujem preklad…"));
             string text;
             try
             {
@@ -99,12 +100,12 @@ public sealed class SvSubClient(HttpClient http, string token)
                 text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
-                    throw new SubtitleServiceException($"svsub.net: preklad sa nepodarilo stiahnuť ({(int)response.StatusCode}) – {Message(text) ?? response.ReasonPhrase}");
+                    throw new SubtitleServiceException(CoreText.F("svsub.net: preklad sa nepodarilo stiahnuť ({0}) – {1}", (int)response.StatusCode, Message(text) ?? response.ReasonPhrase));
                 }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                throw new SubtitleServiceException("svsub.net: preklad sa nepodarilo stiahnuť – " + ex.Message, ex);
+                throw new SubtitleServiceException(CoreText.T("svsub.net: preklad sa nepodarilo stiahnuť – ") + ex.Message, ex);
             }
 
             // the file itself, or JSON with it
@@ -167,7 +168,7 @@ public sealed class SvSubClient(HttpClient http, string token)
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
-            throw new SubtitleServiceException("svsub.net nie je dostupný: " + ex.Message, ex);
+            throw new SubtitleServiceException(CoreText.T("svsub.net nie je dostupný: ") + ex.Message, ex);
         }
 
         using (response)
@@ -178,11 +179,11 @@ public sealed class SvSubClient(HttpClient http, string token)
                 var message = Message(text) ?? response.ReasonPhrase;
                 throw new SubtitleServiceException(response.StatusCode switch
                 {
-                    HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "svsub.net: neplatný token – " + message,
-                    (HttpStatusCode)429 => "svsub.net: príliš veľa požiadaviek (60 za minútu) – " + message,
+                    HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => CoreText.T("svsub.net: neplatný token – ") + message,
+                    (HttpStatusCode)429 => CoreText.T("svsub.net: príliš veľa požiadaviek (60 za minútu) – ") + message,
                     _ when text.Contains("no_key_for_provider", StringComparison.Ordinal) =>
-                        "svsub.net: v nastaveniach služby chýba váš AI kľúč pre zvoleného poskytovateľa (no_key_for_provider).",
-                    _ => $"svsub.net: chyba {(int)response.StatusCode} – {message}",
+                        CoreText.T("svsub.net: v nastaveniach služby chýba váš AI kľúč pre zvoleného poskytovateľa (no_key_for_provider)."),
+                    _ => CoreText.F("svsub.net: chyba {0} – {1}", (int)response.StatusCode, message),
                 });
             }
 
@@ -192,7 +193,7 @@ public sealed class SvSubClient(HttpClient http, string token)
             }
             catch (JsonException)
             {
-                throw new SubtitleServiceException("svsub.net: nečitateľná odpoveď.");
+                throw new SubtitleServiceException(CoreText.T("svsub.net: nečitateľná odpoveď."));
             }
         }
     }

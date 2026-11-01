@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.News;
 
 /// <summary>How often the episodes of a season come out, from their air dates – in Slovak.</summary>
@@ -20,7 +22,7 @@ public static class Periodicity
 
         if (dates.Count == 1)
         {
-            return all.Count > 1 ? "všetky naraz" : "";
+            return all.Count > 1 ? CoreText.T("všetky naraz") : "";
         }
 
         var gaps = dates.Zip(dates.Skip(1), (a, b) => b.DayNumber - a.DayNumber).ToList();
@@ -29,33 +31,33 @@ public static class Periodicity
         var regular = gaps.Count(g => g == typical) * 3 >= gaps.Count * 2;
         if (typical <= 3 && weekdays.Count >= 4)
         {
-            return weekdays.All(d => d is >= 1 and <= 5) ? "každý pracovný deň (po–pi)" : "každý deň";
+            return weekdays.All(d => d is >= 1 and <= 5) ? CoreText.T("každý pracovný deň (po–pi)") : CoreText.T("každý deň");
         }
 
         if (typical is >= 6 and <= 8 && weekdays.Count == 1 && regular)
         {
             // two episodes on most of the days
             var doubles = dates.Count(d => all.Count(a => a == d) >= 2);
-            return (doubles * 2 > dates.Count ? "2 epizódy týždenne – " : "raz do týždňa – ") + DayName(dates[0]);
+            return (doubles * 2 > dates.Count ? CoreText.T("2 epizódy týždenne – ") : CoreText.T("raz do týždňa – ")) + DayName(dates[0]);
         }
 
         if (weekdays.Count is 2 or 3 && dates.Count >= 4 && gaps.All(g => g <= 6))
         {
-            return (weekdays.Count == 2 ? "dvakrát do týždňa – " : "trikrát do týždňa – ") +
+            return (weekdays.Count == 2 ? CoreText.T("dvakrát do týždňa – ") : CoreText.T("trikrát do týždňa – ")) +
                    string.Join(", ", weekdays.Select(d => DayName(DateOnly.FromDayNumber(DateOnly.MinValue.DayNumber + (d + 6) % 7))));
         }
 
         return typical switch
         {
-            >= 6 and <= 8 when regular => "raz do týždňa",
-            >= 13 and <= 15 when regular => "každé 2 týždne",
-            >= 27 and <= 32 when regular => "mesačne",
-            _ => "nepravidelne",
+            >= 6 and <= 8 when regular => CoreText.T("raz do týždňa"),
+            >= 13 and <= 15 when regular => CoreText.T("každé 2 týždne"),
+            >= 27 and <= 32 when regular => CoreText.T("mesačne"),
+            _ => CoreText.T("nepravidelne"),
         };
     }
 
     /// <summary>"pondelok", "utorok" … of a day.</summary>
-    public static string DayName(DateOnly day) => day.DayOfWeek switch
+    public static string DayName(DateOnly day) => CoreText.T(day.DayOfWeek switch
     {
         DayOfWeek.Monday => "pondelok",
         DayOfWeek.Tuesday => "utorok",
@@ -64,5 +66,5 @@ public static class Periodicity
         DayOfWeek.Friday => "piatok",
         DayOfWeek.Saturday => "sobota",
         _ => "nedeľa",
-    };
+    });
 }

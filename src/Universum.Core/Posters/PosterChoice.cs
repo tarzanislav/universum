@@ -1,5 +1,6 @@
 using System.Globalization;
 using Universum.Core.Library;
+using Universum.Core.Text;
 
 namespace Universum.Core.Posters;
 
@@ -132,7 +133,7 @@ public static class PosterChoice
         var original = originalLanguage?.ToLowerInvariant();
         if (latinOriginal && original is { Length: > 0 } and not ("cs" or "sk" or "en"))
         {
-            Add($"Originál ({original})", c => c.Picture.Language == original);
+            Add(CoreText.F("Originál ({0})", original), c => c.Picture.Language == original);
         }
 
         Add("EN", c => c.Picture.Language == "en");
@@ -141,8 +142,8 @@ public static class PosterChoice
         if (groups.Count == 0)
         {
             // nothing in these languages: what there is (the original in another script, without text)
-            Add(original is { Length: > 0 } ? $"Originál ({original})" : "Originál", c => c.Tier == 2);
-            Add("Bez textu", c => c.Tier == 3);
+            Add(original is { Length: > 0 } ? CoreText.F("Originál ({0})", original) : CoreText.T("Originál"), c => c.Tier == 2);
+            Add(CoreText.T("Bez textu"), c => c.Tier == 3);
         }
 
         var look = recommended is null ? null : looks.GetValueOrDefault(recommended.Picture.Path);
@@ -180,7 +181,7 @@ public static class PosterChoice
     {
         if (chosen is null)
         {
-            return "TMDB k titulu nemá žiadny plagát.";
+            return CoreText.T("TMDB k titulu nemá žiadny plagát.");
         }
 
         var sk = CultureInfo.GetCultureInfo("sk-SK");
@@ -189,42 +190,42 @@ public static class PosterChoice
         {
             chosen.Tier switch
             {
-                0 => "Odporúčam český plagát – názov je na ňom po česky",
-                1 => all.Any(c => c.Tier == 0) ? "Odporúčam anglický plagát – české plagáty sú príliš malé alebo nevhodné" : "Odporúčam anglický plagát – český TMDB nemá",
-                2 => $"Odporúčam plagát v pôvodnom jazyku ({originalLanguage}) – český ani anglický TMDB nemá",
-                3 => "Odporúčam plagát bez textu – plagát s názvom TMDB nemá",
-                _ => $"Odporúčam plagát v jazyku ({picture.Language}) – v češtine, angličtine ani v pôvodnom jazyku TMDB nemá žiadny",
+                0 => CoreText.T("Odporúčam český plagát – názov je na ňom po česky"),
+                1 => all.Any(c => c.Tier == 0) ? CoreText.T("Odporúčam anglický plagát – české plagáty sú príliš malé alebo nevhodné") : CoreText.T("Odporúčam anglický plagát – český TMDB nemá"),
+                2 => CoreText.F("Odporúčam plagát v pôvodnom jazyku ({0}) – český ani anglický TMDB nemá", originalLanguage),
+                3 => CoreText.T("Odporúčam plagát bez textu – plagát s názvom TMDB nemá"),
+                _ => CoreText.F("Odporúčam plagát v jazyku ({0}) – v češtine, angličtine ani v pôvodnom jazyku TMDB nemá žiadny", picture.Language),
             },
         };
 
         var sameTier = all.Count(c => c.Tier == chosen.Tier);
         parts.Add(picture.VoteCount > 0
-            ? (sameTier > 1 ? "z nich je najlepší" : "jediný v tomto jazyku") +
-              $" (hodnotenie {picture.VoteAverage.ToString("0.0", sk)}, {Texts(picture.VoteCount)})"
-            : sameTier > 1 ? "z nich sa hodí najviac (zatiaľ bez hodnotení)" : "jediný v tomto jazyku");
+            ? (sameTier > 1 ? CoreText.T("z nich je najlepší") : CoreText.T("jediný v tomto jazyku")) +
+              CoreText.F(" (hodnotenie {0}, {1})", picture.VoteAverage.ToString("0.0", sk), Texts(picture.VoteCount))
+            : sameTier > 1 ? CoreText.T("z nich sa hodí najviac (zatiaľ bez hodnotení)") : CoreText.T("jediný v tomto jazyku"));
 
         // the colours as measured, and whether they suit the genre
         if (look is not null)
         {
             var colours = look.Colorfulness switch
             {
-                < 25 => "tlmené farby",
-                < 50 => "striedme farby",
-                < 80 => "pestré farby",
-                _ => "veľmi pestré farby",
-            } + (look.Brightness < 0.3 ? ", tmavý" : look.Brightness > 0.6 ? ", svetlý" : "");
+                < 25 => CoreText.T("tlmené farby"),
+                < 50 => CoreText.T("striedme farby"),
+                < 80 => CoreText.T("pestré farby"),
+                _ => CoreText.T("veľmi pestré farby"),
+            } + (look.Brightness < 0.3 ? CoreText.T(", tmavý") : look.Brightness > 0.6 ? CoreText.T(", svetlý") : "");
             var genre = (genres.Any(Romantic.Contains) ? Library.Tmdb.TmdbGenres.Name(10749) : null) ??
                         genres.Select(Library.Tmdb.TmdbGenres.Name).FirstOrDefault(n => n is not null) ?? "";
-            parts.Add(Fit(look, mood) >= 0.55 && genre.Length > 0 ? $"{colours} – sedí to k žánru ({genre})" : colours);
+            parts.Add(Fit(look, mood) >= 0.55 && genre.Length > 0 ? CoreText.F("{0} – sedí to k žánru ({1})", colours, genre) : colours);
         }
         parts.Add($"{picture.Width} × {picture.Height} px");
         if (!chosen.Acceptable)
         {
-            parts.Add("pozor: je menší alebo iných rozmerov, ako TMDB odporúča");
+            parts.Add(CoreText.T("pozor: je menší alebo iných rozmerov, ako TMDB odporúča"));
         }
 
         return string.Join(", ", parts) + ".";
     }
 
-    private static string Texts(int votes) => votes == 1 ? "1 hlas" : votes is >= 2 and <= 4 ? $"{votes} hlasy" : $"{votes} hlasov";
+    private static string Texts(int votes) => votes == 1 ? CoreText.T("1 hlas") : votes is >= 2 and <= 4 ? CoreText.F("{0} hlasy", votes) : CoreText.F("{0} hlasov", votes);
 }

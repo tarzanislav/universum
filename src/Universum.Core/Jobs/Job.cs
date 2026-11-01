@@ -1,3 +1,5 @@
+using Universum.Core.Text;
+
 namespace Universum.Core.Jobs;
 
 public enum JobStatus
@@ -108,7 +110,7 @@ public abstract class Job
 
         if (status == JobStatus.Cancelled && Outcome.Length == 0)
         {
-            Outcome = "Zrušené.";
+            Outcome = CoreText.T("Zrušené.");
         }
 
         if (status == JobStatus.Done && Warnings > 0)
@@ -126,7 +128,7 @@ public abstract class Job
     internal void MarkCancelled()
     {
         Status = JobStatus.Cancelled;
-        Outcome = "Zrušené pred spustením.";
+        Outcome = CoreText.T("Zrušené pred spustením.");
         FinishedUtc = DateTime.UtcNow;
         Changed?.Invoke(this);
     }

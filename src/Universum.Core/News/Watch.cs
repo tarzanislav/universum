@@ -10,14 +10,14 @@ namespace Universum.Core.News;
 public sealed record WatchOffer(string Country, string Provider, string Kind, DateOnly Since)
 {
     /// <summary>"predplatné", "zadarmo", "s reklamou", "požičanie", "kúpa".</summary>
-    public string KindText => Kind switch
+    public string KindText => CoreText.T(Kind switch
     {
         "flatrate" => "predplatné",
         "free" => "zadarmo",
         "ads" => "s reklamou",
         "rent" => "požičanie",
         _ => "kúpa",
-    };
+    });
 }
 
 /// <summary>The legal offers of one chosen title, as last checked.</summary>

@@ -258,7 +258,7 @@ public sealed class PremieresPageViewModel : ObservableObject
     public string Attribution =>
         Loc.T("Zdroje: ") + string.Join(" · ", _services.NewsSources.Where(s => s.Enabled).Select(s => s.Kind switch
         {
-            NewsSourceKind.TvMaze => TvMazeClient.Attribution,
+            NewsSourceKind.TvMaze => Loc.T(TvMazeClient.Attribution),
             NewsSourceKind.TmdbFilms => Loc.T("TMDB (filmy)"),
             _ => s.Name,
         })) + ". " + Universum.Core.Library.Tmdb.TmdbClient.Attribution;

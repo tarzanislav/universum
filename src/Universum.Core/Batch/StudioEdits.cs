@@ -3,6 +3,7 @@ using Universum.Core.IO;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 using Universum.Core.Subtitles;
+using Universum.Core.Text;
 
 namespace Universum.Core.Batch;
 
@@ -119,45 +120,45 @@ public sealed record StudioEdits
         var parts = new List<string>();
         if (Timings.Count + FileTimings.Count is > 0 and var timed)
         {
-            parts.Add($"časy titulkov {timed}");
+            parts.Add(CoreText.F("časy titulkov {0}", timed));
         }
 
         if (Languages.Count + FileLanguages.Count is > 0 and var languages)
         {
-            parts.Add($"jazyk {languages}");
+            parts.Add(CoreText.F("jazyk {0}", languages));
         }
 
         if (Names.Count + FileNames.Count is > 0 and var named)
         {
-            parts.Add($"názvy {named}");
+            parts.Add(CoreText.F("názvy {0}", named));
         }
 
         if (Added.Count > 0)
         {
-            parts.Add($"pridané {Added.Count}");
+            parts.Add(CoreText.F("pridané {0}", Added.Count));
         }
 
         if (Removed.Count + RemovedFiles.Count is > 0 and var removed)
         {
-            parts.Add($"vynechané {removed}");
+            parts.Add(CoreText.F("vynechané {0}", removed));
         }
 
         if (SoundRecipes.Count > 0 || SoundLanguages.Count + SoundNames.Count > 0)
         {
-            parts.Add($"zvuk {SoundRecipes.Keys.Concat(SoundLanguages.Keys).Concat(SoundNames.Keys).Distinct().Count()}");
+            parts.Add(CoreText.F("zvuk {0}", SoundRecipes.Keys.Concat(SoundLanguages.Keys).Concat(SoundNames.Keys).Distinct().Count()));
         }
 
         if (AddedSounds.Count > 0)
         {
-            parts.Add($"pridaný zvuk {AddedSounds.Count}");
+            parts.Add(CoreText.F("pridaný zvuk {0}", AddedSounds.Count));
         }
 
         if (RemovedSounds.Count > 0)
         {
-            parts.Add($"vynechaný zvuk {RemovedSounds.Count}");
+            parts.Add(CoreText.F("vynechaný zvuk {0}", RemovedSounds.Count));
         }
 
-        return parts.Count == 0 ? "bez zmien" : string.Join(", ", parts);
+        return parts.Count == 0 ? CoreText.T("bez zmien") : string.Join(", ", parts);
     }
 
     /// <summary>

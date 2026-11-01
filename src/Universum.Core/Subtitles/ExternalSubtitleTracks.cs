@@ -59,7 +59,7 @@ public static class ExternalSubtitleTracks
             var pgs = Path.GetExtension(match.Path).Equals(".sup", StringComparison.OrdinalIgnoreCase);
             return new MediaTrack
             {
-                Id = id, Type = TrackType.Subtitles, CodecId = pgs ? "S_HDMV/PGS" : "S_VOBSUB", Codec = (pgs ? "PGS" : "VobSub") + " (externý súbor)",
+                Id = id, Type = TrackType.Subtitles, CodecId = pgs ? "S_HDMV/PGS" : "S_VOBSUB", Codec = CoreText.F("{0} (externý súbor)", pgs ? "PGS" : "VobSub"),
                 Language = language, Name = name, Flags = flags, ExternalFile = match.Path,
             };
         }
@@ -81,7 +81,7 @@ public static class ExternalSubtitleTracks
 
         return new MediaTrack
         {
-            Id = id, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8", Codec = document.Format + " (externý súbor)", IsTextSubtitles = true,
+            Id = id, Type = TrackType.Subtitles, CodecId = "S_TEXT/UTF8", Codec = CoreText.F("{0} (externý súbor)", document.Format), IsTextSubtitles = true,
             Language = language, Name = name, Flags = flags, StatisticsFrames = document.Cues.Count, ExternalFile = match.Path,
         };
     }

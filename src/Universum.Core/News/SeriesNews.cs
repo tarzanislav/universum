@@ -55,9 +55,9 @@ public sealed record NewsSource
     [JsonIgnore]
     public string KindText => Kind switch
     {
-        NewsSourceKind.Page => "webová stránka (podľa pravidiel)",
-        NewsSourceKind.TvMaze => "TVmaze API – seriály vo svete",
-        _ => "TMDB – filmové premiéry",
+        NewsSourceKind.Page => CoreText.T("webová stránka (podľa pravidiel)"),
+        NewsSourceKind.TvMaze => CoreText.T("TVmaze API – seriály vo svete"),
+        _ => CoreText.T("TMDB – filmové premiéry"),
     };
 
     /// <summary>The sources of a new installation: TVmaze and TMDB (web pages are imported by the user).</summary>
@@ -145,7 +145,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
             }
             catch (FormatException ex)
             {
-                problems.Add($"{source.Name}: stránka sa nedá prečítať podľa pravidiel ({ex.Message}).");
+                problems.Add(CoreText.F("{0}: stránka sa nedá prečítať podľa pravidiel ({1}).", source.Name, ex.Message));
             }
         }
 
@@ -293,7 +293,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
     {
         if (source.Kind == NewsSourceKind.Page)
         {
-            var rules = source.Rules ?? throw new NewsSourceException("zdroj nemá pravidlá – importujte ho znova.");
+            var rules = source.Rules ?? throw new NewsSourceException(CoreText.T("zdroj nemá pravidlá – importujte ho znova."));
             var html = await pages.GetAsync(rules.PageAddress(day), cancellationToken).ConfigureAwait(false);
             return rules.Read(html, day, source.Name);
         }
@@ -372,7 +372,7 @@ public sealed class SeriesNews(WebPageClient pages, TvMazeClient tvmaze, NewsCac
                 var show = premiere.TvMaze;
                 if (show is null && lookups++ < maxLookups)
                 {
-                    progress?.Report($"Seriály: {rows.Count + 1} z {premieres.Count}");
+                    progress?.Report(CoreText.F("Seriály: {0} z {1}", rows.Count + 1, premieres.Count));
                     if (await tvmaze.FindAsync(premiere.OriginalTitle, cancellationToken).ConfigureAwait(false) is { } found &&
                         (premiere.Year is null || found.Year is null || Math.Abs(found.Year.Value - premiere.Year.Value) <= 1))
                     {

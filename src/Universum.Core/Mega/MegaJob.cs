@@ -7,6 +7,7 @@ using Universum.Core.Muxing;
 using Universum.Core.Planning;
 using Universum.Core.Rules;
 using Universum.Core.Templates;
+using Universum.Core.Text;
 
 namespace Universum.Core.Mega;
 
@@ -30,7 +31,7 @@ public sealed class MegaJob(
 
     public MegaBatch Batch { get; } = batch;
 
-    public string LogKind => $"MEGA spracovanie – {Batch.Label}";
+    public string LogKind => CoreText.F("MEGA spracovanie – {0}", Batch.Label);
 
     public IReadOnlyList<LoggedFile> LoggedFiles
     {
@@ -59,13 +60,13 @@ public sealed class MegaJob(
     {
         if (!File.Exists(file.Path))
         {
-            return (null, "súbor chýba");
+            return (null, CoreText.T("súbor chýba"));
         }
 
         var info = new FileInfo(file.Path);
         if (info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedUtc)
         {
-            return (null, "súbor sa medzičasom zmenil (veľkosť alebo čas zmeny)");
+            return (null, CoreText.T("súbor sa medzičasom zmenil (veľkosť alebo čas zmeny)"));
         }
 
         MediaFile media;
@@ -75,19 +76,19 @@ public sealed class MegaJob(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (null, "súbor sa nedá prečítať: " + ex.Message);
+            return (null, CoreText.T("súbor sa nedá prečítať: ") + ex.Message);
         }
 
         // the same checks as a run of Hromadné spracovanie: the file read now against the file that was analysed
         if (FileProcessor.StructureOf(media) != file.Structure)
         {
-            return (null, "súbor sa medzičasom zmenil (stopy, názvy, príznaky alebo tagy) – je to iný súbor, než ktorý sa pripravil");
+            return (null, CoreText.T("súbor sa medzičasom zmenil (stopy, názvy, príznaky alebo tagy) – je to iný súbor, než ktorý sa pripravil"));
         }
 
         // external subtitle files of the video: only as they were when the batch was made
         if (file.Externals.FirstOrDefault(e => !e.Unchanged) is { } changed)
         {
-            return (null, $"pridaný súbor {System.IO.Path.GetFileName(changed.Path)} (titulky alebo zvuk) sa medzičasom zmenil alebo chýba – treba ho znova pripraviť v Hromadnom spracovaní");
+            return (null, CoreText.F("pridaný súbor {0} (titulky alebo zvuk) sa medzičasom zmenil alebo chýba – treba ho znova pripraviť v Hromadnom spracovaní", System.IO.Path.GetFileName(changed.Path)));
         }
 
         media = media with { Tracks = [.. media.Tracks, .. file.Externals.Select(e => e.ToTrack())] };
@@ -95,7 +96,7 @@ public sealed class MegaJob(
         var target = UniversumRules.Apply(media, profile, file.Decisions());
         if (target.IsBlocked)
         {
-            return (null, "pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní");
+            return (null, CoreText.T("pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní"));
         }
 
         var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile).WithAddition(file.Addition);
@@ -119,7 +120,7 @@ public sealed class MegaJob(
         {
             return made == LibraryIndex.TargetSignature(target)
                 ? (null, AlreadyInLibrary)
-                : (null, "medzičasom sa spracoval inak (napr. v Hromadnom spracovaní) – dávka by novší výsledok prepísala staršími rozhodnutiami");
+                : (null, CoreText.T("medzičasom sa spracoval inak (napr. v Hromadnom spracovaní) – dávka by novší výsledok prepísala staršími rozhodnutiami"));
         }
 
         return (item, "");
@@ -133,7 +134,7 @@ public sealed class MegaJob(
         // the check reads files (also from a cache): off the thread that added the job (the window's)
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         var waiting = Batch.Files.Where(f => f.State == MegaFileState.Waiting).ToList();
-        context.Log(JobSeverity.Info, $"MEGA {Batch.Label}: {waiting.Count} súborov – kontrola pred spustením.");
+        context.Log(JobSeverity.Info, CoreText.F("MEGA {0}: {1} súborov – kontrola pred spustením.", Batch.Label, waiting.Count));
         var items = new List<(BatchItem Item, MegaFile File)>();
         var skipped = 0;
         foreach (var file in waiting.Where(f => f.Mux is null))
@@ -144,10 +145,10 @@ public sealed class MegaJob(
             {
                 skipped++;
                 file.State = problem == AlreadyInLibrary ? MegaFileState.AlreadyInLibrary : MegaFileState.Skipped;
-                file.Note = problem;
+                file.Note = file.State == MegaFileState.AlreadyInLibrary ? CoreText.T(AlreadyInLibrary) : problem;
                 Log(ProcessingWords.Skipped(file.Path, problem, file.State == MegaFileState.AlreadyInLibrary));
                 context.Log(file.State == MegaFileState.AlreadyInLibrary ? JobSeverity.Info : JobSeverity.Warning,
-                    $"{(file.State == MegaFileState.AlreadyInLibrary ? "Už v knižnici" : "PRESKOČENÝ")}: {Path.GetFileName(file.Path)} – {problem}");
+                    $"{(file.State == MegaFileState.AlreadyInLibrary ? CoreText.T("Už v knižnici") : CoreText.T("PRESKOČENÝ"))}: {Path.GetFileName(file.Path)} – {file.Note}");
                 changed?.Invoke(Batch);
             }
             else
@@ -207,14 +208,14 @@ public sealed class MegaJob(
             if (cancellationToken.IsCancellationRequested)
             {
                 file.State = MegaFileState.Cancelled;
-                file.Note = "zrušené";
+                file.Note = CoreText.T("zrušené");
                 changed?.Invoke(Batch);
                 continue;
             }
 
             var recipe = file.Mux!;
-            var problem = mux is null ? "Zlučovanie tu nie je k dispozícii"
-                : recipe.Changed() is { } moved ? $"súbor {Path.GetFileName(moved)} sa medzičasom zmenil alebo chýba – výsledok Zlučovania treba pripraviť znova"
+            var problem = mux is null ? CoreText.T("Zlučovanie tu nie je k dispozícii")
+                : recipe.Changed() is { } moved ? CoreText.F("súbor {0} sa medzičasom zmenil alebo chýba – výsledok Zlučovania treba pripraviť znova", Path.GetFileName(moved))
                 : null;
             if (problem is not null)
             {
@@ -222,12 +223,12 @@ public sealed class MegaJob(
                 file.State = MegaFileState.Skipped;
                 file.Note = problem;
                 Log(ProcessingWords.Skipped(file.Path, problem, false));
-                context.Log(JobSeverity.Warning, $"PRESKOČENÝ (Zlučovanie): {Path.GetFileName(file.Path)} – {problem}");
+                context.Log(JobSeverity.Warning, CoreText.F("PRESKOČENÝ (Zlučovanie): {0} – {1}", Path.GetFileName(file.Path), problem));
                 changed?.Invoke(Batch);
                 continue;
             }
 
-            context.Log(JobSeverity.Info, $"Zlučovanie: {recipe.Spec.Sources.Count} vstup(y), {recipe.Spec.Tracks.Count} stôp → {file.PlannedPath}");
+            context.Log(JobSeverity.Info, CoreText.F("Zlučovanie: {0} vstup(y), {1} stôp → {2}", recipe.Spec.Sources.Count, recipe.Spec.Tracks.Count, file.PlannedPath));
             MuxResult result;
             try
             {
@@ -249,12 +250,12 @@ public sealed class MegaJob(
                 MuxStatus.Cancelled => MegaFileState.Cancelled,
                 _ => MegaFileState.Failed,
             };
-            file.Note = result.OutputPath ?? (result.Status == MuxStatus.Cancelled ? "zrušené" : string.Join(" | ", result.Messages));
+            file.Note = result.OutputPath ?? (result.Status == MuxStatus.Cancelled ? CoreText.T("zrušené") : string.Join(" | ", result.Messages));
             file.ResultPath = result.Status == MuxStatus.Done ? result.OutputPath : null;
             merged += result.Status == MuxStatus.Done ? 1 : 0;
             Log(MuxJob.Describe(recipe.Spec, result));
             context.Log(result.Status == MuxStatus.Done ? JobSeverity.Info : JobSeverity.Error,
-                $"{finished} / {total} · Zlučovanie: " + (result.Status == MuxStatus.Done ? "hotovo – " + result.OutputPath : result.Status == MuxStatus.Cancelled ? "zrušené" : "chyba"));
+                $"{finished} / {total} · " + (result.Status == MuxStatus.Done ? CoreText.F("Zlučovanie: hotovo – {0}", result.OutputPath) : result.Status == MuxStatus.Cancelled ? CoreText.T("Zlučovanie: zrušené") : CoreText.T("Zlučovanie: chyba")));
             changed?.Invoke(Batch);
         }
 
@@ -263,9 +264,9 @@ public sealed class MegaJob(
         var failed = results.Count(r => r.Status == ProcessingStatus.Failed) + muxes.Count(f => f.State == MegaFileState.Failed);
         var problems = waiting.Count(f => f.State == MegaFileState.Skipped);
         var cancelled = cancellationToken.IsCancellationRequested;
-        Outcome = $"{done} z {waiting.Count} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
-                  (problems > 0 ? $", {problems} preskočených pri kontrole" : "") + (failed > 0 ? $", {failed} s chybou" : "") +
-                  (cancelled ? " – zrušené." : ".");
+        Outcome = CoreText.F("{0} z {1} súborov v knižnici", done, waiting.Count) + (present > 0 ? CoreText.F(", {0} tam už bolo", present) : "") +
+                  (problems > 0 ? CoreText.F(", {0} preskočených pri kontrole", problems) : "") + (failed > 0 ? CoreText.F(", {0} s chybou", failed) : "") +
+                  (cancelled ? CoreText.T(" – zrušené.") : ".");
         return cancelled ? JobStatus.Cancelled
             : failed + problems > 0 ? JobStatus.DoneWithWarnings
             : JobStatus.Done;

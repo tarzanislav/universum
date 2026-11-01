@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Universum.Core.Security;
+using Universum.Core.Text;
 
 namespace Universum.Core.Speech;
 
@@ -49,7 +50,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new SpeechException("Súbory rozpoznávania reči sa nedajú prečítať: " + ex.Message, ex);
+            throw new SpeechException(CoreText.T("Súbory rozpoznávania reči sa nedajú prečítať: ") + ex.Message, ex);
         }
     }
 
@@ -63,7 +64,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
         }
         catch (Exception ex) when (ex is IOException or JsonException or KeyNotFoundException or InvalidOperationException or UnauthorizedAccessException)
         {
-            throw new SpeechException("Zoznam súborov rozpoznávania reči sa nedá prečítať – preinštalujte UNIVERSUM.", ex);
+            throw new SpeechException(CoreText.T("Zoznam súborov rozpoznávania reči sa nedá prečítať – preinštalujte UNIVERSUM."), ex);
         }
 
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Folder));
@@ -71,7 +72,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
         {
             if (!files.ContainsKey(Path.GetRelativePath(root, required).Replace('\\', '/')))
             {
-                throw new SpeechException($"Súbor {Path.GetFileName(required)} nie je v zozname súborov rozpoznávania reči – preinštalujte UNIVERSUM.");
+                throw new SpeechException(CoreText.F("Súbor {0} nie je v zozname súborov rozpoznávania reči – preinštalujte UNIVERSUM.", Path.GetFileName(required)));
             }
         }
 
@@ -80,12 +81,12 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
             var path = Path.GetFullPath(Path.Combine(root, relative));
             if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
-                throw new SpeechException("Zoznam súborov rozpoznávania reči je neplatný – preinštalujte UNIVERSUM.");
+                throw new SpeechException(CoreText.T("Zoznam súborov rozpoznávania reči je neplatný – preinštalujte UNIVERSUM."));
             }
 
             if (!File.Exists(path) || !FileHashes.Matches(expected, await FileHashes.Sha256Async(path, cancellationToken).ConfigureAwait(false)))
             {
-                throw new SpeechException($"Súbor {relative} rozpoznávania reči chýba alebo je zmenený – nespustil sa. Preinštalujte UNIVERSUM.");
+                throw new SpeechException(CoreText.F("Súbor {0} rozpoznávania reči chýba alebo je zmenený – nespustil sa. Preinštalujte UNIVERSUM.", relative));
             }
         }
 
@@ -95,7 +96,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
             if (relative != ManifestName && !files.ContainsKey(relative))
             {
-                throw new SpeechException($"V priečinku rozpoznávania reči je neznámy súbor {relative} – nespustilo sa nič. Preinštalujte UNIVERSUM.");
+                throw new SpeechException(CoreText.F("V priečinku rozpoznávania reči je neznámy súbor {0} – nespustilo sa nič. Preinštalujte UNIVERSUM.", relative));
             }
         }
     }

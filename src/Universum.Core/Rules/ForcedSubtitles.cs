@@ -1,5 +1,6 @@
 using System.Globalization;
 using Universum.Core.Media;
+using Universum.Core.Text;
 
 namespace Universum.Core.Rules;
 
@@ -40,13 +41,15 @@ public static class ForcedSubtitles
             var fewer = frames <= full * Share;
             var smaller = track.StatisticsBytes is not { } bytes || fullest.StatisticsBytes is not { } fullBytes || fullBytes <= 0 || bytes <= fullBytes * Share;
             return fewer && smaller
-                ? $"{Count(frames)} titulkov oproti {Count(full)} v najväčšej {(track.IsTextSubtitles ? "textovej" : "obrázkovej")} titulkovej stope"
+                ? track.IsTextSubtitles
+                    ? CoreText.F("{0} titulkov oproti {1} v najväčšej textovej titulkovej stope", Count(frames), Count(full))
+                    : CoreText.F("{0} titulkov oproti {1} v najväčšej obrázkovej titulkovej stope", Count(frames), Count(full))
                 : null;
         }
 
         if (file.Duration is { TotalMinutes: >= 20 } duration && frames < duration.TotalMinutes * PerMinute)
         {
-            return $"{Count(frames)} titulkov na {(int)duration.TotalMinutes} minút filmu";
+            return CoreText.F("{0} titulkov na {1} minút filmu", Count(frames), (int)duration.TotalMinutes);
         }
 
         return null;

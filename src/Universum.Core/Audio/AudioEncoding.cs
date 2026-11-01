@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Universum.Core.Media;
 using Universum.Core.Processes;
 using Universum.Core.Subtitles;
+using Universum.Core.Text;
 
 namespace Universum.Core.Audio;
 
@@ -57,7 +58,7 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         var parts = new List<string>();
         if (Timing.Numerator != Timing.Denominator)
         {
-            parts.Add(new SubtitleTiming(0, Timing.Numerator, Timing.Denominator).Describe("zvuk") + (KeepPitch ? ", výška tónu ostane" : ", výška tónu sa zmení"));
+            parts.Add(CoreText.F(KeepPitch ? "{0}, výška tónu ostane" : "{0}, výška tónu sa zmení", new SubtitleTiming(0, Timing.Numerator, Timing.Denominator).Describe("zvuk")));
         }
 
         if (Timing.DelayMilliseconds != 0)
@@ -68,7 +69,7 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
         if (NeedsEncoding)
         {
             var (name, _) = Encoder(track);
-            parts.Add(name is null ? "kodek sa nedá zapísať" : $"{name}{(BitrateFor(track) is { } kbps ? string.Create(sk, $" {kbps} kbit/s") : "")}");
+            parts.Add(name is null ? CoreText.T("kodek sa nedá zapísať") : $"{name}{(BitrateFor(track) is { } kbps ? string.Create(sk, $" {kbps} kbit/s") : "")}");
         }
 
         if (Stereo)
@@ -78,12 +79,12 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
 
         if (Normalize)
         {
-            parts.Add("hlasitosť −23 LUFS (EBU R128)");
+            parts.Add(CoreText.T("hlasitosť −23 LUFS (EBU R128)"));
         }
 
         if (Gain != 0)
         {
-            parts.Add(string.Create(sk, $"hlasitosť {Gain:+0.#;−0.#} dB"));
+            parts.Add(CoreText.F("hlasitosť {0} dB", Gain.ToString("+0.#;−0.#", sk)));
         }
 
         return parts.Count == 0 ? "bez zmeny" : string.Join(", ", parts);
@@ -94,7 +95,7 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
     {
         if (Timing.Numerator != Timing.Denominator && Timing.Factor is < 0.5 or > 2)
         {
-            return "Taká zmena rýchlosti sa nedá.";
+            return CoreText.T("Taká zmena rýchlosti sa nedá.");
         }
 
         if (!NeedsEncoding)
@@ -104,8 +105,8 @@ public sealed record AudioRecipe(SubtitleTiming Timing, bool KeepPitch = true, A
 
         var (name, encoder) = Encoder(track);
         var most = encoder switch { "ac3" => 640, "eac3" => 6144, _ => int.MaxValue };
-        return encoder is null ? $"Kodek {name ?? track.Codec} FFmpeg UNIVERSUM nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, FLAC)."
-            : BitrateFor(track) > most ? $"{name} najviac {most} kbit/s."
+        return encoder is null ? CoreText.F("Kodek {0} FFmpeg UNIVERSUM nezapíše – zvoľte kodek (AC-3, E-AC-3, AAC, FLAC).", name ?? track.Codec)
+            : BitrateFor(track) > most ? CoreText.F("{0} najviac {1} kbit/s.", name, most)
             : null;
     }
 
@@ -235,7 +236,7 @@ public static partial class AudioEncoder
             var measured = await MeasureAsync(runner, ffmpeg, input, filters, stretched, progress, cancellationToken).ConfigureAwait(false);
             if (measured is null)
             {
-                return "Hlasitosť zvuku sa nepodarilo zmerať.";
+                return CoreText.T("Hlasitosť zvuku sa nepodarilo zmerať.");
             }
 
             filters.Add(measured);
@@ -276,7 +277,7 @@ public static partial class AudioEncoder
         }, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0 || !File.Exists(output))
         {
-            return "FFmpeg: " + (result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? $"skončil s kódom {result.ExitCode}");
+            return "FFmpeg: " + (result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? CoreText.F("skončil s kódom {0}", result.ExitCode));
         }
 
         progress?.Report(1);

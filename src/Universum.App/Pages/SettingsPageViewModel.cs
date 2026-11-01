@@ -406,7 +406,7 @@ public sealed class SettingsPageViewModel : ObservableObject
             ? Loc.F("Počasie pre: {0} (súradnice {1:0.00}, {2:0.00}).", place.FullDisplay, place.Latitude, place.Longitude)
             : Loc.T("Mesto nie je zadané – počasie sa nezisťuje a na Open-Meteo sa nič neposiela.");
 
-    public string WeatherAttribution => OpenMeteo.Attribution;
+    public string WeatherAttribution => Loc.T(OpenMeteo.Attribution);
 
     /// <summary>Looks the town up on Open-Meteo (only the typed name is sent): one match is stored, several are offered.</summary>
     private async Task FindWeatherTownAsync()

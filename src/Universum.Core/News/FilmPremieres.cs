@@ -105,7 +105,7 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
         var done = 0;
         foreach (var (id, (english, popularity)) in found)
         {
-            progress?.Report($"Filmy v kinách SK/CZ: {++done} z {found.Count}");
+            progress?.Report(CoreText.F("Filmy v kinách SK/CZ: {0} z {1}", ++done, found.Count));
             if (await DetailsAsync(id, cancellationToken).ConfigureAwait(false) is { } details && InCinemasHere(details, english, popularity, from, to) is { } film)
             {
                 films.Add(film);
@@ -230,7 +230,7 @@ public sealed partial class FilmPremieres(TmdbClient tmdb)
         var done = 0;
         foreach (var film in found)
         {
-            progress?.Report($"Filmy vo svete: {++done} z {found.Count}");
+            progress?.Report(CoreText.F("Filmy vo svete: {0} z {1}", ++done, found.Count));
             if (await DetailsAsync(film.Id, cancellationToken).ConfigureAwait(false) is { } details && OfTheWorld(details, film.English, film.Popularity, from, to) is { } premiere)
             {
                 films.Add(premiere);

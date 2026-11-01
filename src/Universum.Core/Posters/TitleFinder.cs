@@ -14,7 +14,7 @@ public sealed record FoundTitle(MediaKind Kind, int Id, string Title, string Ori
     public string Caption => (Year is { } year ? $"{OriginalTitle} ({year.ToString(CultureInfo.InvariantCulture)})" : OriginalTitle) +
                              (Words.Normalize(Title) != Words.Normalize(OriginalTitle) ? " · " + Title : "");
 
-    public string KindText => Kind == MediaKind.Movie ? "film" : "seriál";
+    public string KindText => CoreText.T(Kind == MediaKind.Movie ? "film" : "seriál");
 }
 
 /// <summary>

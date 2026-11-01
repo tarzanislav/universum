@@ -1,6 +1,7 @@
 using System.Globalization;
 using Universum.Core.IO;
 using Universum.Core.Library;
+using Universum.Core.Text;
 
 namespace Universum.Core.Execution;
 
@@ -73,7 +74,7 @@ public static class OriginalCleanup
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                kept.Add($"{name}: do Koša sa nedal presunúť – {ex.Message}");
+                kept.Add(CoreText.F("{0}: do Koša sa nedal presunúť – {1}", name, ex.Message));
             }
         }
 
@@ -91,18 +92,18 @@ public static class OriginalCleanup
 
         if (Paths.Same(original.Source, original.Result) || inLibrary(original.Source) || index.Knows(original.Source))
         {
-            return "je to súbor knižnice – nemaže sa";
+            return CoreText.T("je to súbor knižnice – nemaže sa");
         }
 
         if (!File.Exists(original.Result) || new FileInfo(original.Result).Length == 0)
         {
-            return "jeho výsledok v knižnici chýba – ostal";
+            return CoreText.T("jeho výsledok v knižnici chýba – ostal");
         }
 
         var info = new FileInfo(original.Source);
         if (info.Length != original.Size || info.LastWriteTimeUtc != original.ModifiedUtc)
         {
-            return "po spracovaní sa zmenil – ostal";
+            return CoreText.T("po spracovaní sa zmenil – ostal");
         }
 
         string fingerprint;
@@ -112,14 +113,14 @@ public static class OriginalCleanup
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return "nedá sa prečítať – ostal (" + ex.Message + ")";
+            return CoreText.F("nedá sa prečítať – ostal ({0})", ex.Message);
         }
 
         if (!index.IsMadeFrom(original.Result, fingerprint))
         {
-            return "nedá sa overiť, že výsledok v knižnici vznikol práve z neho (zmenil sa alebo bol nahradený) – ostal";
+            return CoreText.T("nedá sa overiť, že výsledok v knižnici vznikol práve z neho (zmenil sa alebo bol nahradený) – ostal");
         }
 
-        return recycleBin.CannotRecycle(original.Source) is { } reason ? $"Kôš nie je k dispozícii ({reason}) – ostal" : null;
+        return recycleBin.CannotRecycle(original.Source) is { } reason ? CoreText.F("Kôš nie je k dispozícii ({0}) – ostal", reason) : null;
     }
 }

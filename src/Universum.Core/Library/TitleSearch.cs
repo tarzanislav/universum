@@ -310,7 +310,7 @@ public sealed class TitleSearch
         if (TitleGuess.ParseTmdb(text) is not null)
         {
             return new TitleResults([], "HISTRA", tmdbProblem?.Message ??
-                (_tmdb is null ? "ID alebo adresu TMDB načíta len TMDB (kľúč v Nastaveniach) – v katalógu HISTRA hľadajte Názov (rok)." : "TMDB taký titul nepozná."))
+                (_tmdb is null ? CoreText.T("ID alebo adresu TMDB načíta len TMDB (kľúč v Nastaveniach) – v katalógu HISTRA hľadajte Názov (rok).") : CoreText.T("TMDB taký titul nepozná.")))
             {
                 TmdbProblem = tmdbProblem?.Message,
             };
@@ -462,7 +462,7 @@ public sealed class TitleSearch
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            return found with { HistraUnavailable = true, Note = "Titul nemá názov na overenie v HISTRA." };
+            return found with { HistraUnavailable = true, Note = CoreText.T("Titul nemá názov na overenie v HISTRA.") };
         }
 
         try
@@ -471,7 +471,7 @@ public sealed class TitleSearch
         }
         catch (HistraException ex)
         {
-            return found with { HistraUnavailable = true, Note = $"HISTRA sa nedala opýtať ({ex.Message}) – titul nie je overený." };
+            return found with { HistraUnavailable = true, Note = CoreText.F("HISTRA sa nedala opýtať ({0}) – titul nie je overený.", ex.Message) };
         }
     }
 
@@ -484,7 +484,7 @@ public sealed class TitleSearch
     }
 
     private string Why(TitleServiceException? tmdbProblem) =>
-        tmdbProblem is not null ? tmdbProblem.Message + " Výsledky sú z katalógu HISTRA."
-        : _tmdb is not null ? "TMDB nič nenašlo – výsledky sú z katalógu HISTRA."
+        tmdbProblem is not null ? tmdbProblem.Message + CoreText.T(" Výsledky sú z katalógu HISTRA.")
+        : _tmdb is not null ? CoreText.T("TMDB nič nenašlo – výsledky sú z katalógu HISTRA.")
         : "";
 }

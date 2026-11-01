@@ -1,5 +1,6 @@
 using Universum.Core.Execution;
 using Universum.Core.Media;
+using Universum.Core.Text;
 
 namespace Universum.Core.Batch;
 
@@ -122,7 +123,7 @@ public static class BatchAnalyzer
     {
         if (!Directory.Exists(folder))
         {
-            return "Priečinok neexistuje alebo nie je dostupný: " + folder;
+            return CoreText.T("Priečinok neexistuje alebo nie je dostupný: ") + folder;
         }
 
         folder = Path.GetFullPath(folder);
@@ -132,8 +133,8 @@ public static class BatchAnalyzer
 
         if (InLibrary(folder))
         {
-            return "Tento priečinok je v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva, sú to " +
-                   "už hotové súbory. Vyberte priečinok s pôvodnými súbormi.";
+            return CoreText.T("Tento priečinok je v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva, sú to " +
+                   "už hotové súbory. Vyberte priečinok s pôvodnými súbormi.");
         }
 
         List<(string Path, string Extension, bool Top)> all;
@@ -157,7 +158,7 @@ public static class BatchAnalyzer
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            return "Do priečinka sa nedá pozrieť: " + ex.Message;
+            return CoreText.T("Do priečinka sa nedá pozrieť: ") + ex.Message;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -171,32 +172,32 @@ public static class BatchAnalyzer
 
         if (videoBelow)
         {
-            return "Priamo v priečinku nie sú video súbory, v podpriečinkoch áno – zaškrtnite „aj podpriečinky“ a dajte Analyzovať znova.";
+            return CoreText.T("Priamo v priečinku nie sú video súbory, v podpriečinkoch áno – zaškrtnite „aj podpriečinky“ a dajte Analyzovať znova.");
         }
 
         var outsideDiscs = video.Where(f => !InDiscStructure(f.Path)).ToList();
         if (outsideDiscs.Count > 0 && outsideDiscs.All(f => InLibrary(f.Path)))
         {
-            return $"Všetky video súbory ({outsideDiscs.Count}) sú v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva.";
+            return CoreText.F("Všetky video súbory ({0}) sú v knižnici s výsledkami (MOVIES alebo TVSHOWS) – tie Hromadné spracovanie nespracúva.", outsideDiscs.Count);
         }
 
         if (all.Any(f => InDiscStructure(f.Path)))
         {
-            return "V priečinku je kópia disku (BDMV alebo VIDEO_TS) – jej časti sa nespracúvajú jednotlivo. Film z disku " +
-                   "zostavte v Zlučovaní: z Blu-ray pridajte súbor playlistu (BDMV\\PLAYLIST\\*.mpls), z DVD súbory VOB ako ďalšie časti.";
+            return CoreText.T("V priečinku je kópia disku (BDMV alebo VIDEO_TS) – jej časti sa nespracúvajú jednotlivo. Film z disku " +
+                   "zostavte v Zlučovaní: z Blu-ray pridajte súbor playlistu (BDMV\\PLAYLIST\\*.mpls), z DVD súbory VOB ako ďalšie časti.");
         }
 
-        var where = recursive ? "V priečinku a jeho podpriečinkoch" : "V priečinku";
+        var where = recursive ? CoreText.T("V priečinku a jeho podpriečinkoch") : CoreText.T("V priečinku");
         if (all.Any(f => f.Extension == DvdPart))
         {
-            return $"{where} sú len súbory DVD (VOB) – ich časti patria k sebe, film z nich zostavte v Zlučovaní (pridajte ich ako ďalšie časti).";
+            return CoreText.F("{0} sú len súbory DVD (VOB) – ich časti patria k sebe, film z nich zostavte v Zlučovaní (pridajte ich ako ďalšie časti).", where);
         }
 
         var others = all.Where(f => Unsupported.Contains(f.Extension)).GroupBy(f => f.Extension)
             .OrderByDescending(g => g.Count()).Select(g => $"{g.Count()} × {g.Key.TrimStart('.').ToUpperInvariant()}").ToList();
         return others.Count > 0
-            ? $"{where} sú len formáty, ktoré MKVToolNix nevie prečítať: {string.Join(", ", others)}."
-            : $"{(recursive ? "V priečinku ani v jeho podpriečinkoch" : "V priečinku")} nie sú žiadne video súbory (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…).";
+            ? CoreText.F("{0} sú len formáty, ktoré MKVToolNix nevie prečítať: {1}.", where, string.Join(", ", others))
+            : CoreText.F("{0} nie sú žiadne video súbory (MKV, MP4, AVI, TS, M2TS, MOV, MPG, WebM…).", recursive ? CoreText.T("V priečinku ani v jeho podpriečinkoch") : CoreText.T("V priečinku"));
     }
 
     /// <summary>Reads the structure of every file (in parallel) and groups the files by structure.</summary>
@@ -243,9 +244,9 @@ public static class BatchAnalyzer
                     }
 
                     results[index] = !file.IsRecognized || !file.IsSupported
-                        ? (null, file.Errors.FirstOrDefault() ?? "mkvmerge tento formát nevie spracovať")
+                        ? (null, file.Errors.FirstOrDefault() ?? CoreText.T("mkvmerge tento formát nevie spracovať"))
                         : !file.IsMatroska && !file.TracksOf(TrackType.Video).Any()
-                            ? (null, "neobsahuje video")
+                            ? (null, CoreText.T("neobsahuje video"))
                             : (file, null);
                     if (results[index].File is { } read)
                     {

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Universum.Core.Text;
 
 namespace Universum.Core.Weather;
 
@@ -18,7 +19,7 @@ public sealed record WeatherPlace(
     /// <summary>Where it lies: "okres Brezno, Banskobystrický kraj, Slovensko · 469 m n. m.".</summary>
     public string Details =>
         string.Join(", ", new[] { District, Region, Country }.Select(Known).OfType<string>().Distinct()) +
-        (Elevation is { } meters ? string.Create(CultureInfo.GetCultureInfo("sk-SK"), $" · {meters:0} m n. m.") : "");
+        (Elevation is { } meters ? CoreText.F(" · {0:0} m n. m.", meters) : "");
 
     /// <summary>For the choice and the settings: "Valaská – okres Brezno, Banskobystrický kraj, Slovensko · 469 m n. m.".</summary>
     public string FullDisplay => Details.Length == 0 ? Name : $"{Name} – {Details.TrimStart(' ', '·')}";
@@ -129,8 +130,8 @@ public sealed class OpenMeteo(HttpClient http)
             Number(current, "wind_speed_10m"), Number(current, "is_day") is not 0, days, DateTime.UtcNow);
     }
 
-    /// <summary>The WMO weather code in Slovak.</summary>
-    public static string Describe(int code) => code switch
+    /// <summary>The WMO weather code in words (in the language of the window).</summary>
+    public static string Describe(int code) => CoreText.T(code switch
     {
         0 => "jasno",
         1 => "prevažne jasno",
@@ -153,7 +154,7 @@ public sealed class OpenMeteo(HttpClient http)
         95 => "búrka",
         96 or 99 => "búrka s krupobitím",
         _ => "",
-    };
+    });
 
     /// <summary>A symbol for the weather code (the font draws it in one colour).</summary>
     public static string Symbol(int code, bool day = true) => code switch

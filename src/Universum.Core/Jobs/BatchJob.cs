@@ -1,5 +1,6 @@
 using Universum.Core.Batch;
 using Universum.Core.Execution;
+using Universum.Core.Text;
 
 namespace Universum.Core.Jobs;
 
@@ -16,7 +17,7 @@ public sealed class BatchJob(
     private readonly List<LoggedFile> _logged = [];
     private IReadOnlyList<ProcessingResult> _results = [];
 
-    public string LogKind => "Hromadné spracovanie";
+    public string LogKind => CoreText.T("Hromadné spracovanie");
 
     public IReadOnlyList<LoggedFile> LoggedFiles
     {
@@ -43,16 +44,16 @@ public sealed class BatchJob(
 
     protected override async Task<JobStatus> ExecuteAsync(IJobContext context, CancellationToken cancellationToken)
     {
-        context.Log(JobSeverity.Info, $"Hromadné spracovanie: {FileCount} súborov do knižnice.");
+        context.Log(JobSeverity.Info, CoreText.F("Hromadné spracovanie: {0} súborov do knižnice.", FileCount));
         _results = await BatchRunner.RunAsync(items, processor, output, new Reporter(context, progress, Log), Control, cancellationToken).ConfigureAwait(false);
 
         var done = _results.Count(r => r.Status == ProcessingStatus.Done);
         var present = _results.Count(r => r.Status == ProcessingStatus.AlreadyInLibrary);
         var failed = _results.Count(r => r.Status == ProcessingStatus.Failed);
         var cancelled = cancellationToken.IsCancellationRequested || _results.Any(r => r.Status == ProcessingStatus.Cancelled);
-        Outcome = $"{done} z {FileCount} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
-                  (failed > 0 ? $", {failed} s chybou" : "") +
-                  (cancelled ? " – zrušené." : Control.StopAfterCurrent ? " – zastavené na požiadanie." : ".");
+        Outcome = CoreText.F("{0} z {1} súborov v knižnici", done, FileCount) + (present > 0 ? CoreText.F(", {0} tam už bolo", present) : "") +
+                  (failed > 0 ? CoreText.F(", {0} s chybou", failed) : "") +
+                  (cancelled ? CoreText.T(" – zrušené.") : Control.StopAfterCurrent ? CoreText.T(" – zastavené na požiadanie.") : ".");
         return cancelled ? JobStatus.Cancelled
             : failed > 0 && done + present == 0 ? JobStatus.Failed
             : failed > 0 ? JobStatus.DoneWithWarnings
@@ -69,14 +70,14 @@ public sealed class BatchJob(
         return result.Status switch
         {
             ProcessingStatus.Done when result.Messages.FirstOrDefault(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)) is { } kept =>
-                (JobSeverity.Warning, $"OK: {name} → {result.OutputPath} · originál ostal ({kept[FileProcessor.OriginalKeptPrefix.Length..]})"),
+                (JobSeverity.Warning, CoreText.F("OK: {0} → {1} · originál ostal ({2})", name, result.OutputPath, kept[FileProcessor.OriginalKeptPrefix.Length..])),
             ProcessingStatus.Done => (JobSeverity.Info, $"OK: {name} → {result.OutputPath}" +
-                                                         (result.Messages.Contains(FileProcessor.OriginalRecycledMessage) ? " · originál v Koši" : "")),
-            ProcessingStatus.AlreadyInLibrary => (JobSeverity.Info, $"Už v knižnici: {name} ({result.OutputPath})"),
-            ProcessingStatus.Unchanged => (JobSeverity.Info, $"Bez zmien: {name}"),
-            ProcessingStatus.Cancelled => (JobSeverity.Warning, $"Zrušené: {name} – originál ostal nezmenený"),
-            ProcessingStatus.NeedsReview => (JobSeverity.Warning, $"Na kontrolu: {name}"),
-            _ => (JobSeverity.Error, $"CHYBA: {name}" + (result.Messages.Count > 0 ? " – " + string.Join(" | ", result.Messages) : "")),
+                                                         (result.Messages.Contains(FileProcessor.OriginalRecycledMessage) ? CoreText.T(" · originál v Koši") : "")),
+            ProcessingStatus.AlreadyInLibrary => (JobSeverity.Info, CoreText.F("Už v knižnici: {0} ({1})", name, result.OutputPath)),
+            ProcessingStatus.Unchanged => (JobSeverity.Info, CoreText.F("Bez zmien: {0}", name)),
+            ProcessingStatus.Cancelled => (JobSeverity.Warning, CoreText.F("Zrušené: {0} – originál ostal nezmenený", name)),
+            ProcessingStatus.NeedsReview => (JobSeverity.Warning, CoreText.F("Na kontrolu: {0}", name)),
+            _ => (JobSeverity.Error, CoreText.F("CHYBA: {0}", name) + (result.Messages.Count > 0 ? " – " + string.Join(" | ", result.Messages) : "")),
         };
     }
 

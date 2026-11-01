@@ -95,6 +95,16 @@ public static class ReportPrinting
                 Canvas.SetLeft(rectangle, box.X);
                 Canvas.SetTop(rectangle, box.Y);
                 return rectangle;
+            case ImageItem image:
+                var picture = new Image { Width = image.Width, Height = image.Height, Stretch = Stretch.Fill };
+                using (var stream = new MemoryStream(image.Picture.Bytes))
+                {
+                    picture.Source = System.Windows.Media.Imaging.BitmapFrame.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                }
+
+                Canvas.SetLeft(picture, image.X);
+                Canvas.SetTop(picture, image.Y);
+                return picture;
             case LineItem line:
                 return new Line { X1 = line.X1, Y1 = line.Y1, X2 = line.X2, Y2 = line.Y2, Stroke = Paint(options.Ink(line.Color)), StrokeThickness = line.Width };
             default:

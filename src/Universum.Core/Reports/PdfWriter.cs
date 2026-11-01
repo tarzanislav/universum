@@ -75,7 +75,14 @@ public static class PdfWriter
     {
         var used = new[] { new Dictionary<ushort, int>(), new Dictionary<ushort, int>() };   // glyph → character, regular and bold
         var sheets = Sheets.Of(pages, options.PagesPerSheet);
-        var contents = sheets.Select(sheet => Content(sheet, fonts, options, used)).ToList();
+        // the pictures, each once (by its bytes), numbered in the order they come
+        var order = new Dictionary<byte[], int>(ReferenceEqualityComparer.Instance);
+        foreach (var image in pages.SelectMany(p => p.Items).OfType<ImageItem>())
+        {
+            order.TryAdd(image.Picture.Bytes, order.Count);
+        }
+
+        var contents = sheets.Select(sheet => Content(sheet, fonts, options, used, order)).ToList();
 
         var pdf = new PdfFile();
         var catalog = pdf.Reserve();
@@ -86,7 +93,24 @@ public static class PdfWriter
             fontObjects[f] = used[f].Count == 0 && f == 1 ? 0 : EmbedFont(pdf, fonts.Of(f == 1), used[f]);
         }
 
-        var resources = "<< /Font << /F1 " + fontObjects[0] + " 0 R" + (fontObjects[1] > 0 ? " /F2 " + fontObjects[1] + " 0 R" : "") + " >> >>";
+        // the pictures as XObjects taken without decoding (DCTDecode)
+        var numbers = new int[order.Count];
+        foreach (var image in pages.SelectMany(p => p.Items).OfType<ImageItem>())
+        {
+            var index = order[image.Picture.Bytes];
+            if (numbers[index] == 0)
+            {
+                var picture = image.Picture;
+                numbers[index] = pdf.Stream(
+                    $"/Type /XObject /Subtype /Image /Width {picture.Width} /Height {picture.Height} /ColorSpace /{(picture.Components == 1 ? "DeviceGray" : "DeviceRGB")} /BitsPerComponent 8 /Filter /DCTDecode",
+                    picture.Bytes, compress: false);
+            }
+        }
+
+        var xobjects = numbers.Length == 0 ? "" : " /XObject << " + string.Join(" ", numbers.Select(n => $"/Im{n} {n} 0 R")) + " >>";
+        var resources = "<< /Font << /F1 " + fontObjects[0] + " 0 R" + (fontObjects[1] > 0 ? " /F2 " + fontObjects[1] + " 0 R" : "") + " >>" + xobjects + " >>";
+        // the drawings refer to the pictures by their object numbers
+        contents = [.. contents.Select(c => Pictures(c, numbers))];
         var kids = new List<int>();
         for (var i = 0; i < sheets.Count; i++)
         {
@@ -100,9 +124,21 @@ public static class PdfWriter
         return pdf.Bytes(catalog, info);
     }
 
+    // "/Im@<index> Do" of a drawing (the index of the picture's bytes) becomes the name of its object
+    private static byte[] Pictures(byte[] content, int[] numbers)
+    {
+        if (numbers.Length == 0)
+        {
+            return content;
+        }
+
+        var text = Encoding.ASCII.GetString(content);
+        return Encoding.ASCII.GetBytes(System.Text.RegularExpressions.Regex.Replace(text, @"/Im@(\d+) Do", m => $"/Im{numbers[int.Parse(m.Groups[1].Value, Invariant)]} Do"));
+    }
+
     // the drawing of a sheet; the glyphs used are noted
     private static byte[] Content((double Width, double Height, IReadOnlyList<(ReportPage Page, double X, double Y, double Scale)> Pages) sheet, ReportFonts fonts, ReportOptions options,
-        Dictionary<ushort, int>[] used)
+        Dictionary<ushort, int>[] used, Dictionary<byte[], int> pictures)
     {
         var s = new StringBuilder();
         foreach (var (page, x, y, scale) in sheet.Pages)
@@ -120,6 +156,11 @@ public static class PdfWriter
                 {
                     case BoxItem box:
                         Box(s, box, options);
+                        break;
+                    case ImageItem image:
+                        // the unit square of the picture onto its rectangle (the page's y grows downwards)
+                        s.Append("q ").Append(N(image.Width)).Append(" 0 0 ").Append(N(-image.Height)).Append(' ').Append(N(image.X)).Append(' ').Append(N(image.Y + image.Height))
+                            .Append(" cm /Im@").Append(pictures[image.Picture.Bytes].ToString(Invariant)).Append(" Do Q\n");
                         break;
                     case LineItem line:
                         s.Append(Color(options.Ink(line.Color), stroke: true)).Append(N(line.Width)).Append(" w ").Append(N(line.X1)).Append(' ').Append(N(line.Y1))

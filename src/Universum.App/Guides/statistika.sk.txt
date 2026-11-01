@@ -1,0 +1,98 @@
+# Návod – ŠTATISTIKA
+Skupina **ŠTATISTIKA** ukazuje, čo UNIVERSUM práve robí a čo už urobilo: **frontu úloh**, **výstup nástrojov** a
+**záznamy spracovania** slovami. Patria sem aj **Nastavenia** – knižnica, vstupný priečinok, kľúče služieb, jazyk a aktualizácie.
+
+## Fronta úloh
+Sem prichádzajú úlohy z tlačidla [Do fronty] (Single spracovanie, Úprava hlavičky, Zlučovanie) a behy Hromadného spracovania.
+Pod nadpisom je stav fronty – čo beží, koľko úloh **čaká**, koľko je **hotovo** a koľko skončilo **s chybou**.
+![Fronta úloh](queue.jpg)
+- [Spustiť] spustí frontu, [Zastaviť po aktuálnej] ju pozastaví – bežiaca úloha sa dokončí, ďalšie počkajú.
+- [Zrušiť] zruší bežiacu úlohu (*originál ostane nezmenený*) alebo vyradí čakajúcu.
+- [Spustiť znova] znova zaradí úlohu, ktorá skončila **chybou** alebo bola **zrušená**.
+- [▲] a [▼] posunú čakajúcu úlohu skôr alebo neskôr.
+- [Výstup…] otvorí výstup nástrojov vybranej úlohy, [Vrátiť späť] vráti úpravu hlavičky, ktorú úloha urobila.
+- [Odstrániť] vyradí vybranú úlohu, [Vyčistiť dokončené] zmaže zo zoznamu hotové úlohy.
+Stĺpec **Stav** je pri chybe **červený**, pri upozorneniach oranžový; stĺpec **Výsledok** ukáže celý text po nabehnutí myšou.
+### Voľby pod zoznamom
+- [Spustiť frontu hneď po pridaní úlohy] – úloha sa začne spracúvať bez ďalšieho kliknutia.
+- [Zvukové upozornenie, keď sú hotové všetky úlohy] – zvuk Windows *Hviezdička*, keď je všetko hotové,
+  a *Výkričník*, keď niečo zlyhalo. Pri zastavení fronty nezaznie.
+@otvorit Queue Otvoriť Frontu úloh
+
+## Výstup úloh
+Podrobné hlásenia nástrojov MKVToolNix k jednej úlohe – po riadkoch s **časom**, **druhom** a **správou**.
+1. Vpravo hore vyberte úlohu zo zoznamu (alebo vo Fronte úloh stlačte [Výstup…]).
+2. Pod nadpisom vidíte popis úlohy, súhrn a počas behu aj priebeh.
+3. **Upozornenia** sú oranžové, **chyby** červené.
+!info Počas behu fronty sa tu ukazuje práve spracovaná úloha.
+![Výstup úloh](job-output.jpg)
+@otvorit Output Otvoriť Výstup úloh
+
+## Záznamy spracovania
+Každý beh (Hromadné a Single spracovanie, MEGA, Úprava hlavičky, Zlučovanie, štúdiá, Kapitoly) je tu **opísaný slovami**.
+Vľavo je zoznam behov s dátumom a súhrnom – beh s problémom má súhrn **červený**. Vpravo je vybraný beh, súbor po súbore:
+- **Čo sa urobilo** – zoznam zmien v súbore (stopy, názvy, zápis);
+- pri probléme **Čo sa stalo** a **Čo s tým** – vysvetlenie a rada, ako postupovať;
+- cesta k originálu a k výsledku, tlačidlo [Ukázať] otvorí priečinok v Prieskumníkovi;
+- [Technické podrobnosti (výstup nástrojov)] rozbalí presné technické riadky.
+!tip Zaškrtnite [len súbory s problémom] a uvidíte iba súbory, pri ktorých sa niečo nepodarilo.
+![Záznamy spracovania](logs.jpg)
+### Mazanie
+Záznamy ostávajú, kým ich nezmažete. [Zmazať označené] zmaže zaškrtnuté záznamy (alebo vybraný, ak nie je nič zaškrtnuté),
+[Zmazať všetky] zmaže všetky. [Priečinok záznamov] otvorí priečinok, kde sú uložené.
+!info Zmazaním záznamu sa **filmy nemenia** – zmizne len opis behu.
+@otvorit Logs Otvoriť Záznamy spracovania
+
+## Nastavenia
+Nastavenia sú jedna dlhá stránka s blokmi – posúvajte ju nadol.
+![Nastavenia](settings.jpg)
+- **Výstupný priečinok (knižnica)** – [Priečinok…] vyberie knižnicu. Filmy idú do *MOVIES\\Názov (rok)*, seriály do
+  *TVSHOWS\\Názov (rok)\\Season 01*. Priečinky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
+- **Vstupný priečinok** – [Zmeniť…] ho vyberie, [Otvoriť] ho ukáže v Prieskumníkovi. Sem prichádzajú nové filmy a epizódy;
+  súbory v ňom UNIVERSUM **len číta**. Voľba [Sledovať vstupný priečinok – upozorniť na nové filmy a epizódy] zapne lištu hore.
+- **Jazyk rozhrania (platí po reštarte)** – slovenčina, čeština alebo angličtina (menu, nadpisy, Nastavenia, tlačidlá).
+- **Zvukové upozornenie** – to isté ako vo Fronte úloh; zvuky a hlasitosť sa menia v nastaveniach zvuku Windows.
+- **TMDB – názvy filmov a seriálov** – vložte svoj bezplatný kľúč TMDB a stlačte [Overiť a uložiť]. Voľba [Pripájať sa k TMDB]
+  pripojenie vypne bez zmazania kľúča.
+- **HISTRA – sledovanie filmov a seriálov** – vložte svoj token a stlačte [Uložiť]; [Pripájať sa k HISTRA] ho dočasne vypne.
+- **TMDB poster** – nepovinné kľúče pre návrh plagátu cez AI a ďalšie hodnotenia, každý s [Uložiť] a [Odstrániť].
+- **Zdroje noviniek (Premiéry, Novinky – Seriály)** – zapnutie a vypnutie zdrojov, [Importovať zdroj…],
+  [Vrátiť TVmaze a TMDB] a [Vymazať uložené novinky a históriu…].
+- **Napovedkyňa seriálov** – seriály, ktoré si UNIVERSUM zapamätalo; zlý seriál odstránite tlačidlom [Zabudnúť].
+- **Titulky – sťahovanie a preklad (vaše účty)** – vaše účty služieb titulkov, uložené šifrovane.
+- **Zaujímavosti** – zdroje článkov ([Pridať], [Importovať zdroje…]) a preklad vlastným kľúčom DeepL.
+- **Plagáty filmov a seriálov** – [Zobrazovať plagáty] a server plagátov; [Predvolený (TMDB)] ho vráti.
+- **Počasie na Dashboarde** – napíšte mesto, napr. *Horná Lehota*, a stlačte [Hľadať]. Ak je miest viac, vyberte správne
+  a stlačte [Použiť vybrané miesto]. Bez mesta sa počasie nezisťuje.
+- **Preferované jazyky** a **Jazyky titulkov** (kódy oddelené čiarkou), slová pre forced titulky, pre nepočujúcich a komentáre,
+  veľkosti v názve – potvrďte tlačidlom [Uložiť], [Predvolený profil] vráti pôvodné hodnoty.
+- **Aktualizácie**, **Zlučovanie** (pýtať sa pri pridaní viacerých súborov) a **Údržba**
+  ([Vymazať vyrovnávaciu pamäť analýzy]).
+!pozor Kľúče a tokeny sú **vaše osobné** – nikomu ich neposielajte. UNIVERSUM ich ukladá chránené pre vaše konto Windows.
+@otvorit Settings Otvoriť Nastavenia
+
+## Lišty hore a dole
+- **Modrá lišta hore** – *Na vstupe pribudli nové súbory (2): Ukážkový film (2024).mkv, …*. [Do Hromadného spracovania]
+  ich pošle na analýzu, krížik lištu skryje (súbory ostanú na vstupe). **Nič sa nespracuje samo.**
+- **Ružová lišta hore** – pripomienka z Kalendára; [Otvoriť v kalendári] ukáže deň, krížik ju skryje.
+- **Spodná lišta** – vľavo verzia UNIVERSUM a stav MKVToolNix. Vpravo [Aktualizácie…], [Otvoriť v MKVToolNix GUI]
+  a [MKVToolNix…] – okno, kde MKVToolNix nainštalujete alebo vyberiete priečinok, kde ho už máte.
+
+## Aktualizácie
+UNIVERSUM sa pýta len stránok MKVToolNix a GitHubu – **nič o vás sa neposiela**.
+1. V Nastaveniach zapnite [Kontrolovať automaticky (pri spustení, najviac raz za deň)] alebo stlačte [Skontrolovať teraz…].
+2. Keď je nová verzia, tlačidlo na spodnej lište zmení text na *Nová verzia: …* a zvýrazní sa.
+3. Kliknite naň – otvorí sa okno **Aktualizácie** s novinkami MKVToolNix aj UNIVERSUM.
+4. Zvoľte [Aktualizovať všetko], [Len MKVToolNix] alebo [Len UNIVERSUM]; [Stránka vydania] ukáže podrobnosti.
+![Okno Aktualizácie](updates.jpg)
+- [Pripomenúť neskôr] sa ozve znova o 3 dni, [Preskočiť túto verziu] ju už neponúkne, [Skontrolovať znova] zistí stav hneď.
+!info Najprv sa aktualizuje MKVToolNix, potom UNIVERSUM, ktorý sa na konci sám znova spustí. Inštalátory sa spustia
+  **len po overení** kontrolného súčtu a podpisu. Nič sa neinštaluje bez vášho kliknutia.
+
+## Tipy
+- Pred dlhou dávkou zapnite **zvukové upozornenie** – nemusíte sledovať obrazovku.
+- Keď úloha skončí **chybou**, otvorte najprv **Záznamy spracovania** – rada *Čo s tým* býva jednoduchšia ako výstup nástrojov.
+- Úlohu s chybou po oprave stačí [Spustiť znova] – netreba ju pridávať odznova.
+- Po zmene jazyka rozhrania UNIVERSUM **reštartujte**.
+- Staré záznamy občas zmažte tlačidlom [Zmazať označené] – zoznam ostane prehľadný.
+@otvorit Dashboard Späť na Dashboard

@@ -1,0 +1,98 @@
+# Guide – STATISTICS
+The **STATISTICS** group shows what UNIVERSUM is doing now and what it has done: the **job queue**, the **tool output** and
+the **processing logs** in plain words. **Settings** belong here too – library, input folder, service keys, language and updates.
+
+## Job queue
+Jobs arrive here from the [Add to queue] button (Single processing, Header editing, Multiplexing), along with Batch processing runs.
+Below the heading is the state of the queue – what is running, how many jobs are **waiting**, how many are **done** and how many ended **with an error**.
+![Job queue](queue.jpg)
+- [Start] starts the queue, [Stop after the current one] pauses it – the running job finishes, the others wait.
+- [Cancel] cancels the running job (*the original stays unchanged*) or drops a waiting one.
+- [Start again] queues again a job that ended **with an error** or was **cancelled**.
+- [▲] and [▼] move a waiting job earlier or later.
+- [Output…] opens the tool output of the selected job, [Undo] reverts the header edit the job made.
+- [Remove] drops the selected job, [Clear finished] removes the done jobs from the list.
+The **State** column is **red** on an error and orange on warnings; the **Result** column shows the full text when you hover the mouse over it.
+### Options below the list
+- [Spustiť frontu hneď po pridaní úlohy] – the job starts being processed without another click.
+- [Zvukové upozornenie, keď sú hotové všetky úlohy] – the Windows sound *Asterisk* when everything is done,
+  and *Exclamation* when something failed. It does not sound when the queue is stopped.
+@otvorit Queue Open Job queue
+
+## Job output
+Detailed messages of the MKVToolNix tools for one job – line by line with **time**, **kind** and **message**.
+1. At the top right choose a job from the list (or press [Output…] in the Job queue).
+2. Below the heading you see the job's description, a summary and, while it runs, the progress.
+3. **Warnings** are orange, **errors** red.
+!info While the queue runs, the job being processed is shown here.
+![Job output](job-output.jpg)
+@otvorit Output Open Job output
+
+## Processing logs
+Every run (Batch and Single processing, MEGA, Header editing, Multiplexing, studios, Chapters) is **described in words** here.
+On the left is a list of runs with date and summary – a run with a problem has a **red** summary. On the right is the selected run, file by file:
+- **What was done** – a list of changes in the file (tracks, names, writing);
+- on a problem, **What happened** and **What to do** – an explanation and advice on how to proceed;
+- the path to the original and to the result; the [Ukázať] button opens the folder in File Explorer;
+- [Technické podrobnosti (výstup nástrojov)] expands the exact technical lines.
+!tip Tick [len súbory s problémom] to see only the files where something went wrong.
+![Processing logs](logs.jpg)
+### Deleting
+Logs stay until you delete them. [Delete the ticked] deletes the ticked logs (or the selected one if nothing is ticked),
+[Delete all] deletes all of them. [Logs folder] opens the folder where they are stored.
+!info Deleting a log **does not change any films** – only the description of the run disappears.
+@otvorit Logs Open Processing logs
+
+## Settings
+Settings is one long page of blocks – scroll down.
+![Settings](settings.jpg)
+- **Output folder (library)** – [Folder…] chooses the library. Films go to *MOVIES\\Title (year)*, series to
+  *TVSHOWS\\Title (year)\\Season 01*. UNIVERSUM **never deletes** the MOVIES and TVSHOWS folders.
+- **Input folder** – [Change…] chooses it, [Open] shows it in File Explorer. New films and episodes arrive here;
+  UNIVERSUM **only reads** the files in it. The option [Watch the input folder – tell about new films and episodes] turns on the bar at the top.
+- **Interface language (applies after a restart)** – Slovak, Czech or English (menu, headings, Settings, buttons).
+- **Sound notification** – the same as in the Job queue; sounds and volume are changed in the Windows sound settings.
+- **TMDB – titles of films and series** – paste your free TMDB key and press [Verify and save]. The option [Connect to TMDB]
+  turns the connection off without deleting the key.
+- **HISTRA – tracking films and series** – paste your token and press [Save]; [Connect to HISTRA] turns it off for a while.
+- **TMDB poster** – optional keys for an AI-drawn poster and more ratings, each with [Save] and [Remove].
+- **News sources (Premieres, News – Series)** – turning sources on and off, [Import a source…],
+  [Restore TVmaze and TMDB] and [Clear the stored news and history…].
+- **Series prompter** – series UNIVERSUM has remembered; remove a wrong one with the [Forget] button.
+- **Subtitles – downloads and translation (your accounts)** – your subtitle service accounts, stored encrypted.
+- **Interesting news** – article sources ([Add], [Import sources…]) and translation with your own DeepL key.
+- **Film and series posters** – [Show posters] and the poster server; [Default (TMDB)] restores it.
+- **Weather on the Dashboard** – type a town, e.g. *Horná Lehota*, and press [Search]. If there are several places, choose the right one
+  and press [Use the chosen place]. Without a town no weather is fetched.
+- **Preferred languages** and **Subtitle languages** (codes separated by commas), words for forced subtitles, for the deaf and commentaries,
+  sizes in the name – confirm with the [Save] button; [Default profile] restores the original values.
+- **Updates**, **Multiplexing** (ask when several files are added) and **Maintenance**
+  ([Clear the analysis cache]).
+!pozor Keys and tokens are **your personal** ones – never send them to anyone. UNIVERSUM stores them protected for your Windows account.
+@otvorit Settings Open Settings
+
+## Bars at the top and bottom
+- **Blue bar at the top** – *New files arrived in the input (2): Ukážkový film (2024).mkv, …*. [To Batch processing]
+  sends them for analysis, the cross hides the bar (the files stay in the input). **Nothing is processed by itself.**
+- **Pink bar at the top** – a reminder from the Calendar; [Open in the calendar] shows the day, the cross hides it.
+- **Bottom bar** – on the left the UNIVERSUM version and the MKVToolNix state. On the right [Aktualizácie…], [Open in MKVToolNix GUI]
+  and [MKVToolNix…] – a window where you install MKVToolNix or choose the folder where you already have it.
+
+## Updates
+UNIVERSUM asks only the MKVToolNix and GitHub pages – **nothing about you is sent**.
+1. In Settings turn on [Check automatically (at start, at most once a day)] or press [Check now…].
+2. When there is a new version, the button on the bottom bar changes its text to *New version: …* and is highlighted.
+3. Click it – the **Updates** window opens with what is new in MKVToolNix and UNIVERSUM.
+4. Choose [Aktualizovať všetko], [Len MKVToolNix] or [Len UNIVERSUM]; [Stránka vydania] shows the details.
+![Updates window](updates.jpg)
+- [Pripomenúť neskôr] reminds you again in 3 days, [Preskočiť túto verziu] will not offer it again, [Skontrolovať znova] checks right away.
+!info MKVToolNix is updated first, then UNIVERSUM, which restarts itself at the end. The installers run
+  **only after checking** the checksum and signature. Nothing is installed without your click.
+
+## Tips
+- Before a long batch turn on the **sound notification** – you do not have to watch the screen.
+- When a job ends **with an error**, open **Processing logs** first – the *What to do* advice is usually simpler than the tool output.
+- After fixing a job with an error, just [Start again] – no need to add it again.
+- After changing the interface language, **restart** UNIVERSUM.
+- Now and then delete old logs with the [Delete the ticked] button – the list stays clear.
+@otvorit Dashboard Back to Dashboard

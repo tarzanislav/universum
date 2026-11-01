@@ -7,6 +7,9 @@ namespace Universum.App.Shell;
 public sealed record ToolItem(string Title, string Glyph, object Page, ToolGroup? InGroup = null, ToolBadge? Badge = null)
 {
     public ToolGroup Group => InGroup ?? ToolGroup.None;
+
+    /// <summary>The guide of its group (a quieter row).</summary>
+    public bool IsGuide => Page is Pages.GuidePageViewModel;
 }
 
 /// <summary>A live count next to a tool in the left rail (POZNÁMKY: today's records, late tasks in red, notes).</summary>

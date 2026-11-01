@@ -1,0 +1,110 @@
+# Návod – ŠABLONY
+Skupina **ŠABLONY (TEMPLATE)** upraví video podle *pravidel UNIVERSUM* – jazyky a pořadí stop, příznaky, názvy stop, název souboru a místo v knihovně. Můžete zpracovat jeden soubor, celou složku najednou nebo připravit dávky na později.
+
+!info Originál se **nikdy nemění** – výsledek je vždy **nový soubor** v knihovně. Originály se dají smazat jen v Hromadném a MEGA zpracování, jen pokud to sami zvolíte, a vždy jen **do Koše Windows**.
+
+## Single zpracování
+Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu nebo jedné epizody.
+
+1. Klikněte na [Otvoriť súbor…] a vyberte video (MKV, MP4, AVI, TS…). Dialog začíná ve vstupní složce.
+2. V tabulce stop zkontrolujte sloupce **Jazyk (pred → po)** a **Názov (pred → po)**. Neurčený nebo nesprávný jazyk vyberte v nabídce, název stopy můžete přepsat.
+3. Pořadí zvuků a titulků změníte ve sloupci **Poradie** – stopu chyťte a přetáhněte, nebo použijte šipky.
+4. Zvolte *film* nebo *seriál*, do pole **Titul** napište *Název (rok)* a klikněte na [TMDB]. Pokud se objeví [Potvrdit titul], zkontrolujte návrh a potvrďte ho.
+5. U seriálu vyplňte **Epizóda** (např. S01E04). Podle potřeby vyberte **Doplnok** (např. Directors Cut).
+6. Zkontrolujte řádek **Cieľ** a klikněte na [Použít pravidla]. Pokud chcete zpracování spustit později, klikněte na [Do fronty].
+
+![Single zpracování – stopy, titul a cíl v knihovně před zápisem](rules-preview.jpg)
+
+- **Forced** – zaškrtnutím označíte titulky jako forced. UNIVERSUM to někdy navrhne samo, například při malém počtu titulků.
+- [Revize] – zobrazí se, když výsledek už v knihovně je. Soubor se zpracuje znovu jako nová verze: nová se zapíše a ověří, teprve potom jde dosavadní do Koše.
+- [Složka…] u **Knižnica:** změní, kam se výsledky zapisují.
+- [Vymazat frontu] zapomene otevřený, ještě nezpracovaný soubor. Na disku se nic nezmění.
+
+!pozor V Single zpracování je volba **Originál: vymazať** vypnutá – originál se tu vždy zachová.
+
+@otvorit Rules Otevřít Single zpracování
+
+## Hromadné zpracování
+Celá složka najednou. UNIVERSUM soubory analyzuje, seřadí je do **skupin** (jeden film nebo jeden seriál) a ukáže *výsledok simulácie* – ještě před zápisem vidíte, co ze kterého souboru vznikne.
+
+1. Klikněte na [Složka…], podle potřeby zaškrtněte **aj podpriečinky** a klikněte na [Analyzovat].
+2. Vlevo vyberte skupinu v seznamu **Skupina (film / seriál)**. Vpravo uvidíte její soubory a pod nimi **Stopy skupiny**.
+3. Zvolte druh *filmy* nebo *seriál*. U seriálu vyplňte **Seriál:** a klikněte na [TMDB], u filmu vyplňte **Film:**. Přesný titul zadáte i přes **TMDB ID**.
+4. Návrhy názvů zkontrolujte a přijměte: [Upřesnit názvy], [Přijmout návrhy názvů] nebo pro celou skupinu najednou [Přijmout vše ve skupině].
+5. V části **Stopy skupiny** nastavte **Jazyk**, **Názov stopy**, **Forced** a pořadí. Rozhodnutí platí pro všechny soubory skupiny.
+6. U **Originál:** zvolte *zachovať*, *zmazať automaticky* nebo *zmazať ručne*.
+7. Klikněte na [Spustit]. Průběh uvidíte i ve Frontě úloh, konec se ukáže výrazným pruhem.
+
+![Hromadné zpracování připravené ke spuštění](batch-ready.jpg)
+
+### Důležité sloupce souborů
+- **Film / epizóda** – název filmu *Název (rok)* nebo číslo epizody (S01E04). Pokud návrh není jistý, potvrďte ho tlačítkem [Potvrdit návrh] nebo vyberte jiný nalezený titul.
+- **Jazyk audia** – jazyk zvukové stopy jen pro tento soubor. Má přednost před volbou pro skupinu.
+- **Cieľ v knižnici** – kam a pod jakým jménem se výsledek zapíše.
+- **Doplnok k názvu** – jiná verze titulu (Directors Cut, Remaster, 2…).
+- **Aj tak** – soubor se zpracuje i bez povinné stopy šablony.
+- **Revízia** – výsledek už v knihovně je, soubor se zpracuje znovu jako nová verze.
+
+### Rozpoznání jazyka řeči
+Pokud zvuková stopa nemá jazyk, klikněte na [Rozpoznat jazyk audiostop ▾] a vyberte *Vybrané súbory*, *Celá skupina* nebo *Všetky skupiny*. UNIVERSUM si poslechne několik úseků z různých míst filmu a jazyk navrhne. Vše probíhá **jen ve vašem počítači**. Návrhy přijmete tlačítkem [Potvrdit návrhy].
+
+![Navržené jazyky řeči u souborů](batch-speech.jpg)
+
+!tip Jazyk textových titulků UNIVERSUM přečte po analýze samo. Pokud je třeba, zopakujete to tlačítkem [Přečíst titulky znovu].
+
+### Šablona a další tlačítka
+- **Šablóna:** – [Ze skupiny] udělá šablonu podle vybrané skupiny, [Bez šablony] použije jen pravidla UNIVERSUM. Tlačítky [Uložit…] a [Načíst…] šablonu uložíte nebo znovu použijete.
+- **stopy mimo šablóny odstrániť** – stopy, které šablona nezná, se do výsledku nedostanou.
+- [Zvuk v štúdiu] a [Titulky v štúdiu] – podrobnější úprava jedné stopy. Změny se uloží do úlohy.
+- [Uložit zprávu…] uloží přehled běhu, [Pozastaviť] a [Zastavit] řídí běh.
+- [Upratať zvyšky] přesune dočasné soubory po přerušeném zpracování do Koše.
+
+![Epizody zařazené do seriálu a sezóny](batch-sorted-series.jpg)
+
+!pozor Při volbě *zmazať automaticky* jde každý originál do Koše hned po zapsání a ověření nového souboru. Při volbě *zmazať ručne* se během běhu nic nemaže, originály pošlete do Koše po dokončení tlačítkem [Smazat originály].
+
+@otvorit Batch Otevřít Hromadné zpracování
+
+## MEGA zpracování
+Dávky připravené v Hromadném zpracování, které se zapíšou **později** – například v noci.
+
+1. V Hromadném zpracování připravte soubory a v nabídce vedle tlačítka zvolte *novou dávku* nebo doplnění čekající dávky.
+2. Klikněte na [Odoslať do MEGA]. Soubory se uloží do dávky se všemi rozhodnutími, se šablonou i s volbou pro originály.
+3. V MEGA zpracování nastavte ve sloupci **Spustiť**, kdy se dávka spustí: *keď ju spustím*, *po predchádzajúcej dávke* nebo *v dátum a čas* (datum a čas, např. 2:00).
+4. Pořadí dávek změníte šipkami [▲] a [▼]. Okamžitě spustíte dávku tlačítkem [Spustit nyní].
+
+![Seznam dávek MEGA zpracování](mega.jpg)
+
+- Sloupce dávek: **Dávka**, **Čo obsahuje**, **Súbory**, **Originály** (*zachovať*, *mazať automaticky*, *mazať ručne*), **Spustiť**, **Stav**, **Výsledok**.
+- **Súbory vybranej dávky** ukazují **Cieľ v knižnici**, **Stav** a **Poznámka** každého souboru.
+- [Upravit v Hromadném zpracování] – otevře dávku se všemi rozhodnutími. Po opravě klikněte na tlačítko s číslem dávky, např. [Uložiť do Dávka 1]. Dokud se dávka upravuje, nespustí se.
+- [Znovu přeskočené a chybné] – soubory dokončené dávky, které se přeskočily, nepodařily nebo zrušily, se znovu zkontrolují a zapíšou.
+- [Smazat originály] – u dávky odeslané s volbou *zmazať ručne* pošle originály zapsaných souborů do Koše Windows.
+- [Vybrať súbor z dávky] a [Odstranit dávku] soubory nemění. Soubory, které se nezapsaly, se v Hromadném zpracování znovu ukážou jako volné.
+- [Vyčistit dokončené] odstraní ze seznamu hotové dávky.
+
+!pozor Dávka nastavená na čas se spustí **jen tehdy, když UNIVERSUM běží** a počítač nespí. Jinak dostane stav *ZMEŠKANÉ* – spusťte ji ručně nebo nastavte nový čas.
+
+!info Před zápisem se každý soubor znovu zkontroluje. Chybějící nebo změněný soubor či soubor, který už je v knihovně, se **přeskočí** a nic se nepokazí.
+
+@otvorit Mega Otevřít MEGA zpracování
+
+## Knihovna a pojmenování
+Výsledky se zapisují do knihovny připravené pro Jellyfin:
+- filmy do složky **MOVIES**, např. MOVIES\\Vymyslený film (2026)
+- seriály do složky **TVSHOWS** po sezónách, např. TVSHOWS\\Vymyslený seriál (2024)\\Season 01. Speciály patří vždy do *Season 00*.
+
+Jméno souboru obsahuje název, rok, jazyky, rozlišení, kodek a velikostní třídu, např. *Vymyslený film (2026) - CZ EN FHD H264 BIG.mkv*. **Doplnok k názvu** se přidá před velikostní třídu: *… H264 Directors Cut BIG.mkv*. Jellyfin ho ukáže jako název verze.
+
+!info Titul v latince dostane původní název, titul v jiném písmu anglický název. Název se ověřuje přes TMDB.
+
+## Tipy
+- Pokud se ve vstupní složce objeví nová videa, UNIVERSUM ukáže pruh *Nové súbory vo vstupnom priečinku* s nabídkou analýzy. Samo nic nespustí.
+- Skupiny s novými soubory od předchozí analýzy jsou podbarvené **zelenkavě**.
+- Tlačítkem [Skryť nastavenia ▴] dostanou tabulky celé okno.
+- Před velkou dávkou nechte originály *zachovať* a zkontrolujte výsledek v knihovně. Mazat můžete i později, tlačítkem [Smazat originály].
+- Co se při zpracování stalo, najdete ve Frontě úloh a v Záznamech zpracování.
+
+!tip Na noční zpracování: připravte několik dávek, první nastavte *v dátum a čas* a dalším *po predchádzajúcej dávke*. UNIVERSUM nechte běžet.
+
+@otvorit Queue Otevřít Frontu úloh

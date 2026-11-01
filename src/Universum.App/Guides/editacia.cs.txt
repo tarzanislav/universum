@@ -1,0 +1,99 @@
+# Návod – EDITACE VIDEOSTOP
+Skupina **EDITACE VIDEOSTOP (video, audio, titulky)** slouží k úpravě jednotlivých stop filmu: střih a otočení obrazu,
+napasování dabingu, posun a opravu titulků. Vše si nejprve **prohlédnete a poslechnete v přehrávači** a teprve potom uložíte.
+Originál se **nikdy nemění** – výsledek je vždy **nový soubor** (video v knihovně, titulky vedle původních).
+
+!info Přehrávač je na všech třech stránkách stejný: [−5 s], [+5 s], přehrát / pozastavit (**mezerník**),
+  hlasitost, výběr zvukové stopy a skok na předchozí / další titulek.
+
+## Úprava videostopy
+Tady z filmu **vystřihnete nepotřebné části** (např. úvod nebo reklamy), změníte **poměr stran**, **otočíte** obraz,
+zmenšíte **výšku** nebo změníte **kodek**.
+### Střih
+1. Klikněte na [Otevřít video…] a vyberte např. *Vymyslený film (2026).mkv*.
+2. Pusťte film a v místě, kde má úsek **začínat**, klikněte na [Začátek úseku].
+3. Kde má úsek **končit**, klikněte na [Konec úseku] – úsek se přidá do seznamu (*Od*, *Do*, *Dĺžka*).
+4. Opakujte pro další úseky. **Zůstanou jen úseky v seznamu**, vše ostatní se vystřihne.
+5. Dole vyplňte [Titul:] (případně [TMDB]) a klikněte na [Uložit].
+- **Dvojklik** na úsek přesune přehrávač na jeho začátek, [Odstranit] ho ze seznamu vyřadí.
+- [Celý film] zruší všechny úseky – nic se nevystřihne.
+!tip Bez volby [Presný strih (obraz sa zapíše znova)] je střih **rychlý a bez ztráty kvality** – úsek se jen posune
+  na nejbližší místo, kde se dá stříhat (obvykle o zlomek sekundy). Přesný střih je přesný na snímek, ale trvá dlouho.
+### Obraz
+- **Pomer strán** – jak přehrávače obraz zobrazí; zapíše se bez ztráty kvality.
+- [Otočiť:] *o 90° doprava*, *o 180°*, *o 90° doľava*; [Výška (riadky):] např. z 2160 na 1080.
+- **Prekódovanie** – *H.264* nebo *H.265 (HEVC)* a posuvník [Kvalita:].
+!pozor Otočení, jiná výška, jiný kodek a přesný střih **zapíšou obraz znovu** kodéry Windows – trvá to dlouho.
+  Zvuk a titulky se nemění.
+![Úprava videostopy – úsek, otočení](studio-video.jpg)
+@otvorit Video Otevřít Úpravu videostopy
+
+## Úprava audiostopy
+Tady **napasujete dabing** z jiného vydání, opravíte zvuk, který se zpožďuje, převedete zvuk mezi **PAL 25 a 23,976 FPS**,
+změníte kodek nebo hlasitost. Vybraný zvuk hraje s obrazem **přesně tak, jak se zapíše**.
+### Napasování dabingu
+1. [Otevřít video…] – např. *Vymyslený film (2026).mkv*.
+2. [Přidat zvuk…] – zvukový soubor (MKA, AC-3, DTS, AAC, FLAC, WAV…) nebo **jiný film**, ze kterého se vezme zvuk.
+3. Vyberte přidaný zvuk v seznamu a u **Napasovať vybraný zvuk na:** zvolte původní zvuk filmu.
+4. Klikněte na [Napasovat]. Jistý výsledek (posun i změna FPS) se **nastaví sám**.
+5. Ověřte si ho přehráním a klikněte na [Uložit].
+!info Nejistý výsledek se sám nepoužije – objeví se tlačítko [Použít návrh]. Použijte ho až po ověření v přehrávači.
+### Ruční úpravy vybraného zvuku
+- **Posun** pod přehrávačem: [−1000] [−100] [−10] … [+1000] ms – změnu uslyšíte hned.
+- **Zmena FPS (PAL 25 ↔ 23,976)** – s volbou [Zachovať výšku tónu] znějí hlasy stejně, jen pomaleji nebo rychleji.
+- **Kodek a hlasitosť** – [Kodek:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (bezstratovo)*;
+  [Stereo (zmiešať 5.1 do dvoch kanálov)], [Normalizovať hlasitosť na −23 LUFS (EBU R128)], [Zosilniť / stlmiť:].
+- [Jazyk:] a [Názov stopy:]; sloupec **Ponechať** určí, zda stopa ve výsledku zůstane.
+- [Vynulovat změny] vrátí vybraný zvuk do původního stavu.
+!tip Samotný **posun se zapíše bez ztráty kvality**. Změna FPS, kodek, stereo a hlasitost zvuk zapíšou znovu.
+![Úprava audiostopy – přidaný dabing](studio-audio.jpg)
+@otvorit Audio Otevřít Úpravu audiostopy
+
+## Úprava titulkové stopy
+Tady titulky **posunete, napasujete, opravíte, stáhnete, přeložíte** nebo **přečtete z obrázků**. Upravované titulky
+jsou v obraze **dole bílé**, titulky vybrané v [Porovnať s:] **nahoře žluté**.
+### Posun během sledování
+1. [Otevřít video…] (nebo [Otevřít titulky…] pro samotné soubory titulků).
+2. Na záložce **Stopy titulkov** vyberte titulky, které chcete upravit.
+3. Pusťte film. Když se titulek zpožďuje, klikněte na [Titulek začíná nyní] ve chvíli, kdy postava začne mluvit.
+4. Dolaďte tlačítky [−100] / [+100] (ms) a klikněte na [Uložit].
+### Automatické napasování
+- Zaškrtněte **podľa zvuku** a/nebo **podľa titulkov:** (jiné titulky, které k filmu sedí, i v jiném jazyce).
+- [Napasovat] nastaví posun i **změnu FPS** nebo rychlost. Nejistý výsledek čeká na [Použít návrh].
+- [Zkontrolovat titulky videa] řekne u každé stopy: sedí, zpožďuje se, jde dříve nebo jiné FPS.
+- **Synchronizácia podľa dvoch titulkov**: u titulku na začátku filmu klikněte na [1. bod], u titulku ke konci
+  na [2. bod] – rychlost a posun se spočítají samy.
+### Záložky
+- **Časy titulkov** – všechny titulky s časem *Teraz* a *Po zmene*. Text opravíte klávesou **F2**;
+  pravé tlačítko nabídne *Odstrániť titulok* a *Vrátiť všetky úpravy textu*.
+- **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com přes prohlížeč a překlad přes svsub.net.
+  Výsledek se uloží vedle videa, např. *Vymyslený film (2026).sk.srt*.
+- **Text z obrázkov (OCR)** – obrázkové titulky z Blu-ray (PGS) přepíše na text: vyberte stopu a klikněte
+  na [Rozpoznat text]. Tvar, který nezná, se **jednou za film zeptá** a zapamatuje si ho.
+![Úprava titulkové stopy](studio-subtitles.jpg)
+![OCR se ptá na neznámý tvar](ocr-question.jpg)
+!info Na otázku OCR napište písmeno a stiskněte [Dále]; skvrna je [Není to písmeno], při nejistotě [Nevím].
+  [Opraviť text podľa jazyka] pak opraví pochybná slova – každou opravu můžete [Vrátiť].
+!pozor Soubory titulků se uloží jako **nové SRT nebo WebVTT vedle původních**, nikdy přes existující soubor.
+@otvorit Subtitles Otevřít Úpravu titulkové stopy
+
+## Práce se studiem z Hromadného zpracování
+Soubor z Hromadného zpracování můžete upravit ve studiu ještě **před spuštěním úlohy**:
+1. V Hromadném zpracování vyberte soubor a klikněte na [Titulky v štúdiu] nebo [Zvuk v štúdiu]
+   (stejně tak pravé tlačítko: *Upraviť v štúdiu (titulky)* / *Upraviť v štúdiu (zvuk)*).
+2. Soubor se otevře v Úpravě titulkové stopy nebo audiostopy i s dosavadními úpravami.
+3. Upravte, co je třeba, a klikněte na [Uložit do úlohy]. Změny se zapíšou **až při běhu úlohy**.
+- [Zpět bez uložení] se vrátí bez změn.
+- Mimo úlohu si rozdělanou práci odložíte tlačítkem [Uložit práci] – při dalším otevření **téhož videa**
+  se obnoví. Do souborů se nic nezapíše; [Zahodit práci] ji zapomene.
+!pozor **Opravy textu titulků** (F2, prvky pro neslyšící, formátování, překrývání) se do úlohy uložit nedají –
+  studio na to upozorní. Takové titulky uložte přímo tlačítkem [Uložit].
+![Studio otevřené z úlohy](studio-task.jpg)
+@otvorit Batch Otevřít Hromadné zpracování
+
+## Tipy
+- **Nejdřív poslouchat, pak ukládat** – každou změnu si ověřte v přehrávači, pustí se hned tak, jak se zapíše.
+- [Vyčistit] zapomene otevřené video – na disku se nic nezmění.
+- Před [Uložit] můžete zapnout [Použiť pravidlá UNIVERSUM (poradie stôp, príznaky, Forced, odstránenie prázdnych)].
+!tip Dabing z vydání pro PAL (25 FPS) k filmu s 23,976 FPS: [Napasovat] najde i změnu FPS, není třeba ji zadávat ručně.
+!tip Titulky z OpenSubtitles ukazují, zda **FPS sedí** s filmem – vyberte raději ty, které sedí.

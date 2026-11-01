@@ -160,10 +160,11 @@ internal static class SelfTest
         model.Settings.UiLanguage = "sk";
         Check(string.Join(" | ", model.ToolsView.Groups!.Cast<System.Windows.Data.CollectionViewGroup>()
                   .Select(g => $"{(g.Name is ToolGroup { IsFramed: true } group ? group.Title : "-")}: {string.Join(", ", g.Items.Cast<ToolItem>().Select(t => t.Title))}")) ==
-              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky, Návod | MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
-              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia",
-            "left rail: Dashboard, then the groups Novinky a obsah, Poznámky, Multiplexing, Šablóny and Štatistika");
+              "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti, Návod | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky, Návod | " +
+              "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie, Návod | " +
+              "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy, Návod | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie, Návod | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia, Návod",
+            "left rail: Dashboard, then the groups Novinky a obsah, Poznámky, Multiplexing, Šablóny and Štatistika, each with its guide last");
         model.Open(model.Info);
         await Screenshot(window, "main-info.png");
 
@@ -1284,6 +1285,7 @@ internal static class SelfTest
         await TestReportsAsync(model, services);
         await TestDashboardAgendaAsync(model, window, services);
         await TestActionsAsync(model, window, services);
+        await TestGuidesAsync(model, window);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
@@ -1386,6 +1388,53 @@ internal static class SelfTest
         }
 
         store.EmptyBin();
+    }
+
+    /// <summary>
+    /// Návody (owner, 31. 10. 2026, stage N): each guide in Slovak, Czech and English with the same parts, its pictures
+    /// and the categories it opens all there, the contents and search, a part shown, and the guide printed to a PDF.
+    /// </summary>
+    private static async Task TestGuidesAsync(MainViewModel model, MainWindow window)
+    {
+        foreach (var guide in model.Guides)
+        {
+            model.Open(guide);
+            var parts = guide.Guide.Sections.Count;
+            Check(guide.Title.Length > 0 && parts >= 3 && guide.Sections.Count == parts && model.Tools.Any(t => t.Page == guide && t.IsGuide),
+                $"guide {guide.Key}: {guide.Title} – parts {parts}");
+            foreach (var language in new[] { "cs", "en" })
+            {
+                var text = GuidePageViewModel.Text(guide.Key, language);
+                var translated = text is null ? null : Core.Guides.GuideDocument.Parse(text);
+                Check(translated is not null && translated.Sections.Count == parts && translated.Pictures.SequenceEqual(guide.Guide.Pictures),
+                    $"guide {guide.Key}: the {language} translation has the same parts and pictures – {translated?.Sections.Count}");
+            }
+
+            var missing = guide.Guide.Pictures.Where(p => GuidePageViewModel.Picture(p) is null).ToList();
+            Check(missing.Count == 0 && guide.Guide.Pictures.Any(), $"guide {guide.Key}: every picture there – missing: {string.Join(", ", missing)}");
+            foreach (var open in guide.Guide.Blocks.Where(b => b.Kind == Core.Guides.GuideBlockKind.Open))
+            {
+                Check(model.OpenNamed(open.Target), $"guide {guide.Key}: the button opens {open.Target}");
+            }
+
+            model.Open(guide);
+            guide.Search = "vymyslenéslovonikde";
+            Check(guide.NothingFound && guide.Sections.Count == 0, $"guide {guide.Key}: nothing found for a word not in it");
+            guide.Search = "";
+            if (guide.Sections.Count < 2)
+            {
+                continue;
+            }
+
+            guide.Sections[1].GoCommand.Execute(null);
+            Check(guide.ShownPart == guide.Sections[1].Index, $"guide {guide.Key}: a part of the contents shown");
+            await Screenshot(window, $"guide-{guide.Key}.png");
+            var report = guide.Report();
+            var pdf = report.Pdf();
+            File.WriteAllBytes(Path.Combine(_outputDirectory, $"navod-{guide.Key}.pdf"), pdf);
+            Check(report.PageCount >= 2 && pdf.Length > 20000 && System.Text.Encoding.Latin1.GetString(pdf).Contains("/DCTDecode", StringComparison.Ordinal),
+                $"guide {guide.Key}: printed – {report.PageCount} pages, PDF {pdf.Length / 1024} kB with its pictures");
+        }
     }
 
     /// <summary>
@@ -1775,7 +1824,11 @@ internal static class SelfTest
         calendar.Editor!.CancelCommand.Execute(null);
 
         calendar.TodayCommand.Execute(null);
+        // the panel of the layers folded: the month has the room
+        calendar.ShowLayers = false;
+        Check(!services.Settings.CalendarLayersShown, "calendar: the panel of the layers folded (kept in the settings)");
         await Screenshot(window, "calendar-month.png");
+        calendar.ShowLayers = true;
         calendar.IsWeek = true;
         Check(calendar.Days.Count == 7, "calendar: the week of seven days");
         await Screenshot(window, "calendar-week.png");

@@ -189,6 +189,21 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     }
 
     /// <summary>The month as a list leaves out the days without anything.</summary>
+    /// <summary>The panel of the layers open; closed, the days have more room (kept in the settings).</summary>
+    public bool ShowLayers
+    {
+        get => _services.Settings.CalendarLayersShown;
+        set
+        {
+            if (value != _services.Settings.CalendarLayersShown)
+            {
+                _services.Settings.CalendarLayersShown = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool HideEmptyDays
     {
         get => _hideEmpty;

@@ -32,6 +32,9 @@ internal static class SelfTest
             ? dir
             : Path.Combine(Path.GetTempPath(), "UNIVERSUM-selftest");
         Directory.CreateDirectory(_outputDirectory);
+
+        // the tracks arranged at once after a change (the pause the user gets is tried in Zlučovanie on its own)
+        ArrangeLater.Delay = TimeSpan.Zero;
         Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
 
         MkvToolNixInstallation? installation = null;
@@ -3770,6 +3773,16 @@ internal static class SelfTest
             var english2 = At(czech) < At(subtitles);
             subtitles.Language = subtitles.LanguageChoices.First(c => c.Tag.Primary == "sk");
             Check(english2 && At(czech) < At(subtitles), "mux order: a language set by hand puts the track in its place");
+
+            // owner, 1. 11. 2026: the order follows only after a pause – the track does not jump away from under the mouse
+            ArrangeLater.Delay = TimeSpan.FromMilliseconds(400);
+            czech.Language = czech.LanguageChoices.First(c => c.Tag.Primary == "sk");
+            var stayed = At(czech) < At(subtitles);
+            await Task.Delay(1200);
+            var arranged = At(subtitles) < At(czech);
+            ArrangeLater.Delay = TimeSpan.Zero;
+            czech.Language = czech.LanguageChoices.First(c => c.Tag.Primary == "cs");
+            Check(stayed && arranged && At(czech) < At(subtitles), $"mux order: arranged after the pause, not at once (stayed {stayed}, arranged {arranged})");
 
             // owner, 1. 11. 2026: the drop-down of the languages (thousands) opens at once – only the items seen are made
             set.SelectedTrack = czech;

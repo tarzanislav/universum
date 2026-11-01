@@ -209,14 +209,17 @@ public sealed class MuxTrackRow : ObservableObject
                 OnPropertyChanged(nameof(HasAdvanced));
 
                 // owner, 1. 11. 2026: the order follows the language (CZ at the top, SK under it)
-                LanguageSet?.Invoke(this);
+                OrderChanged?.Invoke(this);
                 _changed();
             }
         }
     }
 
-    /// <summary>Called when the user (or a recognition) sets the language – before the settings are recalculated.</summary>
-    public Action<MuxTrackRow>? LanguageSet { get; set; }
+    /// <summary>
+    /// Called when the user (or a recognition) sets what the order of the rules depends on – the language, Forced,
+    /// commentary – before the settings are recalculated.
+    /// </summary>
+    public Action<MuxTrackRow>? OrderChanged { get; set; }
 
     public bool IsDefault { get => _flags.Default; set => SetFlags(_flags with { Default = value }); }
 
@@ -310,8 +313,14 @@ public sealed class MuxTrackRow : ObservableObject
     {
         if (_flags != flags)
         {
+            var order = _flags.Forced != flags.Forced || _flags.Commentary != flags.Commentary;
             _flags = flags;
             OnPropertyChanged(string.Empty);
+            if (order)
+            {
+                OrderChanged?.Invoke(this);
+            }
+
             _changed();
         }
     }

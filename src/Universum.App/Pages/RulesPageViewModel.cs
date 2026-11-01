@@ -422,10 +422,21 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         _plan = EditPlan.For(target);
-        Rows.Clear();
-        for (var i = 0; i < target.Tracks.Count; i++)
+
+        // held: the rows in the order they are shown (a new row after them); otherwise the waiting order is not needed
+        var shown = Rows.Select(r => r.TrackId).ToList();
+        var tracks = _holdOrder
+            ? target.Tracks.OrderBy(t => shown.IndexOf(t.TrackId) is var at and >= 0 ? at : int.MaxValue).ToList()
+            : target.Tracks.ToList();
+        if (!_holdOrder)
         {
-            var track = target.Tracks[i];
+            _arrangeLater.Cancel();
+        }
+
+        Rows.Clear();
+        foreach (var track in tracks)
+        {
+            var i = target.Tracks.IndexOf(track);
             var chosen = _languages.TryGetValue(track.TrackId, out var tag) ? Languages.Find(tag.Primary)
                 : _detected.TryGetValue(track.TrackId, out var read) ? Languages.Find(read.Language)
                 : null;
@@ -474,13 +485,33 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         if (row.ChosenLanguage is { } language)
         {
-            Later(() => ChooseLanguage(row.TrackId, language.Ietf));
+            Later(() => Holding(() => ChooseLanguage(row.TrackId, language.Ietf)));
         }
     }
 
     private void Moved(RuleRow row, int by) => Later(() => MoveTrack(row.TrackId, by));
 
-    private void ForcedChanged(RuleRow row, bool forced) => Later(() => ChooseForced(row.TrackId, forced));
+    private void ForcedChanged(RuleRow row, bool forced) => Later(() => Holding(() => ChooseForced(row.TrackId, forced)));
+
+    // owner, 1. 11. 2026: a change at a track keeps the rows where they are; the order of the rules comes two seconds
+    // after the last change (a Forced box clicked twice stays under the mouse)
+    private void Holding(Action change)
+    {
+        _holdOrder = true;
+        try
+        {
+            change();
+        }
+        finally
+        {
+            _holdOrder = false;
+        }
+
+        _arrangeLater.Schedule(Recalculate);
+    }
+
+    private readonly ArrangeLater _arrangeLater = new();
+    private bool _holdOrder;
 
     private void NameWritten(RuleRow row, string name) => Later(() => ChooseName(row.TrackId, name));
 

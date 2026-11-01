@@ -28,6 +28,10 @@ namespace Universum.App.Pages;
 public sealed class BatchPageViewModel : ObservableObject
 {
     private readonly AppServices _services;
+
+    // owner, 1. 11. 2026: the tracks are arranged two seconds after the last change of a language or of Forced
+    private readonly ArrangeLater _arrangeLater = new();
+    private bool _changedAtTrack;
     private BatchAnalysis? _analysis;
     private LibraryJob? _library;
     private IReadOnlyList<string> _leftovers = [];
@@ -1663,7 +1667,18 @@ public sealed class BatchPageViewModel : ObservableObject
             slot.Refresh();
         }
 
-        ArrangeSlots();
+        if (_changedAtTrack)
+        {
+            // the names and what is left out at once, the order after the pause (the track stays under the mouse)
+            ArrangeSlots(move: false);
+            _arrangeLater.Schedule(() => ArrangeSlots());
+        }
+        else
+        {
+            _arrangeLater.Cancel();
+            ArrangeSlots();
+        }
+
         var byItem = _items.ToDictionary(i => i.File.Path);
         foreach (var file in FileRows)
         {
@@ -1765,7 +1780,21 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>The group's tracks in the order of the result (of its first file), the left-out subtitles at the end.</summary>
-    private void ArrangeSlots()
+    // a change at a track (its language, Forced, its name): planned again, the order arranged after the pause
+    private void ReplanAtTrack()
+    {
+        _changedAtTrack = true;
+        try
+        {
+            Replan();
+        }
+        finally
+        {
+            _changedAtTrack = false;
+        }
+    }
+
+    private void ArrangeSlots(bool move = true)
     {
         if (SlotRows.Count == 0 || SlotRows[0].Group is not { } group ||
             _items.FirstOrDefault(i => i.Group == group && Paths.Same(i.File.Path, group.Representative.Path)) is not { } item)
@@ -1794,6 +1823,11 @@ public sealed class BatchPageViewModel : ObservableObject
             slot.SetResultName(names.GetValueOrDefault(slot.Key));
         }
 
+        if (!move)
+        {
+            return;
+        }
+
         var wanted = SlotRows.OrderBy(s => order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
             .ThenBy(s => s.Key.Type).ThenBy(s => s.Key.Ordinal).ToList();
         for (var i = 0; i < wanted.Count; i++)
@@ -1819,7 +1853,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         foreach (var (key, track) in SlotKey.Of(group.Representative))
         {
-            SlotRows.Add(new SlotRow(group, key, track, Replan, MoveSlot, _services.Profile));
+            SlotRows.Add(new SlotRow(group, key, track, ReplanAtTrack, MoveSlot, _services.Profile));
         }
 
         ArrangeSlots();

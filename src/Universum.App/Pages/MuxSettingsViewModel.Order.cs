@@ -30,6 +30,8 @@ public sealed partial class MuxSettingsViewModel
             return;
         }
 
+        _arrangeLater.Cancel();
+        _sortLater.Clear();
         Tracks.Move(from, to);
         SelectedTrack = dragged;
         Changed();
@@ -42,6 +44,8 @@ public sealed partial class MuxSettingsViewModel
             return;
         }
 
+        _arrangeLater.Cancel();
+        _sortLater.Clear();
         var index = Tracks.IndexOf(row);
         Tracks.Move(index, index + step);
         SelectedTrack = row;
@@ -51,14 +55,34 @@ public sealed partial class MuxSettingsViewModel
     private bool CanMoveRow(MuxTrackRow? row, int step) =>
         row is not null && Tracks.IndexOf(row) is var index and >= 0 && index + step >= 0 && index + step < Tracks.Count;
 
-    // a language set: the taken tracks of its type in the order of the rules (the other tracks keep their places)
+    // a language (or Forced) set: the taken tracks of its type in the order of the rules – two seconds after the last
+    // change, so the track does not jump away from under the mouse (owner, 1. 11. 2026); the other tracks keep their places
     private void FollowLanguage(MuxTrackRow row)
     {
-        if (!_loading && row.Include && row.Kind is TrackType.Audio or TrackType.Subtitles)
+        if (_loading || !row.Include || row.Kind is not (TrackType.Audio or TrackType.Subtitles))
         {
-            SortTracks(row.Kind);
+            return;
         }
+
+        _sortLater.Add(row.Kind);
+        _arrangeLater.Schedule(() =>
+        {
+            var moved = false;
+            foreach (var type in _sortLater.Order().ToList())
+            {
+                moved |= SortTracks(type);
+            }
+
+            _sortLater.Clear();
+            if (moved)
+            {
+                Changed();
+            }
+        });
     }
+
+    private readonly ArrangeLater _arrangeLater = new();
+    private readonly HashSet<TrackType> _sortLater = [];
 
     /// <summary>The taken tracks of the type put in the order of the rules, in the places the tracks of the type have.</summary>
     internal bool SortTracks(TrackType type)

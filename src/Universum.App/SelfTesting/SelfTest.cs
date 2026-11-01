@@ -3304,6 +3304,13 @@ internal static class SelfTest
                       $"{string.Join(" ", stages.Distinct().Where((_, i) => i % 4 == 0).Take(12))}): audio {ordinal + 1} spoken {spoken} → {result.Language ?? "?"}, margin sk−cs {result.SlovakMargin?.ToString("0.000") ?? "–"}, " +
                       $"written in {result.Comparison?.TextLanguage ?? (result.Comparison?.TextLeaning is { } lean ? lean + "?" : "–")}, pieces {string.Join(" ", result.Pieces.Select(p => $"{p.Language}:{p.Probability:0.00}"))}, " +
                       $"doubt: {result.Doubt} | as cs: {result.Comparison?.CzechText} | as sk: {result.Comparison?.SlovakText}");
+                if (spoken != "en" && tools.Accurate is not null)
+                {
+                    // the same with the quick model only (as before the accurate model) – for the comparison of speed
+                    timed.Restart();
+                    var quick = await Core.Speech.SpokenLanguage.DetectAsync(tools with { Accurate = null }, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
+                    Write($"speech detail, quick model only ({timed.Elapsed.TotalSeconds:0.0} s): audio {ordinal + 1} spoken {spoken} → {quick.Language ?? "?"}, doubt: {quick.Doubt}");
+                }
             }
 
             // owner, 28. 10.: each film of a group on its own, or only the chosen films

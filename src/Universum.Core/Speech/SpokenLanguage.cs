@@ -35,10 +35,16 @@ public sealed record CzechSlovakComparison(double Margin, string CzechText, stri
     /// The language the words of both transcriptions belong to (se / sa, jsem / som, pro / pre…): whisper writes the
     /// words it hears, though its spelling leans to Czech (ů, ě also in Slovak speech); null when they do not tell.
     /// </summary>
-    public string? TextLanguage => CzechOrSlovak.Decide(CzechText, SlovakText);
+    public string? TextLanguage => Heard is not null ? CzechOrSlovak.DecideWeighed(Heard) : CzechOrSlovak.Decide(CzechText, SlovakText);
+
+    /// <summary>
+    /// The accurate model's one transcription (owner, 1. 11. 2026: one run instead of two): its words, letters and
+    /// endings decide; null for the quick model's two transcriptions.
+    /// </summary>
+    public string? Heard { get; init; }
 
     /// <summary>The language the words lean to, though not clearly (a suggestion with a doubt); null when they do not.</summary>
-    public string? TextLeaning => CzechOrSlovak.Lean(CzechText, SlovakText);
+    public string? TextLeaning => Heard is not null ? CzechOrSlovak.DecideWeighed(Heard, 1.5) : CzechOrSlovak.Lean(CzechText, SlovakText);
 }
 
 /// <summary>What the recognition of a track does now.</summary>
@@ -362,9 +368,10 @@ public static partial class SpokenLanguage
         };
 
     /// <summary>
-    /// Czech against Slovak by the accurate model: the few seconds of the piece with the most speech, transcribed as
-    /// Czech and as Slovak with the encoder looking only at those seconds (much less work than a whole window); null when
-    /// it cannot be compared.
+    /// Czech against Slovak by the accurate model: the few seconds of the piece with the most speech, written down once
+    /// (as Czech – the accurate model keeps the words it hears, Slovak ones too, while a Slovak hint pulls Czech speech to
+    /// Slovak words) with the encoder looking only at those seconds; the words, letters and endings of the transcription
+    /// decide (<see cref="CzechOrSlovak.Weigh"/>). Null when it cannot be compared.
     /// </summary>
     public static async Task<CzechSlovakComparison?> CompareAccurateAsync(
         SpeechTools tools, IProcessRunner runner, string wave, Action<double>? progress = null, CancellationToken cancellationToken = default)
@@ -374,52 +381,43 @@ public static partial class SpokenLanguage
             return await CompareCzechSlovakAsync(tools, runner, wave, cancellationToken).ConfigureAwait(false);
         }
 
-        var clip = Path.Combine(Path.GetDirectoryName(wave)!, Path.GetFileNameWithoutExtension(wave) + "-speech.wav");
+        var folder = Path.GetDirectoryName(wave)!;
+        var clip = Path.Combine(folder, Path.GetFileNameWithoutExtension(wave) + "-speech.wav");
         if (SpeechClip(wave, clip, ClipSeconds) is not { } seconds)
         {
             return null;
         }
 
-        var context = AudioContext(seconds);
-        var transcripts = new Dictionary<string, (double Score, string Text)>();
-        var languages = new[] { "cs", "sk" };
-        for (var i = 0; i < languages.Length; i++)
+        var name = Path.GetFileNameWithoutExtension(clip) + "-heard";
+        var json = Path.Combine(folder, name + ".json");
+        try
         {
-            var language = languages[i];
-            var name = Path.GetFileNameWithoutExtension(clip) + "-" + language;
-            var json = Path.Combine(Path.GetDirectoryName(clip)!, name + ".json");
-            var part = i;
-            try
+            var request = new ProcessRequest(tools.Whisper,
+            [
+                "-m", model, "-f", Path.GetFileName(clip), "-l", "cs", "-ac", AudioContext(seconds).ToString(CultureInfo.InvariantCulture),
+                "-bs", "1", "-bo", "1", "-nf", "-nt", "-ojf", "-of", name, "-t", Threads.ToString(CultureInfo.InvariantCulture),
+            ])
             {
-                var request = new ProcessRequest(tools.Whisper,
-                [
-                    "-m", model, "-f", Path.GetFileName(clip), "-l", language, "-ac", context.ToString(CultureInfo.InvariantCulture),
-                    "-bs", "1", "-bo", "1", "-nf", "-nt", "-ojf", "-of", name, "-t", Threads.ToString(CultureInfo.InvariantCulture),
-                ])
-                {
-                    WorkingDirectory = Path.GetDirectoryName(clip),
-                    Timeout = TimeSpan.FromMinutes(5),
-                    Background = true,
-                };
-                var result = await Timed(runner, request, f => progress?.Invoke((part + f) / languages.Length), cancellationToken).ConfigureAwait(false);
-                if (result.ExitCode != 0 || !File.Exists(json) || Transcript(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false)) is not { } transcript)
-                {
-                    return null;
-                }
+                WorkingDirectory = folder,
+                Timeout = TimeSpan.FromMinutes(5),
+                Background = true,
+            };
+            var result = await Timed(runner, request, f => progress?.Invoke(f), cancellationToken).ConfigureAwait(false);
+            if (result.ExitCode != 0 || !File.Exists(json) || Transcript(await File.ReadAllTextAsync(json, cancellationToken).ConfigureAwait(false)) is not { } transcript)
+            {
+                return null;
+            }
 
-                transcripts[language] = transcript;
-            }
-            finally
-            {
-                File.Delete(json);
-            }
+            return new CzechSlovakComparison(0, transcript.Text, transcript.Text) { Heard = transcript.Text };
         }
-
-        return new CzechSlovakComparison(transcripts["sk"].Score - transcripts["cs"].Score, transcripts["cs"].Text, transcripts["sk"].Text);
+        finally
+        {
+            File.Delete(json);
+        }
     }
 
     /// <summary>The seconds of speech the accurate model hears (enough words to tell Czech from Slovak, little work).</summary>
-    public const double ClipSeconds = 9;
+    public const double ClipSeconds = 6;
 
     /// <summary>
     /// The encoder's window for so many seconds of sound (50 positions a second, a little more for its edge; at most the
@@ -825,9 +823,9 @@ public static partial class SpokenLanguage
     private static string Counts(IEnumerable<(string Language, double Score, int Count)> scores) =>
         string.Join(", ", scores.Select(s => $"{Languages.Find(s.Language)?.Name ?? s.Language} {s.Count}×"));
 
-    // whisper's threads: every processor but one (the window keeps one for itself), up to eight – more do not help it;
-    // it also runs below normal priority, so the computer and UNIVERSUM's menus stay responsive (owner, 1. 11. 2026)
-    private static int Threads => Math.Clamp(Environment.ProcessorCount > 2 ? Environment.ProcessorCount - 1 : Environment.ProcessorCount, 1, 8);
+    // whisper's threads: every processor up to eight (more do not help it) – below normal priority, so whatever the user
+    // does (UNIVERSUM's menus too) gets the processors first and nothing freezes (owner, 1. 11. 2026)
+    private static int Threads => Math.Clamp(Environment.ProcessorCount, 1, 8);
 
     private static string LastLine(string text) =>
         text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? CoreText.T("neznáma chyba");

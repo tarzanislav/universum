@@ -4,6 +4,7 @@ using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 using Universum.Core.Speech;
+using Universum.Core.Text;
 
 namespace Universum.Tests;
 
@@ -139,11 +140,15 @@ public sealed class SpeechTests
         {
             var tools = FakeTools(folder, accurate: true);
             Assert.True(tools.Accurate is not null && tools.Writer == tools.Accurate, "the accurate model installed – it also writes down dictation");
-            var dubbed = new StandIn(tools, _ => 0.3, "cs", 0.62, l => l == "sk" ? 0.8 : 0.6);
+            // Slovak speech heard as Czech by the quick model: the accurate model writes down Slovak words
+            var dubbed = new StandIn(tools, _ => 0.3, "cs", 0.62, _ => 0.7) { Said = "Vitajte pri dnešnom vymyslenom príbehu. Malá dědina sa prebůdza do rána." };
             var steps = new List<SpeechProgress>();
             var result = await SpokenLanguage.DetectAsync(tools, dubbed, "film.mkv", 0, TimeSpan.FromMinutes(100), new Gauge(steps.Add));
             Assert.Equal("sk", result.Language);
-            Assert.True(dubbed.Accurate == 2 && dubbed.Transcribed.SequenceEqual(["cs", "sk"]), "the clip transcribed by the accurate model in both languages");
+            Assert.True(dubbed.Accurate == 1 && dubbed.Transcribed.SequenceEqual(["cs"]), "the clip written down once by the accurate model: " + string.Join(",", dubbed.Transcribed));
+            Assert.True(result.Doubt?.StartsWith("podľa prepisu slovenčina, nie čeština", StringComparison.Ordinal) == true && !result.NeedsOwnConfirmation, "decided, the change noted: " + result.Doubt);
+            var czech = new StandIn(tools, _ => 0.3, "sk", 0.6, _ => 0.7) { Said = "Malá vesnice pod horami se probouzí. Starý mlynář otevírá dveře a říká, že jsme doma." };
+            Assert.Equal("cs", (await SpokenLanguage.DetectAsync(tools, czech, "film.mkv", 0, TimeSpan.FromMinutes(100))).Language, "Czech words, ř: Czech");
             Assert.True(steps.Count > 3 && steps.Zip(steps.Skip(1)).All(p => p.Second.Fraction >= p.First.Fraction - 1e-9) && steps[^1] is { Fraction: 1, Stage: SpeechStage.Done },
                 "the gauge only goes forward, up to 100 %: " + string.Join(" ", steps.Select(p => $"{p.Fraction:0.00}{p.Stage.ToString()[0]}")));
             Assert.True(steps.Any(p => p.Stage == SpeechStage.CzechOrSlovak), "the Czech-or-Slovak stage reported");
@@ -153,6 +158,16 @@ public sealed class SpeechTests
         {
             Directory.Delete(folder, true);
         }
+    }
+
+    [Test]
+    public void CzechAndSlovakByWordsLettersAndEndings()
+    {
+        // what the accurate model wrote down from a few seconds of invented synthetic speech (CI, 1. 11. 2026)
+        Assert.Equal("cs", CzechOrSlovak.DecideWeighed("Malá mesnice pod horami se probovní do chladného rána. Starý mliná dotemírá dveře a dívá se na namrlou reku. Říká jsme, že..."));
+        Assert.Equal("sk", CzechOrSlovak.DecideWeighed("Vitajte pri dnešnom vymyslenom príbehu. Malá dědina pod horami sa prebůdza do chladného rána. Starým liná rotvára dvere a pod..."));
+        Assert.Equal<string?>(null, CzechOrSlovak.DecideWeighed("Malá dědina pod horami."), "too little to tell");
+        Assert.Equal("sk", CzechOrSlovak.DecideWeighed("Musíš to urobiť hneď, ľudia čakajú."), "-ť and ľ");
     }
 
     [Test]
@@ -367,6 +382,9 @@ public sealed class SpeechTests
 
         public List<string> Transcribed { get; } = [];
 
+        /// <summary>What a transcription writes down.</summary>
+        public string? Said { get; init; }
+
         /// <summary>The language heard in each piece in turn (instead of the one language).</summary>
         public string[]? Languages { get; init; }
 
@@ -407,7 +425,7 @@ public sealed class SpeechTests
                     var p = sureOf(as_).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     var tokens = string.Join(",", Enumerable.Range(0, 8).Select(i => $$"""{"text":" slovo{{i}}","id":{{100 + i}},"p":{{p}}}""").Prepend("""{"text":"[_BEG_]","id":50365,"p":0.01}"""));
                     File.WriteAllText(Path.Combine(request.WorkingDirectory!, arguments[arguments.IndexOf("-of") + 1] + ".json"),
-                        $$"""{"result":{"language":"{{as_}}"},"transcription":[{"text":" ...","tokens":[{{tokens}}]}]}""");
+                        $$"""{"result":{"language":"{{as_}}"},"transcription":[{"text":" {{Said ?? "..."}}","tokens":[{{tokens}}]}]}""");
                 }
 
                 return Task.FromResult(new ProcessResult(0, "", "", TimeSpan.Zero));

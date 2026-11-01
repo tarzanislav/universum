@@ -425,18 +425,18 @@ public sealed class RulesPageViewModel : ObservableObject
 
         // held: the rows in the order they are shown (a new row after them); otherwise the waiting order is not needed
         var shown = Rows.Select(r => r.TrackId).ToList();
+        var numbered = target.Tracks.Select((track, index) => (Track: track, Index: index)).ToList();
         var tracks = _holdOrder
-            ? target.Tracks.OrderBy(t => shown.IndexOf(t.TrackId) is var at and >= 0 ? at : int.MaxValue).ToList()
-            : target.Tracks.ToList();
+            ? numbered.OrderBy(t => shown.IndexOf(t.Track.TrackId) is var at and >= 0 ? at : int.MaxValue).ToList()
+            : numbered;
         if (!_holdOrder)
         {
             _arrangeLater.Cancel();
         }
 
         Rows.Clear();
-        foreach (var track in tracks)
+        foreach (var (track, i) in tracks)
         {
-            var i = target.Tracks.IndexOf(track);
             var chosen = _languages.TryGetValue(track.TrackId, out var tag) ? Languages.Find(tag.Primary)
                 : _detected.TryGetValue(track.TrackId, out var read) ? Languages.Find(read.Language)
                 : null;

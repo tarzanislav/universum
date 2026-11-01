@@ -93,7 +93,7 @@ public static partial class VoiceNotes
         var json = Path.Combine(Path.GetDirectoryName(wave)!, name + ".json");
         try
         {
-            var result = await runner.RunAsync(SpokenLanguage.TranscriptionRequest(tools, wave, language, name) with { Timeout = TimeSpan.FromMinutes(15) }, cancellationToken).ConfigureAwait(false);
+            var result = await runner.RunAsync(SpokenLanguage.TranscriptionRequest(tools, wave, language, name) with { Timeout = TimeSpan.FromMinutes(60) }, cancellationToken).ConfigureAwait(false);
             if (result.ExitCode != 0 || !File.Exists(json))
             {
                 return (null, CoreText.F("Prepis sa nepodaril (whisper.cpp skončil s kódom {0}).", result.ExitCode.ToString(CultureInfo.InvariantCulture)));

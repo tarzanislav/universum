@@ -259,7 +259,7 @@ public sealed class SpeechTests
     private static SpeechTools FakeTools(string folder)
     {
         var exe = OperatingSystem.IsWindows() ? ".exe" : "";
-        foreach (var (path, text) in new[] { ($"ffmpeg/ffmpeg{exe}", "ffmpeg"), ($"whisper/whisper-cli{exe}", "whisper"), ("models/ggml-base.bin", "model") })
+        foreach (var (path, text) in new[] { ($"ffmpeg/ffmpeg{exe}", "ffmpeg"), ($"whisper/whisper-cli{exe}", "whisper"), ($"models/{SpeechTools.ModelName}", "model") })
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(folder, path))!);
             File.WriteAllText(Path.Combine(folder, path), text);

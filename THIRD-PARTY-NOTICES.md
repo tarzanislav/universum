@@ -40,7 +40,7 @@ procesy; všetko beží len v počítači). Pri každom je jeho licencia a súbo
   GitHube ako `ffmpeg-9.0.2-source.tar.xz` (https://github.com/tarzanislav/universum/releases).
 - **whisper.cpp 1.9.2** (`speech/whisper`) – https://github.com/ggml-org/whisper.cpp, licencia MIT (`LICENSE`),
   oficiálna zostava pre Windows `whisper-bin-x64.zip`.
-- **Model reči Whisper „base“** (`speech/models/ggml-base.bin`) – model OpenAI Whisper (https://github.com/openai/whisper)
+- **Model reči Whisper „large-v3-turbo“, kvantizovaný q5_0** (`speech/models/ggml-large-v3-turbo-q5_0.bin`) – model OpenAI Whisper (https://github.com/openai/whisper)
   prevedený pre whisper.cpp (https://huggingface.co/ggerganov/whisper.cpp), licencia MIT, Copyright (c) 2022 OpenAI.
 
 ## Služby, ktoré UNIVERSUM používa (nič z nich nie je súčasťou programu)

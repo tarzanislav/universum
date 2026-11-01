@@ -10,15 +10,19 @@ public sealed class SpeechException(string message, Exception? inner = null) : E
 /// <summary>
 /// The tools of the recognition of the spoken language, installed with UNIVERSUM in its "speech" folder (decided by
 /// the owner on 28. 10. 2026: part of the installation, nothing is downloaded): FFmpeg (LGPL, the whole program – it
-/// reads the audio and will serve more later), whisper.cpp (MIT) and the speech model "base" (MIT). The build writes
+/// reads the audio and will serve more later), whisper.cpp (MIT) and the speech model "large-v3-turbo" quantised q5_0 (MIT; owner, 1. 11. 2026: "base" mixed up
+/// Czech and Slovak). The build writes
 /// a manifest with the SHA-256 of every file; nothing is started before the files match it.
 /// </summary>
 /// <param name="Ffmpeg">ffmpeg.exe</param>
 /// <param name="Whisper">whisper-cli.exe</param>
-/// <param name="Model">ggml-base.bin</param>
+/// <param name="Model">ggml-large-v3-turbo-q5_0.bin</param>
 public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, string Model)
 {
     public const string ManifestName = "manifest.json";
+
+    /// <summary>The speech model: Whisper large-v3-turbo, quantised q5_0 (574 MB).</summary>
+    public const string ModelName = "ggml-large-v3-turbo-q5_0.bin";
 
     private static string Exe(string name) => OperatingSystem.IsWindows() ? name + ".exe" : name;
 
@@ -32,7 +36,7 @@ public sealed record SpeechTools(string Folder, string Ffmpeg, string Whisper, s
             folder,
             Path.Combine(folder, "ffmpeg", Exe("ffmpeg")),
             Path.Combine(folder, "whisper", Exe("whisper-cli")),
-            Path.Combine(folder, "models", "ggml-base.bin"));
+            Path.Combine(folder, "models", ModelName));
         return File.Exists(tools.Ffmpeg) && File.Exists(tools.Whisper) && File.Exists(tools.Model) && File.Exists(Path.Combine(folder, ManifestName))
             ? tools
             : null;

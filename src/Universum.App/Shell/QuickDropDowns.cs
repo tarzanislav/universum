@@ -41,7 +41,16 @@ internal static class QuickDropDowns
     /// <summary>The open list scrolls by items (a list in groups keeps scrolling by pixels – it needs it).</summary>
     internal static bool ByItems(ComboBox combo)
     {
-        if (combo.IsGrouping || combo.Template?.FindName("PART_Popup", combo) is not Popup { Child: { } list } || Scroller(list) is not { } scroller)
+        if (combo.IsGrouping)
+        {
+            return false;
+        }
+
+        // the drop-down itself (a template that passes it on to its list) and the list's own scrolling (one that does not)
+        combo.SetValue(ScrollViewer.CanContentScrollProperty, true);
+        combo.SetValue(VirtualizingPanel.IsVirtualizingProperty, true);
+        combo.SetValue(VirtualizingPanel.ScrollUnitProperty, ScrollUnit.Item);
+        if (Scroller(combo) is not { } scroller)
         {
             return false;
         }
@@ -54,8 +63,12 @@ internal static class QuickDropDowns
         return true;
     }
 
+    /// <summary>The scrolled part of the open list of a drop-down (null before its template is made).</summary>
+    internal static ScrollViewer? Scroller(ComboBox combo) =>
+        combo.Template?.FindName("PART_Popup", combo) is Popup { Child: { } list } ? Find(list) : null;
+
     // the scrolled part of the open list (the template's own elements: logical children of the popup's content)
-    private static ScrollViewer? Scroller(DependencyObject element)
+    private static ScrollViewer? Find(DependencyObject element)
     {
         if (element is ScrollViewer scroller)
         {
@@ -64,7 +77,7 @@ internal static class QuickDropDowns
 
         foreach (var child in LogicalTreeHelper.GetChildren(element).OfType<DependencyObject>())
         {
-            if (Scroller(child) is { } found)
+            if (Find(child) is { } found)
             {
                 return found;
             }

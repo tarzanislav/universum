@@ -3797,8 +3797,12 @@ internal static class SelfTest
                 var opened = opening.Elapsed.TotalMilliseconds;
                 await Settle();
                 var made = Enumerable.Range(0, combo.Items.Count).Count(i => combo.ItemContainerGenerator.ContainerFromIndex(i) is not null);
+                var scroller = QuickDropDowns.Scroller(combo);
+                var panel = scroller is null ? null : FindVisual<System.Windows.Controls.Panel>(scroller, p => p.IsItemsHost);
+                Write($"mux languages drop-down: {combo.Items.Count} languages, {made} items made, opened in {opened:0} ms; list scrolls by items " +
+                      $"{scroller?.CanContentScroll}, drop-down {System.Windows.Controls.ScrollViewer.GetCanContentScroll(combo)}, panel {panel?.GetType().Name}, " +
+                      $"virtualizing {System.Windows.Controls.VirtualizingPanel.GetIsVirtualizing(combo)}, scroller {scroller?.GetType().Name} {scroller?.ActualHeight:0} px");
                 combo.IsDropDownOpen = false;
-                Write($"mux languages drop-down: {combo.Items.Count} languages, {made} items made, opened in {opened:0} ms");
                 Check(made > 0 && (made < 200 || combo.Items.Count < 300), $"mux languages drop-down: only the items seen are made ({made} of {combo.Items.Count})");
             }
             else

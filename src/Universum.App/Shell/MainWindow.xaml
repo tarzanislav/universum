@@ -3914,6 +3914,8 @@
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Content="{loc:T '+ Udalosť'}" Command="{Binding NewEventCommand}" Padding="12,4" Margin="8,0,0,0" ToolTip="Nová udalosť vo vybraný deň" />
+                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="12,4" Margin="8,0,0,0"
+                                    ToolTip="Tlač s náhľadom, PDF, HTML, iCalendar (.ics), CSV a záloha" />
                             <Button Content="{loc:T 'Obnoviť'}" Command="{Binding RefreshCommand}" Padding="12,4" Margin="8,0,0,0"
                                     ToolTip="Znova prečíta premiéry a epizódy, ktoré uchovávajú Premiéry a Novinky (zo zdrojov ich obnovíte tam)" />
                         </StackPanel>
@@ -4426,7 +4428,8 @@
                             <RadioButton Content="Zoznam" IsChecked="{Binding IsList}" GroupName="TasksView" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="Tabuľa" IsChecked="{Binding IsBoard}" GroupName="TasksView" MinWidth="0" Margin="0,0,20,0" />
                             <CheckBox Content="Ukázať hotové" IsChecked="{Binding ShowDone}" MinWidth="0" Margin="0,0,12,0" />
-                            <Button Content="{loc:T 'Hotové do koša'}" Command="{Binding EmptyDoneCommand}" Padding="10,3" Margin="0,0,16,0" />
+                            <Button Content="{loc:T 'Hotové do koša'}" Command="{Binding EmptyDoneCommand}" Padding="10,3" Margin="0,0,8,0" />
+                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,16,0" ToolTip="Tlač s náhľadom, PDF, HTML, iCalendar, CSV, Markdown" />
                             <TextBlock Text="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
                         </WrapPanel>
                     </DockPanel>
@@ -4534,6 +4537,7 @@
                             <RadioButton Content="K dňom" IsChecked="{Binding ShowDays}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="K titulom" IsChecked="{Binding ShowTitles}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="{Binding BinText}" IsChecked="{Binding ShowBin}" GroupName="NotesSource" MinWidth="0" Margin="0,0,10,0" />
+                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,8,0" ToolTip="Tlač s náhľadom, PDF, HTML, Markdown, CSV" />
                             <Button Content="{loc:T 'Vysypať kôš'}" Command="{Binding EmptyBinCommand}" Padding="10,3"
                                     Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)" />
                         </WrapPanel>

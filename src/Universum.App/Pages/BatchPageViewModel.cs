@@ -60,6 +60,7 @@ public sealed class BatchPageViewModel : ObservableObject
     public BatchPageViewModel(AppServices services)
     {
         _services = services;
+        Groups.CollectionChanged += (_, _) => SortGroups();
         ChooseFolderCommand = new RelayCommand(ChooseFolder, () => !Busy);
         ClearCommand = new RelayCommand(Clear, () => !Busy && !IsRunning);
         AnalyzeCommand = new AsyncRelayCommand(AnalyzeAsync, () => !Busy && Directory.Exists(Folder));
@@ -148,6 +149,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 _library = LibraryJob.Guess(layout, _analysis);
+                SortGroups();
                 if (ApplySeriesMemory() is { Length: > 0 } hint)
                 {
                     RunState = hint.Trim();
@@ -284,6 +286,87 @@ public sealed class BatchPageViewModel : ObservableObject
     public RelayCommand SaveReportCommand { get; }
 
     public ObservableCollection<GroupRow> Groups { get; } = [];
+
+    /// <summary>
+    /// The list of groups in two (owner, 1. 11. 2026): Skupina Seriál above – the series only, Skupina Film below – the films
+    /// (and groups whose kind is not known yet); both in the order of <see cref="Groups"/>.
+    /// </summary>
+    public ObservableCollection<GroupRow> SeriesGroups { get; } = [];
+
+    public ObservableCollection<GroupRow> FilmGroups { get; } = [];
+
+    /// <summary>The selected group when it is a series (the upper list); choosing in it selects the group.</summary>
+    public GroupRow? SelectedSeriesGroup
+    {
+        get => SelectedGroup is { } row && SeriesGroups.Contains(row) ? row : null;
+        set
+        {
+            if (value is not null)
+            {
+                SelectedGroup = value;
+            }
+        }
+    }
+
+    /// <summary>The selected group when it is a film (the lower list).</summary>
+    public GroupRow? SelectedFilmGroup
+    {
+        get => SelectedGroup is { } row && FilmGroups.Contains(row) ? row : null;
+        set
+        {
+            if (value is not null)
+            {
+                SelectedGroup = value;
+            }
+        }
+    }
+
+    // a group is a series by its first file (MOVIES/TVSHOWS or the group's own choice), or by the kind of the whole folder
+    private bool IsSeriesGroup(GroupRow row) => _library is { } library &&
+        (row.Group.Files.Count > 0 ? library.KindFor(row.Group.Files[0].Path) : library.Kind) == MediaKind.Series;
+
+    /// <summary>Sorts the groups into the two lists again (after an analysis, a change of the kind, a new group).</summary>
+    private void SortGroups()
+    {
+        var series = Groups.Where(IsSeriesGroup).ToList();
+        var films = Groups.Where(g => !series.Contains(g)).ToList();
+        var changed = Sync(SeriesGroups, series) | Sync(FilmGroups, films);
+        if (changed)
+        {
+            OnPropertyChanged(nameof(SelectedSeriesGroup));
+            OnPropertyChanged(nameof(SelectedFilmGroup));
+        }
+
+        static bool Sync(ObservableCollection<GroupRow> list, List<GroupRow> wanted)
+        {
+            if (list.SequenceEqual(wanted))
+            {
+                return false;
+            }
+
+            list.Clear();
+            foreach (var row in wanted)
+            {
+                list.Add(row);
+            }
+
+            return true;
+        }
+    }
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(IsSeries) or nameof(IsMovies))
+        {
+            SortGroups();
+        }
+        else if (e.PropertyName == nameof(SelectedGroup))
+        {
+            base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedSeriesGroup)));
+            base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(SelectedFilmGroup)));
+        }
+    }
 
     public ObservableCollection<SlotRow> SlotRows { get; } = [];
 
@@ -1284,6 +1367,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _analysisCancellation = null;
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
+            SortGroups();
             ApplySentSeries();
             var hint = ApplySeriesMemory();
             ApplyStudioEdits();

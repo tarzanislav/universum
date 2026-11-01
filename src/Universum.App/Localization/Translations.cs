@@ -2777,6 +2777,11 @@ internal static class Translations
         ["Neplatný atribút v selektore „{0}“."] = "Neplatný atribut v selektoru „{0}“.",
         ["Stránka je príliš veľká."] = "Stránka je příliš velká.",
         ["Prázdna záloha."] = "Prázdná záloha.",
+
+        // the groups of Hromadné spracovanie in two lists (1. 11. 2026)
+        ["Skupina Seriál"] = "Skupina Seriál",
+        ["Skupina Film"] = "Skupina Film",
+        ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Tažením změníte výšku seznamů seriálů a filmů",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -5550,5 +5555,10 @@ internal static class Translations
         ["Neplatný atribút v selektore „{0}“."] = "Invalid attribute in the selector “{0}”.",
         ["Stránka je príliš veľká."] = "The page is too large.",
         ["Prázdna záloha."] = "Empty backup.",
+
+        // the groups of Hromadné spracovanie in two lists (1. 11. 2026)
+        ["Skupina Seriál"] = "Series groups",
+        ["Skupina Film"] = "Film groups",
+        ["Ťahaním zmeníte výšku zoznamov seriálov a filmov"] = "Drag to change the height of the series and film lists",
     };
 }

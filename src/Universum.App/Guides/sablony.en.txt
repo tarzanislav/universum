@@ -30,10 +30,10 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows the *simulation result* – before anything is written, you can see what each file will become.
 
 1. Click [Folder…], tick **aj podpriečinky** if needed, and click [Analyze].
-2. On the left, choose a group in the **Skupina (film / seriál)** list. On the right you will see its files and, below them, **Stopy skupiny**.
+2. On the left, choose a group – series are at the top in the **Series groups** list, films below in the **Film groups** list. On the right you will see its files and, below them, **Group tracks**.
 3. Choose the kind, *films* or *series*. For a series, fill in **Seriál:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
 4. Check and accept the suggested names: [Refine the titles], [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
-5. In **Stopy skupiny**, set **Jazyk**, **Názov stopy**, **Forced** and the order. The decision applies to all files in the group.
+5. In **Group tracks**, set **Jazyk**, **Názov stopy**, **Forced** and the order. The decision applies to all files in the group.
 6. At **Originál:**, choose *keep*, *delete automatically* or *delete manually*.
 7. Click [Start]. You can follow the progress in the Job queue too; a prominent bar shows when it has finished.
 

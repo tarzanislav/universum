@@ -49,9 +49,19 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
 
         temporary = Path.Combine(Path.GetDirectoryName(output)!,
             Path.GetFileNameWithoutExtension(output) + "." + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant() + FileProcessor.TemporaryExtension);
+        var converted = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "srt-" + Guid.NewGuid().ToString("N"));
         try
         {
             EnsureFreeSpace(spec, output);
+
+            // owner, 1. 11. 2026: subtitles the user ticked written as SRT first; the SRT takes the track's place
+            var (withSrt, srtProblem) = await ToSrtAsync(spec, converted, cancellationToken);
+            if (srtProblem is not null)
+            {
+                return new MuxResult(MuxStatus.Failed, null, [srtProblem]);
+            }
+
+            spec = withSrt;
             ProcessResult result;
             using (var options = MkvToolNixOptionsFile.Create(MuxArguments.Build(spec, temporary)))
             {
@@ -104,6 +114,70 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
             TryDelete(temporary);
             return new MuxResult(MuxStatus.Failed, null, [ex.Message]);
         }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(converted))
+                {
+                    Directory.Delete(converted, recursive: true);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // a temporary folder left behind is harmless
+            }
+        }
+    }
+
+    /// <summary>
+    /// The tracks with <see cref="MuxTrackOptions.ToSrt"/> written as SRT in UTF-8 into <paramref name="folder"/>: each SRT is
+    /// one more input whose only track takes the place (name, language, flags, delay) of the track it was made of; the
+    /// track of the other format is not taken. Tracks of files read with appended files or parts are left as they are.
+    /// </summary>
+    public async Task<(MuxSpec Spec, string? Problem)> ToSrtAsync(MuxSpec spec, string folder, CancellationToken cancellationToken = default)
+    {
+        if (!spec.Tracks.Any(t => t.Options.ToSrt))
+        {
+            return (spec, null);
+        }
+
+        var sources = spec.Sources.ToList();
+        var tracks = new List<MuxTrack>(spec.Tracks.Count);
+        foreach (var track in spec.Tracks)
+        {
+            var source = spec.Sources[track.Source];
+            var media = source.File.Tracks.FirstOrDefault(t => t.Id == track.TrackId);
+            if (!track.Options.ToSrt || media is null || !Subtitles.SrtConversion.Offers(media) || source.Appended.Count > 0 || source.AdditionalParts.Count > 0)
+            {
+                tracks.Add(track.Options.ToSrt ? track with { Options = track.Options with { ToSrt = false } } : track);
+                continue;
+            }
+
+            var srt = Path.Combine(folder, $"srt-{sources.Count:00}.srt");
+            if (!await Subtitles.SrtConversion.WriteAsync(installation, runner, source.File, media, srt, null, cancellationToken).ConfigureAwait(false))
+            {
+                return (spec, $"the subtitles of track {track.TrackId} of {Path.GetFileName(source.File.Path)} cannot be read to write them as SRT");
+            }
+
+            var file = new Media.MediaFile
+            {
+                Path = srt,
+                ContainerType = "SRT subtitles",
+                Tracks =
+                [
+                    new Media.MediaTrack
+                    {
+                        Id = 0, Type = Media.TrackType.Subtitles, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", IsTextSubtitles = true,
+                        Language = media.Language, Name = media.Name, Flags = media.Flags,
+                    },
+                ],
+            };
+            sources.Add(new MuxSource(file, KeepChapters: false, KeepAttachments: false, KeepTags: false));
+            tracks.Add(track with { Source = sources.Count - 1, TrackId = 0, Options = track.Options with { ToSrt = false, SubtitleCharset = "UTF-8" } });
+        }
+
+        return (spec with { Sources = sources, Tracks = tracks }, null);
     }
 
     /// <summary>The first free name of the placement for the written size (… BIG, … BIG2 …); never overwrites.</summary>

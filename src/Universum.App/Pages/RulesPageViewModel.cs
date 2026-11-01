@@ -100,6 +100,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _kept.Clear();
         _order.Clear();
         _forced.Clear();
+        _toSrt.Clear();
         _names.Clear();
         _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
         _subtitleReading?.Cancel();
@@ -298,6 +299,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _kept.Clear();
         _order.Clear();
         _forced.Clear();
+        _toSrt.Clear();
         _names.Clear();
         _detected = new Dictionary<int, Core.Text.SubtitleLanguageResult>();
         _subtitleReading?.Cancel();
@@ -415,7 +417,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         var target = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names });
+            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt });
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -449,6 +451,7 @@ public sealed class RulesPageViewModel : ObservableObject
                     : ForcedSubtitles.ByAmount(_file, track.Source) is { } amount && track.Role == TrackRole.Forced ? Loc.F("návrh UNIVERSUM: forced – {0}", amount)
                     : "",
                 ForcedChanged = ForcedChanged,
+                ToSrtChanged = ToSrtChanged,
                 NameWritten = NameWritten,
             });
         }
@@ -465,7 +468,7 @@ public sealed class RulesPageViewModel : ObservableObject
             WriteMethod.None => Loc.T("Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice."),
             WriteMethod.HeaderEdit => Loc.F("Zmení sa len hlavička ({0}) – trvá to pár sekúnd.", ChangeCount(_plan.Changes.Count)),
             _ when target.ContainerChanged => Loc.F("Súbor {0} sa prevedie do MKV – vznikne nový súbor ({1}).", _file.ContainerName, ChangeCount(_plan.Changes.Count)),
-            _ when target.AddsFiles || target.TimingChanged => Loc.F("Vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
+            _ when target.AddsFiles || target.TimingChanged || target.Tracks.Any(t => t.ToSrt) => Loc.F("Vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
             _ => Loc.F("Mení sa poradie stôp – vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
         } + (target.RemovedByLanguage.Count > 0
                 ? Loc.F(" Odstránia sa titulky mimo zoznamu jazykov (Nastavenia): {0}.", string.Join(", ", target.RemovedByLanguage.Select(t => Texts.Language(t.Language))))
@@ -492,6 +495,25 @@ public sealed class RulesPageViewModel : ObservableObject
     private void Moved(RuleRow row, int by) => Later(() => MoveTrack(row.TrackId, by));
 
     private void ForcedChanged(RuleRow row, bool forced) => Later(() => Holding(() => ChooseForced(row.TrackId, forced)));
+
+    private void ToSrtChanged(RuleRow row, bool toSrt) => Later(() => Holding(() => ChooseSrt(row.TrackId, toSrt)));
+
+    /// <summary>Subtitles written as SRT inside the result, or in their own format (owner, 1. 11. 2026; also the self-test).</summary>
+    public void ChooseSrt(int trackId, bool toSrt)
+    {
+        if (toSrt)
+        {
+            _toSrt.Add(trackId);
+        }
+        else
+        {
+            _toSrt.Remove(trackId);
+        }
+
+        Recalculate();
+    }
+
+    private readonly HashSet<int> _toSrt = [];
 
     // owner, 1. 11. 2026: a change at a track keeps the rows where they are; the order of the rules comes two seconds
     // after the last change (a Forced box clicked twice stays under the mouse)
@@ -535,7 +557,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         var rules = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names });
+            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt });
         if ((rules.Tracks.FirstOrDefault(t => t.TrackId == trackId)?.Name ?? "") != name)
         {
             _names[trackId] = name;
@@ -799,7 +821,7 @@ public sealed class RulesPageViewModel : ObservableObject
             languages[id] = chosen;
         }
 
-        return new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names };
+        return new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt };
     }
 
     private bool CanApply() =>

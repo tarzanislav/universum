@@ -260,6 +260,7 @@ internal static class SelfTest
         await TestMultiplexerAsync(model, window, services, work);
         await TestMegaSourcesAsync(model, window, services, work);
         await TestMuxRecognitionAsync(model, window, work);
+        await TestSrtConversionAsync(model, window, services, work);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -3729,6 +3730,71 @@ internal static class SelfTest
 
     // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,
     // with forced subtitles told by the file's name (invented speech and text)
+    // owner, 1. 11. 2026: subtitles of another format (WebVTT) written as SRT inside the result, only when ticked – in
+    // Zlučovanie (a .vtt added to a film) and in Single spracovanie (WebVTT in the film); invented names
+    private static async Task TestSrtConversionAsync(MainViewModel model, MainWindow window, AppServices services, string work)
+    {
+        var film = Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv");
+        var vtt = Path.Combine(work, "Vymyslená epizóda.vtt");
+        File.WriteAllText(vtt, "WEBVTT\n\n00:00.500 --> 00:01.500\nŘekl jsem ti, že tady budu.\n\n00:01.600 --> 00:01.900\nCo ještě chceš?\n");
+        var mux = model.Mux;
+        var previous = mux.AskHowToAdd;
+        mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent);
+        try
+        {
+            model.Open(mux);
+            mux.NewSettingsCommand.Execute(null);
+            await mux.AddFilesAsync([film, vtt]);
+            var set = mux.Current;
+            var webVtt = set.Tracks.Single(t => t.Input.File.Path == vtt);
+            Check(webVtt.CanConvertToSrt && set.Tracks.Where(t => t.Kind == TrackType.Subtitles && t != webVtt).All(t => !t.CanConvertToSrt),
+                $"srt: Zlučovanie offers Na SRT for the WebVTT only – {webVtt.ToSrtHint}");
+            webVtt.ToSrt = true;
+            set.SelectedTrack = webVtt;
+            Check(webVtt.FlagMarks.Contains("na SRT", StringComparison.Ordinal) && set.Spec().Tracks.Any(t => t.Options.ToSrt),
+                "srt: ticked – shown in the list and in the recipe");
+            await Screenshot(window, "mux-srt.png");
+            var confirm = mux.Confirm;
+            mux.Confirm = _ => true;
+            mux.CloseSettingsCommand.Execute(set);
+            mux.Confirm = confirm;
+        }
+        finally
+        {
+            mux.AskHowToAdd = previous;
+        }
+
+        // Single spracovanie: WebVTT inside the film
+        if (services.CurrentMkvToolNix is not { } installation)
+        {
+            Fail("srt: MKVToolNix missing");
+            return;
+        }
+
+        var withVtt = Path.Combine(work, "Vymyslený film s WebVTT.mkv");
+        var made = await services.Runner.RunAsync(new Core.Processes.ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge),
+            ["-q", "-o", withVtt, film, "--language", "0:cze", vtt]));
+        Check(made.ExitCode is 0 or 1, "srt: a film with WebVTT made – " + made.StandardError);
+        model.Open(model.Rules);
+        await model.Rules.LoadAsync(withVtt);
+        for (var wait = 0; wait < 600 && model.Rules.IsReadingSubtitles; wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        var row = model.Rules.Rows.FirstOrDefault(r => r.CanConvertToSrt);
+        Check(row is not null && model.Rules.Rows.Count(r => r.CanConvertToSrt) == 1, "srt: Single offers Na SRT for the WebVTT track only");
+        if (row is not null)
+        {
+            model.Rules.ChooseSrt(row.TrackId, true);
+            Check(model.Rules.Plan is { Method: Core.Planning.WriteMethod.Remux } plan && plan.Changes.Any(c => c.Kind == Core.Planning.ChangeKind.ToSrt) &&
+                  model.Rules.Rows.Single(r => r.TrackId == row.TrackId).ToSrt,
+                "srt: Single plans the WebVTT as SRT – " + model.Rules.Summary);
+            await Screenshot(window, "single-srt.png");
+            model.Rules.ChooseSrt(row.TrackId, false);
+        }
+    }
+
     private static async Task TestMuxRecognitionAsync(MainViewModel model, MainWindow window, string work)
     {
         var mux = model.Mux;

@@ -41,6 +41,12 @@ public sealed record TrackDecisions
     /// </summary>
     public IReadOnlyDictionary<int, string> Names { get; init; } = new Dictionary<int, string>();
 
+    /// <summary>
+    /// Text subtitle tracks written as SRT (owner, 1. 11. 2026: WebVTT, ASS … converted inside the result, only when the
+    /// user ticks it); the track of the other format is not in the result. Tracks that are not such subtitles are ignored.
+    /// </summary>
+    public IReadOnlySet<int> ToSrt { get; init; } = new HashSet<int>();
+
     /// <summary>Video names to reuse, so a preview does not change on every recalculation.</summary>
     public IReadOnlyDictionary<int, string> VideoNames { get; init; } = new Dictionary<int, string>();
 }

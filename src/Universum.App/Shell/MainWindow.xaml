@@ -489,6 +489,19 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
+                        <!-- owner, 1. 11. 2026: WebVTT, ASS … written as SRT inside the result, only when ticked -->
+                        <DataGridTemplateColumn Header="{loc:T 'Na SRT'}" Width="Auto" MinWidth="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <CheckBox IsChecked="{Binding ToSrt, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                                  Visibility="{Binding CanConvertToSrt, Converter={StaticResource BoolToVisibility}}"
+                                                  ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
+                                        <TextBlock Text="{Binding ToSrtHint}" FontSize="11" TextWrapping="Wrap" MaxWidth="220" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="{loc:T 'Iné príznaky'}" Binding="{Binding OtherFlagsAfter}" />
                         <DataGridTextColumn Header="{loc:T 'Rola'}" Binding="{Binding Role}" />
                     </DataGrid.Columns>
@@ -851,6 +864,12 @@
                                     <CheckBox Content="{loc:T 'Predvolená stopa (Default)'}" IsChecked="{Binding IsDefault, UpdateSourceTrigger=PropertyChanged}" />
                                     <CheckBox Content="{loc:T 'Zapnutá (Enabled)'}" IsChecked="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" />
                                     <CheckBox Content="{loc:T 'Vynútené zobrazenie (Forced)'}" IsChecked="{Binding IsForced, UpdateSourceTrigger=PropertyChanged}" />
+                                    <!-- owner, 1. 11. 2026: WebVTT, ASS … written as SRT inside the result, only when ticked -->
+                                    <StackPanel Margin="0,8,0,0" Visibility="{Binding CanConvertToSrt, Converter={StaticResource BoolToVisibility}}">
+                                        <CheckBox Content="{loc:T 'Previesť na SRT'}" IsChecked="{Binding ToSrt, UpdateSourceTrigger=PropertyChanged}"
+                                                  ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
+                                        <TextBlock Text="{Binding ToSrtHint}" Style="{StaticResource Hint}" FontSize="11" Margin="26,0,0,0" />
+                                    </StackPanel>
                                     <Expander Header="{loc:T 'Ďalšie príznaky a rozšírené vlastnosti'}" Margin="0,8,0,0"
                                               IsExpanded="{Binding DataContext.ShowAdvanced, ElementName=SettingsRoot}">
                                         <StackPanel Margin="0,6,0,0">
@@ -2730,6 +2749,19 @@
                                                 <CheckBox IsThreeState="True" IsChecked="{Binding Forced, UpdateSourceTrigger=PropertyChanged}"
                                                           ToolTip="{loc:T 'zaškrtnuté = forced, prázdne = nie, plné pole = podľa súboru'}" />
                                                 <TextBlock Text="{Binding ForcedHint}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <!-- owner, 1. 11. 2026: WebVTT, ASS … written as SRT inside the result, only when ticked -->
+                                <DataGridTemplateColumn Header="{loc:T 'Na SRT'}" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <CheckBox IsChecked="{Binding ToSrt, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                                          Visibility="{Binding CanConvertToSrt, Converter={StaticResource BoolToVisibility}}"
+                                                          ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
+                                                <TextBlock Text="{Binding ToSrtHint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>

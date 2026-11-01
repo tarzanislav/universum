@@ -25,6 +25,9 @@ public enum ChangeKind
 
     /// <summary>New times of subtitles (FPS, speed, delay).</summary>
     Timing,
+
+    /// <summary>Text subtitles of another format (WebVTT, ASS …) written as SRT.</summary>
+    ToSrt,
 }
 
 /// <summary>One visible difference between the file and the target, for previews and reports.</summary>

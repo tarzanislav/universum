@@ -69,7 +69,7 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// A new file must be written (another container, order, removed tracks, index repair, added files, new times of
     /// subtitles); otherwise a header edit is enough.
     /// </summary>
-    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged || IsCut || Tracks.Any(t => t.AspectRatio is not null);
+    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged || IsCut || Tracks.Any(t => t.AspectRatio is not null || t.ToSrt);
 
     public bool IsBlocked => Issues.Any(i => i.IsBlocking);
 

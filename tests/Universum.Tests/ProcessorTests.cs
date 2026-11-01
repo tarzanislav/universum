@@ -55,6 +55,40 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task WebVttTickedIsWrittenAsSrtInsideTheResult()
+    {
+        // owner, 1. 11. 2026: WebVTT in the film written as SRT inside the result, the WebVTT track not kept; only when ticked
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var vtt = System.IO.Path.Combine(work.Path, "titulky.vtt");
+        await System.IO.File.WriteAllTextAsync(vtt, "WEBVTT\n\n00:00.300 --> 00:00.900 line:90%\n<c.yellow>Ahoj, toto je vymyslený titulok.</c>\n\n00:01.000 --> 00:01.800\nĎakujem, dobre.\n");
+        var film = System.IO.Path.Combine(work.Path, "film-vtt.mkv");
+        var made = await new ProcessRunner().RunAsync(new ProcessRequest(installation.ToolPath(MkvToolNixTool.MkvMerge),
+            ["-q", "-o", film, TestData.Media("en-und-cz-forced.mkv"), "--language", "0:slk", vtt]));
+        Assert.True(made.ExitCode is 0 or 1, "a film with WebVTT made: " + made.StandardError);
+        var file = await inspector.InspectAsync(film);
+        var webVtt = file.TracksOf(TrackType.Subtitles).Single(t => t.CodecId == "S_TEXT/WEBVTT");
+        Assert.True(Universum.Core.Subtitles.SrtConversion.Offers(webVtt), "WebVTT can be written as SRT");
+
+        var untouched = EditPlan.For(UniversumRules.Apply(file, decisions: CzechDub));
+        Assert.True(!untouched.Target.Tracks.Any(t => t.ToSrt), "not ticked: kept as it is");
+
+        var plan = EditPlan.For(UniversumRules.Apply(file, decisions: CzechDub with { ToSrt = new HashSet<int> { webVtt.Id } }));
+        Assert.True(plan.Method == WriteMethod.Remux && plan.Changes.Any(c => c.Kind == ChangeKind.ToSrt && c.TrackId == webVtt.Id), "ticked: a new file, the change listed");
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var written = await inspector.InspectAsync(result.OutputPath!);
+        var subtitles = written.TracksOf(TrackType.Subtitles).ToList();
+        Assert.True(subtitles.All(t => t.CodecId == "S_TEXT/UTF8") && subtitles.Any(t => t.Language.Primary == "sk"),
+            "no WebVTT left, the Slovak subtitles as SRT – " + string.Join(", ", subtitles.Select(t => $"{t.CodecId} {t.Language.Primary}")));
+        var slovak = subtitles.First(t => t.Language.Primary == "sk");
+        var document = await SubtitleText.ExtractDocumentAsync(installation, new ProcessRunner(), written, slovak);
+        Assert.True(document is { Cues.Count: 2 } && document.Cues[0].Text.Contains("Ahoj, toto je vymyslený titulok.", StringComparison.Ordinal) &&
+                    !document.Cues[0].Text.Contains("yellow", StringComparison.Ordinal), "the text kept, WebVTT styling left out");
+    }
+
+    [Test]
     public async Task OtherContainersBecomeMkv()
     {
         // owner, 27. 10. 2026: batch processing converts MP4, AVI, TS and other formats – always as a new MKV

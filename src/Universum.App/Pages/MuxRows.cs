@@ -124,6 +124,7 @@ public sealed class MuxTrackRow : ObservableObject
     private string _aspectRatio = "";
     private string _cropping = "";
     private string _subtitleCharset = "";
+    private bool _toSrt;
 
     public MuxTrackRow(MuxInputRow input, MediaTrack track, IReadOnlyList<LanguageChoice> choices, Action changed)
     {
@@ -245,6 +246,7 @@ public sealed class MuxTrackRow : ObservableObject
         _flags.TextDescriptions ? Loc.T("popis textom") : null,
         _flags.Original ? Loc.T("pôvodný") : null,
         _flags.Commentary ? Loc.T("komentár") : null,
+        _toSrt ? Loc.T("na SRT") : null,
     }.OfType<string>());
 
     /// <summary>Delay in milliseconds as typed ("", "-120").</summary>
@@ -266,11 +268,35 @@ public sealed class MuxTrackRow : ObservableObject
 
     public string SubtitleCharset { get => _subtitleCharset; set => Set(ref _subtitleCharset, value); }
 
+    /// <summary>
+    /// Text subtitles of another format than SRT, in a file read on its own (not with appended files or parts): they can be
+    /// written as SRT (owner, 1. 11. 2026).
+    /// </summary>
+    public bool CanConvertToSrt => Core.Subtitles.SrtConversion.Offers(Track) && Children.Count == 0 && Input.ToSource() is { Appended.Count: 0, AdditionalParts.Count: 0 };
+
+    /// <summary>Written as SRT inside the result; the track of the other format is not in it (the original file is not changed).</summary>
+    public bool ToSrt
+    {
+        get => _toSrt;
+        set
+        {
+            Set(ref _toSrt, value);
+            OnPropertyChanged(nameof(FlagMarks));
+        }
+    }
+
+    /// <summary>What the conversion means ("WebVTT → SRT"; styled subtitles lose their look).</summary>
+    public string ToSrtHint => !CanConvertToSrt ? ""
+        : Core.Subtitles.SrtConversion.IsStyled(Track)
+            ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(Track))
+            : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(Track));
+
     /// <summary>A delay that is not a whole number of milliseconds ("1,5", "abc"); writing waits until it is fixed.</summary>
     public bool HasInvalidDelay => _delay.Trim().Length > 0 && ParseDelay(_delay) is null;
 
     /// <summary>True when a less common flag or option is set (the advanced section opens for it).</summary>
-    public bool HasAdvanced => FlagMarks.Length > 0 || Options().IsEmpty is false;
+    public bool HasAdvanced => _flags.HearingImpaired || _flags.VisualImpaired || _flags.TextDescriptions || _flags.Original || _flags.Commentary ||
+                               (Options() with { ToSrt = false }).IsEmpty is false;
 
     public MuxTrack ToTrack(int source) =>
         new(source, Track.Id, Name.Length == 0 ? null : Name, Language.Tag, _flags) { Options = Options() };
@@ -293,6 +319,7 @@ public sealed class MuxTrackRow : ObservableObject
         AspectRatio = Empty(_aspectRatio),
         Cropping = Empty(_cropping),
         SubtitleCharset = Empty(_subtitleCharset),
+        ToSrt = _toSrt && CanConvertToSrt,
     };
 
     private static string? Empty(string text) => text.Trim().Length == 0 ? null : text.Trim();

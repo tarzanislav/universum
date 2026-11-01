@@ -16,6 +16,8 @@ Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu
 ![Single zpracování – stopy, titul a cíl v knihovně před zápisem](rules-preview.jpg)
 
 - **Forced** – zaškrtnutím označíte titulky jako forced. UNIVERSUM to někdy navrhne samo, například při malém počtu titulků.
+- **Na SRT** – titulky jiného formátu (WebVTT, ASS…) se ve výsledku zapíšou jako SRT, jen když to zaškrtnete. Stopa původního
+  formátu ve výsledku nebude, originál se nemění. Externí titulky u videa se zapíšou jako SRT vždy. ASS ztratí barvy a písma.
 - [Revize] – zobrazí se, když výsledek už v knihovně je. Soubor se zpracuje znovu jako nová verze: nová se zapíše a ověří, teprve potom jde dosavadní do Koše.
 - [Složka…] u **Knihovna:** změní, kam se výsledky zapisují.
 - [Vymazat frontu] zapomene otevřený, ještě nezpracovaný soubor. Na disku se nic nezmění.

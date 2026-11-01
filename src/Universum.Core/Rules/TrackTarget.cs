@@ -33,5 +33,8 @@ public sealed record TrackTarget(MediaTrack Source, string? Name, LanguageTag La
     /// <summary>The proportions the picture is shown at ("16/9"; Úprava videostopy – owner, 30. 10. 2026); null keeps them.</summary>
     public string? AspectRatio { get; init; }
 
-    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged || TimingChanged || IsAdded || AspectRatio is not null;
+    /// <summary>Text subtitles of another format written as SRT (owner, 1. 11. 2026); the original format is not kept.</summary>
+    public bool ToSrt { get; init; }
+
+    public bool HasChanges => NameChanged || LanguageChanged || FlagsChanged || TimingChanged || IsAdded || AspectRatio is not null || ToSrt;
 }

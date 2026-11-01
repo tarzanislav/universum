@@ -28,6 +28,8 @@ Tu z filmu, zvukov a titulkov zložíte **jeden nový súbor MKV** – vyberiete
   v akom budú vo výstupe. Poradie zmeníte šípkami (**Ctrl+↑** / **Ctrl+↓**), šípkami pri stope alebo potiahnutím za úchyt v stĺpci **Poradie**
   (v rámci zvukov alebo titulkov). Keď stope zmeníte jazyk alebo Forced, stopy sa po **2 sekundách** samy zoradia
   podľa pravidiel: CZ hore, SK pod ňu, potom ostatné, komentáre na koniec.
+- Titulky iného formátu (napr. pridané **WebVTT**) zapíšete ako SRT vo vnútri výsledku zaškrtnutím **Previesť na SRT**
+  vo Vlastnostiach stopy. Stopa pôvodného formátu vo výsledku nebude; pridaný súbor sa nemení.
 - Po výbere stopy sa vpravo v časti **Vlastnosti** dá zmeniť [Názov stopy], [Jazyk] a príznaky
   [Predvolená stopa (Default)], [Zapnutá (Enabled)], [Vynútené zobrazenie (Forced)].
 - [Ďalšie príznaky a rozšírené vlastnosti]: SDH, audio popis, komentár, oneskorenie (ms), FPS, pomer strán, orez,

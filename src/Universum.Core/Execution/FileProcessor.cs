@@ -709,6 +709,45 @@ public sealed class FileProcessor(
             {
                 Source = track.Source with { Id = next++, ExternalFile = srt, ExternalTrack = 0, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", Number = null, Uid = null },
                 Timing = null,
+                ToSrt = false,
+            });
+        }
+
+        return (target with { Tracks = tracks, Removed = removed }, null);
+    }
+
+    // owner, 1. 11. 2026: text subtitles of another format (WebVTT, ASS …) the user ticked are written as SRT, with their new
+    // times; the SRT takes the track's place and the track of the other format is not in the result
+    private async Task<(TargetState Target, string? Problem)> ToSrtAsync(TargetState target, string folder, CancellationToken cancellationToken)
+    {
+        if (!target.Tracks.Any(t => t.ToSrt))
+        {
+            return (target, null);
+        }
+
+        var tracks = new List<TrackTarget>();
+        var removed = target.Removed.ToList();
+        var next = 4000 + target.Tracks.Max(t => t.TrackId);
+        foreach (var track in target.Tracks)
+        {
+            if (!track.ToSrt)
+            {
+                tracks.Add(track);
+                continue;
+            }
+
+            var srt = Path.Combine(folder, $"srt-{tracks.Count + 1:00}.srt");
+            if (!await Subtitles.SrtConversion.WriteAsync(installation, runner, target.Source, track.Source, srt, track.Timing, cancellationToken).ConfigureAwait(false))
+            {
+                return (target, $"the subtitles of track {track.TrackId} cannot be read to write them as SRT");
+            }
+
+            removed.Add(track.Source);
+            tracks.Add(track with
+            {
+                Source = track.Source with { Id = next++, ExternalFile = srt, ExternalTrack = 0, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", Number = null, Uid = null },
+                Timing = null,
+                ToSrt = false,
             });
         }
 
@@ -748,6 +787,13 @@ public sealed class FileProcessor(
                     written = clipped;
                 }
 
+                var (converted, srtProblem) = await ToSrtAsync(written, folder, cancellationToken).ConfigureAwait(false);
+                if (srtProblem is not null)
+                {
+                    return [srtProblem];
+                }
+
+                written = converted;
                 var (inputs, problem) = await Subtitles.ExternalSubtitleTracks.ConvertAsync(written, folder, cancellationToken).ConfigureAwait(false);
                 if (problem is not null)
                 {

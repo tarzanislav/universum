@@ -140,6 +140,9 @@ public sealed class MegaFile
     /// <summary>Track names written by the user, by track ID (empty = no name).</summary>
     public Dictionary<int, string> Names { get; init; } = [];
 
+    /// <summary>Subtitle tracks written as SRT (by track ID; owner, 1. 11. 2026).</summary>
+    public List<int> ToSrt { get; init; } = [];
+
     /// <summary>The edits of Úprava titulkostopy, to be opened again in Hromadné spracovanie; null = none.</summary>
     public StudioEdits? Studio { get; init; }
 
@@ -201,6 +204,7 @@ public sealed class MegaFile
         Order = Order,
         Timings = Timings,
         Names = Names,
+        ToSrt = ToSrt.ToHashSet(),
     };
 
     /// <summary>
@@ -226,6 +230,7 @@ public sealed class MegaFile
             Order = [.. decisions.Order],
             Timings = decisions.Timings.ToDictionary(),
             Names = decisions.Names.ToDictionary(),
+            ToSrt = [.. decisions.ToSrt],
             PlannedPath = plannedPath,
             Addition = addition,
             Revision = revision,
@@ -280,6 +285,7 @@ public sealed class MegaFile
             Order = [.. item.Decisions.Order],
             Timings = item.Decisions.Timings.ToDictionary(),
             Names = item.Decisions.Names.ToDictionary(),
+            ToSrt = [.. item.Decisions.ToSrt],
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),

@@ -106,7 +106,9 @@ public static class MkvMergeIdentificationParser
             AudioSamplingFrequency = Int(properties, "audio_sampling_frequency"),
             PixelDimensions = String(properties, "pixel_dimensions"),
             DisplayDimensions = String(properties, "display_dimensions"),
-            IsTextSubtitles = Bool(properties, "text_subtitles") ?? false,
+            // mkvmerge leaves the property out for WebVTT in Matroska: text all the same
+            IsTextSubtitles = Bool(properties, "text_subtitles") ??
+                              (String(properties, "codec_id")?.ToUpperInvariant() is "S_TEXT/WEBVTT" or "D_WEBVTT/SUBTITLES"),
             StatisticsFrames = Long(properties, "tag_number_of_frames"),
             StatisticsBytes = Long(properties, "tag_number_of_bytes"),
             StatisticsBitsPerSecond = Long(properties, "tag_bps"),

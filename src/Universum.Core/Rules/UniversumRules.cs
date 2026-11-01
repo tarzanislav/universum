@@ -67,7 +67,8 @@ public static class UniversumRules
             a.Role)).Select(a => decisions.Timings.TryGetValue(a.TrackId, out var shift) && !shift.IsNone ? a with { Timing = shift } : a));
 
         targets.AddRange(SubtitleTargets(audio, defaultAudio, subtitles, profile, issues)
-            .Select(s => decisions.Timings.TryGetValue(s.TrackId, out var timing) && !timing.IsNone ? s with { Timing = timing } : s));
+            .Select(s => decisions.Timings.TryGetValue(s.TrackId, out var timing) && !timing.IsNone ? s with { Timing = timing } : s)
+            .Select(s => decisions.ToSrt.Contains(s.TrackId) && Subtitles.SrtConversion.Offers(s.Source) ? s with { ToSrt = true } : s));
 
         // the names the user wrote win over the rules' (owner, 30. 10. 2026)
         for (var i = 0; i < targets.Count; i++)

@@ -204,6 +204,49 @@ public sealed class MuxTests
     }
 
     [Test]
+    public async Task AWebVttFileTickedIsMergedAsSrt()
+    {
+        // owner, 1. 11. 2026: a WebVTT added to an episode in Zlučovanie – inside the result as SRT, no WebVTT track in it
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-mux-srt-");
+        try
+        {
+            var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+            var film = await inspector.InspectAsync(TestData.Media("en-und-cz-forced.mkv"));
+            var vtt = Path.Combine(work.FullName, "Vymyslená epizóda.cze.vtt");
+            await File.WriteAllTextAsync(vtt, "WEBVTT\n\nNOTE vymyslená poznámka\n\n00:00.500 --> 00:01.500 align:start\nŘekl jsem ti, že tady budu.\n");
+            var subtitles = await inspector.InspectAsync(vtt);
+            Assert.True(Universum.Core.Subtitles.SrtConversion.Offers(subtitles.Tracks[0]) && !Universum.Core.Subtitles.SrtConversion.Offers(film.TracksOf(TrackType.Subtitles).First()),
+                "WebVTT offered, SRT not");
+            var srt = Path.Combine(work.FullName, "Vymyslená epizóda.slk.srt");
+            await File.WriteAllTextAsync(srt, "1\n00:00:00,500 --> 00:00:01,500\nVymyslený titulok.\n");
+            Assert.True(!Universum.Core.Subtitles.SrtConversion.Offers((await inspector.InspectAsync(srt)).Tracks[0]), "an SRT file on its own is SRT already");
+            var output = Path.Combine(work.FullName, "Zlúčená epizóda.mkv");
+            var spec = new MuxSpec(
+                [new MuxSource(film, KeepTags: false), new MuxSource(subtitles)],
+                [
+                    new MuxTrack(0, 0, null, LanguageTag.Undetermined, new TrackFlags()),
+                    new MuxTrack(0, 1, null, LanguageTag.FromCode("en"), new TrackFlags(Default: true)),
+                    new MuxTrack(1, 0, "České", LanguageTag.FromCode("cs"), new TrackFlags(Default: false)) { Options = new MuxTrackOptions { ToSrt = true, DelayMs = 100 } },
+                ],
+                output);
+            var result = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(spec);
+            Assert.Equal(MuxStatus.Done, result.Status, string.Join("; ", result.Messages));
+            var written = await inspector.InspectAsync(output);
+            var czech = written.TracksOf(TrackType.Subtitles).Single();
+            Assert.True(czech is { CodecId: "S_TEXT/UTF8", Name: "České" } && czech.Language.Primary == "cs", $"SRT with its name and language – {czech.CodecId} {czech.Name}");
+            var document = await SubtitleText.ExtractDocumentAsync(installation, new ProcessRunner(), written, czech);
+            Assert.True(document is { Cues.Count: 1 } && document.Cues[0].Text == "Řekl jsem ti, že tady budu." &&
+                        Math.Abs(document.Cues[0].Start.TotalMilliseconds - 600) < 2, "the text, the delay applied – " + document?.Cues[0].Start);
+            Assert.True(File.Exists(vtt) && Directory.EnumerateFiles(work.FullName, "*.srt").Count() == 1, "the WebVTT file unchanged, no SRT left beside it");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public async Task MuxWritesVerifiesAndNeverOverwrites()
     {
         var installation = await TestData.RequireMkvToolNixAsync();

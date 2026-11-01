@@ -30,7 +30,7 @@ Jeden súbor podľa pravidiel UNIVERSUM. Hodí sa na rýchlu úpravu jedného fi
 Celý priečinok naraz. UNIVERSUM súbory analyzuje, zoradí ich do **skupín** (jeden film alebo jeden seriál) a ukáže *výsledok simulácie* – ešte pred zápisom vidíte, čo z ktorého súboru vznikne.
 
 1. Kliknite na [Priečinok…], podľa potreby zaškrtnite **aj podpriečinky** a kliknite na [Analyzovať].
-2. Vľavo vyberte skupinu v zozname **Skupina (film / seriál)**. Vpravo uvidíte jej súbory a pod nimi **Stopy skupiny**.
+2. Vľavo vyberte skupinu – seriály sú hore v zozname **Skupina Seriál**, filmy dole v zozname **Skupina Film**. Vpravo uvidíte jej súbory a pod nimi **Stopy skupiny**.
 3. Zvoľte druh *filmy* alebo *seriál*. Pri seriáli vyplňte **Seriál:** a kliknite na [TMDB], pri filme vyplňte **Film:**. Presný titul zadáte aj cez **TMDB ID**.
 4. Návrhy názvov skontrolujte a prijmite: [Spresniť názvy], [Prijať návrhy názvov] alebo pre celú skupinu naraz [Prijať všetko v skupine].
 5. V **Stopách skupiny** nastavte **Jazyk**, **Názov stopy**, **Forced** a poradie. Rozhodnutie platí pre všetky súbory skupiny.

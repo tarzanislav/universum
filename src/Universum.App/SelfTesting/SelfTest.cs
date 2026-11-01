@@ -1309,6 +1309,10 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Batch && model.Batch.ChosenFiles?.Count == 2 && model.Batch.IsSeries &&
               model.Batch.SeriesTitle.StartsWith("Domáci seriál (2020)", StringComparison.Ordinal) && model.Batch.Analysis?.FileCount == 2,
             $"novinky: episodes of a series go to Hromadné spracovanie, only their files – {page.Status} | {model.Batch.SeriesTitle} | {model.Batch.Summary}");
+        // owner, 1. 11. 2026: the groups in two lists – a series in Skupina Seriál, nothing among the films
+        Check(model.Batch.SeriesGroups.Count == model.Batch.Groups.Count && model.Batch.FilmGroups.Count == 0 &&
+              (model.Batch.SelectedGroup is null || model.Batch.SelectedSeriesGroup == model.Batch.SelectedGroup && model.Batch.SelectedFilmGroup is null),
+            $"batch: a series is in Skupina Seriál – series {model.Batch.SeriesGroups.Count}, films {model.Batch.FilmGroups.Count}");
         Check(page.Waiting.Count == 1 && page.Waiting[0].Episode.OriginalTitle == "World Invented" && page.Status.Contains("čakajú nižšie", StringComparison.Ordinal),
             "novinky: an episode not in the input folder waits – " + page.Status);
         await Screenshot(window, "novinky-batch.png");
@@ -3658,6 +3662,10 @@ internal static class SelfTest
         Check(batch.Groups.Count == 3 && batch.Groups.Take(2).Select(g => g.Signature).SequenceEqual(firstOrder) && !batch.Groups[0].IsNew && !batch.Groups[1].IsNew &&
               batch.Groups[2].IsNew && batch.Groups[2].Group.Files.Any(f => f.Path == added),
             "batch: the new file's group at the end, marked new – " + string.Join(" | ", batch.Groups.Select(g => $"{g.Title} {(g.IsNew ? "NEW" : "")}")));
+        batch.SelectedFilmGroup = batch.FilmGroups.LastOrDefault();
+        Check(batch.FilmGroups.Count == 3 && batch.SeriesGroups.Count == 0 && batch.SelectedGroup == batch.Groups[2] &&
+              batch.SelectedFilmGroup == batch.Groups[2] && batch.SelectedSeriesGroup is null,
+            $"batch: films in Skupina Film, chosen there – films {batch.FilmGroups.Count}, series {batch.SeriesGroups.Count}");
         await Screenshot(window, "batch-new-groups.png");
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");

@@ -2398,40 +2398,84 @@
                         <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" MinWidth="400" />
                     </Grid.ColumnDefinitions>
-                    <DataGrid ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" AutoGenerateColumns="False" IsReadOnly="True"
-                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
-                        <!-- owner, 31. 10. 2026: groups with files new since the analysis before – a pastel background, dark text to stay readable -->
-                        <DataGrid.RowStyle>
-                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsNew}" Value="True">
-                                        <Setter Property="Background" Value="#DDF3E4" />
-                                        <Setter Property="Foreground" Value="#1B1B1B" />
-                                        <Setter Property="ToolTip" Value="{loc:T 'Nové súbory od predchádzajúcej analýzy'}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </DataGrid.RowStyle>
-                        <DataGrid.Columns>
-                            <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
-                            <DataGridTextColumn Header="{loc:T 'Skupina (film / seriál)'}" Binding="{Binding Title}" Width="*" MinWidth="90">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Count}" />
-                            <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding State}" />
-                        </DataGrid.Columns>
-                        <DataGrid.RowDetailsTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Signature}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            </DataTemplate>
-                        </DataGrid.RowDetailsTemplate>
-                    </DataGrid>
+                    <!-- owner, 1. 11. 2026: the groups in two lists – Skupina Seriál above (the series only), Skupina Film below -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" MinHeight="70" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" MinHeight="70" />
+                        </Grid.RowDefinitions>
+                        <DataGrid Grid.Row="0" ItemsSource="{Binding SeriesGroups}" SelectedItem="{Binding SelectedSeriesGroup}" AutoGenerateColumns="False" IsReadOnly="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                            <!-- owner, 31. 10. 2026: groups with files new since the analysis before – a pastel background, dark text to stay readable -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                            <Setter Property="Background" Value="#DDF3E4" />
+                                            <Setter Property="Foreground" Value="#1B1B1B" />
+                                            <Setter Property="ToolTip" Value="{loc:T 'Nové súbory od predchádzajúcej analýzy'}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Columns>
+                                <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
+                                <DataGridTextColumn Header="{loc:T 'Skupina Seriál'}" Binding="{Binding Title}" Width="*" MinWidth="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Count}" />
+                                <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding State}" />
+                            </DataGrid.Columns>
+                            <DataGrid.RowDetailsTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Signature}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </DataTemplate>
+                            </DataGrid.RowDetailsTemplate>
+                        </DataGrid>
+                        <GridSplitter Grid.Row="1" Height="10" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"
+                                      Background="Transparent" Cursor="SizeNS" ToolTip="{loc:T 'Ťahaním zmeníte výšku zoznamov seriálov a filmov'}" />
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding FilmGroups}" SelectedItem="{Binding SelectedFilmGroup}" AutoGenerateColumns="False" IsReadOnly="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                            <!-- owner, 31. 10. 2026: groups with files new since the analysis before – a pastel background, dark text to stay readable -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsNew}" Value="True">
+                                            <Setter Property="Background" Value="#DDF3E4" />
+                                            <Setter Property="Foreground" Value="#1B1B1B" />
+                                            <Setter Property="ToolTip" Value="{loc:T 'Nové súbory od predchádzajúcej analýzy'}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Columns>
+                                <!-- the group by its film or series (owner, 28. 10.); the letter stays in the tooltip and the report -->
+                                <DataGridTextColumn Header="{loc:T 'Skupina Film'}" Binding="{Binding Title}" Width="*" MinWidth="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Count}" />
+                                <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding State}" />
+                            </DataGrid.Columns>
+                            <DataGrid.RowDetailsTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Signature}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </DataTemplate>
+                            </DataGrid.RowDetailsTemplate>
+                        </DataGrid>
+                    </Grid>
                     <!-- the list of groups can be widened -->
                     <GridSplitter Grid.Column="1" Width="10" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
                                   Background="Transparent" Cursor="SizeWE" ToolTip="{loc:T 'Ťahaním zmeníte šírku zoznamu skupín'}" />

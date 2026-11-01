@@ -1,0 +1,61 @@
+1. Registrácia (zadarmo)…
+1. Registrácia DeepL API Free (zadarmo)…
+2 z 2 súborov v knižnici.
+2. Získať kľúč API…
+2. Získať kľúč…
+3 z 4 súborov v knižnici, 1 tam už bolo.
+3. Vytvoriť API token…
+4 z 4 súborov v knižnici.
+Alžbeta, Liliana
+Aurélia
+Bibiána, Viviána
+Bohumír
+Cecília
+Dnešný vymyslený
+Dnešný vymyslený · CZ · SK
+Elvíra
+Emília
+Félix
+Henrietta, René
+Hotovo: D:\a\_temp\selftest\library\MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+Hotovo: D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv
+Hromadné spracovanie: batch → knižnica
+Katarína
+Klára, Kiara
+MEGA Dávka 1: Zlučovanie: Zlúčený pre MEGA
+MEGA Dávka 1: zoradene: Vymyslený film na skúšku, Vymyslený seriál
+Martin, Maroš
+Mikuláš, Nikolas
+OpenSubtitles: API kľúč…
+OpenSubtitles: registrácia (zadarmo)…
+Renáta
+René
+SK: Krátky úvod.
+SK: Vymyšlená novinka z kina
+Sabína
+Season 2 · Netflix · Svetový seriál
+Seriál (2026)
+Slovenčina
+Svätopluk, Jonáš
+Tomorrow: Pamiatka zosnulých
+Vymyslená premiéra
+Vymyslené filmy
+Vymyslené filmy · 3
+Vymyslené kino
+Vymyslené kino · 1
+Vymyslené príbehy
+Vymyslené+ (SK)
+Vymyslený seriál (2024)
+Weather for: Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m above sea level (coordinates 48.90, 19.60).
+Zlučovanie: Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv (6 stôp)
+Získať kľúč (platené)…
+Získať kľúč (zadarmo)…
+celý film
+new series · ČT1 · Vymyslený seriál
+podľa zmeny
+pozrieť s rodinou
+svsub.net: účet a token…
+teším sa veľmi [Kino](https://kino.example/vymyslena-premiera)
+Úprava hlavičky: header.mkv
+ČR, SR · Invented Pictures
+Šimon, Simon, Simona

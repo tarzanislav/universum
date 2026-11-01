@@ -8,6 +8,7 @@ using System.Windows.Shapes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.Core.Reports;
+using Sheet = Universum.Core.Reports.Paper;
 
 namespace Universum.App.Pages;
 
@@ -158,7 +159,7 @@ public sealed class ReportViewModel : ObservableObject
         }
     }
 
-    public static IReadOnlyList<VideoChoice<Paper>> Papers { get; } = [new(Paper.A4, "A4"), new(Paper.A3, "A3"), new(Paper.A5, "A5"), new(Paper.Letter, "Letter")];
+    public static IReadOnlyList<VideoChoice<Paper>> Papers { get; } = [new(Sheet.A4, "A4"), new(Sheet.A3, "A3"), new(Sheet.A5, "A5"), new(Sheet.Letter, "Letter")];
 
     public static IReadOnlyList<VideoChoice<bool?>> Orientations { get; } = [new(null, "podľa zostavy"), new(false, "na výšku"), new(true, "na šírku")];
 

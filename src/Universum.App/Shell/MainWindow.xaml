@@ -263,6 +263,7 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
+                        <DataGridTextColumn Header="Odkiaľ" Binding="{Binding Source}" Width="Auto" MinWidth="90" />
                         <DataGridTextColumn Header="Cieľ v knižnici" Binding="{Binding Target}" Width="3*">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
@@ -538,6 +539,11 @@
                                         Visibility="{Binding CanRevise, Converter={StaticResource BoolToVisibility}}"
                                         ToolTip="Výsledok už v knižnici je – spracovať znova ako novú verziu: nová sa zapíše a overí, až potom ide doterajšia do Koša" />
                                 <Button Content="{loc:T 'Do fronty'}" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="Pridá súbor do fronty úloh namiesto okamžitého spracovania" />
+                                <!-- owner, 1. 11. 2026: the file to MEGA spracovanie, written later; its original is kept -->
+                                <ComboBox ItemsSource="{Binding Mega.Targets}" SelectedItem="{Binding Mega.Selected}" DisplayMemberPath="Label" MaxWidth="200" Margin="0,0,4,0"
+                                          VerticalAlignment="Center" ToolTip="Do novej dávky MEGA spracovania, alebo doplniť čakajúcu dávku" />
+                                <Button Content="{loc:T 'Odoslať do MEGA'}" Command="{Binding SendToMegaCommand}" Margin="0,0,8,0" Padding="16,6"
+                                        ToolTip="Súbor sa so všetkými rozhodnutiami zapíše neskôr v MEGA spracovaní (keď dávku spustíte alebo v nastavenom čase); originál ostane" />
                                 <Button Content="{loc:T 'Použiť pravidlá'}" Command="{Binding ApplyCommand}" Padding="16,6" />
                             </StackPanel>
                             <StackPanel Margin="0,0,16,0">
@@ -956,6 +962,36 @@
                             <TextBlock Text="{Binding Result}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Result}" />
                         </StackPanel>
                     </DockPanel>
+                    <!-- owner, 1. 11. 2026: a preview first (UNIVERSUM's folder of previews, never the output), then the final result to MEGA -->
+                    <Border Margin="0,6,0,0" Padding="10,6" CornerRadius="6" Background="#144A7BD9" BorderThickness="1" BorderBrush="#334A7BD9">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                <ComboBox ItemsSource="{Binding Mega.Targets}" SelectedItem="{Binding Mega.Selected}" DisplayMemberPath="Label" MaxWidth="200" Margin="0,0,4,0"
+                                          ToolTip="Do novej dávky MEGA spracovania, alebo doplniť čakajúcu dávku" />
+                                <Button Content="{loc:T 'Odoslať do MEGA'}" Command="{Binding SendToMegaCommand}" Padding="12,4" FontWeight="SemiBold"
+                                        ToolTip="Výsledok (celý, nie náhľad) sa zapíše neskôr v MEGA spracovaní – keď dávku spustíte alebo v nastavenom čase. Zdrojové súbory ostanú." />
+                            </StackPanel>
+                            <StackPanel>
+                                <WrapPanel>
+                                    <TextBlock Text="Náhľad:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <ComboBox ItemsSource="{Binding Source={x:Static pages:MuxSettingsViewModel.PreviewRanges}}" SelectedItem="{Binding PreviewRange}" Width="270" Margin="0,0,6,2" />
+                                    <Button Content="{loc:T 'Vytvoriť náhľad'}" Command="{Binding PreviewCommand}" Padding="10,3" Margin="0,0,6,2"
+                                            ToolTip="Zapíše výsledok do priečinka náhľadov UNIVERSUM (nie do výstupného priečinka) – úseky sú hotové za chvíľu, celý film trvá ako zlučovanie" />
+                                    <Button Content="{loc:T 'Zastaviť'}" Command="{Binding CancelPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
+                                            Visibility="{Binding IsPreviewing, Converter={StaticResource BoolToVisibility}}" />
+                                    <ProgressBar Width="120" Height="6" Maximum="1" Value="{Binding PreviewProgress, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,6,2"
+                                                 Visibility="{Binding IsPreviewing, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Content="{loc:T 'Prehrať náhľad'}" Command="{Binding PlayPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
+                                            ToolTip="V prehrávači UNIVERSUM so zvukmi a titulkami výsledku" />
+                                    <Button Content="{loc:T 'V inom prehrávači'}" Command="{Binding OpenPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
+                                            ToolTip="Otvorí náhľad v prehrávači, ktorý má Windows pre MKV" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding PreviewText}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock Text="Nastavenia sa od náhľadu zmenili – vytvorte nový náhľad." FontSize="12" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                           Visibility="{Binding PreviewIsOld, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
                 </StackPanel>
             </Grid>
         </DataTemplate>
@@ -5566,6 +5602,23 @@
                         <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="4,4,0,0" TextWrapping="Wrap"
                                    Text="{loc:T 'Sem prichádzajú nové filmy a epizódy. Novinky – Seriály v ňom (aj v podpriečinkoch) hľadajú epizódy, ktoré odošlete na spracovanie; Single a Hromadné spracovanie v ňom otvárajú výber súborov. Súbory v ňom UNIVERSUM len číta.'}" />
                     </StackPanel>
+                    <!-- owner, 1. 11. 2026: where Zlučovanie writes its previews – never the output folders -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <Button Content="{loc:T 'Zmeniť…'}" Command="{Binding ChoosePreviewFolderCommand}" Padding="10,3" Margin="6,0,0,0" />
+                                    <Button Content="{loc:T 'Otvoriť'}" Command="{Binding OpenPreviewFolderCommand}" Padding="10,3" Margin="6,0,0,0" />
+                                    <Button Content="{loc:T 'Vymazať náhľady'}" Command="{Binding ClearPreviewsCommand}" Padding="10,3" Margin="6,0,0,0"
+                                            ToolTip="Vymaže náhľady Zlučovania v tomto priečinku (len súbory „… – náhľad …“, ktoré vytvoril UNIVERSUM)" />
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run Text="{loc:T 'Priečinok náhľadov Zlučovania:'}" FontWeight="SemiBold" /> <Run Text="{Binding PreviewFolder, Mode=OneWay}" />
+                                </TextBlock>
+                            </DockPanel>
+                            <TextBlock Text="{Binding PreviewFolderNote}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>
                             <TextBlock Text="{loc:T 'Jazyk rozhrania (platí po reštarte)'}" FontWeight="SemiBold" />

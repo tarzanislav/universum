@@ -22,6 +22,8 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 
 !pozor In Single processing the **Originál: vymazať** option is switched off – the original is always kept here.
 
+- [Send to MEGA] – the file is written **later** in MEGA processing with all its decisions (into a new or a waiting batch). The original stays.
+
 @otvorit Rules Open Single processing
 
 ## Batch processing
@@ -66,7 +68,7 @@ If an audio track has no language, click [Recognise the audio languages ▾] and
 @otvorit Batch Open Batch processing
 
 ## MEGA processing
-Batches prepared in Batch processing that are written **later** – at night, for example.
+Batches prepared in Batch processing, Single processing or Merging that are written **later** – at night, for example.
 
 1. In Batch processing, prepare the files and, in the menu next to the button, choose a *new batch* or adding to a waiting batch.
 2. Click [Odoslať do MEGA]. The files are saved to the batch with all the decisions, the template and the choice for the originals.
@@ -86,6 +88,12 @@ Batches prepared in Batch processing that are written **later** – at night, fo
 !pozor A batch set for a time starts **only while UNIVERSUM is running** and the computer is not asleep. Otherwise it gets the state *ZMEŠKANÉ* – start it by hand or set a new time.
 
 !info Before writing, every file is checked again. A missing or changed file, or one that is already in the library, is **skipped** and nothing breaks.
+
+### Where the files come from
+A batch takes files from **Batch processing**, **Single processing** and results of **Merging** – the column **Odkiaľ** shows where from.
+- A file of Single processing and a result of Merging **always keep their originals**, whatever the batch has chosen.
+- A result of Merging is written whole by its settings; if one of its files changes meanwhile, it is **skipped**.
+- [Upraviť v Hromadnom spracovaní] opens only the files that came from Batch processing.
 
 @otvorit Mega Open MEGA processing
 

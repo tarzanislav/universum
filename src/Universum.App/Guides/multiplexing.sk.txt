@@ -44,6 +44,15 @@ Tu z filmu, zvukov a titulkov zložíte **jeden nový súbor MKV** – vyberiete
 - Bodka **•** pri záložke znamená, že zmeny **ešte nie sú vo fronte**. Zatvorenie takej záložky sa najprv opýta.
 - Dole vľavo je stav **fronty** a priebeh bežiacej úlohy.
 !pozor Ak je titul neistý, objaví sa [Potvrdiť titul] – kým ho nepotvrdíte, zápis do knižnice nezačne.
+### Náhľad a MEGA spracovanie
+Výsledok si môžete najprv **pozrieť** a až hotový, bezchybný tvar poslať do **MEGA spracovania** – zapíše sa neskôr, napríklad v noci.
+1. Pri **Náhľad:** zvoľte *úseky: začiatok, stred, koniec (3 × 2 min)* – je hotový za chvíľu – alebo *celý film*.
+2. Kliknite na [Vytvoriť náhľad]. Náhľad sa zapíše do **priečinka náhľadov UNIVERSUM**, nikdy nie do výstupného priečinka.
+3. [Prehrať náhľad] ho pustí v prehrávači UNIVERSUM – zvuk prepnete pod obrazom, titulky vpravo hore. [V inom prehrávači] ho otvorí v prehrávači Windows.
+4. Keď je všetko v poriadku, zvoľte *do novej dávky* alebo čakajúcu dávku a kliknite na [Odoslať do MEGA].
+- Každá záložka má **vlastný náhľad** – môžete pripraviť a porovnať viac výsledkov naraz.
+- Ak nastavenia po náhľade zmeníte, UNIVERSUM upozorní, že náhľad už výsledku nezodpovedá.
+!info Náhľad sa vymaže so svojou záložkou alebo po týždni. Priečinok náhľadov zmeníte v Nastaveniach.
 @otvorit Mux Otvoriť Zlučovanie
 
 ## Úprava hlavičky

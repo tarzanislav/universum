@@ -17,7 +17,7 @@ namespace Universum.App.Pages;
 /// with their properties in the output order, title, chapters, attachments and where the output goes. The inputs are
 /// only read and an existing file is never overwritten.
 /// </summary>
-public sealed class MuxSettingsViewModel : ObservableObject
+public sealed partial class MuxSettingsViewModel : ObservableObject
 {
     private static int _created;
     private readonly AppServices _services;
@@ -411,7 +411,11 @@ public sealed class MuxSettingsViewModel : ObservableObject
     }
 
     /// <summary>The settings were closed: they stop following the library and TMDB.</summary>
-    public void Detach() => Library.Detach();
+    public void Detach()
+    {
+        Library.Detach();
+        ForgetPreview();
+    }
 
     /// <summary>Fills names, languages, flags and the order in by the UNIVERSUM rules (for the tracks taken).</summary>
     public void ApplyRules()
@@ -1015,5 +1019,11 @@ public sealed class MuxSettingsViewModel : ObservableObject
         ChooseOutputCommand?.NotifyCanExecuteChanged();
         StartCommand?.NotifyCanExecuteChanged();
         QueueCommand?.NotifyCanExecuteChanged();
+        _previewCommand?.NotifyCanExecuteChanged();
+        _sendToMegaCommand?.NotifyCanExecuteChanged();
+        if (_previewPath is not null)
+        {
+            OnPropertyChanged(nameof(PreviewIsOld));
+        }
     }
 }

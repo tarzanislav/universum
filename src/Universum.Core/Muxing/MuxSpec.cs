@@ -142,6 +142,16 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
     /// </summary>
     public Placement? Placement { get; init; }
 
+    /// <summary>
+    /// Only parts of the film are written – a preview (owner, 1. 11. 2026): the value of mkvmerge's "--split parts:…",
+    /// the parts joined into one file; null: the whole film.
+    /// </summary>
+    public string? PreviewParts { get; init; }
+
+    /// <summary>Every file the multiplexer reads: the sources with their parts and appended files, the chapters, the attachments.</summary>
+    public IEnumerable<string> InputPaths() =>
+        [.. Sources.SelectMany(s => s.AllPaths), .. string.IsNullOrEmpty(ChaptersFile) ? [] : new[] { ChaptersFile }, .. Attachments.Select(a => a.Path)];
+
     public MediaTrack TrackOf(MuxTrack track) => Sources[track.Source].File.Tracks.First(t => t.Id == track.TrackId);
 
     /// <summary>

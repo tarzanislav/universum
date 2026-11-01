@@ -1322,8 +1322,9 @@ public sealed class BatchPageViewModel : ObservableObject
 
             if (_editing is { } edited)
             {
-                var missing = edited.Files.Count(f => !File.Exists(f.Path));
-                Summary = $"Upravujete {edited.Label} MEGA spracovania ({Texts.Count(edited.Files.Count, "súbor", "súbory", "súborov")}" +
+                var own = edited.Files.Where(f => f.FromBatch).ToList();
+                var missing = own.Count(f => !File.Exists(f.Path));
+                Summary = $"Upravujete {edited.Label} MEGA spracovania ({Texts.Count(own.Count, "súbor", "súbory", "súborov")}" +
                           (missing > 0 ? $", {missing} chýba" : "") + $") – po úprave dajte Uložiť do {edited.Label}. · " + Summary;
             }
             else if (only is not null)
@@ -2747,7 +2748,8 @@ public sealed class BatchPageViewModel : ObservableObject
             return false;
         }
 
-        var files = batch.Files.Where(f => f.State == Core.Mega.MegaFileState.Waiting && File.Exists(f.Path)).Select(f => f.Path).ToList();
+        // only the files of Hromadné spracovanie: those of Single spracovanie and results of Zlučovanie stay in the batch as they are
+        var files = batch.Files.Where(f => f.State == Core.Mega.MegaFileState.Waiting && f.FromBatch && File.Exists(f.Path)).Select(f => f.Path).ToList();
         if (files.Count == 0)
         {
             return false;
@@ -2788,7 +2790,7 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        var stored = _editing.Files.ToDictionary(f => Path.GetFullPath(f.Path), Paths.Comparer);
+        var stored = _editing.Files.Where(f => f.FromBatch).GroupBy(f => Path.GetFullPath(f.Path), Paths.Comparer).ToDictionary(g => g.Key, g => g.First(), Paths.Comparer);
         var kinds = new List<MediaKind>();
         foreach (var group in _analysis.Groups)
         {

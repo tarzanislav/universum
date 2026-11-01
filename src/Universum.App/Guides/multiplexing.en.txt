@@ -44,6 +44,15 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
 - A dot **•** on a tab means the changes are **not in the queue yet**. Closing such a tab asks first.
 - At the bottom left is the state of the **queue** and the progress of the running job.
 !pozor If the title is uncertain, [Confirm the title] appears – until you confirm it, writing to the library does not start.
+### Preview and MEGA processing
+You can **look at** the result first and send only the finished, flawless one to **MEGA processing** – it is written later, at night for example.
+1. At **Náhľad:** choose *úseky: začiatok, stred, koniec (3 × 2 min)* – ready in a moment – or *celý film* (the whole film).
+2. Click [Make a preview]. The preview is written to **UNIVERSUM's folder of previews**, never to the output folder.
+3. [Play the preview] plays it in UNIVERSUM's player – switch the sound under the picture, the subtitles at the top right. [In another player] opens it in the Windows player.
+4. When everything is right, choose *do novej dávky* (a new batch) or a waiting batch and click [Send to MEGA].
+- Every tab has **its own preview** – you can prepare and compare several results at once.
+- If you change the settings after the preview, UNIVERSUM tells you the preview no longer matches the result.
+!info A preview is deleted with its tab or after a week. You change the folder of previews in the Settings.
 @otvorit Mux Open Multiplexing
 
 ## Header editing

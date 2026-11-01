@@ -3,6 +3,7 @@ using Universum.Core.Execution;
 using Universum.Core.Jobs;
 using Universum.Core.Library;
 using Universum.Core.Media;
+using Universum.Core.Muxing;
 using Universum.Core.Planning;
 using Universum.Core.Rules;
 using Universum.Core.Templates;
@@ -12,12 +13,17 @@ namespace Universum.Core.Mega;
 /// <summary>
 /// A MEGA batch as a job of the job queue. Right before writing, every file is read again: a file that is missing,
 /// changed (size, time of the last change, tracks) or whose plan no longer holds is skipped and marked – never written
-/// with decisions made for another file. The rest is written by the <see cref="BatchRunner"/> as in Hromadné spracovanie.
+/// with decisions made for another file. The rest is written by the <see cref="BatchRunner"/> as in Hromadné spracovanie;
+/// the files of Single spracovanie keep their originals; the results of Zlučovanie are written by the multiplexer from
+/// their recipes when every file they read is as it was.
 /// </summary>
 /// <param name="inspect">Reads a file (mkvmerge identification).</param>
 /// <param name="changed">Called after a file's state changed (the page saves the list).</param>
+/// <param name="keeping">The processor that never deletes an original (files of Single spracovanie); null: <paramref name="processor"/>.</param>
+/// <param name="mux">The multiplexer (results of Zlučovanie); null: they are skipped.</param>
 public sealed class MegaJob(
-    MegaBatch batch, FileProcessor processor, Func<string, CancellationToken, Task<MediaFile>> inspect, Action<MegaBatch>? changed = null)
+    MegaBatch batch, FileProcessor processor, Func<string, CancellationToken, Task<MediaFile>> inspect, Action<MegaBatch>? changed = null,
+    FileProcessor? keeping = null, Func<MuxSpec, IProgress<double>?, CancellationToken, Task<MuxResult>>? mux = null)
     : Job($"MEGA {batch.Label}: {batch.Name}"), ILoggedJob
 {
     private readonly List<LoggedFile> _logged = [];
@@ -130,7 +136,7 @@ public sealed class MegaJob(
         context.Log(JobSeverity.Info, $"MEGA {Batch.Label}: {waiting.Count} súborov – kontrola pred spustením.");
         var items = new List<(BatchItem Item, MegaFile File)>();
         var skipped = 0;
-        foreach (var file in waiting)
+        foreach (var file in waiting.Where(f => f.Mux is null))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var (item, problem) = await CheckAsync(file, Batch, inspect, cancellationToken, processor.Index).ConfigureAwait(false);
@@ -151,13 +157,28 @@ public sealed class MegaJob(
         }
 
         var byPath = items.ToDictionary(x => x.Item.File.Path, x => x.File, StringComparer.Ordinal);
-        IReadOnlyList<ProcessingResult> results = [];
+        var results = new List<ProcessingResult>();
+        var muxes = waiting.Where(f => f.Mux is not null).ToList();
+        var total = Math.Max(1, items.Count + muxes.Count);
+        var finished = 0;
         if (items.Count > 0)
         {
             new LibraryLayout(Batch.LibraryRoot).EnsureCreated();
-            results = await BatchRunner.RunAsync(
-                items.Select(x => x.Item).ToList(), processor, new OutputOptions(Batch.Originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep, MoveIntoLibrary: false),
-                new Reporter(context, (item, result) =>
+        }
+
+        // the files of Hromadné spracovanie as the batch says; those of Single spracovanie always keep their originals
+        foreach (var (run, keep) in new[] { (items.Where(x => !x.File.KeepOriginal).ToList(), false), (items.Where(x => x.File.KeepOriginal).ToList(), true) })
+        {
+            if (run.Count == 0)
+            {
+                continue;
+            }
+
+            var deletes = !keep && Batch.Originals == OriginalsMode.DeleteAutomatically;
+            var start = (double)finished / total;
+            results.AddRange(await BatchRunner.RunAsync(
+                run.Select(x => x.Item).ToList(), keep ? keeping ?? processor : processor, new OutputOptions(deletes ? OriginalHandling.Delete : OriginalHandling.Keep, MoveIntoLibrary: false),
+                new Reporter(context, start, (double)run.Count / total, (item, result) =>
                 {
                     var file = byPath[item.File.Path];
                     file.State = result.Status switch
@@ -173,12 +194,73 @@ public sealed class MegaJob(
                     Log(ProcessingWords.Describe(item.File.Path, item.Plan, result));
                     changed?.Invoke(Batch);
                 }),
-                null, cancellationToken).ConfigureAwait(false);
+                null, cancellationToken).ConfigureAwait(false));
+            finished += run.Count;
         }
 
-        var done = results.Count(r => r.Status == ProcessingStatus.Done);
+        // the results of Zlučovanie, one after another, each from its recipe
+        var merged = 0;
+        foreach (var file in muxes)
+        {
+            var share = 1.0 / total;
+            var from = (double)finished++ / total;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                file.State = MegaFileState.Cancelled;
+                file.Note = "zrušené";
+                changed?.Invoke(Batch);
+                continue;
+            }
+
+            var recipe = file.Mux!;
+            var problem = mux is null ? "Zlučovanie tu nie je k dispozícii"
+                : recipe.Changed() is { } moved ? $"súbor {Path.GetFileName(moved)} sa medzičasom zmenil alebo chýba – výsledok Zlučovania treba pripraviť znova"
+                : null;
+            if (problem is not null)
+            {
+                skipped++;
+                file.State = MegaFileState.Skipped;
+                file.Note = problem;
+                Log(ProcessingWords.Skipped(file.Path, problem, false));
+                context.Log(JobSeverity.Warning, $"PRESKOČENÝ (Zlučovanie): {Path.GetFileName(file.Path)} – {problem}");
+                changed?.Invoke(Batch);
+                continue;
+            }
+
+            context.Log(JobSeverity.Info, $"Zlučovanie: {recipe.Spec.Sources.Count} vstup(y), {recipe.Spec.Tracks.Count} stôp → {file.PlannedPath}");
+            MuxResult result;
+            try
+            {
+                result = await mux!(recipe.Spec, new Share(context, from, share), cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                result = new MuxResult(MuxStatus.Cancelled, null, []);
+            }
+
+            foreach (var message in result.Messages)
+            {
+                context.Log(result.Status == MuxStatus.Done ? JobSeverity.Warning : JobSeverity.Error, message);
+            }
+
+            file.State = result.Status switch
+            {
+                MuxStatus.Done => MegaFileState.Done,
+                MuxStatus.Cancelled => MegaFileState.Cancelled,
+                _ => MegaFileState.Failed,
+            };
+            file.Note = result.OutputPath ?? (result.Status == MuxStatus.Cancelled ? "zrušené" : string.Join(" | ", result.Messages));
+            file.ResultPath = result.Status == MuxStatus.Done ? result.OutputPath : null;
+            merged += result.Status == MuxStatus.Done ? 1 : 0;
+            Log(MuxJob.Describe(recipe.Spec, result));
+            context.Log(result.Status == MuxStatus.Done ? JobSeverity.Info : JobSeverity.Error,
+                $"{finished} / {total} · Zlučovanie: " + (result.Status == MuxStatus.Done ? "hotovo – " + result.OutputPath : result.Status == MuxStatus.Cancelled ? "zrušené" : "chyba"));
+            changed?.Invoke(Batch);
+        }
+
+        var done = results.Count(r => r.Status == ProcessingStatus.Done) + merged;
         var present = waiting.Count(f => f.State == MegaFileState.AlreadyInLibrary);
-        var failed = results.Count(r => r.Status == ProcessingStatus.Failed);
+        var failed = results.Count(r => r.Status == ProcessingStatus.Failed) + muxes.Count(f => f.State == MegaFileState.Failed);
         var problems = waiting.Count(f => f.State == MegaFileState.Skipped);
         var cancelled = cancellationToken.IsCancellationRequested;
         Outcome = $"{done} z {waiting.Count} súborov v knižnici" + (present > 0 ? $", {present} tam už bolo" : "") +
@@ -192,11 +274,17 @@ public sealed class MegaJob(
     /// <summary>A finished batch is not repeated from the queue: it is started again on the MEGA page.</summary>
     internal override bool Reset() => false;
 
-    private sealed class Reporter(IJobContext context, Action<BatchItem, ProcessingResult> finished) : IProgress<BatchProgress>
+    // the progress of one part of the batch (a run, a result of Zlučovanie) in its share of the whole
+    private sealed class Share(IJobContext context, double from, double share) : IProgress<double>
+    {
+        public void Report(double value) => context.Report(from + (Math.Clamp(value, 0, 1) * share));
+    }
+
+    private sealed class Reporter(IJobContext context, double from, double share, Action<BatchItem, ProcessingResult> finished) : IProgress<BatchProgress>
     {
         public void Report(BatchProgress value)
         {
-            context.Report(value.Total == 0 ? 0 : (value.Finished + (value.Result is null ? value.FileFraction : 0)) / value.Total);
+            context.Report(from + (share * (value.Total == 0 ? 0 : (value.Finished + (value.Result is null ? value.FileFraction : 0)) / value.Total)));
             if (value.Result is { } result)
             {
                 var (severity, text) = BatchJob.Line(value.Item, result);

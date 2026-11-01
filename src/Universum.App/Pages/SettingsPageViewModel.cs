@@ -40,6 +40,17 @@ public sealed class SettingsPageViewModel : ObservableObject
         ResetCommand = new RelayCommand(() => Load(RuleProfile.Default));
         ClearCacheCommand = new RelayCommand(ClearCache);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
+        ChoosePreviewFolderCommand = new RelayCommand(ChoosePreviewFolder);
+        OpenPreviewFolderCommand = new RelayCommand(() =>
+        {
+            Directory.CreateDirectory(_services.PreviewFolder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_services.PreviewFolder) { UseShellExecute = true })?.Dispose();
+        });
+        ClearPreviewsCommand = new RelayCommand(() =>
+        {
+            var cleared = _services.ClearOldPreviews(TimeSpan.Zero);
+            PreviewFolderNote = $"Vymazané náhľady: {cleared}. " + PreviewNote();
+        });
         SaveTmdbKeyCommand = new AsyncRelayCommand(SaveTmdbKeyAsync, () => TmdbKeyInput.Trim().Length > 0);
         RemoveTmdbKeyCommand = new RelayCommand(RemoveTmdbKey, () => _services.Settings.TmdbKeyProtected is not null);
         SaveHistraTokenCommand = new RelayCommand(SaveHistraToken, () => HistraTokenInput.Trim().Length > 0);
@@ -69,6 +80,63 @@ public sealed class SettingsPageViewModel : ObservableObject
     public NewsSourcesViewModel NewsSources { get; }
 
     /// <summary>The input folder is watched: new films and episodes are told (owner, 31. 10. 2026).</summary>
+    // ---------------------------------------------------------------- previews of Zlučovanie (owner, 1. 11. 2026)
+
+    /// <summary>Where Zlučovanie writes its previews (never an output folder).</summary>
+    public string PreviewFolder => _services.PreviewFolder;
+
+    private string? _previewNote;
+
+    public string PreviewFolderNote { get => _previewNote ??= PreviewNote(); private set => SetProperty(ref _previewNote, value); }
+
+    public RelayCommand ChoosePreviewFolderCommand { get; }
+
+    public RelayCommand OpenPreviewFolderCommand { get; }
+
+    public RelayCommand ClearPreviewsCommand { get; }
+
+    // the size of the previews there and the free space of the disk
+    private string PreviewNote()
+    {
+        var text = "Zlučovanie sem zapisuje náhľady výsledkov (nikdy nie do výstupných priečinkov); náhľad sa vymaže so svojou kartou alebo po týždni.";
+        try
+        {
+            var folder = _services.PreviewFolder;
+            var size = Directory.Exists(folder) ? Universum.Core.Muxing.MuxPreview.Old(folder, TimeSpan.Zero, DateTime.Now.AddSeconds(1)).Sum(f => new FileInfo(f).Length) : 0;
+            var root = Path.GetPathRoot(Path.GetFullPath(folder));
+            var free = root is { Length: > 0 } ? new DriveInfo(root).AvailableFreeSpace : -1;
+            return text + $" Náhľady teraz: {size / (1024 * 1024.0):0.#} MB" + (free >= 0 ? $" · voľné miesto na disku: {free / (1024 * 1024 * 1024.0):0.#} GB." : ".");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return text;
+        }
+    }
+
+    private void ChoosePreviewFolder()
+    {
+        var dialog = new OpenFolderDialog { Title = "Priečinok náhľadov Zlučovania (nie výstupný ani vstupný priečinok)" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var chosen = Path.GetFullPath(dialog.FolderName);
+        static bool Inside(string folder, string? root) =>
+            root is { Length: > 0 } && (SameFolder(folder, root) || folder.StartsWith(Path.GetFullPath(root).TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        static bool SameFolder(string a, string b) => string.Equals(a.TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+        if (Inside(chosen, _services.Library?.Root) || Inside(chosen, _services.Settings.InputDirectory))
+        {
+            PreviewFolderNote = "Náhľady nesmú byť vo výstupnom priečinku (knižnici) ani vo vstupnom priečinku – zvoľte iný. " + PreviewNote();
+            return;
+        }
+
+        _services.Settings.MuxPreviewFolder = chosen;
+        _services.Settings.Save();
+        OnPropertyChanged(nameof(PreviewFolder));
+        PreviewFolderNote = PreviewNote();
+    }
+
     public bool WatchInput
     {
         get => _services.Settings.WatchInput;

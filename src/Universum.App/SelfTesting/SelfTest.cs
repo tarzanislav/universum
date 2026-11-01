@@ -3311,6 +3311,24 @@ internal static class SelfTest
                     timed.Restart();
                     var quick = await Core.Speech.SpokenLanguage.DetectAsync(tools with { Accurate = null }, services.Runner, synthetic.Path, ordinal, synthetic.Duration);
                     Write($"speech detail, quick model only ({timed.Elapsed.TotalSeconds:0.0} s): audio {ordinal + 1} spoken {spoken} → {quick.Language ?? "?"}, doubt: {quick.Doubt}");
+
+                    // the way of 0.3.17 (a run of FFmpeg and of whisper for each piece, two transcriptions with the search of
+                    // alternatives) – how long it took, for the comparison
+                    timed.Restart();
+                    var old = Path.Combine(_outputDirectory, "rec-old");
+                    Directory.CreateDirectory(old);
+                    var oldPiece = Path.Combine(old, "piece-1.wav");
+                    await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Ffmpeg, Core.Speech.SpokenLanguage.CutArguments(synthetic.Path, ordinal, TimeSpan.Zero, oldPiece)));
+                    await services.Runner.RunAsync(Core.Speech.SpokenLanguage.WhisperRequest(tools, oldPiece) with { Background = false });
+                    foreach (var language in new[] { "cs", "sk" })
+                    {
+                        await services.Runner.RunAsync(new Core.Processes.ProcessRequest(tools.Whisper,
+                            ["-m", tools.Model, "-f", "-", "-l", language, "-nt", "-ojf", "-of", "old-" + language, "-t", Math.Clamp(Environment.ProcessorCount, 1, 8).ToString(CultureInfo.InvariantCulture)])
+                            { WorkingDirectory = old, StandardInputFile = oldPiece });
+                    }
+
+                    Write($"speech detail, the way of 0.3.17 ({timed.Elapsed.TotalSeconds:0.0} s): audio {ordinal + 1}");
+                    Directory.Delete(old, recursive: true);
                 }
             }
 

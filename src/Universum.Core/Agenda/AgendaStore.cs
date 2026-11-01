@@ -224,6 +224,57 @@ public sealed class AgendaStore
         return [.. found.OrderBy(o => o.First).ThenBy(o => o.Item.Time?.StartTime ?? o.Item.Task?.DueTime ?? TimeOnly.MinValue)];
     }
 
+    /// <summary>A backup of all records (the bin too) in a JSON file of the user's choice.</summary>
+    public void Export(string file)
+    {
+        lock (_gate)
+        {
+            var temporary = file + ".part";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(Loaded(), Json));
+            File.Move(temporary, file, overwrite: true);
+        }
+    }
+
+    /// <summary>
+    /// The records of a backup added: a record not here is added, one here is replaced when the backup's is newer; how many
+    /// changed. A file that is not a backup of the agenda throws <see cref="JsonException"/>.
+    /// </summary>
+    public int Import(string file)
+    {
+        var backup = JsonSerializer.Deserialize<List<AgendaItem>>(File.ReadAllText(file), Json) ?? throw new JsonException("Prázdna záloha.");
+        var changed = 0;
+        lock (_gate)
+        {
+            var items = Loaded();
+            foreach (var item in backup)
+            {
+                var index = items.FindIndex(i => i.Id == item.Id);
+                if (index < 0)
+                {
+                    items.Add(item);
+                    changed++;
+                }
+                else if (item.Modified > items[index].Modified)
+                {
+                    items[index] = item;
+                    changed++;
+                }
+            }
+
+            if (changed > 0)
+            {
+                Write(items);
+            }
+        }
+
+        if (changed > 0)
+        {
+            Changed?.Invoke();
+        }
+
+        return changed;
+    }
+
     /// <summary>The hour a reminder of a whole day comes at (8:00 of the day, minus the time asked before).</summary>
     public static readonly TimeOnly WholeDayAt = new(8, 0);
 

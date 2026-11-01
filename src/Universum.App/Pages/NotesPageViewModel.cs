@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Universum.App.Localization;
 using Universum.Core.Agenda;
 using Universum.Core.News;
+using Universum.Core.Reports;
 using Universum.Core.Text;
 
 namespace Universum.App.Pages;
@@ -213,6 +214,41 @@ public sealed class NotesPageViewModel : ObservableObject
     }
 
     public bool HasEditor => Editor is not null;
+
+    /// <summary>Tlač a export (stage P3): the notes as they are shown (source, tag, search).</summary>
+    public RelayCommand PrintCommand => _print ??= new RelayCommand(() => ShowReport(Report()));
+
+    private RelayCommand? _print;
+
+    public Action<ReportViewModel> ShowReport { get; set; } = model =>
+        new ReportWindow(model) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+
+    public ReportViewModel Report()
+    {
+        var title = L("Poznámky", "Poznámky", "Notes");
+        var cards = Cards.ToList();
+        var records = cards.Select(c => c.Record).OfType<AgendaItem>().ToList();
+        IReadOnlyList<ReportExport> exports =
+        [
+            new("Markdown…", "Markdown|*.md", "UNIVERSUM – poznámky.md", path =>
+            {
+                File.WriteAllText(path, AgendaExport.Markdown(title, [.. cards.Select(c => c.Record ?? new AgendaItem { Title = c.Title, Text = c.Text, Note = new AgendaNote() })]));
+                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+            }),
+            new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – poznámky.csv", path =>
+            {
+                File.WriteAllText(path, AgendaExport.Csv(records, Loc.Language));
+                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+            }),
+        ];
+        return new ReportViewModel(_services, title, [new("list", L("Ako na obrazovke", "Jako na obrazovce", "As on the screen"))], (_, options, fonts) =>
+        {
+            var layout = new ReportLayout(fonts, options, title, landscape: false);
+            AgendaReports.Notes(layout, title, cards.Select(c => new ReportNote(c.Title, c.Text,
+                string.Join(" · ", new[] { c.Pinned ? L("pripnutá", "připnutá", "pinned") : "", c.Where }.Where(t => t.Length > 0)), c.Tags, CalendarPageViewModel.ColorOf(c.Accent), c.Pinned)));
+            return layout.Finish();
+        }, exports);
+    }
 
     /// <summary>The page was opened: the names of the titles with a note are read from what Premiéry and Novinky keep.</summary>
     public void Shown()

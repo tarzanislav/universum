@@ -694,6 +694,14 @@ public sealed class AppServices
 
     private Universum.Core.Agenda.AgendaStore? _agenda;
 
+    /// <summary>The font of printed reports and their PDF: the first face of Windows whose licence allows embedding; null: none.</summary>
+    public Universum.Core.Reports.ReportFonts? ReportFonts => ReportFontsForSelfTest ?? (_reportFonts ??=
+        Universum.Core.Reports.ReportFonts.In(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), Universum.Core.Reports.ReportFonts.WindowsFaces));
+
+    public Universum.Core.Reports.ReportFonts? ReportFontsForSelfTest { get; set; }
+
+    private Universum.Core.Reports.ReportFonts? _reportFonts;
+
     /// <summary>The voice of notes: recording and writing it down (POZNÁMKY).</summary>
     public Pages.VoiceRecorder Voice => _voice ??= new(this);
 
@@ -1038,6 +1046,9 @@ public sealed class AppSettings
 
     /// <summary>Kalendár: only the chosen titles (Vybrané) of Premiéry and Novinky.</summary>
     public bool CalendarOnlyChosen { get; set; }
+
+    /// <summary>Tlač a export of POZNÁMKY: the choices of printing (paper, orientation, pages on a sheet …).</summary>
+    public Universum.Core.Reports.ReportOptions Print { get; set; } = new();
 
     /// <summary>Plánované úlohy: the done tasks shown in the list.</summary>
     public bool TasksShowDone { get; set; }

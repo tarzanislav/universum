@@ -1,0 +1,65 @@
+<Window x:Class="Universum.App.Pages.ReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:pages="clr-namespace:Universum.App.Pages"
+        Title="{Binding Title, StringFormat='UNIVERSUM – tlač a export: {0}'}" Width="1180" Height="820" MinWidth="820" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <!-- the choices, the buttons, the other formats -->
+        <Border DockPanel.Dock="Left" Width="300" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="18,16,18,16">
+                    <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Summary}" Style="{StaticResource Hint}" Margin="0,2,0,12" />
+                    <StackPanel Visibility="{Binding HasForms, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,10">
+                        <TextBlock Text="Čo tlačiť" Style="{StaticResource Hint}" />
+                        <ComboBox ItemsSource="{Binding Forms}" SelectedItem="{Binding Form}" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <TextBlock Text="Papier" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:ReportViewModel.Papers}}" SelectedItem="{Binding Paper}" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+                    <TextBlock Text="Orientácia" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:ReportViewModel.Orientations}}" SelectedItem="{Binding Orientation}" HorizontalAlignment="Stretch" Margin="0,0,0,8" />
+                    <TextBlock Text="Rozmiestnenie" Style="{StaticResource Hint}" />
+                    <ComboBox ItemsSource="{Binding Source={x:Static pages:ReportViewModel.PerSheet}}" SelectedItem="{Binding PagesPerSheet}" HorizontalAlignment="Stretch" Margin="0,0,0,10" />
+                    <CheckBox Content="Zosvetliť tlač (šetrí toner)" IsChecked="{Binding Lighter}" Margin="0,0,0,4" />
+                    <CheckBox Content="Bez farebných podkladov" IsChecked="{Binding NoBackgrounds}" Margin="0,0,0,4" />
+                    <CheckBox Content="Okraj na dierovanie" IsChecked="{Binding PunchMargin}" Margin="0,0,0,4" />
+                    <CheckBox Content="Obojstranná tlač (okraj striedavo)" IsChecked="{Binding DoubleSided}" Margin="0,0,0,4" />
+                    <CheckBox Content="Hlavička a čísla strán" IsChecked="{Binding HeaderAndFooter}" Margin="0,0,0,14" />
+                    <Button Command="{Binding PrintCommand}" Padding="12,6" Margin="0,0,0,6" HorizontalAlignment="Stretch" FontWeight="SemiBold">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE749;" Margin="0,0,8,0" />
+                            <TextBlock Text="Tlačiť…" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SavePdfCommand}" Padding="12,6" Margin="0,0,0,6" HorizontalAlignment="Stretch" ToolTip="PDF zapísané vlastným kódom UNIVERSUM, s vloženým písmom (diakritika)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xEA90;" Margin="0,0,8,0" />
+                            <TextBlock Text="Uložiť PDF…" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding SaveHtmlCommand}" Padding="12,6" Margin="0,0,0,14" HorizontalAlignment="Stretch" ToolTip="Jedna stránka HTML – otvorí sa v prehliadači">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE774;" Margin="0,0,8,0" />
+                            <TextBlock Text="Uložiť HTML…" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel Visibility="{Binding HasExports, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Ďalšie formáty" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <ItemsControl ItemsSource="{Binding Exports}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding Label}" Command="{Binding Command}" ToolTip="{Binding ToolTip}" Padding="10,4" Margin="0,0,0,4" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        <!-- the preview, page by page -->
+        <DocumentViewer Document="{Binding Document}" Background="#E6E6E6" />
+    </DockPanel>
+</Window>

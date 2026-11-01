@@ -1281,12 +1281,109 @@ internal static class SelfTest
         await TestCalendarAsync(model, window, services);
         await TestTasksAsync(model, window, services);
         await TestNotesAsync(model, window, services);
+        await TestReportsAsync(model, services);
 
         services.SeriesTmdbForSelfTest = null;
         services.PostersForSelfTest = null;
         services.SeriesNewsForSelfTest = null;
         services.SetNewsSources(Core.News.NewsSource.Defaults);
         model.Open(model.Dashboard);
+    }
+
+    /// <summary>
+    /// Tlač a export (owner, 31. 10. 2026, stage P3): the reports of Kalendár, Plánované úlohy and Poznámky – the preview,
+    /// the forms of the calendar, pages on a sheet, the PDF of UNIVERSUM's own writer with the font embedded, HTML, iCalendar,
+    /// CSV, Markdown, a backup and its import; the report window shown. Invented records only; the files in the output.
+    /// </summary>
+    private static async Task TestReportsAsync(MainViewModel model, AppServices services)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var store = services.Agenda;
+        var cinema = new Core.Agenda.AgendaItem
+        {
+            Title = "Kino – vymyslený ďábelský film", Tags = ["kino"],
+            Time = new Core.Agenda.AgendaTime { Start = today, StartTime = new TimeOnly(20, 0), ReminderMinutes = 60, Repeat = new Core.Agenda.Recurrence { Every = Core.Agenda.RepeatEvery.Week, Count = 3 } },
+        };
+        store.Save(cinema);
+        store.Save(new Core.Agenda.AgendaItem { Title = "Spracovať vymyslený seriál", Task = new Core.Agenda.AgendaTask { Due = today, Checklist = [new Core.Agenda.CheckItem { Text = "ťažký krok", Done = true }] } });
+        store.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená poznámka", Text = "Žltý kôň úpel ďábelské ódy.", Note = new Core.Agenda.AgendaNote() });
+        var folder = Path.Combine(_outputDirectory, "tlac");
+        Directory.CreateDirectory(folder);
+        string? Ask(string filter, string name) => Path.Combine(folder, name.Length > 0 ? name : "subor");
+
+        ReportViewModel? shown = null;
+        var calendar = model.Calendar;
+        model.Open(calendar);
+        calendar.IsMonth = true;
+        calendar.TodayCommand.Execute(null);
+        calendar.ShowReport = report => shown = report;
+        calendar.PrintCommand.Execute(null);
+        var report = shown!;
+        report.AskSave = Ask;
+        report.AskOpen = _ => Path.Combine(folder, $"UNIVERSUM – záloha poznámok {DateTime.Now:yyyy-MM-dd}.json");
+        Check(report.Document is { Pages.Count: 1 } && report.Status.Length == 0, "print: the month of the calendar on one sheet – " + report.Status);
+        var forms = new Dictionary<string, int>();
+        foreach (var form in report.Forms)
+        {
+            report.Form = form;
+            forms[form.Value] = report.PageCount;
+        }
+
+        Check(forms["yearrows"] == 1 && forms["yearmonths"] == 1 && forms["month"] == 1 && forms["day"] >= 1 && forms["monthlist"] >= 1,
+            "print: every form of the calendar laid out – " + string.Join(", ", forms.Select(f => $"{f.Key} {f.Value}")));
+        report.Form = report.Forms.First(f => f.Value == "monthlist");
+        var pages = report.PageCount;
+        report.PagesPerSheet = ReportViewModel.PerSheet.First(p => p.Value == 2);
+        Check(report.Document!.Pages.Count == (pages + 1) / 2, "print: two pages on a sheet");
+        report.PagesPerSheet = ReportViewModel.PerSheet[0];
+        report.Lighter = true;
+        report.PunchMargin = true;
+        Check(services.Settings.Print is { Lighter: true, PunchMargin: true }, "print: the choices kept in the settings");
+        var pdf = report.Pdf();
+        var text = System.Text.Encoding.Latin1.GetString(pdf);
+        Check(text.StartsWith("%PDF-1.7", StringComparison.Ordinal) && text.Contains("/FontFile2", StringComparison.Ordinal) && text.Contains("/ToUnicode", StringComparison.Ordinal) &&
+              System.Text.RegularExpressions.Regex.Matches(text, @"/Type /Page\b").Count == report.Document.Pages.Count, $"print: the own PDF with the font embedded ({pdf.Length / 1024} kB, font {services.ReportFonts?.Family})");
+        report.SavePdfCommand.Execute(null);
+        report.SaveHtmlCommand.Execute(null);
+        foreach (var export in report.Exports.Take(4))
+        {
+            export.Command.Execute(null);
+        }
+
+        var ics = File.ReadAllText(Path.Combine(folder, "UNIVERSUM – kalendár.ics"));
+        Check(File.Exists(Path.Combine(folder, report.Title + ".pdf")) && File.Exists(Path.Combine(folder, report.Title + ".html")) &&
+              ics.Contains("RRULE:FREQ=WEEKLY;COUNT=3", StringComparison.Ordinal) && ics.Contains("TRIGGER:-PT60M", StringComparison.Ordinal) && ics.Contains("BEGIN:VTODO", StringComparison.Ordinal) &&
+              File.ReadAllText(Path.Combine(folder, "UNIVERSUM – záznamy.csv")).Contains("Kino – vymyslený ďábelský film", StringComparison.Ordinal),
+            "print: PDF, HTML, iCalendar and CSV saved – " + report.Status);
+        store.Delete(cinema.Id);
+        store.EmptyBin();
+        report.Exports[4].Command.Execute(null);
+        Check(store.Find(cinema.Id) is not null && report.Status.Contains('1', StringComparison.Ordinal), "print: the backup brings the record back – " + report.Status);
+
+        var window = new ReportWindow(report) { Owner = Application.Current.MainWindow, Width = 1180, Height = 820 };
+        window.Show();
+        await Screenshot(window, "print-preview.png");
+        window.Close();
+        services.Settings.Print = new Core.Reports.ReportOptions();
+
+        model.Open(model.AgendaTasks);
+        model.AgendaTasks.ShowReport = r => shown = r;
+        model.AgendaTasks.PrintCommand.Execute(null);
+        Check(shown!.PageCount >= 1 && shown.Pdf().Length > 1000, "print: the tasks");
+        shown.AskSave = Ask;
+        shown.Exports[2].Command.Execute(null);
+        Check(File.ReadAllText(Path.Combine(folder, "UNIVERSUM – úlohy.md")).Contains("  - [x] ťažký krok", StringComparison.Ordinal), "print: the tasks in Markdown");
+        model.Open(model.AgendaNotes);
+        model.AgendaNotes.ShowReport = r => shown = r;
+        model.AgendaNotes.PrintCommand.Execute(null);
+        Check(shown!.PageCount >= 1 && shown.Pdf().Length > 1000, "print: the notes");
+
+        foreach (var record in store.Items.ToList())
+        {
+            store.Delete(record.Id);
+        }
+
+        store.EmptyBin();
     }
 
     /// <summary>

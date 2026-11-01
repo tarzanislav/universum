@@ -8,6 +8,7 @@ using Universum.App.Localization;
 using Universum.Core.Agenda;
 using Universum.Core.Calendar;
 using Universum.Core.News;
+using Universum.Core.Reports;
 
 namespace Universum.App.Pages;
 
@@ -314,6 +315,140 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     public RelayCommand NewTaskCommand { get; }
 
     public RelayCommand NewNoteCommand { get; }
+
+    /// <summary>Tlač a export (stage P3).</summary>
+    public RelayCommand PrintCommand => _print ??= new RelayCommand(() => ShowReport(Report()));
+
+    private RelayCommand? _print;
+
+    /// <summary>Shows the report window (the self-test looks at the report instead).</summary>
+    public Action<ReportViewModel> ShowReport { get; set; } = model =>
+        new ReportWindow(model) { Owner = System.Windows.Application.Current.MainWindow }.Show();
+
+    /// <summary>The report of the calendar: the view on the screen, the chosen day, or another form; the formats of its data.</summary>
+    public ReportViewModel Report()
+    {
+        IReadOnlyList<VideoChoice<string>> forms =
+        [
+            new("screen", L("Ako na obrazovke", "Jako na obrazovce", "As on the screen")), new("day", L("Vybraný deň", "Vybraný den", "The chosen day")),
+            new("month", L("Mesiac – mriežka", "Měsíc – mřížka", "Month – grid")), new("monthlist", L("Mesiac – zoznam dní", "Měsíc – seznam dní", "Month – list of days")),
+            new("week", L("Týždeň – zoznam dní", "Týden – seznam dní", "Week – list of days")), new("yearrows", L("Rok na jednej strane (riadky)", "Rok na jedné straně (řádky)", "Year on one page (rows)")),
+            new("yearmonths", L("Rok – 12 mesiacov", "Rok – 12 měsíců", "Year – 12 months")), new("agenda", L("Agenda", "Agenda", "Agenda")),
+        ];
+        var store = _services.Agenda;
+        IReadOnlyList<ReportExport> exports =
+        [
+            new(L("iCalendar (.ics) – moje záznamy…", "iCalendar (.ics) – moje záznamy…", "iCalendar (.ics) – my records…"), "iCalendar|*.ics", "UNIVERSUM – kalendár.ics",
+                path =>
+                {
+                    File.WriteAllText(path, AgendaExport.Ics(store.Items, null, Loc.Language));
+                    return L("Uložené pre Outlook a Google: ", "Uloženo pro Outlook a Google: ", "Saved for Outlook and Google: ") + path;
+                }, ToolTip: "Udalosti s opakovaním a pripomienkou, úlohy, poznámky k dňom"),
+            new(L("iCalendar (.ics) – sviatky roka…", "iCalendar (.ics) – svátky roku…", "iCalendar (.ics) – holidays of the year…"), "iCalendar|*.ics", $"UNIVERSUM – sviatky {_anchor.Year}.ics",
+                path =>
+                {
+                    File.WriteAllText(path, AgendaExport.Ics([], Regions.SelectMany(r => Holidays.Of(_anchor.Year, r)), Loc.Language));
+                    return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                }),
+            new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – záznamy.csv", path =>
+            {
+                File.WriteAllText(path, AgendaExport.Csv(store.Items, Loc.Language));
+                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+            }),
+            new(L("Záloha všetkých záznamov (JSON)…", "Záloha všech záznamů (JSON)…", "Backup of all records (JSON)…"), "JSON|*.json", $"UNIVERSUM – záloha poznámok {DateTime.Now:yyyy-MM-dd}.json",
+                path =>
+                {
+                    store.Export(path);
+                    return L("Záloha uložená: ", "Záloha uložena: ", "Backup saved: ") + path;
+                }),
+            new(L("Obnoviť zo zálohy…", "Obnovit ze zálohy…", "Restore from a backup…"), "JSON|*.json", "",
+                path => L("Zo zálohy pridané alebo obnovené záznamy: ", "Ze zálohy přidané nebo obnovené záznamy: ", "Records added or restored: ") + store.Import(path).ToString(CultureInfo.InvariantCulture),
+                Opens: true, ToolTip: "Pridá záznamy, ktoré tu nie sú, a obnoví staršie verzie novšími zo zálohy – nič sa nemaže"),
+        ];
+        return new ReportViewModel(_services, L("Kalendár", "Kalendář", "Calendar") + " – " + PeriodText, forms, BuildReport, exports);
+    }
+
+    private IReadOnlyList<ReportPage> BuildReport(string form, ReportOptions options, ReportFonts fonts)
+    {
+        var view = form != "screen" ? form : _view switch
+        {
+            CalendarView.Month => "month",
+            CalendarView.MonthList => "monthlist",
+            CalendarView.Week or CalendarView.WeekList => "week",
+            CalendarView.YearMonths => "yearmonths",
+            CalendarView.YearRows => "yearrows",
+            _ => "agenda",
+        };
+        var first = new DateOnly(_anchor.Year, _anchor.Month, 1);
+        var monday = _anchor.AddDays(-(((int)_anchor.DayOfWeek + 6) % 7));
+        var (from, to) = view switch
+        {
+            "day" => (_selected, _selected),
+            "month" => (first.AddDays(-7), first.AddMonths(1).AddDays(14)),
+            "monthlist" => (first, first.AddMonths(1).AddDays(-1)),
+            "week" => (monday, monday.AddDays(6)),
+            "yearrows" or "yearmonths" => (new DateOnly(_anchor.Year, 1, 1), new DateOnly(_anchor.Year, 12, 31)),
+            _ => (_view == CalendarView.Agenda ? _anchor : Today, (_view == CalendarView.Agenda ? _anchor : Today).AddDays(AgendaSpan.Value - 1)),
+        };
+        var map = Collect(from, to);
+        ReportDay Printed(DateOnly date)
+        {
+            var entries = map.GetValueOrDefault(date) ?? [];
+            return new ReportDay(date, Capitalized(date.ToString(Loc.Language == "en" ? "dddd d MMM" : "dddd d. M.", Culture)), NameLines(date),
+                string.Join(" · ", entries.Where(e => e.Layer == CalendarLayer.Holidays).Select(e => e.Title).Distinct()),
+                On(CalendarLayer.Holidays) && Regions.Any(r => Holidays.IsDayOff(date, r)), entries.Any(e => e.Layer == CalendarLayer.School && e.Shade),
+                [.. entries.Where(e => e.Layer != CalendarLayer.Holidays && (e.Layer != CalendarLayer.School || e.InCell)).OrderBy(e => e.Rank).ThenBy(e => e.Time ?? TimeOnly.MinValue)
+                    .Select(e => new ReportEntry(e.TimeText, e.Title, e.Detail, ColorOf(e.Color), e.Done))]);
+        }
+
+        IEnumerable<ReportDay> Range(DateOnly a, DateOnly b, bool onlyFull)
+        {
+            for (var d = a; d <= b; d = d.AddDays(1))
+            {
+                var day = Printed(d);
+                if (!onlyFull || day.Entries.Count > 0 || day.Holiday.Length > 0)
+                {
+                    yield return day;
+                }
+            }
+        }
+
+        var title = L("Kalendár", "Kalendář", "Calendar");
+        var layout = new ReportLayout(fonts, options, title, landscape: view is "month" or "yearrows" or "yearmonths");
+        var months = Culture.DateTimeFormat.MonthNames.Take(12).Select(Capitalized).ToList();
+        switch (view)
+        {
+            case "month":
+                AgendaReports.MonthGrid(layout, Capitalized(Culture.DateTimeFormat.MonthNames[_anchor.Month - 1]) + " " + _anchor.Year.ToString(CultureInfo.InvariantCulture),
+                    _anchor.Year, _anchor.Month, WeekdayNames, Printed);
+                break;
+            case "yearrows":
+                AgendaReports.YearRows(layout, _anchor.Year.ToString(CultureInfo.InvariantCulture), _anchor.Year, [.. Culture.DateTimeFormat.AbbreviatedMonthNames.Take(12)], Printed);
+                break;
+            case "yearmonths":
+                AgendaReports.YearMonths(layout, _anchor.Year.ToString(CultureInfo.InvariantCulture), _anchor.Year, months, WeekdayNames, Printed);
+                break;
+            case "day":
+                AgendaReports.DayList(layout, Capitalized(CalendarTexts.LongDate(_selected, Loc.Language)), [Printed(_selected)]);
+                break;
+            case "monthlist":
+                AgendaReports.DayList(layout, months[_anchor.Month - 1] + " " + _anchor.Year.ToString(CultureInfo.InvariantCulture), Range(from, to, HideEmptyDays));
+                break;
+            case "week":
+                AgendaReports.DayList(layout, L($"{CalendarTexts.Week(from)}. týždeň", $"{CalendarTexts.Week(from)}. týden", $"Week {CalendarTexts.Week(from)}") + $" · {from:d. M.} – {to:d. M. yyyy}",
+                    Range(from, to, false));
+                break;
+            default:
+                AgendaReports.DayList(layout, L("Agenda", "Agenda", "Agenda") + $" · {from:d. M.} – {to:d. M. yyyy}", Range(from, to, true));
+                break;
+        }
+
+        return layout.Finish();
+    }
+
+    // the colour of a brush of the calendar
+    internal static Rgb ColorOf(System.Windows.Media.Brush brush) =>
+        brush is System.Windows.Media.SolidColorBrush solid ? new Rgb(solid.Color.R, solid.Color.G, solid.Color.B) : Core.Reports.Rgb.Gray;
 
     /// <summary>The page was opened: the kept premieres and episodes are read once.</summary>
     public void Shown()

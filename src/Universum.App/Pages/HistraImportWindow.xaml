@@ -14,7 +14,7 @@
                     <Button Content="{loc:T 'Nevybrať nič'}" Command="{Binding NoneCommand}" Padding="10,4" />
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Hľadať list:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" ToolTip="Hľadať list podľa názvu (bez diakritiky)" />
+                <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Hľadať list podľa názvu (bez diakritiky)'}" />
             </DockPanel>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">

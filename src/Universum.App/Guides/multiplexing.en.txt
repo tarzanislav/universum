@@ -46,7 +46,7 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
 !pozor If the title is uncertain, [Confirm the title] appears – until you confirm it, writing to the library does not start.
 ### Preview and MEGA processing
 You can **look at** the result first and send only the finished, flawless one to **MEGA processing** – it is written later, at night for example.
-1. At **Náhľad:** choose *parts: beginning, middle, end (3 × 2 min)* – ready in a moment – or *whole film* (the whole film).
+1. At **Preview:** choose *parts: beginning, middle, end (3 × 2 min)* – ready in a moment – or *whole film* (the whole film).
 2. Click [Make a preview]. The preview is written to **UNIVERSUM's folder of previews**, never to the output folder.
 3. [Play the preview] plays it in UNIVERSUM's player – switch the sound under the picture, the subtitles at the top right. [In another player] opens it in the Windows player.
 4. When everything is right, choose *to a new batch* (a new batch) or a waiting batch and click [Send to MEGA].

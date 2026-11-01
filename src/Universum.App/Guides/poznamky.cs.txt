@@ -6,7 +6,7 @@ automaticky i v Kalendáři, poznámka ke dni i v Poznámkách. Nic se nikam nep
 Kalendář ukazuje vaše záznamy spolu s premiérami, epizodami, svátky, jmeninami a prací UNIVERSUM.
 ![Kalendář – měsíc](calendar-month.jpg)
 ### Zobrazení
-- **Mesiac**, **Týždeň**, **Týždeň ako zoznam**, **Mesiac ako zoznam**, **Rok – 12 mesiacov**, **Rok v riadkoch** a **Agenda**
+- **Měsíc**, **Týden**, **Týden – seznam**, **Měsíc – seznam**, **Rok – měsíce**, **Rok – řádky** a **Agenda**
   (jen dny, ve kterých něco je).
 - Šipkami se posouváte o období, tlačítko [Dnes] vás vrátí na dnešek.
 - **Klik na den** ukáže vlevo vše o něm: svátky, jmeniny, záznamy, premiéry a epizody.
@@ -32,8 +32,8 @@ Napište úkol tak, jak byste ho řekli, a stiskněte **Enter**:
 Pod řádkem vidíte, jak ho UNIVERSUM pochopilo, ještě před přidáním.
 ![Plánované úkoly](tasks-list.jpg)
 ### Seznam a tabule
-- **Zoznam** dělí úkoly na *Po termínu* (červeně), *Dnes*, *Zítra*, *Tento týden*, *Později* a *Bez termínu*.
-- **Tabuľa** má sloupce *K udělání*, *Rozpracované*, *Hotové* – úkol posunete šipkami.
+- **Seznam** dělí úkoly na *Po termínu* (červeně), *Dnes*, *Zítra*, *Tento týden*, *Později* a *Bez termínu*.
+- **Tabule** má sloupce *K udělání*, *Rozpracované*, *Hotové* – úkol posunete šipkami.
 - Úkol může mít **kontrolní seznam** kroků (v editoru).
 ### UNIVERSUM navrhuje
 Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupní složce, nová epizoda, premiéra…).
@@ -49,7 +49,7 @@ Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupn
 @otvorit AgendaTasks Otevřít Plánované úkoly
 
 ## Poznámky
-- **Rýchla poznámka**: první věta je název, slova s # jsou štítky – *Nápad na plakát. Zkusit tmavší pozadí #nápad*.
+- **Rychlá poznámka**: první věta je název, slova s # jsou štítky – *Nápad na plakát. Zkusit tmavší pozadí #nápad*.
 - Na jednom místě jsou **moje poznámky**, **poznámky ke dnům** z Kalendáře a **poznámky k titulům** z Premiér a Novinek.
 - Špendlík na lístku připne poznámku nahoru; smazaná poznámka jde do **koše**, odkud se dá vrátit.
 ### Hlasem

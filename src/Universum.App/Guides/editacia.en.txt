@@ -20,9 +20,9 @@ reduce the **height** or change the **codec**.
 !tip Without [Precise cut (the picture is re-encoded)], cutting is **fast and lossless** – a section just moves
   to the nearest point where a cut is possible (usually a fraction of a second). An exact cut is frame-accurate but takes a long time.
 ### Picture
-- **Pomer strán** – how players display the picture; it is written without any loss of quality.
+- **Aspect ratio** – how players display the picture; it is written without any loss of quality.
 - [Rotate:] *90° clockwise*, *180°*, *90° counterclockwise*; [Height (lines):] e.g. from 2160 to 1080.
-- **Prekódovanie** – *H.264* or *H.265 (HEVC)* and the [Quality:] slider.
+- **Re-encoding** – *H.264* or *H.265 (HEVC)* and the [Quality:] slider.
 !pozor Rotating, a different height, a different codec and an exact cut **write the picture again** with the Windows encoders – this takes a long time.
   Sound and subtitles stay unchanged.
 ![Video track editing – section, rotation](studio-video.jpg)
@@ -34,16 +34,16 @@ and change the codec or the volume. The chosen sound plays with the picture **ex
 ### Fitting a dub
 1. [Open a video…] – e.g. *Vymyslený film (2026).mkv*.
 2. [Add a sound…] – an audio file (MKA, AC-3, DTS, AAC, FLAC, WAV…) or **another film** to take the sound from.
-3. Choose the added sound in the list and, at **Napasovať vybraný zvuk na:**, pick the film's original sound.
+3. Choose the added sound in the list and, at **Fit the selected audio to:**, pick the film's original sound.
 4. Click [Fit]. A certain result (shift and FPS change) is **set automatically**.
 5. Check it by playing it back and click [Save].
 !info An uncertain result is not used automatically – the [Use the suggestion] button appears. Use it only after checking it in the player.
 ### Manual changes to the chosen sound
-- **Posun** below the player: [−1000] [−100] [−10] … [+1000] ms – you hear the change straight away.
-- **Zmena FPS (PAL 25 ↔ 23,976)** – with [Preserve pitch] voices sound the same, just slower or faster.
-- **Kodek a hlasitosť** – [Codec:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (lossless)*;
+- **Shift** below the player: [−1000] [−100] [−10] … [+1000] ms – you hear the change straight away.
+- **FPS change (PAL 25 ↔ 23.976)** – with [Preserve pitch] voices sound the same, just slower or faster.
+- **Codec and volume** – [Codec:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (lossless)*;
   [Stereo (downmix 5.1 to two channels)], [Normalize volume to −23 LUFS (EBU R128)], [Boost / reduce:].
-- [Language:] and [Track name:]; the **Ponechať** column decides whether the track stays in the result.
+- [Language:] and [Track name:]; the **Keep** column decides whether the track stays in the result.
 - [Reset the changes] returns the chosen sound to its original state.
 !tip A **shift on its own is written losslessly**. An FPS change, codec, stereo and volume write the sound again.
 ![Audio track editing – an added dub](studio-audio.jpg)
@@ -54,21 +54,21 @@ Here you **shift, fit, fix, download, translate** or **read subtitles from pictu
 are **white at the bottom** of the picture; those chosen in [Compare with:] are **yellow at the top**.
 ### Shifting while you watch
 1. [Open a video…] (or [Open subtitles…] for subtitle files on their own).
-2. On the **Stopy titulkov** tab, choose the subtitles you want to edit.
+2. On the **Subtitle tracks** tab, choose the subtitles you want to edit.
 3. Play the film. When a subtitle is late, click [Subtitle starts now] at the moment the character starts speaking.
 4. Fine-tune with [−100] / [+100] (ms) and click [Save].
 ### Automatic fitting
-- Tick **podľa zvuku** and/or **podľa titulkov:** (other subtitles that match the film, even in another language).
+- Tick **by audio** and/or **by subtitles:** (other subtitles that match the film, even in another language).
 - [Fit] sets the shift and also an **FPS change** or speed. An uncertain result waits for [Use the suggestion].
 - [Check the video's subtitles] tells you for each track: in sync, late, early or a different FPS.
-- **Synchronizácia podľa dvoch titulkov**: at a subtitle near the start of the film click [Point 1], at a subtitle near the end
+- **Synchronization by two subtitles**: at a subtitle near the start of the film click [Point 1], at a subtitle near the end
   click [Point 2] – speed and shift are worked out automatically.
 ### Tabs
-- **Časy titulkov** – all subtitles with the time *Now* and *After change*. Fix the text with the **F2** key;
+- **Subtitle times** – all subtitles with the time *Now* and *After change*. Fix the text with the **F2** key;
   the right mouse button offers *Remove subtitle* and *Revert all text edits*.
-- **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com via the browser and translation via svsub.net.
+- **Download and translate** – OpenSubtitles.com, titulky.com via the browser and translation via svsub.net.
   The result is saved next to the video, e.g. *Vymyslený film (2026).sk.srt*.
-- **Text z obrázkov (OCR)** – turns picture subtitles from Blu-ray (PGS) into text: choose the track and click
+- **Text from images (OCR)** – turns picture subtitles from Blu-ray (PGS) and DVD (VobSub) into text: choose the track and click
   [Recognize the text]. When it meets a shape it doesn't know, it **asks once per film** and remembers it.
 ![Subtitle track editing](studio-subtitles.jpg)
 ![OCR asks about an unknown shape](ocr-question.jpg)

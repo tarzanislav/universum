@@ -136,16 +136,16 @@
                         <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="250" VerticalAlignment="Center" ToolTip="{Binding Caption}">
                             <Hyperlink Command="{Binding OpenTmdbCommand}"><Run Text="{Binding Caption, Mode=OneWay}" /></Hyperlink>
                         </TextBlock>
-                        <Button Content="{loc:T 'TMDB'}" Command="{Binding OpenTmdbCommand}" Style="{StaticResource NewsLink}" ToolTip="Otvoriť na TMDB" />
-                        <Button Content="{loc:T 'HISTRA'}" Command="{Binding OpenHistraCommand}" Style="{StaticResource NewsLink}" ToolTip="Otvoriť na HISTRA" />
-                        <Button Content="{loc:T 'Zdroj'}" Command="{Binding OpenSourceCommand}" Style="{StaticResource NewsLink}" ToolTip="Otvoriť v zdroji"
+                        <Button Content="{loc:T 'TMDB'}" Command="{Binding OpenTmdbCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Otvoriť na TMDB'}" />
+                        <Button Content="{loc:T 'HISTRA'}" Command="{Binding OpenHistraCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Otvoriť na HISTRA'}" />
+                        <Button Content="{loc:T 'Zdroj'}" Command="{Binding OpenSourceCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Otvoriť v zdroji'}"
                                 Visibility="{Binding HasSource, Converter={StaticResource BoolToVisibility}}" />
                     </WrapPanel>
                     <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource NewsSubtitle}" />
                     <TextBlock Text="{Binding Rhythm, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold"
                                Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                     <TextBlock Text="{Binding Streaming, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold" Foreground="#2F9461"
-                               ToolTip="Kde sa dá titul legálne pozerať (SK, CZ) – údaje JustWatch cez TMDB" />
+                               ToolTip="{loc:T 'Kde sa dá titul legálne pozerať (SK, CZ) – údaje JustWatch cez TMDB'}" />
                 </StackPanel>
             </DockPanel>
         </DataTemplate>
@@ -171,14 +171,14 @@
                                         <Hyperlink Command="{Binding OpenCommand}"><Run Text="{Binding Name, Mode=OneWay}" /></Hyperlink>
                                     </TextBlock>
                                     <Button Content="×" Command="{Binding RemoveCommand}" Padding="5,0" MinWidth="0" MinHeight="0" Margin="3,0,0,0"
-                                            Background="Transparent" BorderThickness="0" VerticalAlignment="Center" ToolTip="Odstrániť odkaz z poznámky" />
+                                            Background="Transparent" BorderThickness="0" VerticalAlignment="Center" ToolTip="{loc:T 'Odstrániť odkaz z poznámky'}" />
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBox Text="{Binding NoteText, UpdateSourceTrigger=LostFocus}" MinHeight="30" MinWidth="60" TextWrapping="Wrap" pages:NoteLinks.AskName="True"
-                         ToolTip="Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa sa zmení na slovo-odkaz vedľa poznámky." />
+                         ToolTip="{loc:T 'Poznámka k titulu – uloží sa, keď pole opustíte. Vložená webová adresa sa zmení na slovo-odkaz vedľa poznámky.'}" />
             </DockPanel>
         </DataTemplate>
         <!-- MEGA spracovanie (owner, 29. 10. 2026): batches written later, each with its start -->
@@ -197,16 +197,16 @@
                     <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
                 </StackPanel>
                 <WrapPanel Grid.Row="1" Margin="0,10,0,10">
-                    <Button Content="{loc:T 'Spustiť teraz'}" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" ToolTip="Pridá vybranú dávku do Fronty úloh a spustí ju" />
+                    <Button Content="{loc:T 'Spustiť teraz'}" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" ToolTip="{loc:T 'Pridá vybranú dávku do Fronty úloh a spustí ju'}" />
                     <Button Content="{loc:T 'Upraviť v Hromadnom spracovaní'}" Command="{Binding EditCommand}" Padding="12,4" Margin="0,0,8,0"
-                            ToolTip="Otvorí dávku so všetkými rozhodnutiami v Hromadnom spracovaní – opravíte ju a dáte Uložiť do dávky" />
+                            ToolTip="{loc:T 'Otvorí dávku so všetkými rozhodnutiami v Hromadnom spracovaní – opravíte ju a dáte Uložiť do dávky'}" />
                     <Button Content="{loc:T 'Znova preskočené a chybné'}" Command="{Binding RetryCommand}" Padding="12,4" Margin="0,0,16,0"
-                            ToolTip="Súbory dokončenej dávky, ktoré sa preskočili, nepodarili alebo zrušili, sa znova skontrolujú a zapíšu" />
-                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Dávku vyššie (poradie pre „po predchádzajúcej dávke“)" />
-                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="Dávku nižšie" />
+                            ToolTip="{loc:T 'Súbory dokončenej dávky, ktoré sa preskočili, nepodarili alebo zrušili, sa znova skontrolujú a zapíšu'}" />
+                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="{loc:T 'Dávku vyššie (poradie pre „po predchádzajúcej dávke“)'}" />
+                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="{loc:T 'Dávku nižšie'}" />
                     <Button Content="{loc:T 'Zmazať originály'}" Command="{Binding DeleteOriginalsCommand}" Padding="12,4" Margin="0,0,8,0"
-                            ToolTip="Dávka odoslaná so „zmazať ručne“: originály jej zapísaných súborov do Koša Windows" />
-                    <Button Content="{loc:T 'Odstrániť dávku'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Súbory sa nemenia; nezapísané sa v Hromadnom spracovaní znova ukážu ako voľné" />
+                            ToolTip="{loc:T 'Dávka odoslaná so „zmazať ručne“: originály jej zapísaných súborov do Koša Windows'}" />
+                    <Button Content="{loc:T 'Odstrániť dávku'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="{loc:T 'Súbory sa nemenia; nezapísané sa v Hromadnom spracovaní znova ukážu ako voľné'}" />
                     <Button Content="{loc:T 'Vyčistiť dokončené'}" Command="{Binding ClearFinishedCommand}" Padding="12,4" />
                 </WrapPanel>
                 <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
@@ -225,7 +225,7 @@
                                         <DatePicker SelectedDate="{Binding Date, UpdateSourceTrigger=PropertyChanged}" Margin="6,0,0,0" FontSize="12" Width="120"
                                                     Visibility="{Binding IsAt, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBox Text="{Binding Time, UpdateSourceTrigger=LostFocus}" Margin="6,0,0,0" Width="56" FontSize="12" VerticalContentAlignment="Center"
-                                                 Visibility="{Binding IsAt, Converter={StaticResource BoolToVisibility}}" ToolTip="Čas spustenia, napr. 2:00" />
+                                                 Visibility="{Binding IsAt, Converter={StaticResource BoolToVisibility}}" ToolTip="{loc:T 'Čas spustenia, napr. 2:00'}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -249,7 +249,7 @@
                 </DataGrid>
                 <DockPanel Grid.Row="3" Margin="0,12,0,6">
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Vybrať súbor z dávky'}" Command="{Binding RemoveFileCommand}" Padding="12,4"
-                            ToolTip="Súbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný" />
+                            ToolTip="{loc:T 'Súbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný'}" />
                     <TextBlock Text="{loc:T 'Súbory vybranej dávky'}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </DockPanel>
                 <DataGrid Grid.Row="4" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" AutoGenerateColumns="False" IsReadOnly="True"
@@ -374,7 +374,7 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="8,0,0,0"
-                            ToolTip="Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)" />
+                            ToolTip="{loc:T 'Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)'}" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" />
@@ -466,7 +466,7 @@
                                         <!-- owner, 30. 10. 2026: Track name – the name can be written or added to -->
                                         <TextBox Text="{Binding EditedName, UpdateSourceTrigger=LostFocus}" FontWeight="SemiBold" MinWidth="120"
                                                  Visibility="{Binding CanName, Converter={StaticResource BoolToVisibility}}"
-                                                 ToolTip="Názov stopy vo výsledku – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu" />
+                                                 ToolTip="{loc:T 'Názov stopy vo výsledku – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu'}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -499,7 +499,7 @@
                             <TextBlock Text="{loc:T 'Originál:'}" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
                             <RadioButton Content="{loc:T 'zachovať'}" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
                             <RadioButton Content="{loc:T 'vymazať (zatiaľ vypnuté)'}" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
-                                         ToolTip="Single spracovanie originály vždy zachová – mazanie originálov je len v Hromadnom spracovaní." ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
+                                         ToolTip="{loc:T 'Single spracovanie originály vždy zachová – mazanie originálov je len v Hromadnom spracovaní.'}" ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
                             <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
                                 <Run Text="{loc:T 'Knižnica:'}" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
@@ -510,7 +510,7 @@
                             <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,20,0" />
                             <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="300" Margin="0,0,6,0"
-                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                     ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="220" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -519,11 +519,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                 <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                          ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                             </StackPanel>
                         </WrapPanel>
                         <TextBlock Margin="0,6,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Target}">
@@ -537,13 +537,13 @@
                                 <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
                                 <Button Content="{loc:T 'Revízia'}" Command="{Binding ReviseCommand}" Margin="0,0,8,0" Padding="16,6"
                                         Visibility="{Binding CanRevise, Converter={StaticResource BoolToVisibility}}"
-                                        ToolTip="Výsledok už v knižnici je – spracovať znova ako novú verziu: nová sa zapíše a overí, až potom ide doterajšia do Koša" />
-                                <Button Content="{loc:T 'Do fronty'}" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="Pridá súbor do fronty úloh namiesto okamžitého spracovania" />
+                                        ToolTip="{loc:T 'Výsledok už v knižnici je – spracovať znova ako novú verziu: nová sa zapíše a overí, až potom ide doterajšia do Koša'}" />
+                                <Button Content="{loc:T 'Do fronty'}" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="{loc:T 'Pridá súbor do fronty úloh namiesto okamžitého spracovania'}" />
                                 <!-- owner, 1. 11. 2026: the file to MEGA spracovanie, written later; its original is kept -->
                                 <ComboBox ItemsSource="{Binding Mega.Targets}" SelectedItem="{Binding Mega.Selected}" DisplayMemberPath="Label" MaxWidth="200" Margin="0,0,4,0"
                                           VerticalAlignment="Center" ToolTip="{loc:T 'Do novej dávky MEGA spracovania, alebo doplniť čakajúcu dávku'}" />
                                 <Button Content="{loc:T 'Odoslať do MEGA'}" Command="{Binding SendToMegaCommand}" Margin="0,0,8,0" Padding="16,6"
-                                        ToolTip="Súbor sa so všetkými rozhodnutiami zapíše neskôr v MEGA spracovaní (keď dávku spustíte alebo v nastavenom čase); originál ostane" />
+                                        ToolTip="{loc:T 'Súbor sa so všetkými rozhodnutiami zapíše neskôr v MEGA spracovaní (keď dávku spustíte alebo v nastavenom čase); originál ostane'}" />
                                 <Button Content="{loc:T 'Použiť pravidlá'}" Command="{Binding ApplyCommand}" Padding="16,6" />
                             </StackPanel>
                             <StackPanel Margin="0,0,16,0">
@@ -613,12 +613,12 @@
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="{loc:T 'Vymazať všetko'}" Padding="10,3" Margin="0,0,6,0"
                                         Command="{Binding DataContext.ClearSourcesCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
-                                        ToolTip="Odstráni všetky zdrojové súbory zo Zlučovania (na disku sa nič nezmení)" />
+                                        ToolTip="{loc:T 'Odstráni všetky zdrojové súbory zo Zlučovania (na disku sa nič nezmení)'}" />
                                 <Button Content="{loc:T 'Informácie'}" Padding="10,3" Margin="0,0,6,0"
                                         Command="{Binding DataContext.ShowInfoCommand, RelativeSource={RelativeSource AncestorType=ContentControl}}"
-                                        ToolTip="Zobrazí vybraný zdrojový súbor (alebo súbor vybranej stopy) na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
+                                        ToolTip="{loc:T 'Zobrazí vybraný zdrojový súbor (alebo súbor vybranej stopy) na stránke Informácie'}" ToolTipService.ShowOnDisabled="True" />
                                 <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveSourceCommand}" Padding="10,3"
-                                        ToolTip="Odstráni vybraný zdrojový súbor (aj jeho stopy), časť alebo pripojený súbor" ToolTipService.ShowOnDisabled="True" />
+                                        ToolTip="{loc:T 'Odstráni vybraný zdrojový súbor (aj jeho stopy), časť alebo pripojený súbor'}" ToolTipService.ShowOnDisabled="True" />
                             </StackPanel>
                             <TextBlock Text="{loc:T 'Zdrojové súbory'}" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding Summary}" ToolTip="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="12,0,8,0"
@@ -631,9 +631,9 @@
                                 <ContextMenu>
                                     <MenuItem Header="{loc:T 'Pridať súbory…'}" Command="{Binding AddSourcesCommand}" />
                                     <MenuItem Header="{loc:T 'Pripojiť súbory…'}" Command="{Binding AppendFilesCommand}"
-                                              ToolTip="Pripojí súbory na koniec vybraného súboru – pokračujú jeho stopami (napr. 2. časť filmu)" />
+                                              ToolTip="{loc:T 'Pripojí súbory na koniec vybraného súboru – pokračujú jeho stopami (napr. 2. časť filmu)'}" />
                                     <MenuItem Header="{loc:T 'Pridať súbory ako ďalšie časti…'}" Command="{Binding AddPartsCommand}"
-                                              ToolTip="Súbory sa prečítajú ako jeden s vybraným súborom (napr. VTS_01_1.VOB, VTS_01_2.VOB)" />
+                                              ToolTip="{loc:T 'Súbory sa prečítajú ako jeden s vybraným súborom (napr. VTS_01_1.VOB, VTS_01_2.VOB)'}" />
                                     <Separator />
                                     <MenuItem Header="{loc:T 'Odstrániť súbor'}" Command="{Binding RemoveSourceCommand}" />
                                     <MenuItem Header="{loc:T 'Odstrániť všetky súbory'}" Command="{Binding RemoveAllSourcesCommand}" />
@@ -643,7 +643,7 @@
                                     <MenuItem Header="{loc:T 'Informácie o súbore'}" Command="{Binding SourceInfoCommand}" />
                                     <Separator />
                                     <MenuItem Header="{loc:T 'Vybrať všetky stopy zo súboru'}" Command="{Binding TakeAllTracksOfSourceCommand}"
-                                              ToolTip="Zaškrtne všetky stopy vybraného súboru" />
+                                              ToolTip="{loc:T 'Zaškrtne všetky stopy vybraného súboru'}" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -697,12 +697,12 @@
                         <DockPanel Grid.Row="3" Margin="0,0,0,4">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="{loc:T 'Pravidlá UNIVERSUM'}" Command="{Binding ApplyRulesCommand}" Padding="10,3" Margin="0,0,6,0"
-                                        ToolTip="Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM" ToolTipService.ShowOnDisabled="True" />
-                                <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveUpCommand}" Padding="9,5" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑)" />
-                                <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveDownCommand}" Padding="9,5" ToolTip="Posunúť nižšie (Ctrl+↓)" />
+                                        ToolTip="{loc:T 'Vyplní názvy, jazyky, príznaky a poradie vybraných stôp podľa pravidiel UNIVERSUM'}" ToolTipService.ShowOnDisabled="True" />
+                                <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveUpCommand}" Padding="9,5" Margin="0,0,4,0" ToolTip="{loc:T 'Posunúť vyššie (Ctrl+↑)'}" />
+                                <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Command="{Binding MoveDownCommand}" Padding="9,5" ToolTip="{loc:T 'Posunúť nižšie (Ctrl+↓)'}" />
                             </StackPanel>
                             <TextBlock Text="{loc:T 'Stopy vo výstupe'}" FontWeight="SemiBold" VerticalAlignment="Center"
-                                       ToolTip="V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú" />
+                                       ToolTip="{loc:T 'V poradí, v akom budú vo výstupnom súbore; nezaškrtnuté stopy sa nevezmú'}" />
                         </DockPanel>
                         <DataGrid Grid.Row="4" ItemsSource="{Binding TrackRows}" SelectedItem="{Binding SelectedTrackItem}" AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
@@ -732,7 +732,7 @@
                                                           IsEnabled="{Binding IsMain}" ToolTip="{loc:T 'Vziať túto stopu do výstupu'}" />
                                                 <Border Width="8" Height="8" CornerRadius="2" Margin="0,0,5,0" VerticalAlignment="Center" ToolTip="{Binding Source}"
                                                         Background="{Binding ColorIndex, Converter={StaticResource FileColor}}" />
-                                                <TextBlock Text="{Binding Position}" VerticalAlignment="Center" ToolTip="Poradie vo výstupe" />
+                                                <TextBlock Text="{Binding Position}" VerticalAlignment="Center" ToolTip="{loc:T 'Poradie vo výstupe'}" />
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -842,7 +842,7 @@
                                             <StackPanel Visibility="{Binding IsTextSubtitles, Converter={StaticResource BoolToVisibility}}">
                                                 <TextBlock Text="{loc:T 'Kódovanie znakov titulkov'}" Margin="0,8,0,2" />
                                                 <ComboBox IsEditable="True" Text="{Binding SubtitleCharset, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch"
-                                                          ToolTip="Prázdne = podľa súboru; pre staré české a slovenské titulky zvyčajne cp1250">
+                                                          ToolTip="{loc:T 'Prázdne = podľa súboru; pre staré české a slovenské titulky zvyčajne cp1250'}">
                                                     <ComboBoxItem Content="cp1250" />
                                                     <ComboBoxItem Content="iso-8859-2" />
                                                     <ComboBoxItem Content="utf-8" />
@@ -894,10 +894,10 @@
                                         <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
                                         <TextBlock Text="{loc:T 'Kapitoly zo súboru (XML, OGM .txt, cue)'}" Margin="0,8,0,2" TextWrapping="Wrap" />
                                         <DockPanel>
-                                            <Button DockPanel.Dock="Right" Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,3" Margin="4,0,0,0" ToolTip="Bez súboru s kapitolami" />
+                                            <Button DockPanel.Dock="Right" Content="✕" Command="{Binding ClearChaptersCommand}" Padding="8,3" Margin="4,0,0,0" ToolTip="{loc:T 'Bez súboru s kapitolami'}" />
                                             <Button DockPanel.Dock="Right" Content="{loc:T 'Vybrať…'}" Command="{Binding ChooseChaptersCommand}" Padding="8,3" Margin="4,0,0,0" />
                                             <TextBox Text="{Binding ChaptersFile, UpdateSourceTrigger=PropertyChanged}"
-                                                     ToolTip="Pridajú sa ku kapitolám zo zdrojov, pri ktorých sú zaškrtnuté" />
+                                                     ToolTip="{loc:T 'Pridajú sa ku kapitolám zo zdrojov, pri ktorých sú zaškrtnuté'}" />
                                         </DockPanel>
                                         <TextBlock Text="{loc:T 'Nové prílohy (písma, obrázky)'}" Margin="0,8,0,2" />
                                         <ListBox ItemsSource="{Binding Attachments}" SelectedItem="{Binding SelectedAttachment}" MaxHeight="80" MinHeight="28" />
@@ -918,7 +918,7 @@
                         <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="muxKind" VerticalAlignment="Center" Margin="0,0,16,4" MinWidth="0" />
                         <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,4" />
                         <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="0,0,6,4"
-                                 ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj adresa TMDB (/movie/ = film, /tv/ = seriál)" />
+                                 ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj adresa TMDB (/movie/ = film, /tv/ = seriál)'}" />
                         <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,4" />
                         <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,12,4"
                                   IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -927,11 +927,11 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                             <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                      ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                      ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,12,4">
                             <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                            <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04 (špeciály S00E01)" />
+                            <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04 (špeciály S00E01)'}" />
                         </StackPanel>
                         <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" TextWrapping="NoWrap" Margin="0,0,0,4">
                             <Run Text="{Binding Tmdb.Message, Mode=OneWay}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" />
@@ -941,12 +941,12 @@
                         <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Výstupný súbor:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                             <Button Content="{loc:T 'Vybrať…'}" Command="{Binding ChooseOutputCommand}" Padding="10,3" Margin="6,0,0,0" ToolTipService.ShowOnDisabled="True"
-                                    ToolTip="Vybrať priečinok a meno výstupného súboru" />
+                                    ToolTip="{loc:T 'Vybrať priečinok a meno výstupného súboru'}" />
                             <CheckBox Content="{loc:T 'Do knižnice'}" IsChecked="{Binding UseLibrary}" IsEnabled="{Binding CanUseLibrary}" VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="0"
-                                      ToolTip="Výsledok pôjde do knižnice (MOVIES / TVSHOWS) s názvom podľa pravidiel; cesta sa potom nedá upravovať." ToolTipService.ShowOnDisabled="True" />
+                                      ToolTip="{loc:T 'Výsledok pôjde do knižnice (MOVIES / TVSHOWS) s názvom podľa pravidiel; cesta sa potom nedá upravovať.'}" ToolTipService.ShowOnDisabled="True" />
                             <Button Content="{loc:T 'Knižnica…'}" Command="{Binding Library.ChooseOutputDirectoryCommand}" Padding="10,3" Margin="4,0,0,0" ToolTip="{Binding Library.OutputDescription}" />
                             <Button Content="{loc:T 'Resetovať'}" Command="{Binding ResetOutputCommand}" Padding="10,3" Margin="6,0,0,0"
-                                    ToolTip="Späť na predvolený výstup: vedľa prvého zdroja, s názvom podľa pravidiel, ak je zadaný titul" />
+                                    ToolTip="{loc:T 'Späť na predvolený výstup: vedľa prvého zdroja, s názvom podľa pravidiel, ak je zadaný titul'}" />
                         </StackPanel>
                         <TextBox Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding OutputEditable}" ToolTip="{Binding OutputPath}" />
                     </DockPanel>
@@ -969,22 +969,22 @@
                                 <ComboBox ItemsSource="{Binding Mega.Targets}" SelectedItem="{Binding Mega.Selected}" DisplayMemberPath="Label" MaxWidth="200" Margin="0,0,4,0"
                                           ToolTip="{loc:T 'Do novej dávky MEGA spracovania, alebo doplniť čakajúcu dávku'}" />
                                 <Button Content="{loc:T 'Odoslať do MEGA'}" Command="{Binding SendToMegaCommand}" Padding="12,4" FontWeight="SemiBold"
-                                        ToolTip="Výsledok (celý, nie náhľad) sa zapíše neskôr v MEGA spracovaní – keď dávku spustíte alebo v nastavenom čase. Zdrojové súbory ostanú." />
+                                        ToolTip="{loc:T 'Výsledok (celý, nie náhľad) sa zapíše neskôr v MEGA spracovaní – keď dávku spustíte alebo v nastavenom čase. Zdrojové súbory ostanú.'}" />
                             </StackPanel>
                             <StackPanel>
                                 <WrapPanel>
                                     <TextBlock Text="{loc:T 'Náhľad:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <ComboBox ItemsSource="{Binding Source={x:Static pages:MuxSettingsViewModel.PreviewRanges}}" SelectedItem="{Binding PreviewRange}" Width="270" Margin="0,0,6,2" />
                                     <Button Content="{loc:T 'Vytvoriť náhľad'}" Command="{Binding PreviewCommand}" Padding="10,3" Margin="0,0,6,2"
-                                            ToolTip="Zapíše výsledok do priečinka náhľadov UNIVERSUM (nie do výstupného priečinka) – úseky sú hotové za chvíľu, celý film trvá ako zlučovanie" />
+                                            ToolTip="{loc:T 'Zapíše výsledok do priečinka náhľadov UNIVERSUM (nie do výstupného priečinka) – úseky sú hotové za chvíľu, celý film trvá ako zlučovanie'}" />
                                     <Button Content="{loc:T 'Zastaviť'}" Command="{Binding CancelPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
                                             Visibility="{Binding IsPreviewing, Converter={StaticResource BoolToVisibility}}" />
                                     <ProgressBar Width="120" Height="6" Maximum="1" Value="{Binding PreviewProgress, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,6,2"
                                                  Visibility="{Binding IsPreviewing, Converter={StaticResource BoolToVisibility}}" />
                                     <Button Content="{loc:T 'Prehrať náhľad'}" Command="{Binding PlayPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
-                                            ToolTip="V prehrávači UNIVERSUM so zvukmi a titulkami výsledku" />
+                                            ToolTip="{loc:T 'V prehrávači UNIVERSUM so zvukmi a titulkami výsledku'}" />
                                     <Button Content="{loc:T 'V inom prehrávači'}" Command="{Binding OpenPreviewCommand}" Padding="10,3" Margin="0,0,6,2"
-                                            ToolTip="Otvorí náhľad v prehrávači, ktorý má Windows pre MKV" />
+                                            ToolTip="{loc:T 'Otvorí náhľad v prehrávači, ktorý má Windows pre MKV'}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding PreviewText}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" />
                                 <TextBlock Text="{loc:T 'Nastavenia sa od náhľadu zmenili – vytvorte nový náhľad.'}" FontSize="12" Foreground="{DynamicResource SystemFillColorCautionBrush}"
@@ -1012,18 +1012,18 @@
                     </StackPanel>
                 </DockPanel>
                 <WrapPanel Grid.Row="1" Margin="0,10,0,10">
-                    <Button Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Nová kapitola za vybranou (o minútu neskôr)" />
+                    <Button Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="{loc:T 'Nová kapitola za vybranou (o minútu neskôr)'}" />
                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" />
                     <Button Content="{loc:T 'Zoradiť podľa času'}" Command="{Binding SortCommand}" Padding="12,4" Margin="0,0,16,0" />
                     <TextBlock Text="{loc:T 'Každých'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                     <TextBox Text="{Binding Interval, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="0,0,6,0" />
                     <TextBlock Text="{loc:T 'min'}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <Button Content="{loc:T 'Vygenerovať'}" Command="{Binding GenerateCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Nahradí zoznam kapitolami po celej dĺžke súboru" />
+                    <Button Content="{loc:T 'Vygenerovať'}" Command="{Binding GenerateCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="{loc:T 'Nahradí zoznam kapitolami po celej dĺžke súboru'}" />
                     <TextBlock Text="{loc:T 'Posun'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                     <TextBox Text="{Binding Shift, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="0,0,6,0" />
                     <TextBlock Text="s" VerticalAlignment="Center" Margin="0,0,6,0" />
                     <Button Content="{loc:T 'Posunúť všetky'}" Command="{Binding ShiftCommand}" Padding="12,4" Margin="0,0,16,0" />
-                    <Button Content="{loc:T 'Načítať zo súboru…'}" Command="{Binding ImportCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Kapitoly XML alebo OGM (.txt)" />
+                    <Button Content="{loc:T 'Načítať zo súboru…'}" Command="{Binding ImportCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="{loc:T 'Kapitoly XML alebo OGM (.txt)'}" />
                     <Button Content="{loc:T 'Odstrániť všetky'}" Command="{Binding RemoveAllCommand}" Padding="12,4" />
                 </WrapPanel>
                 <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" IsReadOnly="True"
@@ -1065,7 +1065,7 @@
                                 <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="chaptersKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                                 <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
-                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                         ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                                 <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -1074,11 +1074,11 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                     <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                     <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                              ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                              ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                     <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                    <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                    <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                                 </StackPanel>
                                 <Button Content="{loc:T 'Knižnica…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                             </WrapPanel>
@@ -1112,10 +1112,10 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="Zabudne otvorené video a titulky – na disku sa nič nezmení" />
+                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="{loc:T 'Zabudne otvorené video a titulky – na disku sa nič nezmení'}" />
                         <Button Content="{loc:T 'Otvoriť video…'}" Command="{Binding OpenVideoCommand}" Padding="16,6" Margin="0,0,8,0" />
                         <Button Content="{loc:T 'Otvoriť titulky…'}" Command="{Binding OpenSubtitlesCommand}" Padding="16,6"
-                                ToolTip="Súbory titulkov (SRT, ASS/SSA, WebVTT, TTML, SAMI, SubViewer, MicroDVD, MPL2, TMPlayer) – uložia sa ako nové SRT" />
+                                ToolTip="{loc:T 'Súbory titulkov (SRT, ASS/SSA, WebVTT, TTML, SAMI, SubViewer, MicroDVD, MPL2, TMPlayer) – uložia sa ako nové SRT'}" />
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" />
@@ -1139,7 +1139,7 @@
                             <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                                 <WrapPanel>
                                     <CheckBox Content="{loc:T 'Porovnať s:'}" IsChecked="{Binding Compare}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                              ToolTip="Iné titulky hore na obraze (žlté), so svojimi zmenami" />
+                                              ToolTip="{loc:T 'Iné titulky hore na obraze (žlté), so svojimi zmenami'}" />
                                     <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding CompareRow}" Width="190" Margin="0,0,16,0">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
@@ -1159,11 +1159,11 @@
                                         <Button Content="+1000" Command="{Binding DelayStepCommand}" CommandParameter="1000" Padding="6,2" />
                                     </StackPanel>
                                     <Button Content="{loc:T 'Titulok začína teraz'}" Command="{Binding StartsNowCommand}" Padding="10,2" Margin="0,0,6,0"
-                                            ToolTip="Najbližší titulok vybraných titulkov sa posunie tak, aby začínal práve teraz (posun sa zmení o rozdiel)" />
+                                            ToolTip="{loc:T 'Najbližší titulok vybraných titulkov sa posunie tak, aby začínal práve teraz (posun sa zmení o rozdiel)'}" />
                                     <Button Content="{loc:T '1. bod'}" Command="{Binding MarkFirstCommand}" Padding="8,2" Margin="0,0,4,0"
-                                            ToolTip="Synchronizácia podľa dvoch titulkov: najbližší titulok patrí sem (na začiatku filmu)" />
+                                            ToolTip="{loc:T 'Synchronizácia podľa dvoch titulkov: najbližší titulok patrí sem (na začiatku filmu)'}" />
                                     <Button Content="{loc:T '2. bod'}" Command="{Binding MarkSecondCommand}" Padding="8,2"
-                                            ToolTip="…a druhý titulok ku koncu filmu – vypočíta rýchlosť a posun" />
+                                            ToolTip="{loc:T '…a druhý titulok ku koncu filmu – vypočíta rýchlosť a posun'}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding LiveStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
                             </StackPanel>
@@ -1213,17 +1213,17 @@
                                     <StackPanel Grid.Row="2" Margin="0,8,0,4">
                                         <WrapPanel>
                                             <Button Content="{loc:T 'Pridať externé titulky…'}" Command="{Binding AddExternalCommand}" Padding="12,4" Margin="0,0,8,0"
-                                                    ToolTip="Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)" />
-                                            <Button Content="{loc:T 'Odstrániť zo zoznamu'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný externý súbor sa nepridá" />
+                                                    ToolTip="{loc:T 'Súbory titulkov, ktoré patria k videu – pridajú sa ako nové stopy (textové ako SRT v UTF-8)'}" />
+                                            <Button Content="{loc:T 'Odstrániť zo zoznamu'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="{loc:T 'Pridaný externý súbor sa nepridá'}" />
                                             <Button Content="{loc:T 'Skontrolovať titulky videa'}" Command="{Binding CheckTracksCommand}" Padding="12,4"
-                                                    ToolTip="Porovná každú titulkovú stopu videa so zvukom: sedí, mešká, ide skôr, iné FPS" />
+                                                    ToolTip="{loc:T 'Porovná každú titulkovú stopu videa so zvukom: sedí, mešká, ide skôr, iné FPS'}" />
                                         </WrapPanel>
                                         <WrapPanel Margin="0,8,0,0">
                                             <TextBlock Text="{loc:T 'Napasovať vybrané automaticky:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <CheckBox Content="{loc:T 'podľa zvuku'}" IsChecked="{Binding SyncByAudio}" VerticalAlignment="Center" Margin="0,0,12,0"
-                                                      ToolTip="Kde sa vo filme hovorí – osem častí filmu, aj iné FPS (25 ↔ 23,976 …)" />
+                                                      ToolTip="{loc:T 'Kde sa vo filme hovorí – osem častí filmu, aj iné FPS (25 ↔ 23,976 …)'}" />
                                             <CheckBox Content="{loc:T 'podľa titulkov:'}" IsChecked="{Binding SyncBySubtitles}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                                      ToolTip="Iné titulky, ktoré k filmu sedia (aj v inom jazyku)" />
+                                                      ToolTip="{loc:T 'Iné titulky, ktoré k filmu sedia (aj v inom jazyku)'}" />
                                             <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SyncReference}" Width="200" Margin="0,0,8,0">
                                                 <ComboBox.ItemTemplate>
                                                     <DataTemplate>
@@ -1234,12 +1234,12 @@
                                                 </ComboBox.ItemTemplate>
                                             </ComboBox>
                                             <Button Content="{loc:T 'Napasovať'}" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
-                                                    ToolTip="Nastaví rýchlosť (alebo zmenu FPS) a posun vybraných titulkov, keď je výsledok istý; oboje naraz = istota, keď sa zhodnú" />
+                                                    ToolTip="{loc:T 'Nastaví rýchlosť (alebo zmenu FPS) a posun vybraných titulkov, keď je výsledok istý; oboje naraz = istota, keď sa zhodnú'}" />
                                             <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopSyncCommand}" Padding="12,4" Margin="0,0,8,0"
-                                                    ToolTip="Zastaví čítanie zvuku filmu" />
+                                                    ToolTip="{loc:T 'Zastaví čítanie zvuku filmu'}" />
                                             <Button Content="{loc:T 'Použiť návrh'}" Command="{Binding ApplyProposalCommand}" Padding="12,4"
                                                     Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
-                                                    ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
+                                                    ToolTip="{loc:T 'Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním'}" />
                                         </WrapPanel>
                                         <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                     </StackPanel>
@@ -1283,14 +1283,14 @@
                                             <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding OnlineLanguage}" Width="60" Margin="0,0,6,0" ToolTip="{loc:T 'Jazyk titulkov'}" />
                                             <ComboBox ItemsSource="{Binding HearingImpairedFilters}" SelectedItem="{Binding HearingImpairedFilter}" Width="100" Margin="0,0,6,0" ToolTip="{loc:T 'Titulky pre nepočujúcich (SDH)'}" />
                                             <Button Content="{loc:T 'Hľadať'}" Command="{Binding SearchOnlineCommand}" Padding="12,3" Margin="0,0,20,0"
-                                                    ToolTip="Podľa titulu (s TMDB ID presne) a epizódy; účet a API kľúč v Nastaveniach" />
+                                                    ToolTip="{loc:T 'Podľa titulu (s TMDB ID presne) a epizódy; účet a API kľúč v Nastaveniach'}" />
                                             <TextBlock Text="{loc:T 'titulky.com (CZ/SK):'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <Button Content="{loc:T 'Hľadať v prehliadači'}" Command="{Binding SearchTitulkyCommand}" Padding="12,3" Margin="0,0,20,0"
-                                                    ToolTip="Pravidlá titulky.com dovoľujú len prehliadač: stiahnite titulky, UNIVERSUM ich sám vezme zo Stiahnutých súborov" />
+                                                    ToolTip="{loc:T 'Pravidlá titulky.com dovoľujú len prehliadač: stiahnite titulky, UNIVERSUM ich sám vezme zo Stiahnutých súborov'}" />
                                             <TextBlock Text="{loc:T 'Preložiť vybrané (svsub.net) do:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                             <ComboBox ItemsSource="{Binding OnlineLanguages}" SelectedItem="{Binding TranslateTo}" Width="60" Margin="0,0,6,0" />
                                             <Button Content="{loc:T 'Preložiť'}" Command="{Binding TranslateCommand}" Padding="12,3"
-                                                    ToolTip="Vybrané titulky preloží AI cez váš účet svsub.net (token v Nastaveniach); posielajú sa len titulky pod neutrálnym názvom" />
+                                                    ToolTip="{loc:T 'Vybrané titulky preloží AI cez váš účet svsub.net (token v Nastaveniach); posielajú sa len titulky pod neutrálnym názvom'}" />
                                         </WrapPanel>
                                         <TextBlock Text="{Binding OnlineStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                                         <ItemsControl ItemsSource="{Binding OnlineResults}" MaxHeight="160" Margin="0,4,0,0">
@@ -1320,15 +1320,15 @@
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
                                     <StackPanel>
                                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                                   Text="{loc:T 'Obrázkové titulky (PGS z Blu-ray) vybranej stopy UNIVERSUM prečíta vlastným rozpoznávaním textu: písmená porovná s písmami Windows, pochybné slová opraví podľa jazyka a tvary, ktoré nepozná, sa opýta – raz za film, zapamätá si ich aj pre ďalšie filmy. Text sa uloží vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor, originál ostane) a pridá sa ako nová titulková stopa; časy sú pôvodné časy obrázkov. VobSub (DVD) zatiaľ nie.'}" />
+                                                   Text="{loc:T 'Obrázkové titulky (PGS z Blu-ray, VobSub z DVD) vybranej stopy UNIVERSUM prečíta vlastným rozpoznávaním textu: písmená porovná s písmami Windows, pochybné slová opraví podľa jazyka a tvary, ktoré nepozná, sa opýta – raz za film, zapamätá si ich aj pre ďalšie filmy. Text sa uloží vedľa videa ako „Názov videa.jazyk.srt“ (nikdy cez existujúci súbor, originál ostane) a pridá sa ako nová titulková stopa; časy sú pôvodné časy obrázkov.'}" />
                                         <WrapPanel Margin="0,6,0,0">
                                             <Button Content="{loc:T 'Rozpoznať text'}" Command="{Binding ReadTextCommand}" Padding="12,3" Margin="0,0,8,0"
-                                                    ToolTip="Vyberte v zozname stopu s obrázkovými titulkami (PGS) – stopu videa alebo súbor .sup" />
+                                                    ToolTip="{loc:T 'Vyberte v zozname stopu s obrázkovými titulkami (PGS) – stopu videa alebo súbor .sup'}" />
                                             <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopReadingTextCommand}" Padding="12,3" Margin="0,0,16,0" />
                                             <CheckBox Content="{loc:T 'Opraviť text podľa jazyka'}" IsChecked="{Binding OcrCheckText}" VerticalAlignment="Center" Margin="0,0,16,0"
-                                                      ToolTip="Slová, ktorými si čítanie nebolo isté, opraví podľa slovníka z vašich titulkov a slov, ktoré vo filme prečítalo isto; každú opravu môžete vrátiť" />
+                                                      ToolTip="{loc:T 'Slová, ktorými si čítanie nebolo isté, opraví podľa slovníka z vašich titulkov a slov, ktoré vo filme prečítalo isto; každú opravu môžete vrátiť'}" />
                                             <Button Content="{loc:T 'Naučiť slovník z titulkov…'}" Command="{Binding LearnLexiconCommand}" Padding="12,3"
-                                                    ToolTip="Vyberte priečinok s vašimi textovými titulkami (SRT, ASS, VTT, SUB), napr. knižnicu – UNIVERSUM si z nich zapamätá slová každého jazyka (len v tomto počítači, každý súbor raz)" />
+                                                    ToolTip="{loc:T 'Vyberte priečinok s vašimi textovými titulkami (SRT, ASS, VTT, SUB), napr. knižnicu – UNIVERSUM si z nich zapamätá slová každého jazyka (len v tomto počítači, každý súbor raz)'}" />
                                         </WrapPanel>
                                         <TextBlock Text="{Binding LexiconSummary}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                         <TextBlock Text="{Binding OcrStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
@@ -1376,13 +1376,13 @@
                                                 </Border>
                                                 <WrapPanel Margin="0,8,0,0">
                                                     <Button Content="{loc:T 'Ďalej'}" Command="{Binding TeachCommand}" Padding="12,3" Margin="0,0,8,0"
-                                                            ToolTip="Tvar je napísaný text (Enter); UNIVERSUM si ho zapamätá" />
+                                                            ToolTip="{loc:T 'Tvar je napísaný text (Enter); UNIVERSUM si ho zapamätá'}" />
                                                     <Button Content="{loc:T 'Nie je to písmeno'}" Command="{Binding SpeckCommand}" Padding="12,3" Margin="0,0,8,0"
-                                                            ToolTip="Škvrna alebo zvyšok obrysu – v texte sa vynechá" />
+                                                            ToolTip="{loc:T 'Škvrna alebo zvyšok obrysu – v texte sa vynechá'}" />
                                                     <Button Content="{loc:T 'Neviem'}" Command="{Binding SkipShapeCommand}" Padding="12,3" Margin="0,0,8,0"
-                                                            ToolTip="V texte bude „�“ – opravíte ho v Časoch titulkov" />
+                                                            ToolTip="{loc:T 'V texte bude „�“ – opravíte ho v Časoch titulkov'}" />
                                                     <Button Content="{loc:T 'Uložiť teraz'}" Command="{Binding FinishReadingCommand}" Padding="12,3"
-                                                            ToolTip="Ďalšie neznáme tvary sa už nepýta – v texte budú ako „�“" />
+                                                            ToolTip="{loc:T 'Ďalšie neznáme tvary sa už nepýta – v texte budú ako „�“'}" />
                                                 </WrapPanel>
                                             </StackPanel>
                                         </Border>
@@ -1401,7 +1401,7 @@
                                 <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}" DisplayMemberPath="Display" Width="170" Margin="0,0,12,0" />
                                 <TextBlock Text="{loc:T 'Názov stopy:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="170"
-                                         ToolTip="Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (forced = „Forced“, inak bez názvu); môžete doň dopísať, prázdny = bez názvu" />
+                                         ToolTip="{loc:T 'Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (forced = „Forced“, inak bez názvu); môžete doň dopísať, prázdny = bez názvu'}" />
                             </WrapPanel>
                             <WrapPanel Margin="0,6,0,0">
                                 <CheckBox Content="{loc:T 'Forced'}" IsChecked="{Binding Forced}" Margin="0,0,16,0" />
@@ -1526,7 +1526,7 @@
                                     <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="subtitlesKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                                     <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                                     <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
-                                             ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                             ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                                     <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                     <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                               IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -1535,11 +1535,11 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                         <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                         <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                                  ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                                  ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                         <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                        <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                        <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                                     </StackPanel>
                                     <Button Content="{loc:T 'Knižnica…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                                 </WrapPanel>
@@ -1559,7 +1559,7 @@
                                     <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                                         <Button Content="{loc:T 'Uložiť prácu'}" Command="{Binding SaveWorkCommand}" Padding="10,2" Margin="0,0,6,0"
-                                                ToolTip="Hodnoty všetkých titulkov tohto videa sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)" />
+                                                ToolTip="{loc:T 'Hodnoty všetkých titulkov tohto videa sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)'}" />
                                         <Button Content="{loc:T 'Zahodiť prácu'}" Command="{Binding DiscardWorkCommand}" Padding="10,2" Margin="0,0,8,0" />
                                         <TextBlock Text="{Binding WorkNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" />
                                     </StackPanel>
@@ -1580,10 +1580,10 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="Zabudne otvorené video a zvuky – na disku sa nič nezmení" />
+                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="{loc:T 'Zabudne otvorené video a zvuky – na disku sa nič nezmení'}" />
                         <Button Content="{loc:T 'Otvoriť video…'}" Command="{Binding OpenVideoCommand}" Padding="16,6" Margin="0,0,8,0" />
                         <Button Content="{loc:T 'Pridať zvuk…'}" Command="{Binding AddSoundCommand}" Padding="16,6"
-                                ToolTip="Zvukové súbory (MKA, AC-3, E-AC-3, DTS, AAC, MP3, FLAC, Opus, WAV) alebo iný film, z ktorého sa zoberie zvuk (napr. CZ dabing z iného vydania)" />
+                                ToolTip="{loc:T 'Zvukové súbory (MKA, AC-3, E-AC-3, DTS, AAC, MP3, FLAC, Opus, WAV) alebo iný film, z ktorého sa zoberie zvuk (napr. CZ dabing z iného vydania)'}" />
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" />
@@ -1647,7 +1647,7 @@
                             </DataGrid>
                             <StackPanel Grid.Row="1" Margin="0,8,0,4">
                                 <WrapPanel>
-                                    <Button Content="{loc:T 'Odstrániť zo zoznamu'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Pridaný zvuk sa nepridá" />
+                                    <Button Content="{loc:T 'Odstrániť zo zoznamu'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="{loc:T 'Pridaný zvuk sa nepridá'}" />
                                     <TextBlock Text="{loc:T 'Napasovať vybraný zvuk na:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <ComboBox ItemsSource="{Binding References}" SelectedItem="{Binding Reference}" Width="200" Margin="0,0,8,0"
                                               ToolTip="{loc:T 'Zvuk filmu, ku ktorému sa vybraný zvuk napasuje (hudba a ruchy sú v oboch, aj pri dabingu)'}">
@@ -1660,11 +1660,11 @@
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
                                     <Button Content="{loc:T 'Napasovať'}" Command="{Binding SyncCommand}" Padding="12,4" Margin="0,0,8,0"
-                                            ToolTip="Prečíta oba zvuky celé a porovná ich v mnohých častiach filmu: posun aj zmena FPS (25 ↔ 23,976); istý výsledok sa nastaví sám" />
+                                            ToolTip="{loc:T 'Prečíta oba zvuky celé a porovná ich v mnohých častiach filmu: posun aj zmena FPS (25 ↔ 23,976); istý výsledok sa nastaví sám'}" />
                                     <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopCommand}" Padding="12,4" Margin="0,0,8,0" />
                                     <Button Content="{loc:T 'Použiť návrh'}" Command="{Binding ApplyProposalCommand}" Padding="12,4"
                                             Visibility="{Binding HasProposal, Converter={StaticResource BoolToVisibility}}"
-                                            ToolTip="Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním" />
+                                            ToolTip="{loc:T 'Neistý výsledok sa sám nepoužije – nastaví ho až toto tlačidlo; overte ho prehraním'}" />
                                 </WrapPanel>
                                 <ProgressBar Value="{Binding Progress, Mode=OneWay}" Maximum="1" Height="4" Margin="0,6,0,0" />
                                 <TextBlock Text="{Binding SyncStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
@@ -1685,7 +1685,7 @@
                             <WrapPanel Margin="0,6,0,0">
                                 <TextBlock Text="{loc:T 'Názov stopy:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="250"
-                                         ToolTip="Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (zvuk bez názvu); môžete doň dopísať, prázdny = bez názvu" />
+                                         ToolTip="{loc:T 'Názov stopy vo výsledku – kým ho neprepíšete, dáva ho pravidlo (zvuk bez názvu); môžete doň dopísať, prázdny = bez názvu'}" />
                             </WrapPanel>
 
                             <TextBlock Text="{loc:T 'Zmena FPS (PAL 25 ↔ 23,976)'}" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,4" />
@@ -1718,7 +1718,7 @@
                                 </StackPanel>
                             </Grid>
                             <CheckBox Content="{loc:T 'Zachovať výšku tónu'}" IsChecked="{Binding KeepPitch}" Margin="0,4,0,0"
-                                      ToolTip="Zapnuté: hlasy znejú rovnako, len pomalšie/rýchlejšie. Vypnuté: výška tónu sa zmení s rýchlosťou (vráti pôvodnú výšku zvuku zrýchleného pre PAL bez korekcie)" />
+                                      ToolTip="{loc:T 'Zapnuté: hlasy znejú rovnako, len pomalšie/rýchlejšie. Vypnuté: výška tónu sa zmení s rýchlosťou (vráti pôvodnú výšku zvuku zrýchleného pre PAL bez korekcie)'}" />
 
                             <TextBlock Text="{loc:T 'Posun (Delay v ms)'}" FontWeight="SemiBold" FontSize="15" Margin="0,16,0,4" />
                             <StackPanel Orientation="Horizontal">
@@ -1739,7 +1739,7 @@
                             </WrapPanel>
                             <CheckBox Content="{loc:T 'Stereo (zmiešať 5.1 do dvoch kanálov)'}" IsChecked="{Binding Stereo}" Margin="0,6,0,0" />
                             <CheckBox Content="{loc:T 'Normalizovať hlasitosť na −23 LUFS (EBU R128)'}" IsChecked="{Binding Normalize}" Margin="0,4,0,0"
-                                      ToolTip="Zvuk sa najprv celý zmeria, potom sa zapíše s rovnakou hlasitosťou ako ostatné filmy" />
+                                      ToolTip="{loc:T 'Zvuk sa najprv celý zmeria, potom sa zapíše s rovnakou hlasitosťou ako ostatné filmy'}" />
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                 <TextBlock Text="{loc:T 'Zosilniť / stlmiť:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBox Text="{Binding GainText, UpdateSourceTrigger=PropertyChanged}" Width="60" TextAlignment="Right" />
@@ -1773,7 +1773,7 @@
                             <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="audioKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                             <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
-                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                     ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -1782,11 +1782,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                 <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                          ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                             </StackPanel>
                             <Button Content="{loc:T 'Knižnica…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                         </WrapPanel>
@@ -1803,7 +1803,7 @@
                                 <TextBlock Text="{Binding Result}" TextWrapping="Wrap" />
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                     <Button Content="{loc:T 'Uložiť prácu'}" Command="{Binding SaveWorkCommand}" Padding="10,2" Margin="0,0,6,0"
-                                            ToolTip="Hodnoty všetkých zvukov tohto videa (aj pridané súbory) sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)" />
+                                            ToolTip="{loc:T 'Hodnoty všetkých zvukov tohto videa (aj pridané súbory) sa zapamätajú – pri ďalšom otvorení videa sa obnovia (nič sa nezapíše do súborov)'}" />
                                     <Button Content="{loc:T 'Zahodiť prácu'}" Command="{Binding DiscardWorkCommand}" Padding="10,2" Margin="0,0,8,0" />
                                     <TextBlock Text="{Binding WorkNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" />
                                 </StackPanel>
@@ -1824,7 +1824,7 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="Zabudne otvorené video – na disku sa nič nezmení" />
+                        <Button Content="{loc:T 'Vyčistiť'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip="{loc:T 'Zabudne otvorené video – na disku sa nič nezmení'}" />
                         <Button Content="{loc:T 'Otvoriť video…'}" Command="{Binding OpenVideoCommand}" Padding="16,6" />
                     </StackPanel>
                     <StackPanel>
@@ -1850,12 +1850,12 @@
                                 <WrapPanel>
                                     <TextBlock Text="{loc:T 'Strih:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                     <Button Content="{loc:T 'Začiatok úseku'}" Command="{Binding MarkStartCommand}" Padding="10,2" Margin="0,0,6,0"
-                                            ToolTip="Úsek, ktorý ostane, začína v čase prehrávača" />
+                                            ToolTip="{loc:T 'Úsek, ktorý ostane, začína v čase prehrávača'}" />
                                     <Button Content="{loc:T 'Koniec úseku'}" Command="{Binding MarkEndCommand}" Padding="10,2" Margin="0,0,12,0"
-                                            ToolTip="…a končí teraz – úsek sa pridá do zoznamu (ostatné časti filmu sa vystrihnú)" />
+                                            ToolTip="{loc:T '…a končí teraz – úsek sa pridá do zoznamu (ostatné časti filmu sa vystrihnú)'}" />
                                     <CheckBox Content="{loc:T 'Presný strih (obraz sa zapíše znova)'}" IsChecked="{Binding ExactCut}" VerticalAlignment="Center" Margin="0,0,12,0"
-                                              ToolTip="Bez neho sa úseky posunú na najbližšiu nasledujúcu kľúčovú snímku (bez straty kvality, rýchlo)" />
-                                    <Button Content="{loc:T 'Celý film'}" Command="{Binding WholeFilmCommand}" Padding="10,2" ToolTip="Zruší všetky úseky – nič sa nevystrihne" />
+                                              ToolTip="{loc:T 'Bez neho sa úseky posunú na najbližšiu nasledujúcu kľúčovú snímku (bez straty kvality, rýchlo)'}" />
+                                    <Button Content="{loc:T 'Celý film'}" Command="{Binding WholeFilmCommand}" Padding="10,2" ToolTip="{loc:T 'Zruší všetky úseky – nič sa nevystrihne'}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
                             </StackPanel>
@@ -1922,7 +1922,7 @@
                             <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="videoKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                             <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
-                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                     ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -1931,11 +1931,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                 <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                          ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                             </StackPanel>
                             <Button Content="{loc:T 'Knižnica…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                         </WrapPanel>
@@ -1974,14 +1974,14 @@
                 <WrapPanel Grid.Row="1" Margin="0,10,0,10">
                     <TextBlock Text="{loc:T 'Názov (title):'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                     <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Width="380" Margin="0,0,20,0"
-                             ToolTip="Názov celého súboru, ktorý ukazujú prehrávače; prázdny ho odstráni" />
+                             ToolTip="{loc:T 'Názov celého súboru, ktorý ukazujú prehrávače; prázdny ho odstráni'}" />
                     <CheckBox Content="{loc:T 'Odstrániť tagy'}" IsChecked="{Binding RemoveTags}" IsEnabled="{Binding HasTags}" VerticalAlignment="Center" Margin="0,0,20,0"
-                              ToolTip="Globálne tagy aj tagy stôp (názvy, štatistiky, údaje o kódovaní)" />
+                              ToolTip="{loc:T 'Globálne tagy aj tagy stôp (názvy, štatistiky, údaje o kódovaní)'}" />
                     <Button Content="{loc:T 'Pravidlá UNIVERSUM'}" Command="{Binding ApplyRulesCommand}" Padding="12,4" Margin="0,0,8,0"
-                            ToolTip="Vyplní názvy, jazyky, príznaky a poradie podľa pravidiel UNIVERSUM – potom sa dá ďalej upraviť" />
+                            ToolTip="{loc:T 'Vyplní názvy, jazyky, príznaky a poradie podľa pravidiel UNIVERSUM – potom sa dá ďalej upraviť'}" />
                     <Button Content="{loc:T 'Obnoviť zo súboru'}" Command="{Binding ResetCommand}" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Posunúť vyššie (Ctrl+↑) – zvuk medzi zvukom, titulky medzi titulkami" />
-                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" ToolTip="Posunúť nižšie (Ctrl+↓)" />
+                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="{loc:T 'Posunúť vyššie (Ctrl+↑) – zvuk medzi zvukom, titulky medzi titulkami'}" />
+                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" ToolTip="{loc:T 'Posunúť nižšie (Ctrl+↓)'}" />
                 </WrapPanel>
                 <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" IsReadOnly="True"
                           HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
@@ -2080,7 +2080,7 @@
                             <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="headerKind" VerticalAlignment="Center" Margin="0,0,20,0" MinWidth="0" />
                             <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="280" Margin="0,0,6,0"
-                                     ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                     ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
@@ -2089,11 +2089,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
                                 <TextBlock Text="{loc:T 'Doplnok:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" Width="130" VerticalAlignment="Center"
-                                          ToolTip="Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                          ToolTip="{loc:T 'Doplnok k názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}" Margin="0,0,16,0">
                                 <TextBlock Text="{loc:T 'Epizóda:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="napr. S01E04" />
+                                <TextBox Text="{Binding EpisodeText, UpdateSourceTrigger=PropertyChanged}" Width="90" ToolTip="{loc:T 'napr. S01E04'}" />
                             </StackPanel>
                             <Button Content="{loc:T 'Knižnica…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" ToolTip="{Binding OutputDescription}" />
                         </WrapPanel>
@@ -2104,7 +2104,7 @@
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                                 <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
-                                <Button Content="{loc:T 'Do fronty'}" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="Pridá zmenu do fronty úloh namiesto okamžitého uloženia" />
+                                <Button Content="{loc:T 'Do fronty'}" Command="{Binding QueueCommand}" Margin="0,0,8,0" Padding="16,6" ToolTip="{loc:T 'Pridá zmenu do fronty úloh namiesto okamžitého uloženia'}" />
                                 <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveCommand}" Padding="16,6" />
                             </StackPanel>
                             <StackPanel Margin="0,0,16,0">
@@ -2132,12 +2132,12 @@
                 <WrapPanel Grid.Row="1" Margin="0,10,0,10">
                     <Button Content="{loc:T 'Spustiť'}" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" />
                     <Button Content="{loc:T 'Zastaviť po aktuálnej'}" Command="{Binding StopCommand}" Padding="12,4" Margin="0,0,16,0" />
-                    <Button Content="{loc:T 'Zrušiť'}" Command="{Binding CancelCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="Zruší bežiacu úlohu (originál ostane nezmenený) alebo vyradí čakajúcu" />
+                    <Button Content="{loc:T 'Zrušiť'}" Command="{Binding CancelCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="{loc:T 'Zruší bežiacu úlohu (originál ostane nezmenený) alebo vyradí čakajúcu'}" />
                     <Button Content="{loc:T 'Spustiť znova'}" Command="{Binding RetryCommand}" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="Čakajúcu úlohu skôr" />
-                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="Čakajúcu úlohu neskôr" />
+                    <Button Content="▲" Command="{Binding MoveUpCommand}" Padding="10,4" Margin="0,0,4,0" ToolTip="{loc:T 'Čakajúcu úlohu skôr'}" />
+                    <Button Content="▼" Command="{Binding MoveDownCommand}" Padding="10,4" Margin="0,0,16,0" ToolTip="{loc:T 'Čakajúcu úlohu neskôr'}" />
                     <Button Content="{loc:T 'Výstup…'}" Command="{Binding OutputCommand}" Padding="12,4" Margin="0,0,8,0" />
-                    <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="Vráti úpravu hlavičky, ktorú urobila táto úloha" />
+                    <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Padding="12,4" Margin="0,0,16,0" ToolTip="{loc:T 'Vráti úpravu hlavičky, ktorú urobila táto úloha'}" />
                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" />
                     <Button Content="{loc:T 'Vyčistiť dokončené'}" Command="{Binding ClearCommand}" Padding="12,4" />
                 </WrapPanel>
@@ -2180,7 +2180,7 @@
                 <StackPanel Grid.Row="3" Margin="0,10,0,0">
                     <CheckBox Content="{loc:T 'Spustiť frontu hneď po pridaní úlohy'}" IsChecked="{Binding AutoStart}" />
                     <CheckBox Content="{loc:T 'Zvukové upozornenie, keď sú hotové všetky úlohy'}" IsChecked="{Binding FinishSound}" Margin="0,4,0,0"
-                              ToolTip="Zvuk Windows: Hviezdička, keď je všetko hotové; Výkričník, keď niečo zlyhalo (aj Hromadné spracovanie)" />
+                              ToolTip="{loc:T 'Zvuk Windows: Hviezdička, keď je všetko hotové; Výkričník, keď niečo zlyhalo (aj Hromadné spracovanie)'}" />
                     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,6,0,0" />
                 </StackPanel>
             </Grid>
@@ -2245,7 +2245,7 @@
                 <DockPanel>
                     <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top">
                         <Button Content="{loc:T 'Zmazať označené'}" Command="{Binding DeleteCommand}" Padding="12,4" Margin="0,0,8,0"
-                                ToolTip="Zmaže zaškrtnuté záznamy (alebo vybraný, keď nie je nič zaškrtnuté) – filmy sa nemenia" />
+                                ToolTip="{loc:T 'Zmaže zaškrtnuté záznamy (alebo vybraný, keď nie je nič zaškrtnuté) – filmy sa nemenia'}" />
                         <Button Content="{loc:T 'Zmazať všetky'}" Command="{Binding DeleteAllCommand}" Padding="12,4" Margin="0,0,8,0" />
                         <Button Content="{loc:T 'Priečinok záznamov'}" Command="{Binding OpenFolderCommand}" Padding="12,4" />
                     </WrapPanel>
@@ -2315,12 +2315,12 @@
                                                 </StackPanel>
                                                 <DockPanel Margin="0,6,0,0">
                                                     <Button DockPanel.Dock="Right" Content="{loc:T 'Ukázať'}" Command="{Binding OpenCommand}" CommandParameter="{Binding File.Source}" Padding="8,1" Margin="8,0,0,0"
-                                                            ToolTip="Otvorí priečinok s originálom v Prieskumníkovi" />
+                                                            ToolTip="{loc:T 'Otvorí priečinok s originálom v Prieskumníkovi'}" />
                                                     <TextBlock Text="{Binding Source}" Style="{StaticResource Hint}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                                 </DockPanel>
                                                 <DockPanel Margin="0,2,0,0" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
                                                     <Button DockPanel.Dock="Right" Content="{loc:T 'Ukázať'}" Command="{Binding OpenCommand}" CommandParameter="{Binding File.Result}" Padding="8,1" Margin="8,0,0,0"
-                                                            ToolTip="Otvorí priečinok s výsledkom v Prieskumníkovi" />
+                                                            ToolTip="{loc:T 'Otvorí priečinok s výsledkom v Prieskumníkovi'}" />
                                                     <TextBlock Text="{Binding Result}" Style="{StaticResource Hint}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                                 </DockPanel>
                                                 <Expander Header="{loc:T 'Technické podrobnosti (výstup nástrojov)'}" Margin="0,4,0,0" Visibility="{Binding HasTechnical, Converter={StaticResource BoolToVisibility}}">
@@ -2359,7 +2359,7 @@
                         <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseFolderCommand}" Margin="0,0,8,0" Padding="12,5" />
                         <Button Content="{loc:T 'Analyzovať'}" Command="{Binding AnalyzeCommand}" Padding="16,5" />
                         <Button Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0"
-                                ToolTip="Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)" />
+                                ToolTip="{loc:T 'Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)'}" />
                     </StackPanel>
                     <StackPanel>
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
@@ -2368,9 +2368,9 @@
                 </DockPanel>
                 <DockPanel Grid.Row="1" Margin="0,6,0,8">
                     <ToggleButton DockPanel.Dock="Right" Content="{Binding PanelsText}" IsChecked="{Binding ShowPanels}" Padding="10,3" Margin="8,0,0,0"
-                                  ToolTip="Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)" />
+                                  ToolTip="{loc:T 'Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)'}" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Upratať zvyšky'}" Command="{Binding CleanupCommand}" Padding="10,3"
-                            ToolTip="Dočasné súbory po prerušenom spracovaní presunie do Koša" />
+                            ToolTip="{loc:T 'Dočasné súbory po prerušenom spracovaní presunie do Koša'}" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Zastaviť analýzu'}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
                             Visibility="{Binding IsAnalyzing, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
@@ -2488,11 +2488,11 @@
                         </Grid.RowDefinitions>
                         <DockPanel Margin="0,0,0,6">
                             <Button DockPanel.Dock="Right" Content="{loc:T 'Informácie'}" Command="{Binding ShowInfoCommand}" Padding="10,3"
-                                    ToolTip="Zobrazí vybraný súbor na stránke Informácie" ToolTipService.ShowOnDisabled="True" />
+                                    ToolTip="{loc:T 'Zobrazí vybraný súbor na stránke Informácie'}" ToolTipService.ShowOnDisabled="True" />
                             <Button DockPanel.Dock="Right" Content="{loc:T 'Zvuk v štúdiu'}" Command="{Binding EditSoundInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
-                                    ToolTip="Úprava audiostopy: dabing, posun, PAL 25 ↔ 23,976, kodek, hlasitosť – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
+                                    ToolTip="{loc:T 'Úprava audiostopy: dabing, posun, PAL 25 ↔ 23,976, kodek, hlasitosť – zmeny sa uložia do úlohy (Hromadné aj MEGA)'}" ToolTipService.ShowOnDisabled="True" />
                             <Button DockPanel.Dock="Right" Content="{loc:T 'Titulky v štúdiu'}" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
-                                    ToolTip="Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)" ToolTipService.ShowOnDisabled="True" />
+                                    ToolTip="{loc:T 'Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)'}" ToolTipService.ShowOnDisabled="True" />
                             <TextBlock Text="{loc:T 'Súbory skupiny – výsledok simulácie'}" FontWeight="SemiBold" VerticalAlignment="Center" />
                         </DockPanel>
                         <DataGrid Grid.Row="1" MinHeight="110" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
@@ -2512,17 +2512,17 @@
                                         <DataTemplate>
                                             <StackPanel>
                                                 <TextBox Text="{Binding Naming, UpdateSourceTrigger=LostFocus}"
-                                                         ToolTip="Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04." />
+                                                         ToolTip="{loc:T 'Film: Názov (rok), napr. Creep (2004). Seriál: číslo epizódy, napr. S01E04.'}" />
                                                 <!-- owner, 29. 10. 2026: a film exactly by its TMDB ID -->
                                                 <DockPanel Margin="0,2,0,0" Visibility="{Binding IsFilm, Converter={StaticResource BoolToVisibility}}">
                                                     <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,4,0" />
                                                     <TextBox Text="{Binding TmdbId, UpdateSourceTrigger=LostFocus}" FontSize="12"
-                                                             ToolTip="Presne podľa TMDB: číslo filmu (napr. 12345) alebo adresa z themoviedb.org; minisériál vložte ako adresu …/tv/…. Použije sa, keď pole opustíte." />
+                                                             ToolTip="{loc:T 'Presne podľa TMDB: číslo filmu (napr. 12345) alebo adresa z themoviedb.org; minisériál vložte ako adresu …/tv/…. Použije sa, keď pole opustíte.'}" />
                                                 </DockPanel>
                                                 <TextBlock Text="{Binding NamingSuggestion}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                                 <Button Content="{loc:T 'Potvrdiť návrh'}" Command="{Binding ConfirmCommand}" Padding="8,2" Margin="0,2,0,0" FontSize="12" HorizontalAlignment="Left"
                                                         Visibility="{Binding IsUnverified, Converter={StaticResource BoolToVisibility}}"
-                                                        ToolTip="Návrh nie je istý (názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila) – potvrďte ho, ak je správny, alebo vyberte iný" />
+                                                        ToolTip="{loc:T 'Návrh nie je istý (názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila) – potvrďte ho, ak je správny, alebo vyberte iný'}" />
                                                 <!-- owner, 28. 10.: the name of a file may be wrong – any title found can be chosen -->
                                                 <ComboBox ItemsSource="{Binding Candidates}" DisplayMemberPath="Display" SelectedItem="{Binding ChosenCandidate}" FontSize="12" Margin="0,2,0,0"
                                                           Visibility="{Binding HasCandidates, Converter={StaticResource BoolToVisibility}}"
@@ -2566,7 +2566,7 @@
                                         <DataTemplate>
                                             <ComboBox IsEditable="True" ItemsSource="{Binding AdditionChoices}" Text="{Binding Addition, UpdateSourceTrigger=LostFocus}" MinWidth="100"
                                                       VerticalAlignment="Top"
-                                                      ToolTip="Doplnok do názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie." />
+                                                      ToolTip="{loc:T 'Doplnok do názvu pred veľkostnú triedu – iná verzia titulu (napr. Directors Cut, Remaster, 2); písmená, číslice, medzery a pomlčky, najviac 30 znakov. Jellyfin ho ukáže ako názov verzie.'}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -2600,11 +2600,11 @@
                         <!-- the buttons wrap under the title when the pane is narrow -->
                         <DockPanel Grid.Row="2" Margin="0,10,0,0">
                             <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Stopy skupiny'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
-                                       ToolTip="Rozhodnutie platí pre všetky súbory skupiny" />
+                                       ToolTip="{loc:T 'Rozhodnutie platí pre všetky súbory skupiny'}" />
                             <WrapPanel HorizontalAlignment="Right">
                                 <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
                                 <Button Content="{loc:T 'Rozpoznať jazyk audiostôp ▾'}" Click="OnSpeechMenu" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="Vypočuje si niekoľko úsekov z rôznych miest filmu a navrhne jazyk reči (whisper.cpp, všetko len v počítači; pár sekúnd na stopu). Vyberte, ktoré súbory.">
+                                        ToolTip="{loc:T 'Vypočuje si niekoľko úsekov z rôznych miest filmu a navrhne jazyk reči (whisper.cpp, všetko len v počítači; pár sekúnd na stopu). Vyberte, ktoré súbory.'}">
                                     <Button.ContextMenu>
                                         <ContextMenu>
                                             <MenuItem Header="{loc:T 'Vybrané súbory (v zozname, Ctrl / Shift)'}" Command="{Binding DetectAudioSelectedCommand}" />
@@ -2614,7 +2614,7 @@
                                     </Button.ContextMenu>
                                 </Button>
                                 <Button Content="{loc:T 'Prečítať titulky znova'}" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám – niekoľko častí filmu ako pri zvuku (forced titulky tam, kde ich súbor má podľa indexu). Tu ho prečíta znova pre vybranú skupinu." />
+                                        ToolTip="{loc:T 'Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám – niekoľko častí filmu ako pri zvuku (forced titulky tam, kde ich súbor má podľa indexu). Tu ho prečíta znova pre vybranú skupinu.'}" />
                                 <Button Content="{loc:T 'Potvrdiť návrhy'}" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
                             </WrapPanel>
                         </DockPanel>
@@ -2659,7 +2659,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding TrackName, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding CanName}" VerticalAlignment="Center"
-                                                     ToolTip="Názov stopy vo výsledku pre celú skupinu – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu" />
+                                                     ToolTip="{loc:T 'Názov stopy vo výsledku pre celú skupinu – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu'}" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -2730,12 +2730,12 @@
                             <!-- owner, 30. 10. 2026: deleting originals – only here; always into the Recycle Bin -->
                             <RadioButton Content="{loc:T 'zachovať'}" IsChecked="{Binding KeepOriginal}" GroupName="batchOriginal" Margin="0,0,12,0" IsEnabled="{Binding IsIdle}" />
                             <RadioButton Content="{loc:T 'zmazať automaticky'}" IsChecked="{Binding DeleteAutomatically}" GroupName="batchOriginal" Margin="0,0,12,0" IsEnabled="{Binding IsIdle}"
-                                         ToolTip="Každý originál ide do Koša hneď po zapísaní a overení nového súboru v knižnici – priebežne, súbor po súbore" />
+                                         ToolTip="{loc:T 'Každý originál ide do Koša hneď po zapísaní a overení nového súboru v knižnici – priebežne, súbor po súbore'}" />
                             <RadioButton Content="{loc:T 'zmazať ručne'}" IsChecked="{Binding DeleteManually}" GroupName="batchOriginal" Margin="0,0,8,0" IsEnabled="{Binding IsIdle}"
-                                         ToolTip="Počas spracovania sa nič nemaže; po dokončení pošle originály do Koša tlačidlo Zmazať originály" />
+                                         ToolTip="{loc:T 'Počas spracovania sa nič nemaže; po dokončení pošle originály do Koša tlačidlo Zmazať originály'}" />
                             <Button Content="{Binding DeleteOriginalsText}" Command="{Binding DeleteOriginalsCommand}" Padding="10,3" Margin="0,0,20,0"
                                     Visibility="{Binding CanDeleteOriginals, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Originály spracovaných súborov do Koša Windows – len tie, ktorých výsledok je v knižnici a ktoré sa od spracovania nezmenili" />
+                                    ToolTip="{loc:T 'Originály spracovaných súborov do Koša Windows – len tie, ktorých výsledok je v knižnici a ktoré sa od spracovania nezmenili'}" />
                             <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0">
                                 <Run Text="{loc:T 'Knižnica:'}" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
                             </TextBlock>
@@ -2750,49 +2750,49 @@
                             <TextBlock Text="{Binding KindNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <Button Content="{loc:T 'Potvrdiť'}" Command="{Binding ConfirmKindCommand}" Padding="10,3" Margin="0,0,20,0"
                                     Visibility="{Binding KindNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Druh (filmy alebo seriál) je odhadnutý z mien súborov – potvrďte ho, alebo zvoľte druhý" />
+                                    ToolTip="{loc:T 'Druh (filmy alebo seriál) je odhadnutý z mien súborov – potvrďte ho, alebo zvoľte druhý'}" />
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsSeries, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{loc:T 'Seriál:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding SeriesTitle, UpdateSourceTrigger=LostFocus}" Width="230" Margin="0,0,6,0"
-                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB" />
+                                         ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                                 <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding SeriesTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center"
-                                         ToolTip="Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho" />
+                                         ToolTip="{loc:T 'Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho'}" />
                                 <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" TextWrapping="Wrap" MaxWidth="360"
-                                           ToolTip="Epizódy ďalších seriálov poslané z Noviniek spolu s prvým – každá ide do priečinka svojho seriálu (vidno v stĺpci Cieľ v knižnici)" />
+                                           ToolTip="{loc:T 'Epizódy ďalších seriálov poslané z Noviniek spolu s prvým – každá ide do priečinka svojho seriálu (vidno v stĺpci Cieľ v knižnici)'}" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <Button Content="{loc:T 'Potvrdiť seriál'}" Command="{Binding ConfirmSeriesCommand}" Padding="10,3" Margin="0,0,12,0"
                                         Visibility="{Binding SeriesNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
-                                        ToolTip="HISTRA tento seriál nepotvrdila – potvrďte ho, ak je správny (alebo zadajte iný)" />
+                                        ToolTip="{loc:T 'HISTRA tento seriál nepotvrdila – potvrďte ho, ak je správny (alebo zadajte iný)'}" />
                             </StackPanel>
                             <!-- owner, 30. 10. 2026: films have the same row as a series – title, TMDB, TMDB ID -->
                             <StackPanel Orientation="Horizontal" Visibility="{Binding IsMovies, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{loc:T 'Film:'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
                                 <TextBox Text="{Binding FilmTitle, UpdateSourceTrigger=LostFocus}" Width="230" Margin="0,0,6,0" IsEnabled="{Binding CanNameFilm}"
-                                         ToolTip="Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB. Platí pre film vybranej skupiny (aj jeho verzie)." />
+                                         ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB. Platí pre film vybranej skupiny (aj jeho verzie).'}" />
                                 <Button Content="{loc:T 'TMDB'}" Command="{Binding FilmTmdb.SearchCommand}" ToolTip="{Binding FilmTmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0"
                                         IsEnabled="{Binding CanNameFilm}" />
                                 <ComboBox ItemsSource="{Binding FilmTmdb.Results}" SelectedItem="{Binding FilmTmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,6,0"
                                           IsDropDownOpen="{Binding FilmTmdb.IsOpen}" Visibility="{Binding FilmTmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding FilmTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center" IsEnabled="{Binding CanNameFilm}"
-                                         ToolTip="Číslo filmu na TMDB (napr. 1629051) alebo adresa themoviedb.org/movie/… – názov sa načíta presne podľa neho, aj pri filme v inom písme" />
+                                         ToolTip="{loc:T 'Číslo filmu na TMDB (napr. 1629051) alebo adresa themoviedb.org/movie/… – názov sa načíta presne podľa neho, aj pri filme v inom písme'}" />
                                 <TextBlock Text="{Binding FilmSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <TextBlock Text="{Binding FilmHint}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="360" />
                             </StackPanel>
                             <Button Content="{loc:T 'Spresniť názvy'}" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
                                     Visibility="{Binding CanFindTitles, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Spresní navrhnuté názvy filmov podľa TMDB a overí ich v katalógu HISTRA; bez kľúča TMDB hľadá v HISTRA (len presná zhoda názvu a roku)" />
+                                    ToolTip="{loc:T 'Spresní navrhnuté názvy filmov podľa TMDB a overí ich v katalógu HISTRA; bez kľúča TMDB hľadá v HISTRA (len presná zhoda názvu a roku)'}" />
                             <Button Content="{loc:T 'Prijať návrhy názvov'}" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
-                                    ToolTip="Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)" />
+                                    ToolTip="{loc:T 'Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)'}" />
                             <Button Content="{loc:T 'Prijať všetko v skupine'}" Command="{Binding AcceptGroupCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"
-                                    ToolTip="Pre vybranú skupinu naraz: druh, názov seriálu alebo filmu, čísla epizód aj jazyky stôp podľa návrhov (nie otázky Season 00 / bežná sezóna a návrhy s upozornením)" />
+                                    ToolTip="{loc:T 'Pre vybranú skupinu naraz: druh, názov seriálu alebo filmu, čísla epizód aj jazyky stôp podľa návrhov (nie otázky Season 00 / bežná sezóna a návrhy s upozornením)'}" />
                             <Button Content="{loc:T 'Špeciály do Season 00'}" Command="{Binding AnswerSpecialsCommand}" Padding="10,3" Margin="6,0,0,0"
                                     Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore." />
+                                    ToolTip="{loc:T 'Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore.'}" />
                         </WrapPanel>
                         <!-- the end of a run, boldly (owner, 29. 10. 2026) -->
                         <Border Margin="0,8,0,0" CornerRadius="6" Padding="14,8" Background="{Binding Finish.Background, FallbackValue=Transparent}"
@@ -2811,13 +2811,13 @@
                                 <Button Content="{loc:T 'Uložiť správu…'}" Command="{Binding SaveReportCommand}" Margin="0,0,6,0" Padding="10,4" />
                                 <Button Content="{Binding PauseText}" Command="{Binding PauseCommand}" Margin="0,0,6,0" Padding="10,4" />
                                 <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopCommand}" Margin="0,0,6,0" Padding="10,4"
-                                        ToolTip="Dokončí rozpracované súbory a ďalej nepokračuje" />
+                                        ToolTip="{loc:T 'Dokončí rozpracované súbory a ďalej nepokračuje'}" />
                                 <ComboBox ItemsSource="{Binding MegaTargets}" SelectedItem="{Binding SelectedMegaTarget}" DisplayMemberPath="Label" MaxWidth="220" Margin="0,0,4,0"
                                           FontSize="12" Visibility="{Binding IsEditingMega, Converter={StaticResource InverseBoolToVisibility}}"
                                           ToolTip="{loc:T 'Kam idú pripravené súbory: nová dávka, alebo doplniť čakajúcu dávku'}" />
                                 <Button Content="{Binding SendToMegaText}" Command="{Binding SendToMegaCommand}" Margin="0,0,6,0" Padding="12,4"
-                                        ToolTip="Pripravené súbory uloží do dávky MEGA spracovania – zapíšu sa neskôr (keď dávku spustíte, po predchádzajúcej dávke alebo v nastavenom čase)" />
-                                <Button Content="{loc:T 'Spustiť'}" Command="{Binding RunCommand}" Padding="18,4" ToolTip="Spustí spracovanie ako úlohu vo Fronte úloh (priebeh aj výstup každého súboru uvidíte aj tam)" />
+                                        ToolTip="{loc:T 'Pripravené súbory uloží do dávky MEGA spracovania – zapíšu sa neskôr (keď dávku spustíte, po predchádzajúcej dávke alebo v nastavenom čase)'}" />
+                                <Button Content="{loc:T 'Spustiť'}" Command="{Binding RunCommand}" Padding="18,4" ToolTip="{loc:T 'Spustí spracovanie ako úlohu vo Fronte úloh (priebeh aj výstup každého súboru uvidíte aj tam)'}" />
                             </StackPanel>
                             <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Simulation}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -2836,7 +2836,7 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Button Content="{loc:T 'Zmeniť…'}" Command="{Binding ChooseCommand}" Padding="10,3" Margin="8,0,6,0" />
-                        <Button Content="{loc:T 'Otvoriť'}" Command="{Binding OpenCommand}" Padding="10,3" ToolTip="Otvoriť v Prieskumníkovi" />
+                        <Button Content="{loc:T 'Otvoriť'}" Command="{Binding OpenCommand}" Padding="10,3" ToolTip="{loc:T 'Otvoriť v Prieskumníkovi'}" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE8B7;" Margin="0,0,10,0" />
                     <StackPanel VerticalAlignment="Center">
@@ -2932,7 +2932,7 @@
                     <!-- what is shown: the last week or the history; posters; only the chosen series; search -->
                     <DockPanel Margin="0,0,0,6">
                         <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                                 ToolTip="Hľadať seriál, stanicu alebo poznámku (bez diakritiky)" />
+                                 ToolTip="{loc:T 'Hľadať seriál, stanicu alebo poznámku (bez diakritiky)'}" />
                         <TextBlock DockPanel.Dock="Right" Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
                         <WrapPanel VerticalAlignment="Center">
@@ -2948,9 +2948,9 @@
                             <RadioButton Content="{loc:T 'Nadchádzajúce'}" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="{loc:T 'História'}" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="{loc:T 'Zobraziť všetko'}" IsChecked="{Binding ShowAll}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0"
-                                         ToolTip="História, posledný týždeň aj nadchádzajúce – všetky informácie" />
+                                         ToolTip="{loc:T 'História, posledný týždeň aj nadchádzajúce – všetky informácie'}" />
                             <CheckBox Content="{loc:T 'Zobraziť aj postery'}" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
-                            <CheckBox Content="{loc:T 'Zobraziť vybrané'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,0,16,0" ToolTip="Len seriály zaškrtnuté v stĺpci Vybrané" />
+                            <CheckBox Content="{loc:T 'Zobraziť vybrané'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,0,16,0" ToolTip="{loc:T 'Len seriály zaškrtnuté v stĺpci Vybrané'}" />
                             <CheckBox Content="{loc:T 'len z mojich listov HISTRA'}" IsChecked="{Binding OnlyMyLists}" MinWidth="0"
                                       Visibility="{Binding HasMyLists, Converter={StaticResource BoolToVisibility}}" />
                         </WrapPanel>
@@ -3162,7 +3162,7 @@
                     <!-- what is shown: the coming premieres or the history; posters; only the chosen titles; search -->
                     <DockPanel Margin="0,0,0,6">
                         <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
-                                 ToolTip="Hľadať názov, produkciu alebo poznámku (bez diakritiky)" />
+                                 ToolTip="{loc:T 'Hľadať názov, produkciu alebo poznámku (bez diakritiky)'}" />
                         <TextBlock DockPanel.Dock="Right" Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
                         <WrapPanel VerticalAlignment="Center">
@@ -3178,9 +3178,9 @@
                             <RadioButton Content="{loc:T 'Nadchádzajúce'}" IsChecked="{Binding ShowUpcoming}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="{loc:T 'História'}" IsChecked="{Binding ShowHistory}" GroupName="PremiereView" MinWidth="0" Margin="0,0,16,0" />
                             <RadioButton Content="{loc:T 'Zobraziť všetko'}" IsChecked="{Binding ShowAll}" GroupName="PremiereView" MinWidth="0" Margin="0,0,24,0"
-                                         ToolTip="História, posledný týždeň aj nadchádzajúce – všetky informácie" />
+                                         ToolTip="{loc:T 'História, posledný týždeň aj nadchádzajúce – všetky informácie'}" />
                             <CheckBox Content="{loc:T 'Zobraziť aj postery'}" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
-                            <CheckBox Content="{loc:T 'Zobraziť vybrané'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" ToolTip="Len tituly zaškrtnuté v stĺpci Vybrané" />
+                            <CheckBox Content="{loc:T 'Zobraziť vybrané'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" ToolTip="{loc:T 'Len tituly zaškrtnuté v stĺpci Vybrané'}" />
                         </WrapPanel>
                     </DockPanel>
                     <TextBlock Text="{Binding Note}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="2,0,0,6" />
@@ -3393,7 +3393,7 @@
                         </Button>
                         <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" Width="150" Margin="8,0" />
                         <TextBox Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"
-                                 ToolTip="Názov (aj s rokom, napr. „Názov 2024“), TMDB ID (číslo alebo adresa z themoviedb.org) alebo IMDb ID (tt a číslice)">
+                                 ToolTip="{loc:T 'Názov (aj s rokom, napr. „Názov 2024“), TMDB ID (číslo alebo adresa z themoviedb.org) alebo IMDb ID (tt a číslice)'}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
                             </TextBox.InputBindings>
@@ -3559,7 +3559,7 @@
                                         <TextBlock Text="{Binding Quality}" VerticalAlignment="Center" Margin="8,0,0,0" Width="28" />
                                     </WrapPanel>
                                     <CheckBox Content="{loc:T 'Zlúčiť poster s filmom/seriálom'}" IsChecked="{Binding Merge}" Margin="0,10,0,0"
-                                              ToolTip="folder.jpg pôjde do hlavného priečinka spracovaného filmu (MOVIES) alebo seriálu (TVSHOWS); keď je zatiaľ len na vstupe, počká, kým ho UNIVERSUM spracuje" />
+                                              ToolTip="{loc:T 'folder.jpg pôjde do hlavného priečinka spracovaného filmu (MOVIES) alebo seriálu (TVSHOWS); keď je zatiaľ len na vstupe, počká, kým ho UNIVERSUM spracuje'}" />
                                     <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,0"
                                                Text="Bez zaškrtnutia: POSTER\Názov (rok)\folder.jpg. So zaškrtnutím: film do MOVIES\Názov (rok), seriál do TVSHOWS\Názov (rok) – vždy do hlavného priečinka, nikdy do Season. Existujúci folder.jpg sa premenuje na folder-povodny.jpg." />
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
@@ -3711,7 +3711,7 @@
                                                Text="{loc:T 'Bez náhľadov (môže ich byť stovky); do priečinkov sérií vedľa epizód – pri spracovanom seriáli s rovnakým menom ako epizóda.'}" />
                                     <TextBlock Text="{Binding ExtrasSizeText}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" />
                                     <CheckBox Content="{loc:T 'Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom'}" IsChecked="{Binding ExtrasMerge}" Margin="0,10,0,0"
-                                              ToolTip="Obrázky pôjdu k spracovanému filmu (MOVIES) alebo seriálu (TVSHOWS); keď je zatiaľ len na vstupe, počkajú, kým ho UNIVERSUM spracuje" />
+                                              ToolTip="{loc:T 'Obrázky pôjdu k spracovanému filmu (MOVIES) alebo seriálu (TVSHOWS); keď je zatiaľ len na vstupe, počkajú, kým ho UNIVERSUM spracuje'}" />
                                     <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="22,2,0,0"
                                                Text="Bez zaškrtnutia: POSTER\Názov (rok). So zaškrtnutím: k výstupu – film do MOVIES\Názov (rok), seriál do TVSHOWS\Názov (rok), obrázky epizód do jeho Season. Existujúce súbory sa premenujú na …-povodny." />
                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
@@ -3867,7 +3867,7 @@
                         <Button DockPanel.Dock="Right" Command="{Binding AddCheckCommand}" Padding="8,2" Margin="4,0,0,0" ToolTip="{loc:T 'Pridať riadok (Enter)'}">
                             <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="11" />
                         </Button>
-                        <TextBox Text="{Binding NewCheckText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový riadok kontrolného zoznamu – Enter ho pridá">
+                        <TextBox Text="{Binding NewCheckText, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový riadok kontrolného zoznamu – Enter ho pridá'}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCheckCommand}" />
                             </TextBox.InputBindings>
@@ -3925,7 +3925,7 @@
                 <WrapPanel>
                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveCommand}" Padding="14,5" Margin="0,0,8,6" FontWeight="SemiBold" />
                     <Button Content="{loc:T 'Zrušiť'}" Command="{Binding CancelCommand}" Padding="12,5" Margin="0,0,8,6" />
-                    <Button Content="{loc:T 'Do koša'}" Command="{Binding DeleteCommand}" Padding="12,5" Margin="0,0,0,6" ToolTip="Záznam pôjde do koša – dá sa vrátiť" />
+                    <Button Content="{loc:T 'Do koša'}" Command="{Binding DeleteCommand}" Padding="12,5" Margin="0,0,0,6" ToolTip="{loc:T 'Záznam pôjde do koša – dá sa vrátiť'}" />
                 </WrapPanel>
             </StackPanel>
         </DataTemplate>
@@ -4003,11 +4003,11 @@
                             <DatePicker SelectedDate="{Binding JumpDate}" Width="130" VerticalAlignment="Center" ToolTip="{loc:T 'Skočiť na dátum'}" />
                         </StackPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Content="{loc:T '+ Udalosť'}" Command="{Binding NewEventCommand}" Padding="12,4" Margin="8,0,0,0" ToolTip="Nová udalosť vo vybraný deň" />
+                            <Button Content="{loc:T '+ Udalosť'}" Command="{Binding NewEventCommand}" Padding="12,4" Margin="8,0,0,0" ToolTip="{loc:T 'Nová udalosť vo vybraný deň'}" />
                             <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="12,4" Margin="8,0,0,0"
-                                    ToolTip="Tlač s náhľadom, PDF, HTML, iCalendar (.ics), CSV a záloha" />
+                                    ToolTip="{loc:T 'Tlač s náhľadom, PDF, HTML, iCalendar (.ics), CSV a záloha'}" />
                             <Button Content="{loc:T 'Obnoviť'}" Command="{Binding RefreshCommand}" Padding="12,4" Margin="8,0,0,0"
-                                    ToolTip="Znova prečíta premiéry a epizódy, ktoré uchovávajú Premiéry a Novinky (zo zdrojov ich obnovíte tam)" />
+                                    ToolTip="{loc:T 'Znova prečíta premiéry a epizódy, ktoré uchovávajú Premiéry a Novinky (zo zdrojov ich obnovíte tam)'}" />
                         </StackPanel>
                     </DockPanel>
                     <!-- the views on their own line (between the buttons they had no room in a narrower window) -->
@@ -4062,7 +4062,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <CheckBox Content="{loc:T 'len vybrané tituly'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,2,0,2" ToolTip="Premiéry a epizódy len titulov zaškrtnutých vo Vybrané" />
+                                <CheckBox Content="{loc:T 'len vybrané tituly'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,2,0,2" ToolTip="{loc:T 'Premiéry a epizódy len titulov zaškrtnutých vo Vybrané'}" />
                             </WrapPanel>
                             <Expander Header="{loc:T 'Nastavenia kalendára – krajiny sviatkov, mená, prázdniny'}" Margin="0,4,0,0">
                                 <StackPanel Margin="0,6,0,4">
@@ -4462,7 +4462,7 @@
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="14,5" Margin="8,0,0,0" FontWeight="SemiBold" />
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Nová úloha…'}" Command="{Binding NewCommand}" Padding="12,5" Margin="8,0,0,0" />
                         <TextBox Text="{Binding QuickText, UpdateSourceTrigger=PropertyChanged}" FontSize="14" Padding="8,5"
-                                 ToolTip="Napríklad: zajtra o 20:00 spracovať film #kino !  ·  do piatku zavolať  ·  za 3 dni …  – Enter pridá">
+                                 ToolTip="{loc:T 'Napríklad: zajtra o 20:00 spracovať film #kino !  ·  do piatku zavolať  ·  za 3 dni …  – Enter pridá'}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                             </TextBox.InputBindings>
@@ -4496,8 +4496,8 @@
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <Button Content="{Binding ActionText}" Command="{Binding ActionCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"
                                                         Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}" />
-                                                <Button Content="{loc:T 'Prevziať'}" Command="{Binding TakeCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="Urobí z návrhu úlohu" />
-                                                <Button Content="{loc:T 'Skryť'}" Command="{Binding HideCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="Tento návrh sa už neukáže" />
+                                                <Button Content="{loc:T 'Prevziať'}" Command="{Binding TakeCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="{loc:T 'Urobí z návrhu úlohu'}" />
+                                                <Button Content="{loc:T 'Skryť'}" Command="{Binding HideCommand}" Padding="10,3" Margin="6,0,0,0" ToolTip="{loc:T 'Tento návrh sa už neukáže'}" />
                                             </StackPanel>
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -4514,7 +4514,7 @@
                         <StackPanel>
                             <DockPanel>
                                 <Button DockPanel.Dock="Right" Content="{loc:T 'Nová akcia UNIVERSUM…'}" Command="{Binding NewActionCommand}" Padding="10,3"
-                                        ToolTip="Napríklad každú noc o 3:00 obnoviť Premiéry a Novinky alebo synchronizovať listy HISTRA" />
+                                        ToolTip="{loc:T 'Napríklad každú noc o 3:00 obnoviť Premiéry a Novinky alebo synchronizovať listy HISTRA'}" />
                                 <TextBlock Text="{loc:T 'UNIVERSUM vykoná sám'}" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </DockPanel>
                             <TextBlock Text="{loc:T 'Zatiaľ nič – akciu (obnoviť Premiéry a Novinky, synchronizovať HISTRA, analyzovať priečinok, spustiť MEGA dávku) naplánujete tlačidlom vpravo alebo v udalosti Kalendára.'}"
@@ -4553,7 +4553,7 @@
                             <RadioButton Content="{loc:T 'Tabuľa'}" IsChecked="{Binding IsBoard}" GroupName="TasksView" MinWidth="0" Margin="0,0,20,0" />
                             <CheckBox Content="{loc:T 'Ukázať hotové'}" IsChecked="{Binding ShowDone}" MinWidth="0" Margin="0,0,12,0" />
                             <Button Content="{loc:T 'Hotové do koša'}" Command="{Binding EmptyDoneCommand}" Padding="10,3" Margin="0,0,8,0" />
-                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,16,0" ToolTip="Tlač s náhľadom, PDF, HTML, iCalendar, CSV, Markdown" />
+                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,16,0" ToolTip="{loc:T 'Tlač s náhľadom, PDF, HTML, iCalendar, CSV, Markdown'}" />
                             <TextBlock Text="{Binding Summary}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
                         </WrapPanel>
                     </DockPanel>
@@ -4639,9 +4639,9 @@
                                Text="{loc:T 'Vaše poznámky, poznámky k dňom z Kalendára a poznámky k titulom z Premiér a Noviniek na jednom mieste. Poznámku môžete napísať aj hlasom – cez hlasové písanie Windows alebo nahrávkou, ktorú UNIVERSUM prepíše v počítači.'}" />
                     <DockPanel Margin="0,0,0,8">
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="14,5" Margin="8,0,0,0" FontWeight="SemiBold" />
-                        <Button DockPanel.Dock="Right" Content="{loc:T 'Nová poznámka…'}" Command="{Binding NewCommand}" Padding="12,5" Margin="8,0,0,0" ToolTip="Poznámka s textom, štítkami, farbou a hlasom" />
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Nová poznámka…'}" Command="{Binding NewCommand}" Padding="12,5" Margin="8,0,0,0" ToolTip="{loc:T 'Poznámka s textom, štítkami, farbou a hlasom'}" />
                         <TextBox Text="{Binding QuickText, UpdateSourceTrigger=PropertyChanged}" FontSize="14" Padding="8,5"
-                                 ToolTip="Rýchla poznámka – prvá veta je názov, #slová sú štítky; Enter ju pridá">
+                                 ToolTip="{loc:T 'Rýchla poznámka – prvá veta je názov, #slová sú štítky; Enter ju pridá'}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                             </TextBox.InputBindings>
@@ -4661,9 +4661,9 @@
                             <RadioButton Content="{loc:T 'K dňom'}" IsChecked="{Binding ShowDays}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="{loc:T 'K titulom'}" IsChecked="{Binding ShowTitles}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="{Binding BinText}" IsChecked="{Binding ShowBin}" GroupName="NotesSource" MinWidth="0" Margin="0,0,10,0" />
-                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,8,0" ToolTip="Tlač s náhľadom, PDF, HTML, Markdown, CSV" />
+                            <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,8,0" ToolTip="{loc:T 'Tlač s náhľadom, PDF, HTML, Markdown, CSV'}" />
                             <Button Content="{loc:T 'Vysypať kôš'}" Command="{Binding EmptyBinCommand}" Padding="10,3"
-                                    Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)" />
+                                    Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="{loc:T 'Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)'}" />
                         </WrapPanel>
                     </DockPanel>
                     <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
@@ -4691,7 +4691,7 @@
                                             <DockPanel>
                                                 <DockPanel DockPanel.Dock="Top">
                                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE7C8;" FontSize="12" Margin="0,2,6,0" ToolTip="Má hlasovú nahrávku"
+                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE7C8;" FontSize="12" Margin="0,2,6,0" ToolTip="{loc:T 'Má hlasovú nahrávku'}"
                                                                    Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
                                                         <Button Command="{Binding PinCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="{loc:T 'Pripnúť hore / odopnúť'}"
                                                                 Visibility="{Binding CanPin, Converter={StaticResource BoolToVisibility}}">
@@ -4761,7 +4761,7 @@
                                     Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                         <TextBox DockPanel.Dock="Right" Width="240" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Hľadať film alebo seriál v listoch (český aj pôvodný názov, rok; bez diakritiky)" VerticalAlignment="Center" />
+                                 ToolTip="{loc:T 'Hľadať film alebo seriál v listoch (český aj pôvodný názov, rok; bez diakritiky)'}" VerticalAlignment="Center" />
                         <TextBlock DockPanel.Dock="Right" Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" ToolTip="{Binding Status}" />
                     </DockPanel>
@@ -4956,7 +4956,7 @@
                         </DockPanel>
                     </Border>
                     <DockPanel Margin="0,0,0,6">
-                        <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="Hľadať v nadpisoch a úvodoch (bez diakritiky)" />
+                        <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:T 'Hľadať v nadpisoch a úvodoch (bez diakritiky)'}" />
                         <TextBlock DockPanel.Dock="Right" Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="12,0,8,0" />
                         <WrapPanel VerticalAlignment="Center">
                             <RadioButton Content="{loc:T 'Dnes'}" IsChecked="{Binding ShowToday}" GroupName="InterestPeriod" MinWidth="0" Margin="0,0,16,0" />
@@ -5121,9 +5121,9 @@
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="{loc:T 'Obsah'}" FontWeight="SemiBold" FontSize="15" Foreground="{Binding Accent}" Margin="2,6,0,8" />
                     <TextBox DockPanel.Dock="Top" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" Padding="6,4"
-                             ToolTip="Hľadať v návode (aj bez diakritiky)" />
+                             ToolTip="{loc:T 'Hľadať v návode (aj bez diakritiky)'}" />
                     <Button DockPanel.Dock="Bottom" Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Margin="0,10,0,0" Padding="10,4" HorizontalAlignment="Left"
-                            ToolTip="Návod vytlačiť alebo uložiť ako PDF či HTML" />
+                            ToolTip="{loc:T 'Návod vytlačiť alebo uložiť ako PDF či HTML'}" />
                     <TextBlock DockPanel.Dock="Top" Text="{loc:T 'Nič sa nenašlo.'}" Style="{StaticResource Hint}" Margin="2,0,0,6"
                                Visibility="{Binding NothingFound, Converter={StaticResource BoolToVisibility}}" />
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -5484,7 +5484,7 @@
                             <StackPanel>
                                 <DockPanel Margin="0,0,0,8">
                                     <Button DockPanel.Dock="Right" Content="{loc:T 'Skontrolovať'}" Command="{Binding Week.CheckWatchCommand}" Padding="10,2"
-                                            ToolTip="Zistí hneď, kde sa dajú vybrané tituly pozerať (inak raz denne pri spustení)" />
+                                            ToolTip="{loc:T 'Zistí hneď, kde sa dajú vybrané tituly pozerať (inak raz denne pri spustení)'}" />
                                     <TextBlock Text="{loc:T 'Kde pozerať – vybrané tituly'}" FontWeight="SemiBold" FontSize="15" Foreground="#2E8F8F" VerticalAlignment="Center" />
                                 </DockPanel>
                                 <TextBlock Text="{loc:T 'Vybrané tituly zatiaľ nie sú na streamovacích službách na Slovensku ani v Česku (alebo ešte neboli skontrolované).'}"
@@ -5642,7 +5642,7 @@
                     <StackPanel Margin="0,0,0,16">
                         <ContentControl Content="{Binding InputFolder}" />
                         <CheckBox Content="{loc:T 'Sledovať vstupný priečinok – upozorniť na nové filmy a epizódy'}" IsChecked="{Binding WatchInput}" Margin="4,8,0,0"
-                                  ToolTip="Keď sa do vstupného priečinka dokopíruje film alebo epizóda, hore sa ukáže upozornenie s tlačidlom Do Hromadného spracovania. Nič sa nespracuje samo." />
+                                  ToolTip="{loc:T 'Keď sa do vstupného priečinka dokopíruje film alebo epizóda, hore sa ukáže upozornenie s tlačidlom Do Hromadného spracovania. Nič sa nespracuje samo.'}" />
                         <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="4,4,0,0" TextWrapping="Wrap"
                                    Text="{loc:T 'Sem prichádzajú nové filmy a epizódy. Novinky – Seriály v ňom (aj v podpriečinkoch) hľadajú epizódy, ktoré odošlete na spracovanie; Single a Hromadné spracovanie v ňom otvárajú výber súborov. Súbory v ňom UNIVERSUM len číta.'}" />
                     </StackPanel>
@@ -5654,7 +5654,7 @@
                                     <Button Content="{loc:T 'Zmeniť…'}" Command="{Binding ChoosePreviewFolderCommand}" Padding="10,3" Margin="6,0,0,0" />
                                     <Button Content="{loc:T 'Otvoriť'}" Command="{Binding OpenPreviewFolderCommand}" Padding="10,3" Margin="6,0,0,0" />
                                     <Button Content="{loc:T 'Vymazať náhľady'}" Command="{Binding ClearPreviewsCommand}" Padding="10,3" Margin="6,0,0,0"
-                                            ToolTip="Vymaže náhľady Zlučovania v tomto priečinku (len súbory „… – náhľad …“, ktoré vytvoril UNIVERSUM)" />
+                                            ToolTip="{loc:T 'Vymaže náhľady Zlučovania v tomto priečinku (len súbory „… – náhľad …“, ktoré vytvoril UNIVERSUM)'}" />
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap">
                                     <Run Text="{loc:T 'Priečinok náhľadov Zlučovania:'}" FontWeight="SemiBold" /> <Run Text="{Binding PreviewFolder, Mode=OneWay}" />
@@ -5690,10 +5690,10 @@
                                     <Button Content="{loc:T 'Overiť a uložiť'}" Command="{Binding SaveTmdbKeyCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveTmdbKeyCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding TmdbKeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč TMDB" />
+                                <TextBox Text="{Binding TmdbKeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový kľúč TMDB'}" />
                             </DockPanel>
                             <CheckBox Content="{loc:T 'Pripájať sa k TMDB'}" IsChecked="{Binding TmdbEnabled}" Margin="0,8,0,0"
-                                      ToolTip="Vypnutím sa na TMDB nič neposiela; uložený kľúč ostáva." />
+                                      ToolTip="{loc:T 'Vypnutím sa na TMDB nič neposiela; uložený kľúč ostáva.'}" />
                             <TextBlock Text="{Binding TmdbStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <DockPanel Margin="0,8,0,0">
                                 <!-- the TMDB logo, smaller than the UNIVERSUM name (TMDB attribution rules) -->
@@ -5713,12 +5713,12 @@
                                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveHistraTokenCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveHistraTokenCommand}" Margin="0,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Získať token…'}" Command="{Binding OpenHistraTokenPageCommand}" Padding="12,5"
-                                            ToolTip="Otvorí https://histra.net/settings/tracking-api" />
+                                            ToolTip="{loc:T 'Otvorí https://histra.net/settings/tracking-api'}" />
                                 </StackPanel>
-                                <TextBox Text="{Binding HistraTokenInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový token HISTRA" />
+                                <TextBox Text="{Binding HistraTokenInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový token HISTRA'}" />
                             </DockPanel>
                             <CheckBox Content="{loc:T 'Pripájať sa k HISTRA'}" IsChecked="{Binding HistraEnabled}" Margin="0,8,0,0"
-                                      ToolTip="Vypnutím sa na HISTRA nič neposiela; uložený token ostáva." />
+                                      ToolTip="{loc:T 'Vypnutím sa na HISTRA nič neposiela; uložený token ostáva.'}" />
                             <TextBlock Text="{Binding HistraStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                             <TextBlock Text="{Binding SyncStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
@@ -5738,8 +5738,8 @@
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveCloudflareCommand}" Padding="12,5" />
                                 </StackPanel>
                                 <UniformGrid Columns="2">
-                                    <TextBox Text="{Binding Account, UpdateSourceTrigger=PropertyChanged}" ToolTip="Account ID (32 znakov)" Margin="0,0,6,0" />
-                                    <TextBox Text="{Binding Token, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový API token" />
+                                    <TextBox Text="{Binding Account, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Account ID (32 znakov)'}" Margin="0,0,6,0" />
+                                    <TextBox Text="{Binding Token, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový API token'}" />
                                 </UniformGrid>
                             </DockPanel>
                             <TextBlock Text="{loc:T 'OpenAI – platené (nepovinné; bez neho kreslí Cloudflare zadarmo)'}" Margin="0,8,0,2" />
@@ -5749,7 +5749,7 @@
                                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveOpenAiCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveOpenAiCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding OpenAi, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč OpenAI (sk-…)" />
+                                <TextBox Text="{Binding OpenAi, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový kľúč OpenAI (sk-…)'}" />
                             </DockPanel>
                             <TextBlock Text="{loc:T 'OMDb (hodnotenia IMDb, Rotten Tomatoes, Metacritic) – stačí bezplatný kľúč'}" Margin="0,8,0,2" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"
@@ -5760,7 +5760,7 @@
                                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveOmdbCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveOmdbCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding Omdb, UpdateSourceTrigger=PropertyChanged}" ToolTip="Nový kľúč OMDb" />
+                                <TextBox Text="{Binding Omdb, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Nový kľúč OMDb'}" />
                             </DockPanel>
                             <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,8,0,0" />
                         </StackPanel>
@@ -5836,8 +5836,8 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox Text="{Binding OpenSubtitlesKey, UpdateSourceTrigger=PropertyChanged}" ToolTip="OpenSubtitles.com – API kľúč (uložený sa nezobrazuje)" Margin="0,0,6,0" />
-                                <TextBox Grid.Column="1" Text="{Binding OpenSubtitlesUser, UpdateSourceTrigger=PropertyChanged}" ToolTip="Meno účtu OpenSubtitles.com" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding OpenSubtitlesKey, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'OpenSubtitles.com – API kľúč (uložený sa nezobrazuje)'}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" Text="{Binding OpenSubtitlesUser, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Meno účtu OpenSubtitles.com'}" Margin="0,0,6,0" />
                                 <PasswordBox Grid.Column="2" app:PasswordBinding.Password="{Binding OpenSubtitlesPassword, Mode=TwoWay}" ToolTip="{loc:T 'Heslo účtu (uložené sa nezobrazuje)'}" Margin="0,0,6,0" />
                                 <StackPanel Grid.Column="3" Orientation="Horizontal">
                                     <Button Content="{loc:T 'Overiť a uložiť'}" Command="{Binding SaveOpenSubtitlesCommand}" Padding="12,5" Margin="0,0,8,0" />
@@ -5854,9 +5854,9 @@
                                 </Grid.ColumnDefinitions>
                                 <PasswordBox app:PasswordBinding.Password="{Binding SvSubToken, Mode=TwoWay}" ToolTip="{loc:T 'svsub.net – token (svs_…; uložený sa nezobrazuje)'}" Margin="0,0,6,0" />
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding Providers}" Text="{Binding SvSubProvider, UpdateSourceTrigger=PropertyChanged}" IsEditable="True"
-                                          ToolTip="Poskytovateľ AI, ktorým svsub.net prekladá (váš kľúč je v nastaveniach služby)" Margin="0,0,6,0" />
+                                          ToolTip="{loc:T 'Poskytovateľ AI, ktorým svsub.net prekladá (váš kľúč je v nastaveniach služby)'}" Margin="0,0,6,0" />
                                 <TextBox Grid.Column="2" Text="{Binding SvSubModel, UpdateSourceTrigger=PropertyChanged}" Width="130" Margin="0,0,6,0"
-                                         ToolTip="Model AI (napr. gpt-6-astra); prázdne = predvolený model služby. Úroveň uvažovania API svsub.net nepozná." />
+                                         ToolTip="{loc:T 'Model AI (napr. gpt-6-astra); prázdne = predvolený model služby. Úroveň uvažovania API svsub.net nepozná.'}" />
                                 <StackPanel Grid.Column="3" Orientation="Horizontal">
                                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SaveSvSubCommand}" Padding="12,5" Margin="0,0,8,0" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveSvSubCommand}" Padding="12,5" />
@@ -5894,8 +5894,8 @@
                                     <ColumnDefinition Width="130" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Meno zdroja" Margin="0,0,6,0" />
-                                <TextBox Grid.Column="1" Text="{Binding NewUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="https://adresa stránky alebo kanála RSS" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Meno zdroja'}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" Text="{Binding NewUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'https://adresa stránky alebo kanála RSS'}" Margin="0,0,6,0" />
                                 <ComboBox Grid.Column="2" ItemsSource="{Binding Languages}" SelectedValuePath="Value" DisplayMemberPath="Text" SelectedValue="{Binding NewLanguage}"
                                           ToolTip="{loc:T 'Jazyk článkov zdroja'}" Margin="0,0,6,0" />
                                 <Button Grid.Column="3" Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="12,5" />
@@ -5915,7 +5915,7 @@
                                     <Button Content="{loc:T 'Overiť a uložiť'}" Command="{Binding SaveKeyCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveKeyCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding KeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Kľúč DeepL API (bezplatný končí :fx)" />
+                                <TextBox Text="{Binding KeyInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Kľúč DeepL API (bezplatný končí :fx)'}" />
                             </DockPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <TextBlock Text="{loc:T 'Prekladať do '}" VerticalAlignment="Center" />
@@ -5938,7 +5938,7 @@
                                     <Button Content="{loc:T 'Uložiť'}" Command="{Binding SavePosterServerCommand}" Margin="8,0,8,0" Padding="12,5" />
                                     <Button Content="{loc:T 'Predvolený (TMDB)'}" Command="{Binding DefaultPosterServerCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding PosterServerInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Adresa servera plagátov (https://…)" />
+                                <TextBox Text="{Binding PosterServerInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Adresa servera plagátov (https://…)'}" />
                             </DockPanel>
                             <TextBlock Text="{Binding PosterStatus}" TextWrapping="Wrap" Margin="0,6,0,0" />
                         </StackPanel>
@@ -5951,10 +5951,10 @@
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="{loc:T 'Hľadať'}" Command="{Binding FindWeatherTownCommand}" IsDefault="False" Margin="8,0,8,0" Padding="12,5"
-                                            ToolTip="Nájde mestá s týmto menom; ak ich je viac, vyberiete to správne" />
+                                            ToolTip="{loc:T 'Nájde mestá s týmto menom; ak ich je viac, vyberiete to správne'}" />
                                     <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveWeatherTownCommand}" Padding="12,5" />
                                 </StackPanel>
-                                <TextBox Text="{Binding WeatherTownInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="Mesto alebo obec, napr. Valaská">
+                                <TextBox Text="{Binding WeatherTownInput, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:T 'Mesto alebo obec, napr. Valaská'}">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Enter" Command="{Binding FindWeatherTownCommand}" />
                                     </TextBox.InputBindings>
@@ -6026,7 +6026,7 @@
                         <StackPanel>
                             <TextBlock Text="{loc:T 'Zlučovanie'}" FontWeight="SemiBold" />
                             <CheckBox Content="{loc:T 'Pri pridaní viacerých súborov sa pýtať, čo s nimi'}" IsChecked="{Binding MuxAskWhenAdding}" Margin="0,6,0,0"
-                                      ToolTip="Ak ste v okne pridávania zvolili „Vždy použiť túto voľbu“, zaškrtnutím sa bude znova pýtať" />
+                                      ToolTip="{loc:T 'Ak ste v okne pridávania zvolili „Vždy použiť túto voľbu“, zaškrtnutím sa bude znova pýtať'}" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" Text="{Binding MuxAddNote}" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
@@ -6176,7 +6176,7 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Content="{Binding UpdateBadge}" Command="{Binding ShowUpdatesCommand}" Margin="0,0,8,0" Padding="12,4"
-                            ToolTip="Aktualizácie MKVToolNix a UNIVERSUM">
+                            ToolTip="{loc:T 'Aktualizácie MKVToolNix a UNIVERSUM'}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                 <Style.Triggers>

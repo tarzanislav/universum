@@ -505,12 +505,12 @@ public sealed partial class SubtitlesPageViewModel
         return new PictureTimeline(timing.IsNone ? pictures : pictures.Select(c => c with { Start = timing.Apply(c.Start), End = timing.Apply(c.End) }));
     }
 
-    // a track is read once for the player (a track of the video: mkvextract reads the whole file); VobSub is not drawn yet
+    // a track is read once for the player (a track of the video: mkvextract reads the whole file); PGS and VobSub are drawn
     private void ReadTrack(SubtitleRow row)
     {
         if (!row.IsText && !PictureSubtitles.CanShow(row.Track))
         {
-            LiveStatus = Loc.F("Stopa {0} má obrázkové titulky {1} – tie prehrávač zatiaľ nezobrazí (PGS áno); časy sa uložia správne.", row.Track.Id, row.Format);
+            LiveStatus = Loc.F("Stopa {0} má obrázkové titulky {1} – tie prehrávač nezobrazí (PGS a VobSub áno); časy sa uložia správne.", row.Track.Id, row.Format);
             return;
         }
 

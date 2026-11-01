@@ -6,7 +6,7 @@ The **TEMPLATES** group adjusts a video according to the *UNIVERSUM rules* – l
 ## Single processing
 One file according to the UNIVERSUM rules. Handy for a quick edit of one film or one episode.
 
-1. Click [Otvoriť súbor…] and choose a video (MKV, MP4, AVI, TS…). The dialog starts in the input folder.
+1. Click [Open file…] and choose a video (MKV, MP4, AVI, TS…). The dialog starts in the input folder.
 2. In the track table, check the **Jazyk (pred → po)** and **Názov (pred → po)** columns. Choose an undetermined or wrong language from the menu; you can rewrite the track name.
 3. Change the order of audio and subtitle tracks in the **Poradie** column – drag a track, or use the arrows.
 4. Choose *film* or *seriál*, type *Title (year)* in the **Titul** field and click [TMDB]. If [Confirm the title] appears, check the suggestion and confirm it.
@@ -57,9 +57,9 @@ If an audio track has no language, click [Recognise the audio languages ▾] and
 ### Template and other buttons
 - **Šablóna:** – [From the group] makes a template from the chosen group, [No template] uses only the UNIVERSUM rules. Use [Save…] and [Load…] to save a template or use it again.
 - **stopy mimo šablóny odstrániť** – tracks the template doesn't know are left out of the result.
-- [Zvuk v štúdiu] and [Titulky v štúdiu] – more detailed editing of one track. The changes are saved to the job.
+- [Audio in studio] and [Subtitles in studio] – more detailed editing of one track. The changes are saved to the job.
 - [Save the report…] saves an overview of the run; [Pozastaviť] and [Stop] control the run.
-- [Upratať zvyšky] moves temporary files left over from interrupted processing to the Recycle Bin.
+- [Clean up leftovers] moves temporary files left over from interrupted processing to the Recycle Bin.
 
 ![Episodes sorted into series and seasons](batch-sorted-series.jpg)
 
@@ -71,7 +71,7 @@ If an audio track has no language, click [Recognise the audio languages ▾] and
 Batches prepared in Batch processing, Single processing or Merging that are written **later** – at night, for example.
 
 1. In Batch processing, prepare the files and, in the menu next to the button, choose a *new batch* or adding to a waiting batch.
-2. Click [Odoslať do MEGA]. The files are saved to the batch with all the decisions, the template and the choice for the originals.
+2. Click [Send to MEGA]. The files are saved to the batch with all the decisions, the template and the choice for the originals.
 3. In MEGA processing, use the **Spustiť** column to set when the batch starts: *keď ju spustím*, *po predchádzajúcej dávke* or *v dátum a čas* (a date and time, e.g. 2:00).
 4. Change the order of the batches with the [▲] and [▼] arrows. Start a batch immediately with [Start now].
 
@@ -82,7 +82,7 @@ Batches prepared in Batch processing, Single processing or Merging that are writ
 - [Edit in Batch processing] – opens the batch with all its decisions. After making changes, click the button with the batch number, e.g. [Uložiť do Dávka 1]. While a batch is being edited, it does not start.
 - [Again the skipped and failed] – files of a finished batch that were skipped, failed or were cancelled are checked and written again.
 - [Delete the originals] – for a batch sent with *zmazať ručne*, sends the originals of the written files to the Windows Recycle Bin.
-- [Vybrať súbor z dávky] and [Remove the batch] don't change the files. Files that were not written show up as free again in Batch processing.
+- [Choose a file from the batch] and [Remove the batch] don't change the files. Files that were not written show up as free again in Batch processing.
 - [Clear finished] removes finished batches from the list.
 
 !pozor A batch set for a time starts **only while UNIVERSUM is running** and the computer is not asleep. Otherwise it gets the state *ZMEŠKANÉ* – start it by hand or set a new time.
@@ -93,7 +93,7 @@ Batches prepared in Batch processing, Single processing or Merging that are writ
 A batch takes files from **Batch processing**, **Single processing** and results of **Merging** – the column **Odkiaľ** shows where from.
 - A file of Single processing and a result of Merging **always keep their originals**, whatever the batch has chosen.
 - A result of Merging is written whole by its settings; if one of its files changes meanwhile, it is **skipped**.
-- [Upraviť v Hromadnom spracovaní] opens only the files that came from Batch processing.
+- [Edit in Batch processing] opens only the files that came from Batch processing.
 
 @otvorit Mega Open MEGA processing
 

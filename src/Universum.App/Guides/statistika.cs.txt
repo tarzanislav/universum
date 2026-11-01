@@ -14,8 +14,8 @@ Pod nadpisem je stav fronty – co běží, kolik úloh **čeká**, kolik je **h
 - [Odstranit] vyřadí vybranou úlohu, [Vyčistit dokončené] smaže ze seznamu hotové úlohy.
 Sloupec **Stav** je při chybě **červený**, při upozorněních oranžový; sloupec **Výsledek** ukáže celý text po najetí myší.
 ### Volby pod seznamem
-- [Spustiť frontu hneď po pridaní úlohy] – úloha se začne zpracovávat bez dalšího kliknutí.
-- [Zvukové upozornenie, keď sú hotové všetky úlohy] – zvuk Windows *Hvězdička*, když je vše hotové,
+- [Spustit frontu hned po přidání úlohy] – úloha se začne zpracovávat bez dalšího kliknutí.
+- [Zvukové upozornění, když jsou hotové všechny úlohy] – zvuk Windows *Hvězdička*, když je vše hotové,
   a *Vykřičník*, když něco selhalo. Při zastavení fronty nezazní.
 @otvorit Queue Otevřít Frontu úloh
 
@@ -33,9 +33,9 @@ Každý běh (Hromadné a Single zpracování, MEGA, Úprava hlavičky, Slučov�
 Vlevo je seznam běhů s datem a souhrnem – běh s problémem má souhrn **červený**. Vpravo je vybraný běh, soubor po souboru:
 - **Co se udělalo** – seznam změn v souboru (stopy, názvy, zápis);
 - při problému **Co se stalo** a **Co s tím** – vysvětlení a rada, jak postupovat;
-- cesta k originálu a k výsledku, tlačítko [Ukázať] otevře složku v Průzkumníkovi;
-- [Technické podrobnosti (výstup nástrojov)] rozbalí přesné technické řádky.
-!tip Zaškrtněte [len súbory s problémom] a uvidíte jen soubory, u kterých se něco nepodařilo.
+- cesta k originálu a k výsledku, tlačítko [Ukázat] otevře složku v Průzkumníkovi;
+- [Technické podrobnosti (výstup nástrojů)] rozbalí přesné technické řádky.
+!tip Zaškrtněte [jen soubory s problémem] a uvidíte jen soubory, u kterých se něco nepodařilo.
 ![Záznamy zpracování](logs.jpg)
 ### Mazání
 Záznamy zůstávají, dokud je nesmažete. [Smazat označené] smaže zaškrtnuté záznamy (nebo vybraný, pokud není nic zaškrtnuto),
@@ -83,9 +83,9 @@ UNIVERSUM se ptá jen stránek MKVToolNix a GitHubu – **nic o vás se neposíl
 1. V Nastavení zapněte [Kontrolovat automaticky (při spuštění, nejvýše jednou denně)] nebo stiskněte [Zkontrolovat nyní…].
 2. Když je nová verze, tlačítko na spodní liště změní text na *Nová verze: …* a zvýrazní se.
 3. Klikněte na něj – otevře se okno **Aktualizace** s novinkami MKVToolNix i UNIVERSUM.
-4. Zvolte [Aktualizovať všetko], [Len MKVToolNix] nebo [Len UNIVERSUM]; [Stránka vydania] ukáže podrobnosti.
+4. Zvolte [Aktualizovat vše], [Jen MKVToolNix] nebo [Jen UNIVERSUM]; [Stránka vydání] ukáže podrobnosti.
 ![Okno Aktualizace](updates.jpg)
-- [Pripomenúť neskôr] se ozve znovu za 3 dny, [Preskočiť túto verziu] ji už nenabídne, [Skontrolovať znova] zjistí stav hned.
+- [Připomenout později] se ozve znovu za 3 dny, [Přeskočit tuto verzi] ji už nenabídne, [Zkontrolovat znovu] zjistí stav hned.
 !info Nejdřív se aktualizuje MKVToolNix, potom UNIVERSUM, který se na konci sám znovu spustí. Instalátory se spustí
   **jen po ověření** kontrolního součtu a podpisu. Nic se neinstaluje bez vašeho kliknutí.
 

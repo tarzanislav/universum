@@ -13,7 +13,7 @@ The Calendar shows your records together with premieres, episodes, holidays, nam
 ### Layers
 Layers can be switched on **one by one or by group** – Premieres, New episodes, Mine, Almanac and UNIVERSUM
 (scheduled actions, MEGA batches, processed runs). UNIVERSUM remembers your choices.
-!tip Tick [len vybrané tituly] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
+!tip Tick [only selected titles] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
 ### New record
 1. Click a day.
 2. Choose [+ Event], [+ Task] or [+ Note].

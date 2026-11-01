@@ -122,7 +122,7 @@ public sealed partial class MuxSettingsViewModel
                 _previewPath = written;
                 _previewRecipe = Recipe(spec);
                 PreviewText = (preview.PreviewParts is null ? "Náhľad celého filmu" : "Náhľad úsekov (začiatok, stred, koniec)") +
-                              $" je hotový ({new FileInfo(written).Length / (1024 * 1024.0):0.#} MB) – prehrajte ho; keď je výsledok v poriadku, odošlite ho do MEGA.";
+                              $" je hotový ({Size(new FileInfo(written).Length)}) – prehrajte ho; keď je výsledok v poriadku, odošlite ho do MEGA.";
             }
             else
             {
@@ -203,6 +203,8 @@ public sealed partial class MuxSettingsViewModel
             // still open in a player: deleted with the old previews later
         }
     }
+
+    private static string Size(long bytes) => bytes < 1024 * 1024 ? $"{Math.Max(1, bytes / 1024)} kB" : $"{bytes / (1024 * 1024.0):0.#} MB";
 
     // what the result is made of (the preview shows these settings as long as this is the same)
     private static string Recipe(MuxSpec spec)

@@ -12,7 +12,7 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
    append them to an existing file (continuation) or add them as further parts. Confirm with [OK].
 3. In the **Tracks in the output** list keep ticked in the **Take** column only the tracks you want.
 4. Click [UNIVERSUM rules] – the track names, languages, flags and order are filled in. Check them.
-5. Choose [film] or [seriál], fill in [Titul:] (or click [TMDB]), for a series also [Epizóda:] (e.g. S01E04).
+5. Choose [film] or [series], fill in [Title:] (or click [TMDB]), for a series also [Episode:] (e.g. S01E04).
 6. Click [Start multiplexing] (adds to the queue and starts) or [Add to queue] (only adds).
 ![Multiplexing – tracks, properties and output](mux.jpg)
 ![How to add files](mux-add-files.jpg)
@@ -26,18 +26,18 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
 ### Tracks in the output and Properties
 - Columns **Take**, **Type**, **Codec**, **Language**, **Name**, **Default**, **Forced**, **More**; the rows are in the order
   they will have in the output. Change the order with the arrows (**Ctrl+↑** / **Ctrl+↓**).
-- After you select a track, you can change [Názov stopy], [Jazyk] and the flags in the **Properties** part on the right:
-  [Predvolená stopa (Default)], [Zapnutá (Enabled)], [Vynútené zobrazenie (Forced)].
-- [Ďalšie príznaky a rozšírené vlastnosti]: SDH, audio description, commentary, delay (ms), FPS, aspect ratio, cropping,
+- After you select a track, you can change [Track name], [Language] and the flags in the **Properties** part on the right:
+  [Default track (Default)], [Track enabled (Enabled)], [Forced display (Forced)].
+- [More flags and advanced properties]: SDH, audio description, commentary, delay (ms), FPS, aspect ratio, cropping,
   subtitle character encoding (usually *cp1250* for old Czech and Slovak subtitles).
 - After you select a source file, you decide whether its **Chapters**, **Attachments (fonts, pictures)** and **Tags** are taken too.
-- [Výstup: názov, kapitoly, prílohy] – the output's name (title), chapters from a file (XML, OGM .txt, cue) and new attachments.
+- [Output: title, chapters, attachments] – the output's name (title), chapters from a file (XML, OGM .txt, cue) and new attachments.
 !info Tracks of an **appended file** are grey and slanted – they continue the track they belong to and take its name,
   language and flags. To edit them, click [Edit the main track].
 ### Output file and library
 - By default the output is made **next to the first source**; with a title filled in it gets a **name by the rules**.
 - [Choose…] picks another folder and name, [Reset] restores the default output.
-- [Do knižnice] sends the result to the library (**MOVIES** / **TVSHOWS**) – the path then cannot be edited.
+- [To the library] sends the result to the library (**MOVIES** / **TVSHOWS**) – the path then cannot be edited.
   [Library…] sets which library.
 ### Several settings at once
 - Each output file has **its own tab**; add a new one with the **+** button (*New multiplexing settings*).
@@ -58,13 +58,13 @@ You can **look at** the result first and send only the finished, flawless one to
 ## Header editing
 Here you fix the **track names, languages and flags** of an MKV file **without multiplexing again**. The header is changed on a copy
 in the library – it takes seconds to minutes.
-1. Click [Otvoriť súbor…] or drag the file in – e.g. *Vymyslený seriál S01E02.mkv*.
+1. Click [Open file…] or drag the file in – e.g. *Vymyslený seriál S01E02.mkv*.
 2. Click [UNIVERSUM rules] – names, languages, flags and order are filled in; then you can edit them by hand.
 3. In the table edit the columns **Name**, **Language**, **Default**, **Enabled**, **Forced**; the **Changes** column shows
    what will change (the original value is in the tooltip).
-4. At the bottom choose [film] / [seriál], fill in [Titul:] and click [Save] (or [Add to queue]).
-- [Názov (title):] is the name of the whole file that players show; leaving it empty removes it.
-- [Odstrániť tagy] deletes tags (names, statistics, encoding data); [Restore from a file] discards unsaved edits.
+4. At the bottom choose [film] / [series], fill in [Title:] and click [Save] (or [Add to queue]).
+- [Title:] is the name of the whole file that players show; leaving it empty removes it.
+- [Remove tags] deletes tags (names, statistics, encoding data); [Restore from a file] discards unsaved edits.
 - **▲ / ▼** change the order (audio among audio, subtitles among subtitles), **Leave out** drops the track from the result.
 - The **Check** part warns e.g. about several tracks with Default or forced subtitles without Default.
 !info Changing the order or leaving out a track **writes a new file** – it takes minutes. Below the table you always see
@@ -74,9 +74,9 @@ in the library – it takes seconds to minutes.
 
 ## Chapters
 Here you **add, fix, generate or shift** a file's chapters.
-1. Click [Otvoriť súbor…] – the duration and the current chapters are shown.
+1. Click [Open file…] – the duration and the current chapters are shown.
 2. Edit **Start (HH:MM:SS.mmm)**, **Name** and **Language**. A wrong time turns red.
-3. Fill in [Titul:] and click [Save] – a copy with the new chapters is saved to the library.
+3. Fill in [Title:] and click [Save] – a copy with the new chapters is saved to the library.
 - [Add] inserts a chapter after the selected one (a minute later), [Remove] drops it, [Sort by time] puts them in order.
 - **Every** … **min** and [Generate] replace the list with chapters over the whole length of the file.
 - **Shift** … **s** and [Shift all] move all chapters at once (negative too, e.g. -1).
@@ -87,7 +87,7 @@ Here you **add, fix, generate or shift** a file's chapters.
 
 ## Information
 Here you **look at the tracks** of any video (MKV, MP4, AVI, TS…) – nothing is changed here.
-1. Click [Otvoriť súbor…] or click a file in the **Files in progress** list on the left (files from Multiplexing and Batch
+1. Click [Open file…] or click a file in the **Files in progress** list on the left (files from Multiplexing and Batch
    processing).
 2. The container, duration and the number of tracks, chapters, tags and attachments are shown at the top.
 3. The table has the columns **ID**, **Type**, **Codec**, **Language**, **Name**, **Default**, **Enabled**, **Forced**,
@@ -98,8 +98,8 @@ Here you **look at the tracks** of any video (MKV, MP4, AVI, TS…) – nothing 
 ## Tips
 - **First [UNIVERSUM rules], then edits by hand** – the rules can be applied again at any time.
 - For tracks with an **undefined language**, choose the language and apply the rules again.
-- Write [Titul:] as *Title (year)*, e.g. *Vymyslený film (2026)*; you can also paste a TMDB address.
-- [Doplnok:] marks a different version of a title, e.g. *Directors Cut* or *Remaster*.
+- Write [Title:] as *Title (year)*, e.g. *Vymyslený film (2026)*; you can also paste a TMDB address.
+- [Addition:] marks a different version of a title, e.g. *Directors Cut* or *Remaster*.
 !tip Add several jobs with [Add to queue] and run them together on the **Job queue** page.
 @otvorit Queue Open Job queue
 !tip The **warning** line below the tracks (Multiplexing) shows what the rules would still change – details are in the tooltip.

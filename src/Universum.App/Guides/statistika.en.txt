@@ -14,8 +14,8 @@ Below the heading is the state of the queue – what is running, how many jobs a
 - [Remove] drops the selected job, [Clear finished] removes the done jobs from the list.
 The **State** column is **red** on an error and orange on warnings; the **Result** column shows the full text when you hover the mouse over it.
 ### Options below the list
-- [Spustiť frontu hneď po pridaní úlohy] – the job starts being processed without another click.
-- [Zvukové upozornenie, keď sú hotové všetky úlohy] – the Windows sound *Asterisk* when everything is done,
+- [Start the queue as soon as a job is added] – the job starts being processed without another click.
+- [Sound notification when all jobs are done] – the Windows sound *Asterisk* when everything is done,
   and *Exclamation* when something failed. It does not sound when the queue is stopped.
 @otvorit Queue Open Job queue
 
@@ -33,9 +33,9 @@ Every run (Batch and Single processing, MEGA, Header editing, Multiplexing, stud
 On the left is a list of runs with date and summary – a run with a problem has a **red** summary. On the right is the selected run, file by file:
 - **What was done** – a list of changes in the file (tracks, names, writing);
 - on a problem, **What happened** and **What to do** – an explanation and advice on how to proceed;
-- the path to the original and to the result; the [Ukázať] button opens the folder in File Explorer;
-- [Technické podrobnosti (výstup nástrojov)] expands the exact technical lines.
-!tip Tick [len súbory s problémom] to see only the files where something went wrong.
+- the path to the original and to the result; the [Show] button opens the folder in File Explorer;
+- [Technical details (tool output)] expands the exact technical lines.
+!tip Tick [only files with a problem] to see only the files where something went wrong.
 ![Processing logs](logs.jpg)
 ### Deleting
 Logs stay until you delete them. [Delete the ticked] deletes the ticked logs (or the selected one if nothing is ticked),
@@ -83,9 +83,9 @@ UNIVERSUM asks only the MKVToolNix and GitHub pages – **nothing about you is s
 1. In Settings turn on [Check automatically (at start, at most once a day)] or press [Check now…].
 2. When there is a new version, the button on the bottom bar changes its text to *New version: …* and is highlighted.
 3. Click it – the **Updates** window opens with what is new in MKVToolNix and UNIVERSUM.
-4. Choose [Aktualizovať všetko], [Len MKVToolNix] or [Len UNIVERSUM]; [Stránka vydania] shows the details.
+4. Choose [Update all], [MKVToolNix only] or [UNIVERSUM only]; [Release page] shows the details.
 ![Updates window](updates.jpg)
-- [Pripomenúť neskôr] reminds you again in 3 days, [Preskočiť túto verziu] will not offer it again, [Skontrolovať znova] checks right away.
+- [Remind me later] reminds you again in 3 days, [Skip this version] will not offer it again, [Check again] checks right away.
 !info MKVToolNix is updated first, then UNIVERSUM, which restarts itself at the end. The installers run
   **only after checking** the checksum and signature. Nothing is installed without your click.
 

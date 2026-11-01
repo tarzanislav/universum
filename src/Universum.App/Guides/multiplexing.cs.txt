@@ -12,7 +12,7 @@ Tady z filmu, zvuků a titulků složíte **jeden nový soubor MKV** – vyberet
    připojit k existujícímu souboru (pokračování) nebo přidat jako další části. Potvrďte [OK].
 3. V seznamu **Stopy ve výstupu** nechte zaškrtnuté ve sloupci **Vzít** jen stopy, které chcete.
 4. Klikněte na [Pravidla UNIVERSUM] – vyplní se názvy, jazyky, příznaky a pořadí stop. Zkontrolujte je.
-5. Zvolte [film] nebo [seriál], vyplňte [Titul:] (nebo klikněte na [TMDB]), u seriálu i [Epizóda:] (např. S01E04).
+5. Zvolte [film] nebo [seriál], vyplňte [Titul:] (nebo klikněte na [TMDB]), u seriálu i [Epizoda:] (např. S01E04).
 6. Klikněte na [Spustit slučování] (přidá do fronty a spustí) nebo na [Do fronty] (jen přidá).
 ![Slučování – stopy, vlastnosti a výstup](mux.jpg)
 ![Jak přidat soubory](mux-add-files.jpg)
@@ -26,18 +26,18 @@ Tady z filmu, zvuků a titulků složíte **jeden nový soubor MKV** – vyberet
 ### Stopy ve výstupu a Vlastnosti
 - Sloupce **Vzít**, **Typ**, **Kodek**, **Jazyk**, **Název**, **Default**, **Forced**, **Další**; řádky jsou v pořadí,
   v jakém budou ve výstupu. Pořadí změníte šipkami (**Ctrl+↑** / **Ctrl+↓**).
-- Po výběru stopy se vpravo v části **Vlastnosti** dá změnit [Názov stopy], [Jazyk] a příznaky
-  [Predvolená stopa (Default)], [Zapnutá (Enabled)], [Vynútené zobrazenie (Forced)].
-- [Ďalšie príznaky a rozšírené vlastnosti]: SDH, audio popis, komentář, zpoždění (ms), FPS, poměr stran, ořez,
+- Po výběru stopy se vpravo v části **Vlastnosti** dá změnit [Název stopy], [Jazyk] a příznaky
+  [Výchozí stopa (Default)], [Zapnutá (Enabled)], [Vynucené zobrazení (Forced)].
+- [Další příznaky a rozšířené vlastnosti]: SDH, audio popis, komentář, zpoždění (ms), FPS, poměr stran, ořez,
   kódování znaků titulků (pro staré české a slovenské titulky obvykle *cp1250*).
 - Po výběru zdrojového souboru určíte, zda se z něj vezmou i **Kapitoly**, **Přílohy (písma, obrázky)** a **Tagy**.
-- [Výstup: názov, kapitoly, prílohy] – název (title) výstupu, kapitoly ze souboru (XML, OGM .txt, cue) a nové přílohy.
+- [Výstup: název, kapitoly, přílohy] – název (title) výstupu, kapitoly ze souboru (XML, OGM .txt, cue) a nové přílohy.
 !info Stopy **připojeného souboru** jsou šedé a šikmé – pokračují stopou, ke které patří, a přebírají její název,
   jazyk i příznaky. Pro úpravu klikněte na [Upravit hlavní stopu].
 ### Výstupní soubor a knihovna
 - Ve výchozím stavu vznikne výstup **vedle prvního zdroje**; se zadaným titulem dostane **název podle pravidel**.
 - [Vybrat…] zvolí jinou složku a jméno, [Resetovat] vrátí výchozí výstup.
-- [Do knižnice] pošle výsledek do knihovny (**MOVIES** / **TVSHOWS**) – cestu pak nelze upravovat.
+- [Do knihovny] pošle výsledek do knihovny (**MOVIES** / **TVSHOWS**) – cestu pak nelze upravovat.
   [Knihovna…] určí, do které knihovny.
 ### Více nastavení najednou
 - Každý výstupní soubor má **vlastní záložku**; novou přidáte tlačítkem **+** (*Nové nastavení slučování*).
@@ -58,13 +58,13 @@ Výsledek si můžete nejdřív **prohlédnout** a teprve hotový, bezchybný tv
 ## Úprava hlavičky
 Tady opravíte **názvy, jazyky a příznaky stop** souboru MKV **bez nového slučování**. Hlavička se změní na kopii
 v knihovně – trvá to sekundy až minuty.
-1. Klikněte na [Otvoriť súbor…] nebo soubor přetáhněte myší – např. *Vymyslený seriál S01E02.mkv*.
+1. Klikněte na [Otevřít soubor…] nebo soubor přetáhněte myší – např. *Vymyslený seriál S01E02.mkv*.
 2. Klikněte na [Pravidla UNIVERSUM] – vyplní se názvy, jazyky, příznaky a pořadí; potom je můžete upravit ručně.
 3. V tabulce upravte sloupce **Název**, **Jazyk**, **Default**, **Enabled**, **Forced**; sloupec **Změny** ukazuje,
    co se změní (původní hodnota je v bublině).
 4. Dole zvolte [film] / [seriál], vyplňte [Titul:] a klikněte na [Uložit] (nebo [Do fronty]).
-- [Názov (title):] je název celého souboru, který ukazují přehrávače; prázdný ho odstraní.
-- [Odstrániť tagy] smaže tagy (názvy, statistiky, údaje o kódování); [Obnovit ze souboru] zahodí neuložené úpravy.
+- [Název (title):] je název celého souboru, který ukazují přehrávače; prázdný ho odstraní.
+- [Odstranit tagy] smaže tagy (názvy, statistiky, údaje o kódování); [Obnovit ze souboru] zahodí neuložené úpravy.
 - **▲ / ▼** mění pořadí (zvuk mezi zvukem, titulky mezi titulky), **Vynechat** stopu z výsledku vyřadí.
 - Část **Kontrola** upozorní např. na více stop s Default nebo na forced titulky bez Default.
 !info Změna pořadí nebo vynechání stopy **zapíše nový soubor** – trvá to minuty. Pod tabulkou vždy vidíte,
@@ -74,7 +74,7 @@ v knihovně – trvá to sekundy až minuty.
 
 ## Kapitoly
 Tady kapitoly souboru **přidáte, opravíte, vygenerujete nebo posunete**.
-1. Klikněte na [Otvoriť súbor…] – zobrazí se délka a dosavadní kapitoly.
+1. Klikněte na [Otevřít soubor…] – zobrazí se délka a dosavadní kapitoly.
 2. Upravte **Začátek (HH:MM:SS.mmm)**, **Název** a **Jazyk**. Chybný čas se zbarví červeně.
 3. Vyplňte [Titul:] a klikněte na [Uložit] – kopie s novými kapitolami se uloží do knihovny.
 - [Přidat] vloží kapitolu za vybranou (o minutu později), [Odstranit] ji vyřadí, [Seřadit podle času] je uspořádá.
@@ -87,7 +87,7 @@ Tady kapitoly souboru **přidáte, opravíte, vygenerujete nebo posunete**.
 
 ## Informace
 Tady si **prohlédnete stopy** libovolného videa (MKV, MP4, AVI, TS…) – nic se tu nemění.
-1. Klikněte na [Otvoriť súbor…] nebo vlevo v seznamu **Soubory v práci** (soubory ze Slučování a Hromadného
+1. Klikněte na [Otevřít soubor…] nebo vlevo v seznamu **Soubory v práci** (soubory ze Slučování a Hromadného
    zpracování) klikněte na soubor.
 2. Nahoře se zobrazí kontejner, délka a počet stop, kapitol, tagů a příloh.
 3. Tabulka má sloupce **ID**, **Typ**, **Kodek**, **Jazyk**, **Název**, **Default**, **Enabled**, **Forced**,
@@ -99,7 +99,7 @@ Tady si **prohlédnete stopy** libovolného videa (MKV, MP4, AVI, TS…) – nic
 - **Nejdřív [Pravidla UNIVERSUM], potom ruční úpravy** – pravidla se dají použít znovu kdykoli.
 - Stopám s **neurčeným jazykem** jazyk vyberte a pravidla použijte znovu.
 - [Titul:] pište ve tvaru *Název (rok)*, např. *Vymyslený film (2026)*; vložit můžete i adresu TMDB.
-- [Doplnok:] odliší jinou verzi titulu, např. *Directors Cut* nebo *Remaster*.
+- [Doplněk:] odliší jinou verzi titulu, např. *Directors Cut* nebo *Remaster*.
 !tip Více úloh najednou přidejte přes [Do fronty] a spusťte je spolu na stránce **Fronta úloh**.
 @otvorit Queue Otevřít Frontu úloh
 !tip Řádek s **upozorněním** pod stopami (Slučování) ukáže, co by pravidla ještě změnila – podrobnosti jsou v bublině.

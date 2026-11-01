@@ -39,6 +39,7 @@ internal static class SelfTest
         await Step("inspection", () => TestInspectionAsync(services));
         await Step("release feed and download", () => TestReleaseFeedAndDownloadAsync(installation));
         await Step("windows", () => TestWindowsAsync(services));
+        await Step("languages", () => TestLanguagesAsync(services));
 
         Write(_failures == 0 ? "SELFTEST OK" : $"SELFTEST FAILED ({_failures})");
         File.WriteAllText(Path.Combine(_outputDirectory, "selftest.log"), Log.ToString(), new UTF8Encoding(false));
@@ -3660,6 +3661,90 @@ internal static class SelfTest
         await Screenshot(window, "batch-new-groups.png");
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");
+    }
+
+    // owner, 1. 11. 2026 (bezchybné preklady): the window drawn in English and in Czech; what is still Slovak on the pages
+    // is written to lang-en-slovak.txt / lang-cs-slovak.txt (the invented names of the test data are among them)
+    private static async Task TestLanguagesAsync(AppServices services)
+    {
+        // every translation keeps the values of its Slovak text ({0}, {1:0.#} …) and is not empty
+        var values = new System.Text.RegularExpressions.Regex(@"\{\d+(?:[,:][^}]*)?\}");
+        string Values(string text) => string.Join(" ", values.Matches(text).Select(m => m.Value).Order(StringComparer.Ordinal));
+        var wrong = new[] { ("cs", Localization.Translations.Czech), ("en", Localization.Translations.English) }
+            .SelectMany(table => table.Item2.Where(t => t.Value.Trim().Length == 0 || Values(t.Key) != Values(t.Value)).Select(t => $"{table.Item1}: {t.Key}"))
+            .ToList();
+        Check(wrong.Count == 0 && Localization.Translations.Czech.Count == Localization.Translations.English.Count,
+            $"languages: {Localization.Translations.English.Count} translations with the same values as the Slovak texts – {string.Join(" | ", wrong.Take(5))}");
+
+        foreach (var (language, marks) in new[] { ("en", "áäčďéíĺľňóôŕšťúýžÁÄČĎÉÍĽĹŇÓÔŔŠŤÚÝŽ"), ("cs", "äĺľôŕÄĹĽÔŔ") })
+        {
+            Localization.Loc.Init(language);
+            MainViewModel? model = null;
+            Window? window = null;
+            try
+            {
+                model = new MainViewModel(services);
+                window = new MainWindow(model) { Width = 1180, Height = 740, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+                window.Show();
+                await Settle();
+                var shots = new Dictionary<object, string>
+                {
+                    [model.Dashboard] = "dashboard", [model.Mux] = "zlucovanie", [model.Batch] = "hromadne", [model.Mega] = "mega",
+                    [model.Rules] = "single", [model.Settings] = "nastavenia", [model.Calendar] = "kalendar",
+                };
+                var slovak = new SortedSet<string>(StringComparer.Ordinal);
+                foreach (var tool in model.Tools.Where(t => !t.IsGuide))
+                {
+                    model.SelectedTool = tool;
+                    await Settle();
+                    foreach (var text in VisibleTexts(window).Where(t => t.IndexOfAny(marks.ToCharArray()) >= 0))
+                    {
+                        slovak.Add(text);
+                    }
+
+                    if (shots.TryGetValue(tool.Page, out var name))
+                    {
+                        await Screenshot(window, $"lang-{language}-{name}.png");
+                    }
+                }
+
+                File.WriteAllLines(Path.Combine(_outputDirectory, $"lang-{language}-slovak.txt"), slovak, new UTF8Encoding(false));
+                Write($"languages: {language} – {slovak.Count} texts on the pages still look Slovak");
+                var expected = language == "en" ? ("Batch processing", "Settings") : ("Hromadné zpracování", "Nastavení");
+                var titles = (model.Tools.First(t => t.Page == model.Batch).Title, model.Tools.First(t => t.Page == model.Settings).Title);
+                Check(titles == expected, $"languages: the left rail in {language} – {titles}");
+            }
+            finally
+            {
+                model?.StopTimers();
+                window?.Close();
+                Localization.Loc.Init(services.Settings.UiLanguage);
+            }
+        }
+    }
+
+    // the texts drawn in the window now (TextBlocks of the visual tree – not what a user typed into a TextBox)
+    private static IEnumerable<string> VisibleTexts(DependencyObject root)
+    {
+        var stack = new Stack<DependencyObject>([root]);
+        while (stack.Count > 0)
+        {
+            var item = stack.Pop();
+            if (item is System.Windows.Controls.TextBox or System.Windows.Controls.RichTextBox)
+            {
+                continue;
+            }
+
+            if (item is System.Windows.Controls.TextBlock { Text: { Length: > 0 } text } block && block.IsVisible && text.Trim().Length > 0)
+            {
+                yield return text.Trim().ReplaceLineEndings(" ⏎ ");
+            }
+
+            for (var i = VisualTreeHelper.GetChildrenCount(item) - 1; i >= 0; i--)
+            {
+                stack.Push(VisualTreeHelper.GetChild(item, i));
+            }
+        }
     }
 
     private static async Task Screenshot(Window window, string fileName)

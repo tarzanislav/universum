@@ -6,17 +6,17 @@ processing, and the Dashboard also draws on your picks.
 !info The sources are asked **only at the first start of the day** or with the [Refresh] button. Stored data is shown at once.
 
 ## Premieres
-Four coloured cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** and
+Four colored cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** and
 **SERIÁL – SVET premiéry**. The number on a card is the number of titles. *SK/CZ* are only Czech and Slovak titles, *SVET* all the others.
 1. Click a card, e.g. **FILM – SK/CZ premiéry**.
-2. Choose a view: [Týždeň spätne], [Nadchádzajúce], [História] or [Zobraziť všetko] (history, last week
+2. Choose a view: [Past week], [Upcoming], [History] or [Show everything] (history, last week
   and upcoming at once).
-3. Tick a title you look forward to in the **Selected** column. The [Zobraziť vybrané] option then shows only the selected ones.
+3. Tick a title you look forward to in the **Selected** column. The [Show selected] option then shows only the selected ones.
 4. In the **Notes** column you can write anything – a pasted web address turns into a link word.
 - Films have the columns **Film title**, **Genre**, **Production**, **Premiere**, **When**, **Day**, **VOD / TV / cinema**.
 - Series also have **Season · episode**, **Frequency** and **Episodes**.
 - Next to the title are the links [TMDB] and [HISTRA]; the green line **▶ service (country)** tells where the title can be watched legally.
-- [Zobraziť aj postery] adds posters, the **Veľkosť POSTERU** slider makes them up to 2× bigger. The [Hľadať:] field also searches without accents.
+- [Show posters too] adds posters, the **Veľkosť POSTERU** slider makes them up to 2× bigger. The [Search:] field also searches without accents.
 !tip A premiere moves to **History** the day after its date and stays there for good.
 !pozor Czech and Slovak series need a source – add it in **Settings → News sources**.
 ![Premieres – films](premieres-films.jpg)
@@ -31,9 +31,9 @@ sorted alphabetically with the next episode; the arrow on the left expands the *
   series) to *Batch processing*.
 - The **Next** column shows the next episode and a green **✓ in folder** when the file is already waiting in the input.
 - **Selected** and **Notes** are shared with Premieres – a series selected here is selected there too.
-- Views [Týždeň spätne], [Nadchádzajúce], [História], [Zobraziť všetko]; the option [len z mojich listov HISTRA].
+- Views [Past week], [Upcoming], [History], [Show everything]; the option [only from my HISTRA lists].
 - An episode that is not in the input folder yet waits below in **Waiting for the file in the input folder** –
-  after downloading it, click [Skontrolovať znova].
+  after downloading it, click [Check again].
 !info While Batch processing is working, series wait in the **Ready for Batch processing** block –
   you send them later with the [To Batch processing] button. Files are **only read**.
 ![News – Series](novinky.jpg)
@@ -42,15 +42,15 @@ sorted alphabetically with the next episode; the arrow on the left expands the *
 ## HISTRA lists
 Your film and series lists from HISTRA. UNIVERSUM **only reads** them (it writes nothing there) and keeps them only on your computer.
 1. Save your HISTRA token in **Settings**.
-2. Click [Importovať listy…], tick the lists (or [Vybrať všetky]) and confirm with [Importovať vybrané].
+2. Click [Import lists…], tick the lists (or [Select all]) and confirm with [Importovať vybrané].
 3. Click a title's poster – its **card** opens on the left: poster, links, identifiers, titles, genre, director,
   cast, plot and collection.
-4. From the card go on with [Otvoriť v TMDB Poster] (choosing a poster) or [Do Single spracovania].
-- [Do Single spracovania] finds the title in the input folder: a film or a single episode goes to *Single processing*,
+4. From the card go on with [Open in TMDB Poster] (choosing a poster) or [To Single processing].
+- [To Single processing] finds the title in the input folder: a film or a single episode goes to *Single processing*,
   more episodes to *Batch processing*.
-- [Synchronizovať] loads all imported lists again – otherwise they **do not refresh** by themselves.
+- [Synchronize] loads all imported lists again – otherwise they **do not refresh** by themselves.
 - Change the order of the lists by **dragging the handle** or with the arrows; the bin removes a list from UNIVERSUM (it stays in HISTRA).
-!tip The [Hľadať:] field searches all lists at once – the Czech or original title, or the year.
+!tip The [Search:] field searches all lists at once – the Czech or original title, or the year.
 ![HISTRA lists](histra-lists.jpg)
 @otvorit HistraLists Open HISTRA lists
 
@@ -61,15 +61,15 @@ right next to the processed title.
   *Films* or *Series* and click [Search].
 2. Click a result – the title's card appears on the left, the **Poster** block on the right.
 3. Choose a poster; the recommended one has a **★** and UNIVERSUM explains below it why it recommends it.
-4. Set the compression: [Veľkosť folder.jpg:] (recommended *1000 × 1500*) and [Kvalita JPEG:] (90 = almost like the original).
-5. Click [Spracovať poster]; you find the result via [Open the POSTER folder].
-- [Zlúčiť poster s filmom/seriálom] saves the poster into the film's (*MOVIES*) or series' (*TVSHOWS*) main folder.
+4. Set the compression: [Size of folder.jpg:] (recommended *1000 × 1500*) and [JPEG quality:] (90 = almost like the original).
+5. Click [Process the poster]; you find the result via [Open the POSTER folder].
+- [Merge the poster with the film/series] saves the poster into the film's (*MOVIES*) or series' (*TVSHOWS*) main folder.
   If the title is only in the input so far, the poster **waits** until UNIVERSUM processes it.
-- When TMDB has no poster, [Navrhnúť plagát cez AI] helps.
+- When TMDB has no poster, [Suggest a poster with AI] helps.
 ### More TMDB pictures
-After ticking [Ďalšie TMDB obrázky] you pick with the mouse the **background** (*fanart.jpg*), the **title logo** (*clearlogo.png*),
-and for a series also **season posters** and **episode pictures**. The [Spracovať ďalšie TMDB obrázky] button saves them;
-[Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom] puts them next to the processed title.
+After ticking [More TMDB images] you pick with the mouse the **background** (*fanart.jpg*), the **title logo** (*clearlogo.png*),
+and for a series also **season posters** and **episode pictures**. The [Process more TMDB images] button saves them;
+[Merge more TMDB images with the film/series] puts them next to the processed title.
 !pozor An existing file is not overwritten – it is renamed to *folder-povodny.jpg* (or *…-povodny*).
 ![TMDB poster](tmdb-poster.jpg)
 @otvorit Posters Open TMDB poster
@@ -77,11 +77,11 @@ and for a series also **season posters** and **episode pictures**. The [Spracova
 ## Interesting news
 News, reviews and interesting stories from the film world – **translated into your language**; the full articles stay with their authors.
 1. Add sources in **Settings → Interesting news**; save a DeepL key there for translation.
-2. Choose the period [Today], [Tento týždeň] or [Všetko (História)].
-3. Click a source's coloured label to show only its articles (another click = all).
+2. Choose the period [Today], [This week] or [Everything (History)].
+3. Click a source's colored label to show only its articles (another click = all).
 4. [Read the whole article] (or [Read]) opens the article on the author's page.
-- [Original / translation] and [Original] switch one article, the [Zobraziť originál] option all at once.
-- The star **☆** marks a favourite article; [Len obľúbené ★] shows only those.
+- [Original / translation] and [Original] switch one article, the [Show original] option all at once.
+- The star **☆** marks a favorite article; [Favorites only ★] shows only those.
 !info Without a DeepL key the articles are shown in their original language.
 ![Interesting news](zaujimavosti.jpg)
 @otvorit Interests Open Interesting news
@@ -90,14 +90,14 @@ News, reviews and interesting stories from the film world – **translated into 
 - **This week – series** and **This week – films**: episodes of selected series and this week's premieres
   (★ = selected title). The [News – Series] and [Premieres] buttons open the full pages.
 - **Where to watch – selected titles**: where the selected titles can be watched legally in Slovakia and Czechia; **NEW** = a new
-  offer. [Skontrolovať] checks right away (otherwise once a day).
+  offer. [Check] checks right away (otherwise once a day).
 - **Ready in the input folder**: series episodes from News and selected films that are already waiting in the input –
-  [Spracovať] sends them to processing.
+  [Process] sends them to processing.
 ![Dashboard – This week](dashboard-week.jpg)
 @otvorit Dashboard Open Dashboard
 
 ## Tips
 - Tick **Selected** – the Dashboard draws on it (*This week*, *Where to watch*, selected films in the input folder).
 - Set the **Input folder** once – it applies to Premieres, News, HISTRA lists and the Dashboard.
-- A title from a HISTRA list gets a poster in two clicks: [Otvoriť v TMDB Poster] → [Spracovať poster].
+- A title from a HISTRA list gets a poster in two clicks: [Open in TMDB Poster] → [Process the poster].
 - If something is missing, try [Refresh] – otherwise the sources are asked only once a day.

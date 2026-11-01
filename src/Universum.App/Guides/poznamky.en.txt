@@ -13,7 +13,7 @@ The Calendar shows your records together with premieres, episodes, holidays, nam
 ### Layers
 Layers can be switched on **one by one or by group** – Premieres, New episodes, Mine, Almanac and UNIVERSUM
 (scheduled actions, MEGA batches, processed runs). UNIVERSUM remembers your choices.
-!tip Tick [len vybrané tituly] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
+!tip Tick [only selected titles] and the calendar shows only the titles you have marked as *Vybrané* in Premieres and News – Series.
 ### New record
 1. Click a day.
 2. Choose [+ Event], [+ Task] or [+ Note].
@@ -42,7 +42,7 @@ At the top are suggestions that UNIVERSUM works out by itself (a chosen title in
 [New UNIVERSUM action…] schedules work that the program does by itself at a set time – for example **every night at 3:00**:
 - refresh Premieres and News – Series,
 - sync the HISTRA lists,
-- analyse the Batch processing folder,
+- analyze the Batch processing folder,
 - start a waiting MEGA batch.
 !pozor An action runs **only while UNIVERSUM is running**. A missed time is not made up, and nothing irreversible starts by itself.
 ![UNIVERSUM actions](actions-tasks.jpg)

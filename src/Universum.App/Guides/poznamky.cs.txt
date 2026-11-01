@@ -13,7 +13,7 @@ Kalendář ukazuje vaše záznamy spolu s premiérami, epizodami, svátky, jmeni
 ### Vrstvy
 Vrstvy se zapínají **jednotlivě i po skupinách** – Premiéry, Novinky – Seriály, Moje, Kalendárium a UNIVERSUM
 (naplánované akce, MEGA dávky, zpracované běhy). Volby si UNIVERSUM pamatuje.
-!tip Zaškrtněte [len vybrané tituly] a kalendář ukáže jen tituly, které máte v Premiérách a Novinkách označené jako *Vybrané*.
+!tip Zaškrtněte [jen vybrané tituly] a kalendář ukáže jen tituly, které máte v Premiérách a Novinkách označené jako *Vybrané*.
 ### Nový záznam
 1. Klikněte na den.
 2. Zvolte [+ Událost], [+ Úkol] nebo [+ Poznámka].

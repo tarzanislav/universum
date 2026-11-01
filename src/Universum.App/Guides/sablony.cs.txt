@@ -6,7 +6,7 @@ Skupina **ŠABLONY (TEMPLATE)** upraví video podle *pravidel UNIVERSUM* – jaz
 ## Single zpracování
 Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu nebo jedné epizody.
 
-1. Klikněte na [Otvoriť súbor…] a vyberte video (MKV, MP4, AVI, TS…). Dialog začíná ve vstupní složce.
+1. Klikněte na [Otevřít soubor…] a vyberte video (MKV, MP4, AVI, TS…). Dialog začíná ve vstupní složce.
 2. V tabulce stop zkontrolujte sloupce **Jazyk (pred → po)** a **Názov (pred → po)**. Neurčený nebo nesprávný jazyk vyberte v nabídce, název stopy můžete přepsat.
 3. Pořadí zvuků a titulků změníte ve sloupci **Poradie** – stopu chyťte a přetáhněte, nebo použijte šipky.
 4. Zvolte *film* nebo *seriál*, do pole **Titul** napište *Název (rok)* a klikněte na [TMDB]. Pokud se objeví [Potvrdit titul], zkontrolujte návrh a potvrďte ho.
@@ -57,9 +57,9 @@ Pokud zvuková stopa nemá jazyk, klikněte na [Rozpoznat jazyk audiostop ▾] a
 ### Šablona a další tlačítka
 - **Šablóna:** – [Ze skupiny] udělá šablonu podle vybrané skupiny, [Bez šablony] použije jen pravidla UNIVERSUM. Tlačítky [Uložit…] a [Načíst…] šablonu uložíte nebo znovu použijete.
 - **stopy mimo šablóny odstrániť** – stopy, které šablona nezná, se do výsledku nedostanou.
-- [Zvuk v štúdiu] a [Titulky v štúdiu] – podrobnější úprava jedné stopy. Změny se uloží do úlohy.
+- [Zvuk ve studiu] a [Titulky ve studiu] – podrobnější úprava jedné stopy. Změny se uloží do úlohy.
 - [Uložit zprávu…] uloží přehled běhu, [Pozastaviť] a [Zastavit] řídí běh.
-- [Upratať zvyšky] přesune dočasné soubory po přerušeném zpracování do Koše.
+- [Uklidit zbytky] přesune dočasné soubory po přerušeném zpracování do Koše.
 
 ![Epizody zařazené do seriálu a sezóny](batch-sorted-series.jpg)
 
@@ -71,7 +71,7 @@ Pokud zvuková stopa nemá jazyk, klikněte na [Rozpoznat jazyk audiostop ▾] a
 Dávky připravené v Hromadném zpracování, v Single zpracování nebo ve Slučování, které se zapíšou **později** – například v noci.
 
 1. V Hromadném zpracování připravte soubory a v nabídce vedle tlačítka zvolte *novou dávku* nebo doplnění čekající dávky.
-2. Klikněte na [Odoslať do MEGA]. Soubory se uloží do dávky se všemi rozhodnutími, se šablonou i s volbou pro originály.
+2. Klikněte na [Odeslat do MEGA]. Soubory se uloží do dávky se všemi rozhodnutími, se šablonou i s volbou pro originály.
 3. V MEGA zpracování nastavte ve sloupci **Spustiť**, kdy se dávka spustí: *keď ju spustím*, *po predchádzajúcej dávke* nebo *v dátum a čas* (datum a čas, např. 2:00).
 4. Pořadí dávek změníte šipkami [▲] a [▼]. Okamžitě spustíte dávku tlačítkem [Spustit nyní].
 
@@ -82,7 +82,7 @@ Dávky připravené v Hromadném zpracování, v Single zpracování nebo ve Slu
 - [Upravit v Hromadném zpracování] – otevře dávku se všemi rozhodnutími. Po opravě klikněte na tlačítko s číslem dávky, např. [Uložiť do Dávka 1]. Dokud se dávka upravuje, nespustí se.
 - [Znovu přeskočené a chybné] – soubory dokončené dávky, které se přeskočily, nepodařily nebo zrušily, se znovu zkontrolují a zapíšou.
 - [Smazat originály] – u dávky odeslané s volbou *zmazať ručne* pošle originály zapsaných souborů do Koše Windows.
-- [Vybrať súbor z dávky] a [Odstranit dávku] soubory nemění. Soubory, které se nezapsaly, se v Hromadném zpracování znovu ukážou jako volné.
+- [Vybrat soubor z dávky] a [Odstranit dávku] soubory nemění. Soubory, které se nezapsaly, se v Hromadném zpracování znovu ukážou jako volné.
 - [Vyčistit dokončené] odstraní ze seznamu hotové dávky.
 
 !pozor Dávka nastavená na čas se spustí **jen tehdy, když UNIVERSUM běží** a počítač nespí. Jinak dostane stav *ZMEŠKANÉ* – spusťte ji ručně nebo nastavte nový čas.
@@ -93,7 +93,7 @@ Dávky připravené v Hromadném zpracování, v Single zpracování nebo ve Slu
 Do dávky pošlete soubory z **Hromadného zpracování**, **Single zpracování** i výsledky **Slučování** – sloupec **Odkiaľ** to ukáže.
 - Soubor ze Single zpracování a výsledek Slučování si **originály vždy ponechají**, ať má dávka zvoleno cokoli.
 - Výsledek Slučování se zapíše celý podle svých nastavení; když se některý jeho soubor mezitím změní, **přeskočí se**.
-- [Upraviť v Hromadnom spracovaní] otevře jen soubory, které přišly z Hromadného zpracování.
+- [Upravit v Hromadném zpracování] otevře jen soubory, které přišly z Hromadného zpracování.
 
 @otvorit Mega Otevřít MEGA zpracování
 

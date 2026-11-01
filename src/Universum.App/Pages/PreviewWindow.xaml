@@ -1,4 +1,5 @@
 <Window x:Class="Universum.App.Pages.PreviewWindow"
+        xmlns:loc="clr-namespace:Universum.App.Localization"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:player="clr-namespace:Universum.App.Player"
@@ -8,7 +9,7 @@
     <DockPanel Margin="16,12,16,12">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Titulky:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="{loc:T 'Titulky:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ComboBox ItemsSource="{Binding Subtitles}" SelectedItem="{Binding Subtitle}" Width="260" />
             </StackPanel>
             <StackPanel>

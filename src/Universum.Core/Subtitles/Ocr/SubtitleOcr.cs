@@ -143,6 +143,20 @@ public sealed class SubtitleOcr(OcrTemplates templates, OcrMemory? memory = null
             Step(ref done, pictures.Count, 0.4, 0.3);
         });
 
+        // pixels that are not square (a DVD: 720 pixels wide for a 4:3 or 16:9 picture): the letters are narrower or wider
+        // than the fonts' – the width the film's letters fit the fonts best with is taken for all of them
+        Stretch = Width(shapes);
+        if (Stretch != 1)
+        {
+            foreach (var line in shapes.SelectMany(c => c))
+            {
+                for (var g = 0; g < line.Length; g++)
+                {
+                    line[g] = line[g] with { Aspect = line[g].Aspect * Stretch };
+                }
+            }
+        }
+
         var clusters = new List<OcrCluster>();
         var buckets = new Dictionary<(int, int, int), List<OcrCluster>>();
         var placed = new List<List<List<(OcrCluster Cluster, FoundGlyph Glyph)>>>(pictures.Count);
@@ -204,6 +218,44 @@ public sealed class SubtitleOcr(OcrTemplates templates, OcrMemory? memory = null
                 progress.Report(from + (share * now / total));
             }
         }
+    }
+
+    /// <summary>How much wider the letters were taken than drawn (1: square pixels; a 16:9 DVD about 1,42) – of the last <see cref="Read"/>.</summary>
+    public float Stretch { get; private set; } = 1;
+
+    // the widths of pixels of pictures: square, 4:3 and 16:9 DVD (PAL and NTSC)
+    private static readonly float[] Widths = [1f, 16f / 15, 8f / 9, 1024f / 720, 853f / 720];
+
+    // the width the letters fit the templates best with: the median distance of a sample of letters to their nearest
+    // template, for each width of pixels – another than square only when it is clearly better
+    private float Width(GlyphShape[][][] shapes)
+    {
+        var all = shapes.SelectMany(c => c).SelectMany(l => l).Where(g => g.Pixels >= 6).ToList();
+        if (all.Count < 40)
+        {
+            return 1;
+        }
+
+        var step = Math.Max(1, all.Count / 300);
+        var sample = all.Where((_, i) => i % step == 0).ToList();
+        float Median(float width)
+        {
+            var distances = sample.Select(g => templates.Ranked(g with { Aspect = g.Aspect * width }, 1) is [var best, ..] ? best.Distance : 1f).Order().ToList();
+            return distances[distances.Count / 2];
+        }
+
+        var square = Median(1);
+        var (chosen, distance) = (1f, square);
+        foreach (var width in Widths.Skip(1))
+        {
+            var median = Median(width);
+            if (median < distance)
+            {
+                (chosen, distance) = (width, median);
+            }
+        }
+
+        return square - distance >= 0.015f ? chosen : 1;
     }
 
     // the line's own height of capitals near the film's; the film's when the line has small letters only (or a few letters

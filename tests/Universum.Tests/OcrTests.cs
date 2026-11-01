@@ -394,6 +394,46 @@ public sealed class OcrTests
     }
 
     // FFmpeg with drawtext (FreeType) and the DejaVu Sans font, when this computer has them
+    [Test]
+    public async Task DvdLettersNarrowerThanTheFontsAreRead()
+    {
+        // owner, 1. 11. 2026 (VobSub): a 16:9 DVD keeps its picture 720 pixels wide – the letters are narrower than the fonts'
+        if (Tools() is not { } tools)
+        {
+            Assert.Skip("FFmpeg with drawtext and the DejaVu font are not here");
+            return;
+        }
+
+        var (ffmpeg, font) = tools;
+        var folder = Directory.CreateTempSubdirectory("universum-ocr-dvd-").FullName;
+        try
+        {
+            var templates = OcrTemplates.From(await DrawAlphabetAsync(ffmpeg, font, folder));
+            string[] lines = ["Vymyslený titulok z DVD, číslo 7.", "Kôň ťahá ďalší voz – áno!", "Malá žltá ryba pláva po rieke."];
+            var pictures = new List<OcrPicture>();
+            for (var i = 0; i < lines.Length; i++)
+            {
+                pictures.Add(new OcrPicture(TimeSpan.FromSeconds(i * 3), TimeSpan.FromSeconds((i * 3) + 2), await DrawSubtitleAsync(ffmpeg, font, folder, lines[i], 40, squeeze: 720f / 1024)));
+            }
+
+            var ocr = new SubtitleOcr(templates, new OcrMemory(Path.Combine(folder, "pamat.json")), "sk");
+            var run = ocr.Read(pictures);
+            foreach (var unknown in run.Unknown)
+            {
+                run.Teach(unknown, "?");
+            }
+
+            run.Check(null);
+            var read = run.Document().Cues.Select(c => c.Text).ToList();
+            Assert.True(MathF.Abs(ocr.Stretch - (1024f / 720)) < 0.01f, $"the letters taken 1,42 times wider ({ocr.Stretch:0.###})");
+            Assert.True(read.SequenceEqual(lines), $"read back: {string.Join(" | ", read)}");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private static (string Ffmpeg, string Font)? Tools()
     {
         var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
@@ -448,14 +488,16 @@ public sealed class OcrTests
     }
 
     // a subtitle as a Blu-ray draws it: white letters with a black outline (here on black)
-    private static async Task<InkBitmap> DrawSubtitleAsync(string ffmpeg, string font, string folder, string text, int size)
+    private static async Task<InkBitmap> DrawSubtitleAsync(string ffmpeg, string font, string folder, string text, int size, float squeeze = 1)
     {
-        var file = Path.Combine(folder, $"t{size}.txt");
+        var file = Path.Combine(folder, $"t{size}-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(file, text);
         const int width = 1100, height = 120;
+        var shown = (int)MathF.Round(width * squeeze);
         var bgra = await DrawAsync(ffmpeg, folder, width, height,
-            $"drawtext=fontfile={font}:textfile={file}:fontsize={size}:fontcolor=white:borderw=3:bordercolor=black:x=20:y=80-ascent", "bgra");
-        return InkBitmap.FromBgra(bgra, width, height, width * 4);
+            $"drawtext=fontfile={font}:textfile={file}:fontsize={size}:fontcolor=white:borderw=3:bordercolor=black:x=20:y=80-ascent" +
+            (squeeze == 1 ? "" : $",scale={shown}:{height}"), "bgra");
+        return InkBitmap.FromBgra(bgra, shown, height, shown * 4);
     }
 
     private static async Task<byte[]> DrawAsync(string ffmpeg, string folder, int width, int height, string filter, string format)

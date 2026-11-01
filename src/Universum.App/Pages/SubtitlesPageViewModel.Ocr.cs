@@ -195,7 +195,7 @@ public sealed partial class SubtitlesPageViewModel
                 if (row.ExternalPath is { } external)
                 {
                     OcrStatus = Loc.T("Čítam obrázkové titulky súboru…");
-                    cues = await PgsReader.ReadFileAsync(external, stop);
+                    cues = await PictureSubtitles.ReadFileAsync(external, stop);
                 }
                 else if (file is not null && _services.CurrentMkvToolNix is { } installation)
                 {

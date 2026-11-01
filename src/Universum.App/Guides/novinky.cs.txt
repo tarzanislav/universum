@@ -6,8 +6,8 @@ zpracování a z vašich výběrů čerpá i Přehled.
 !info Zdroje se ptají **jen při prvním spuštění dne** nebo tlačítkem [Obnovit]. Uložené údaje se zobrazí hned.
 
 ## Premiéry
-Čtyři barevné karty: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** a
-**SERIÁL – SVET premiéry**. Číslo na kartě je počet titulů. *SK/CZ* jsou jen české a slovenské tituly, *SVET* všechny ostatní.
+Čtyři barevné karty: **FILM – SK/CZ premiéry**, **FILM – SVĚT premiéry**, **SERIÁL – SK/CZ premiéry** a
+**SERIÁL – SVĚT premiéry**. Číslo na kartě je počet titulů. *SK/CZ* jsou jen české a slovenské tituly, *SVET* všechny ostatní.
 1. Klikněte na kartu, např. **FILM – SK/CZ premiéry**.
 2. Zvolte pohled: [Týden zpětně], [Nadcházející], [Historie] nebo [Zobrazit vše] (historie, poslední týden
   i nadcházející najednou).
@@ -16,14 +16,14 @@ zpracování a z vašich výběrů čerpá i Přehled.
 - Filmy mají sloupce **Název filmu**, **Žánr**, **Produkce**, **Premiéra**, **Kdy**, **Den**, **VOD / TV / kino**.
 - Seriály mají navíc **Série · epizoda**, **Periodicita** a **Epizody**.
 - U názvu jsou odkazy [TMDB] a [HISTRA]; zelený řádek **▶ služba (země)** říká, kde se dá titul legálně sledovat.
-- [Zobrazit i plakáty] přidá plakáty, posuvník **Veľkosť POSTERU** je zvětší až 2×. Pole [Hledat:] hledá i bez diakritiky.
+- [Zobrazit i plakáty] přidá plakáty, posuvník **Velikost POSTERU** je zvětší až 2×. Pole [Hledat:] hledá i bez diakritiky.
 !tip Premiéra přejde do **Historie** den po svém datu a zůstane tam natrvalo.
 !pozor České a slovenské seriály potřebují zdroj – přidáte ho v **Nastavení → Zdroje novinek**.
 ![Premiéry – filmy](premieres-films.jpg)
 @otvorit Premieres Otevřít Premiéry
 
 ## Novinky – Seriály
-Epizody běžících seriálů za poslední týden, na kartách **SERIÁL – CZ/SK** a **SERIÁL – SVET**. Seriály jsou
+Epizody běžících seriálů za poslední týden, na kartách **SERIÁL – CZ/SK** a **SERIÁL – SVĚT**. Seriály jsou
 seřazené abecedně s nejbližší epizodou; šipka vlevo rozbalí **strom epizod**.
 1. Zkontrolujte nahoře **Vstupní složku** – tam UNIVERSUM hledá stažené epizody ([Změnit…], [Otevřít]).
 2. Zaškrtněte epizody ve stromu nebo políčko ve sloupci **Zpracovat** (všechny odvysílané epizody seriálu).

@@ -20,9 +20,9 @@ zmenšíte **výšku** nebo změníte **kodek**.
 !tip Bez volby [Přesný střih (obraz se zapíše znovu)] je střih **rychlý a bez ztráty kvality** – úsek se jen posune
   na nejbližší místo, kde se dá stříhat (obvykle o zlomek sekundy). Přesný střih je přesný na snímek, ale trvá dlouho.
 ### Obraz
-- **Pomer strán** – jak přehrávače obraz zobrazí; zapíše se bez ztráty kvality.
+- **Poměr stran** – jak přehrávače obraz zobrazí; zapíše se bez ztráty kvality.
 - [Otočit:] *o 90° doprava*, *o 180°*, *o 90° doleva*; [Výška (řádky):] např. z 2160 na 1080.
-- **Prekódovanie** – *H.264* nebo *H.265 (HEVC)* a posuvník [Kvalita:].
+- **Překódování** – *H.264* nebo *H.265 (HEVC)* a posuvník [Kvalita:].
 !pozor Otočení, jiná výška, jiný kodek a přesný střih **zapíšou obraz znovu** kodéry Windows – trvá to dlouho.
   Zvuk a titulky se nemění.
 ![Úprava videostopy – úsek, otočení](studio-video.jpg)
@@ -34,16 +34,16 @@ změníte kodek nebo hlasitost. Vybraný zvuk hraje s obrazem **přesně tak, ja
 ### Napasování dabingu
 1. [Otevřít video…] – např. *Vymyslený film (2026).mkv*.
 2. [Přidat zvuk…] – zvukový soubor (MKA, AC-3, DTS, AAC, FLAC, WAV…) nebo **jiný film**, ze kterého se vezme zvuk.
-3. Vyberte přidaný zvuk v seznamu a u **Napasovať vybraný zvuk na:** zvolte původní zvuk filmu.
+3. Vyberte přidaný zvuk v seznamu a u **Napasovat vybraný zvuk na:** zvolte původní zvuk filmu.
 4. Klikněte na [Napasovat]. Jistý výsledek (posun i změna FPS) se **nastaví sám**.
 5. Ověřte si ho přehráním a klikněte na [Uložit].
 !info Nejistý výsledek se sám nepoužije – objeví se tlačítko [Použít návrh]. Použijte ho až po ověření v přehrávači.
 ### Ruční úpravy vybraného zvuku
 - **Posun** pod přehrávačem: [−1000] [−100] [−10] … [+1000] ms – změnu uslyšíte hned.
-- **Zmena FPS (PAL 25 ↔ 23,976)** – s volbou [Zachovat výšku tónu] znějí hlasy stejně, jen pomaleji nebo rychleji.
-- **Kodek a hlasitosť** – [Kodek:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (bezztrátově)*;
+- **Změna FPS (PAL 25 ↔ 23,976)** – s volbou [Zachovat výšku tónu] znějí hlasy stejně, jen pomaleji nebo rychleji.
+- **Kodek a hlasitost** – [Kodek:] *AC-3*, *E-AC-3*, *AAC*, *FLAC (bezztrátově)*;
   [Stereo (smíchat 5.1 do dvou kanálů)], [Normalizovat hlasitost na −23 LUFS (EBU R128)], [Zesílit / ztlumit:].
-- [Jazyk:] a [Název stopy:]; sloupec **Ponechať** určí, zda stopa ve výsledku zůstane.
+- [Jazyk:] a [Název stopy:]; sloupec **Ponechat** určí, zda stopa ve výsledku zůstane.
 - [Vynulovat změny] vrátí vybraný zvuk do původního stavu.
 !tip Samotný **posun se zapíše bez ztráty kvality**. Změna FPS, kodek, stereo a hlasitost zvuk zapíšou znovu.
 ![Úprava audiostopy – přidaný dabing](studio-audio.jpg)
@@ -54,21 +54,21 @@ Tady titulky **posunete, napasujete, opravíte, stáhnete, přeložíte** nebo *
 jsou v obraze **dole bílé**, titulky vybrané v [Porovnat s:] **nahoře žluté**.
 ### Posun během sledování
 1. [Otevřít video…] (nebo [Otevřít titulky…] pro samotné soubory titulků).
-2. Na záložce **Stopy titulkov** vyberte titulky, které chcete upravit.
+2. Na záložce **Stopy titulků** vyberte titulky, které chcete upravit.
 3. Pusťte film. Když se titulek zpožďuje, klikněte na [Titulek začíná nyní] ve chvíli, kdy postava začne mluvit.
 4. Dolaďte tlačítky [−100] / [+100] (ms) a klikněte na [Uložit].
 ### Automatické napasování
-- Zaškrtněte **podľa zvuku** a/nebo **podľa titulkov:** (jiné titulky, které k filmu sedí, i v jiném jazyce).
+- Zaškrtněte **podle zvuku** a/nebo **podle titulků:** (jiné titulky, které k filmu sedí, i v jiném jazyce).
 - [Napasovat] nastaví posun i **změnu FPS** nebo rychlost. Nejistý výsledek čeká na [Použít návrh].
 - [Zkontrolovat titulky videa] řekne u každé stopy: sedí, zpožďuje se, jde dříve nebo jiné FPS.
-- **Synchronizácia podľa dvoch titulkov**: u titulku na začátku filmu klikněte na [1. bod], u titulku ke konci
+- **Synchronizace podle dvou titulků**: u titulku na začátku filmu klikněte na [1. bod], u titulku ke konci
   na [2. bod] – rychlost a posun se spočítají samy.
 ### Záložky
-- **Časy titulkov** – všechny titulky s časem *Nyní* a *Po změně*. Text opravíte klávesou **F2**;
+- **Časy titulků** – všechny titulky s časem *Nyní* a *Po změně*. Text opravíte klávesou **F2**;
   pravé tlačítko nabídne *Odstranit titulek* a *Vrátit všechny úpravy textu*.
-- **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com přes prohlížeč a překlad přes svsub.net.
+- **Stáhnout a přeložit** – OpenSubtitles.com, titulky.com přes prohlížeč a překlad přes svsub.net.
   Výsledek se uloží vedle videa, např. *Vymyslený film (2026).sk.srt*.
-- **Text z obrázkov (OCR)** – obrázkové titulky z Blu-ray (PGS) přepíše na text: vyberte stopu a klikněte
+- **Text z obrázků (OCR)** – obrázkové titulky z Blu-ray (PGS) i z DVD (VobSub) přepíše na text: vyberte stopu a klikněte
   na [Rozpoznat text]. Tvar, který nezná, se **jednou za film zeptá** a zapamatuje si ho.
 ![Úprava titulkové stopy](studio-subtitles.jpg)
 ![OCR se ptá na neznámý tvar](ocr-question.jpg)

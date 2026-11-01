@@ -26,7 +26,7 @@
                    Text="{loc:T 'Pri pripojení alebo pridaní častí vyberte zdrojový súbor, ku ktorému sa súbory pridajú:'}" />
         <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding Target}" DisplayMemberPath="FileName" IsEnabled="{Binding NeedsTarget}" />
         <CheckBox Content="{loc:T 'Súbory s videom vždy do nových nastavení zlučovania'}" IsChecked="{Binding NewForVideo}" Margin="0,12,0,0"
-                  ToolTip="Každý súbor s videom dostane vlastné nastavenia; titulky a zvuk za ním pôjdu k nemu" />
+                  ToolTip="{loc:T 'Každý súbor s videom dostane vlastné nastavenia; titulky a zvuk za ním pôjdu k nemu'}" />
         <Separator Margin="0,10" />
         <CheckBox Content="{loc:T 'Vždy použiť túto voľbu a nepýtať sa (zmeníte v Nastaveniach)'}" IsChecked="{Binding Remember}" IsEnabled="{Binding CanRemember}" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">

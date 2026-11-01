@@ -68,7 +68,7 @@ sú v obraze **dole biele**, titulky vybrané v [Porovnať s:] **hore žlté**.
   pravé tlačidlo ponúkne *Odstrániť titulok* a *Vrátiť všetky úpravy textu*.
 - **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com cez prehliadač a preklad cez svsub.net.
   Výsledok sa uloží vedľa videa, napr. *Vymyslený film (2026).sk.srt*.
-- **Text z obrázkov (OCR)** – obrázkové titulky z Blu-ray (PGS) prepíše na text: vyberte stopu a kliknite
+- **Text z obrázkov (OCR)** – obrázkové titulky z Blu-ray (PGS) aj z DVD (VobSub) prepíše na text: vyberte stopu a kliknite
   na [Rozpoznať text]. Tvar, ktorý nepozná, sa **raz za film opýta** a zapamätá si ho.
 ![Úprava titulkostopy](studio-subtitles.jpg)
 ![OCR sa pýta na neznámy tvar](ocr-question.jpg)

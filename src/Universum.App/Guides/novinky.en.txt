@@ -6,7 +6,7 @@ processing, and the Dashboard also draws on your picks.
 !info The sources are asked **only at the first start of the day** or with the [Refresh] button. Stored data is shown at once.
 
 ## Premieres
-Four coloured cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** and
+Four colored cards: **FILM – SK/CZ premiéry**, **FILM – SVET premiéry**, **SERIÁL – SK/CZ premiéry** and
 **SERIÁL – SVET premiéry**. The number on a card is the number of titles. *SK/CZ* are only Czech and Slovak titles, *SVET* all the others.
 1. Click a card, e.g. **FILM – SK/CZ premiéry**.
 2. Choose a view: [Past week], [Upcoming], [History] or [Show everything] (history, last week
@@ -78,10 +78,10 @@ and for a series also **season posters** and **episode pictures**. The [Process 
 News, reviews and interesting stories from the film world – **translated into your language**; the full articles stay with their authors.
 1. Add sources in **Settings → Interesting news**; save a DeepL key there for translation.
 2. Choose the period [Today], [This week] or [Everything (History)].
-3. Click a source's coloured label to show only its articles (another click = all).
+3. Click a source's colored label to show only its articles (another click = all).
 4. [Read the whole article] (or [Read]) opens the article on the author's page.
 - [Original / translation] and [Original] switch one article, the [Show original] option all at once.
-- The star **☆** marks a favourite article; [Favorites only ★] shows only those.
+- The star **☆** marks a favorite article; [Favorites only ★] shows only those.
 !info Without a DeepL key the articles are shown in their original language.
 ![Interesting news](zaujimavosti.jpg)
 @otvorit Interests Open Interesting news

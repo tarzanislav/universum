@@ -17,8 +17,8 @@ Here you put a film, audio and subtitles together into **one new MKV file** – 
 ![Multiplexing – tracks, properties and output](mux.jpg)
 ![How to add files](mux-add-files.jpg)
 ### Source files
-- Columns **File name**, **Container**, **Size**, **Folder**; each file has **its own colour**, and its tracks have
-  the same colour.
+- Columns **File name**, **Container**, **Size**, **Folder**; each file has **its own color**, and its tracks have
+  the same color.
 - [Remove] drops the selected file with its tracks, [Clear everything] drops all – **nothing changes on the disk**.
 - [Information] shows the selected file on the **Information** page.
 - The **right mouse button** offers e.g. *Append files…* (part 2 of a film), *Add files as further parts…*
@@ -91,7 +91,7 @@ Here you **look at the tracks** of any video (MKV, MP4, AVI, TS…) – nothing 
    processing).
 2. The container, duration and the number of tracks, chapters, tags and attachments are shown at the top.
 3. The table has the columns **ID**, **Type**, **Codec**, **Language**, **Name**, **Default**, **Enabled**, **Forced**,
-   **More flags** and **Properties**; the rows are **coloured by track type**.
+   **More flags** and **Properties**; the rows are **colored by track type**.
 ![Information about a file from Multiplexing](info-files.jpg)
 @otvorit Info Open Information
 

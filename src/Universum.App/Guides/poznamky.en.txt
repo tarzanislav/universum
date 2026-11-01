@@ -42,7 +42,7 @@ At the top are suggestions that UNIVERSUM works out by itself (a chosen title in
 [New UNIVERSUM action…] schedules work that the program does by itself at a set time – for example **every night at 3:00**:
 - refresh Premieres and News – Series,
 - sync the HISTRA lists,
-- analyse the Batch processing folder,
+- analyze the Batch processing folder,
 - start a waiting MEGA batch.
 !pozor An action runs **only while UNIVERSUM is running**. A missed time is not made up, and nothing irreversible starts by itself.
 ![UNIVERSUM actions](actions-tasks.jpg)

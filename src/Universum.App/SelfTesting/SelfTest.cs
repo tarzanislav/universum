@@ -3667,6 +3667,15 @@ internal static class SelfTest
     // is written to lang-en-slovak.txt / lang-cs-slovak.txt (the invented names of the test data are among them)
     private static async Task TestLanguagesAsync(AppServices services)
     {
+        // every translation keeps the values of its Slovak text ({0}, {1:0.#} …) and is not empty
+        var values = new System.Text.RegularExpressions.Regex(@"\{\d+(?:[,:][^}]*)?\}");
+        string Values(string text) => string.Join(" ", values.Matches(text).Select(m => m.Value).Order(StringComparer.Ordinal));
+        var wrong = new[] { ("cs", Localization.Translations.Czech), ("en", Localization.Translations.English) }
+            .SelectMany(table => table.Item2.Where(t => t.Value.Trim().Length == 0 || Values(t.Key) != Values(t.Value)).Select(t => $"{table.Item1}: {t.Key}"))
+            .ToList();
+        Check(wrong.Count == 0 && Localization.Translations.Czech.Count == Localization.Translations.English.Count,
+            $"languages: {Localization.Translations.English.Count} translations with the same values as the Slovak texts – {string.Join(" | ", wrong.Take(5))}");
+
         foreach (var (language, marks) in new[] { ("en", "áäčďéíĺľňóôŕšťúýžÁÄČĎÉÍĽĹŇÓÔŔŠŤÚÝŽ"), ("cs", "äĺľôŕÄĹĽÔŔ") })
         {
             Localization.Loc.Init(language);

@@ -69,7 +69,7 @@ are **white at the bottom** of the picture; those chosen in [Compare with:] are 
 - **Stiahnuť a preložiť** – OpenSubtitles.com, titulky.com via the browser and translation via svsub.net.
   The result is saved next to the video, e.g. *Vymyslený film (2026).sk.srt*.
 - **Text z obrázkov (OCR)** – turns picture subtitles from Blu-ray (PGS) into text: choose the track and click
-  [Recognise the text]. When it meets a shape it doesn't know, it **asks once per film** and remembers it.
+  [Recognize the text]. When it meets a shape it doesn't know, it **asks once per film** and remembers it.
 ![Subtitle track editing](studio-subtitles.jpg)
 ![OCR asks about an unknown shape](ocr-question.jpg)
 !info When OCR asks, type the letter and press [Next]; a smudge is [Not a letter], and if you are unsure, [Don't know].

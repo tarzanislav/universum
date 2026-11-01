@@ -27,7 +27,7 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 @otvorit Rules Open Single processing
 
 ## Batch processing
-A whole folder at once. UNIVERSUM analyses the files, sorts them into **groups** (one film or one series) and shows a simulated result (*výsledok simulácie*) – before anything is written, you can see what each file will become.
+A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows a simulated result (*výsledok simulácie*) – before anything is written, you can see what each file will become.
 
 1. Click [Folder…], tick **aj podpriečinky** if needed, and click [Analyze].
 2. On the left, choose a group in the **Skupina (film / seriál)** list. On the right you will see its files and, below them, **Stopy skupiny**.
@@ -48,7 +48,7 @@ A whole folder at once. UNIVERSUM analyses the files, sorts them into **groups**
 - **Revízia** – the result is already in the library; the file is processed again as a new version.
 
 ### Speech language detection
-If an audio track has no language, click [Recognise the audio languages ▾] and choose *Vybrané súbory*, *Celá skupina* or *Všetky skupiny*. UNIVERSUM listens to several sections from different parts of the film and suggests the language. Everything happens **only on your computer**. Accept the suggestions with [Confirm the suggestions].
+If an audio track has no language, click [Recognize the audio languages ▾] and choose *Vybrané súbory*, *Celá skupina* or *Všetky skupiny*. UNIVERSUM listens to several sections from different parts of the film and suggests the language. Everything happens **only on your computer**. Accept the suggestions with [Confirm the suggestions].
 
 ![Suggested speech languages for the files](batch-speech.jpg)
 
@@ -107,7 +107,7 @@ The file name contains the title, year, languages, resolution, codec and size cl
 !info A title in Latin script gets its original name; a title in another script gets its English name. The name is checked via TMDB.
 
 ## Tips
-- When new videos appear in the input folder, UNIVERSUM shows the *Nové súbory vo vstupnom priečinku* bar with an offer to analyse them. It never starts anything by itself.
+- When new videos appear in the input folder, UNIVERSUM shows the *Nové súbory vo vstupnom priečinku* bar with an offer to analyze them. It never starts anything by itself.
 - Groups with new files since the previous analysis are tinted **light green**.
 - [Skryť nastavenia ▴] gives the tables the whole window.
 - Before a big batch, leave the originals on *zachovať* and check the result in the library. You can delete them later with [Delete the originals].

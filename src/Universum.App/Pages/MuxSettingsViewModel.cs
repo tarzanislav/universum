@@ -373,7 +373,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             Inputs.Add(input);
             foreach (var track in file.Tracks)
             {
-                Tracks.Add(new MuxTrackRow(input, track, LanguageChoice.Common, Changed));
+                Tracks.Add(new MuxTrackRow(input, track, LanguageChoice.Common, Changed) { LanguageSet = FollowLanguage });
             }
         }
 
@@ -1016,6 +1016,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         SelectMainTrackCommand?.NotifyCanExecuteChanged();
         MoveUpCommand?.NotifyCanExecuteChanged();
         MoveDownCommand?.NotifyCanExecuteChanged();
+        RefreshMoves();
         ApplyRulesCommand?.NotifyCanExecuteChanged();
         _detectAudioCommand?.NotifyCanExecuteChanged();
         _detectSubtitlesCommand?.NotifyCanExecuteChanged();

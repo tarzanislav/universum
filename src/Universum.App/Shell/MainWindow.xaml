@@ -716,7 +716,8 @@
                             </StackPanel>
                         </DockPanel>
                         <DataGrid Grid.Row="4" ItemsSource="{Binding TrackRows}" SelectedItem="{Binding SelectedTrackItem}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False" CanUserSortColumns="False" SelectionMode="Single"
+                                  AllowDrop="True" DragOver="OnMuxTrackDragOver" Drop="OnMuxTrackDrop">
                             <DataGrid.InputBindings>
                                 <KeyBinding Key="Up" Modifiers="Control" Command="{Binding MoveUpCommand}" />
                                 <KeyBinding Key="Down" Modifiers="Control" Command="{Binding MoveDownCommand}" />
@@ -735,6 +736,27 @@
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
+                                <!-- owner, 1. 11. 2026: moved by hand as in Hromadné spracovanie – the grip dragged (within the type) or the arrows -->
+                                <DataGridTemplateColumn Header="{loc:T 'Poradie'}" Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding IsMain, Converter={StaticResource BoolToVisibility}}">
+                                                <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="{loc:T 'Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)'}"
+                                                        PreviewMouseLeftButtonDown="OnMuxGripDown" MouseMove="OnMuxGripMove">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
+                                                </Border>
+                                                <Button Command="{Binding DataContext.MoveRowUpCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"
+                                                        Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu hore'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70E;" FontSize="10" />
+                                                </Button>
+                                                <Button Command="{Binding DataContext.MoveRowDownCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"
+                                                        Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu dole'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="10" />
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="{loc:T 'Vziať'}" Width="84" MinWidth="84">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>

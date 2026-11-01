@@ -448,9 +448,10 @@ internal static class SelfTest
         var set = mux.Current;
         mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent, null, false);
         await mux.AddFilesAsync([film, srt]);
-        set.Tracks[2].Language = set.Tracks[2].LanguageChoices.First(c => c.Tag.Primary == "cs");
-        set.Tracks[3].Language = set.Tracks[3].LanguageChoices.First(c => c.Tag.Primary == "cs");
-        set.Tracks[^1].Language = set.Tracks[^1].LanguageChoices.First(c => c.Tag.Primary == "sk");
+        var (dub, forcedRow, srtRow) = (set.Tracks[2], set.Tracks[3], set.Tracks[^1]);
+        dub.Language = dub.LanguageChoices.First(c => c.Tag.Primary == "cs");
+        forcedRow.Language = forcedRow.LanguageChoices.First(c => c.Tag.Primary == "cs");
+        srtRow.Language = srtRow.LanguageChoices.First(c => c.Tag.Primary == "sk");
         set.ApplyRules();
         set.Library.IsMovie = true;
         set.Library.TitleText = "Zlúčený pre MEGA (2026)";
@@ -563,10 +564,14 @@ internal static class SelfTest
         Check(!set.UseLibrary && set.OutputEditable && set.OutputPath == Path.Combine(Path.GetDirectoryName(film)!, "en-und-cz-forced (1).mkv"),
             "mux: the output is beside the source by default, as in MKVToolNix – " + set.OutputPath);
         LanguageChoice Lang(MuxTrackRow row, string code) => row.LanguageChoices.First(c => c.Tag.Primary == code);
-        set.Tracks[2].Language = Lang(set.Tracks[2], "cs");
-        set.Tracks[3].Language = Lang(set.Tracks[3], "cs");
-        set.Tracks[6].Language = Lang(set.Tracks[6], "sk");
-        set.Tracks[5].Include = false;
+        // the rows held before: a language set moves its track among the tracks of its type (owner, 1. 11. 2026)
+        var (dub, forcedRow, englishSubtitles, srtRow) = (set.Tracks[2], set.Tracks[3], set.Tracks[5], set.Tracks[6]);
+        dub.Language = Lang(dub, "cs");
+        Check(set.Tracks.IndexOf(dub) == 1, "mux: the Czech dub moved above the English audio as soon as its language was set");
+        forcedRow.Language = Lang(forcedRow, "cs");
+        srtRow.Language = Lang(srtRow, "sk");
+        Check(set.Tracks.IndexOf(srtRow) == 5 && set.Tracks.IndexOf(englishSubtitles) == 6, "mux: the Slovak subtitles moved above the English ones");
+        englishSubtitles.Include = false;
         set.ApplyRules();
         set.Library.IsMovie = true;
         set.Library.TitleText = "Zlúčený film (2026)";
@@ -3727,12 +3732,15 @@ internal static class SelfTest
         var srt = Path.Combine(work, "Vymyslený film.forced.srt");
         File.WriteAllText(srt, string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
             $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nAko sa máš? Som tu, čo ešte chceš, keď je teraz všetko také, ako má byť.")) + "\n");
+        var czechSrt = Path.Combine(work, "Vymyslený film.srt");
+        File.WriteAllText(czechSrt, string.Join("\n\n", Enumerable.Range(0, 12).Select(i =>
+            $"{i + 1}\n00:00:{i * 2:00},000 --> 00:00:{(i * 2) + 1:00},500\nŘekl jsem ti, že tady budu. Co ještě chceš, když je teď všechno takové, jaké to má být?")) + "\n");
         var previous = mux.AskHowToAdd;
         mux.AskHowToAdd = request => new MuxAddChoice(MuxAddAction.AddToCurrent);
         try
         {
             mux.NewSettingsCommand.Execute(null);
-            await mux.AddFilesAsync([speech, srt]);
+            await mux.AddFilesAsync([speech, srt, czechSrt]);
             var set = mux.Current;
             var audio = set.Tracks.Where(t => t.Kind == TrackType.Audio).ToList();
             Check(audio.Count == 3 && audio.All(a => a.Language.Tag.IsUndetermined) && set.DetectAudioCommand.CanExecute(null),
@@ -3746,6 +3754,43 @@ internal static class SelfTest
             var subtitles = set.Tracks.Single(t => t.Kind == TrackType.Subtitles && t.Input.File.Path == srt);
             Write("mux recognition: subtitles: " + set.Result);
             Check(subtitles.Language.Tag.Primary == "sk" && subtitles.IsForced, $"mux recognition: Slovak subtitles, forced by the file's name – {subtitles.Language.Display}, forced {subtitles.IsForced}");
+
+            // owner, 1. 11. 2026: the order follows the languages (CZ at the top, SK under it) and is changed by hand
+            var czech = set.Tracks.Single(t => t.Kind == TrackType.Subtitles && t.Input.File.Path == czechSrt);
+            int At(MuxTrackRow row) => set.Tracks.IndexOf(row);
+            var english = audio.FirstOrDefault(a => a.Language.Tag.Primary == "en");
+            Check(czech.Language.Tag.Primary == "cs" && At(czech) < At(subtitles) && english is not null && audio.Where(a => a != english).All(a => At(a) < At(english)),
+                $"mux order: Czech subtitles above the Slovak ones, Czech and Slovak audio above the English – {string.Join(", ", set.Tracks.Select(t => t.Language.Tag.Primary))}");
+            set.MoveRowUpCommand.Execute(subtitles);
+            var byHand = At(subtitles) < At(czech);
+            set.MoveTrackTo(subtitles, czech);
+            Check(byHand && At(czech) < At(subtitles), "mux order: a track moved by its arrow and dragged back");
+            set.MoveRowUpCommand.Execute(subtitles);
+            subtitles.Language = subtitles.LanguageChoices.First(c => c.Tag.Primary == "en");
+            var english2 = At(czech) < At(subtitles);
+            subtitles.Language = subtitles.LanguageChoices.First(c => c.Tag.Primary == "sk");
+            Check(english2 && At(czech) < At(subtitles), "mux order: a language set by hand puts the track in its place");
+
+            // owner, 1. 11. 2026: the drop-down of the languages (thousands) opens at once – only the items seen are made
+            set.SelectedTrack = czech;
+            await Settle();
+            if (FindVisual<System.Windows.Controls.ComboBox>(window, c => ReferenceEquals(c.ItemsSource, czech.LanguageChoices) && c.IsVisible) is { } combo)
+            {
+                var opening = System.Diagnostics.Stopwatch.StartNew();
+                combo.IsDropDownOpen = true;
+                await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var opened = opening.Elapsed.TotalMilliseconds;
+                await Settle();
+                var made = Enumerable.Range(0, combo.Items.Count).Count(i => combo.ItemContainerGenerator.ContainerFromIndex(i) is not null);
+                combo.IsDropDownOpen = false;
+                Write($"mux languages drop-down: {combo.Items.Count} languages, {made} items made, opened in {opened:0} ms");
+                Check(made > 0 && made < 200, $"mux languages drop-down: only the items seen are made ({made} of {combo.Items.Count})");
+            }
+            else
+            {
+                Fail("mux languages drop-down: not found");
+            }
+
             await Screenshot(window, "mux-recognition.png");
             var confirm = mux.Confirm;
             mux.Confirm = _ => true;

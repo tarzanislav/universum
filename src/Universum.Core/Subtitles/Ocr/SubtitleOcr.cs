@@ -423,8 +423,10 @@ public sealed record OcrCorrection(int Cue, TimeSpan At, string Before, string A
 /// only what the reading was not sure of: a shape read wrongly in the whole film whose other reading makes many of its
 /// words words of the language; a doubtful word that another reading of its letters (the next nearest shapes, the
 /// letter with another accent, touching letters) makes a word of the language – of the user's lexicon or read surely
-/// elsewhere in the film; a letter still unknown, when the letters of the language make one guess clearly the likeliest.
-/// A sentence starts with a capital where the shape cannot tell (c/C, s/S, ž/Ž …).
+/// elsewhere in the film; a letter still unknown, when the letters of the language make one guess clearly the likeliest;
+/// a word whose neighbours stand much more often with another reading of it (pairs of words, owner, 1. 11. 2026).
+/// Punctuation and spelling are mended (<see cref="OcrPunctuation"/>); a sentence starts with a capital where the shape
+/// cannot tell (c/C, s/S, ž/Ž …).
 /// </summary>
 public sealed class OcrRun
 {
@@ -509,20 +511,33 @@ public sealed class OcrRun
             Relabel(words, lexicon);
         }
 
-        // the film's own words: those read surely (no letter of another language)
+        // the film's own words: those read surely (no letter of another language) – and the pairs of them next to each
+        // other in a line
         var film = new OcrLexicon();
-        foreach (var word in words.Where(w => w.Pieces.All(p => p.Sure)))
+        string? previous = null;
+        for (var k = 0; k < words.Count; k++)
         {
+            var word = words[k];
             var text = MendWord(Raw(word.Pieces));
-            if (!text.Any(c => SubtitleOcr.Foreign(c, _language)))
+            var sure = word.Pieces.All(p => p.Sure) && !text.Any(c => SubtitleOcr.Foreign(c, _language));
+            if (sure)
             {
                 film.Learn(text);
+                if (previous is not null && k > 0 && words[k - 1].Cue == word.Cue && words[k - 1].Line == word.Line)
+                {
+                    film.AddPair(previous, text, 1);
+                }
             }
+
+            previous = sure ? text : null;
         }
 
-        foreach (var word in words)
+        // each doubtful word by the language – and by its neighbours in the subtitle (owner, 1. 11. 2026: pairs of words)
+        for (var k = 0; k < words.Count; k++)
         {
-            Fix(word, film, lexicon);
+            var before = k > 0 && words[k - 1].Cue == words[k].Cue ? MendWord(Raw(words[k - 1].Pieces)) : null;
+            var after = k + 1 < words.Count && words[k + 1].Cue == words[k].Cue ? MendWord(Raw(words[k + 1].Pieces)) : null;
+            Fix(words[k], before, after, film, lexicon);
         }
 
         _checked = true;
@@ -549,6 +564,8 @@ public sealed class OcrRun
 
                 if (_checked)
                 {
+                    // punctuation first (a dot read for a comma must not make the next word start a sentence)
+                    text = OcrPunctuation.Mend(text, _language, changes);
                     text = SentenceStart(text, ref ended, changes);
                 }
 
@@ -692,9 +709,28 @@ public sealed class OcrRun
         }
     }
 
-    // a doubtful word: another reading of its letters that is a word of the language; an unknown letter guessed by the
-    // letters of the language
-    private void Fix(WordAt word, OcrLexicon film, OcrLexicon? lexicon)
+    // how often a word stood between these neighbours: in the user's subtitles and in the film's sure words
+    private static int Context(string word, string? before, string? after, OcrLexicon film, OcrLexicon? lexicon)
+    {
+        var count = 0;
+        foreach (var model in new[] { film, lexicon })
+        {
+            if (model is null)
+            {
+                continue;
+            }
+
+            count += (before is null ? 0 : model.Pair(before, word)) + (after is null ? 0 : model.Pair(word, after));
+        }
+
+        return count;
+    }
+
+    // a doubtful word: another reading of its letters that is a word of the language – the one its neighbours stand
+    // with most often wins (owner, 1. 11. 2026); a word of the language read with a doubt that stands with its neighbours
+    // much less often than another reading ("my sem" against "my sme"); an unknown letter guessed by the letters of the
+    // language
+    private void Fix(WordAt word, string? before, string? after, OcrLexicon film, OcrLexicon? lexicon)
     {
         if (word.Pieces.All(p => p.Sure))
         {
@@ -703,13 +739,39 @@ public sealed class OcrRun
         }
 
         var raw = Raw(word.Pieces);
+        var variants = Variants(word.Pieces, raw);
         if (Frequency(film, MendWord(raw)) > 0 || (lexicon is not null && Frequency(lexicon, MendWord(raw)) > 0))
         {
+            // a word of the language: another reading only when its neighbours clearly say so (a near shape, a word the
+            // language uses too, pairs seen at least three times and four times as often)
+            if ((before is null && after is null) || (lexicon is not { PairCount: >= 1000 } && film.PairCount < 50))
+            {
+                return;
+            }
+
+            var now = Context(MendWord(raw), before, after, film, lexicon);
+            var frequency = Frequency(film, MendWord(raw)) + (lexicon is null ? 0 : Frequency(lexicon, MendWord(raw)));
+            (string Raw, int Context)? other = null;
+            foreach (var (text, cost) in variants.Where(v => v.Cost <= 0.12f && !v.Raw.Contains('�')))
+            {
+                var mended = MendWord(text);
+                var known = Frequency(film, mended) + (lexicon is null ? 0 : Frequency(lexicon, mended));
+                var context = Context(mended, before, after, film, lexicon);
+                if (known * 10 >= frequency && context >= 3 && context >= 4 * (now + 1) && context > (other?.Context ?? 0))
+                {
+                    other = (text, context);
+                }
+            }
+
+            if (other is { } better)
+            {
+                _fixes[(word.Cue, word.Line, word.First)] = (word.Last, better.Raw, CoreText.T("slovo podľa susedných slov"));
+            }
+
             return;
         }
 
-        var variants = Variants(word.Pieces, raw);
-        (string Raw, double Score)? best = null;
+        (string Raw, double Score, bool ByContext)? best = null;
         foreach (var (text, cost) in variants)
         {
             var mended = MendWord(text);
@@ -720,16 +782,17 @@ public sealed class OcrRun
                 continue;
             }
 
-            var score = Math.Log(1 + (5.0 * seen) + told) - (8 * cost);
+            var context = Context(mended, before, after, film, lexicon);
+            var score = Math.Log(1 + (5.0 * seen) + told) - (8 * cost) + (0.8 * Math.Log(1 + context));
             if (best is null || score > best.Value.Score)
             {
-                best = (text, score);
+                best = (text, score, context > 0);
             }
         }
 
         if (best is { } found)
         {
-            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, found.Raw, CoreText.T("slovo jazyka"));
+            _fixes[(word.Cue, word.Line, word.First)] = (word.Last, found.Raw, CoreText.T(found.ByContext ? "slovo jazyka podľa susedných slov" : "slovo jazyka"));
             return;
         }
 

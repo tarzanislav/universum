@@ -73,7 +73,8 @@ jsou v obraze **dole bílé**, titulky vybrané v [Porovnat s:] **nahoře žlut�
 ![Úprava titulkové stopy](studio-subtitles.jpg)
 ![OCR se ptá na neznámý tvar](ocr-question.jpg)
 !info Na otázku OCR napište písmeno a stiskněte [Dále]; skvrna je [Není to písmeno], při nejistotě [Nevím].
-  [Opravit text podle jazyka] pak opraví pochybná slova – každou opravu můžete [Vrátit].
+  [Opravit text podle jazyka] pak opraví pochybná slova (i podle sousedních slov), interpunkci a pravopis – každou
+  opravu můžete [Vrátit]. Dvojice slov se slovník naučí z vašich titulků – starší slovník nechte naučit znovu.
 !pozor Soubory titulků se uloží jako **nové SRT nebo WebVTT vedle původních**, nikdy přes existující soubor.
 @otvorit Subtitles Otevřít Úpravu titulkové stopy
 

@@ -73,7 +73,8 @@ are **white at the bottom** of the picture; those chosen in [Compare with:] are 
 ![Subtitle track editing](studio-subtitles.jpg)
 ![OCR asks about an unknown shape](ocr-question.jpg)
 !info When OCR asks, type the letter and press [Next]; a smudge is [Not a letter], and if you are unsure, [Don't know].
-  [Correct the text by language] then fixes doubtful words – you can [Revert] any fix.
+  [Correct the text by language] then fixes doubtful words (also by the words next to them), punctuation and spelling –
+  you can [Revert] any fix. The dictionary learns pairs of words from your subtitles – let an older one learn again.
 !pozor Subtitle files are saved as **new SRT or WebVTT files next to the original ones**, never over an existing file.
 @otvorit Subtitles Open Subtitle track editing
 

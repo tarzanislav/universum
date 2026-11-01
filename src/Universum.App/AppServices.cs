@@ -1041,6 +1041,9 @@ public sealed class AppSettings
     /// <summary>Kalendár: the layers switched off.</summary>
     public List<string> CalendarHiddenLayers { get; set; } = [];
 
+    /// <summary>Kalendár: the panel of the layers open (closed it leaves the days more room).</summary>
+    public bool CalendarLayersShown { get; set; } = true;
+
     /// <summary>Kalendár: the view last chosen.</summary>
     public string CalendarView { get; set; } = "Month";
 

@@ -244,6 +244,7 @@ internal static class Translations
         ["UNIVERSUM vykoná sám"] = "UNIVERSUM provede sám",
         ["Upraviť"] = "Upravit",
         ["Obsah"] = "Obsah",
+        ["Vrstvy a nastavenia kalendára"] = "Vrstvy a nastavení kalendáře",
         ["Nič sa nenašlo."] = "Nic se nenašlo.",
     };
 
@@ -485,6 +486,7 @@ internal static class Translations
         ["UNIVERSUM vykoná sám"] = "UNIVERSUM does by itself",
         ["Upraviť"] = "Edit",
         ["Obsah"] = "Contents",
+        ["Vrstvy a nastavenia kalendára"] = "Calendar layers and settings",
         ["Nič sa nenašlo."] = "Nothing found.",
     };
 }

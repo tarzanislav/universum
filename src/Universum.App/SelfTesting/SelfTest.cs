@@ -1824,7 +1824,11 @@ internal static class SelfTest
         calendar.Editor!.CancelCommand.Execute(null);
 
         calendar.TodayCommand.Execute(null);
+        // the panel of the layers folded: the month has the room
+        calendar.ShowLayers = false;
+        Check(!services.Settings.CalendarLayersShown, "calendar: the panel of the layers folded (kept in the settings)");
         await Screenshot(window, "calendar-month.png");
+        calendar.ShowLayers = true;
         calendar.IsWeek = true;
         Check(calendar.Days.Count == 7, "calendar: the week of seven days");
         await Screenshot(window, "calendar-week.png");

@@ -3944,8 +3944,9 @@
                         <CheckBox Content="Skryť prázdne dni" IsChecked="{Binding HideEmptyDays}" MinWidth="0"
                                   Visibility="{Binding IsMonthList, Converter={StaticResource BoolToVisibility}}" />
                     </WrapPanel>
-                    <!-- the layers: each group switches all of its layers, each layer itself (owner, points c and d) -->
+                    <!-- the layers: each group switches all of its layers, each layer itself (owner, points c and d); the panel folds -->
                     <Border Style="{StaticResource Card}" Padding="12,6" Margin="0,0,0,6">
+                        <Expander IsExpanded="{Binding ShowLayers}" Header="{loc:T 'Vrstvy a nastavenia kalendára'}">
                         <StackPanel>
                             <WrapPanel>
                                 <ItemsControl ItemsSource="{Binding LayerGroups}">
@@ -4017,6 +4018,7 @@
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
+                        </Expander>
                     </Border>
                     <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
                 </StackPanel>

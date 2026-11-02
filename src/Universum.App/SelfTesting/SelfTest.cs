@@ -3876,7 +3876,7 @@ internal static class SelfTest
             {
                 var plan = Core.Planning.EditPlan.For(Core.Rules.UniversumRules.Apply(await inspector.InspectAsync(path)) with { NewTitle = title });
                 var place = library.Place(plan.Target, new Core.Library.TitleInfo(MediaKind.Movie, title, 2026), null, Core.Rules.RuleProfile.Default);
-                return await processor.ProcessAsync(plan, place, Core.Execution.OriginalsMode.MoveIntoLibrary.Output());
+                return await processor.ProcessAsync(plan, place, Core.Execution.OriginalsModes.Output(Core.Execution.OriginalsMode.MoveIntoLibrary));
             }
 
             var copied = await Run(film, "Vymyslený zdieľaný film");

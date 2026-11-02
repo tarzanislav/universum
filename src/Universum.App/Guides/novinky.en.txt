@@ -16,6 +16,9 @@ Four colored cards: **FILM – SK/CZ premieres**, **FILM – WORLD premieres**, 
 - Films have the columns **Film title**, **Genre**, **Production**, **Premiere**, **When**, **Day**, **VOD / TV / cinema**.
 - Series also have **Season · episode**, **Frequency** and **Episodes**.
 - Next to the title are the links [TMDB] and [HISTRA]; the green line **▶ service (country)** tells where the title can be watched legally.
+- [To notes] and [To tasks] next to the title (and at each episode in New episodes) add the film, series or episode to **Notes**
+  or **Planned tasks** (a task due on the premiere or airing) and open it at once to edit. A second click opens the same
+  record – nothing is added twice.
 - [Show posters too] adds posters, the **POSTER size** slider makes them up to 2× bigger. The [Search:] field also searches without accents.
 !tip A premiere moves to **History** the day after its date and stays there for good.
 !pozor Czech and Slovak series need a source – add it in **Settings → News sources**.

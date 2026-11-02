@@ -410,6 +410,9 @@ public sealed class PremieresPageViewModel : ObservableObject
     /// <summary>The tab of a table.</summary>
     public PremiereTabItem Tab(PremiereTab tab) => Tabs.First(t => t.Tab == tab);
 
+    /// <summary>A line about what was done (Do poznámok, Do úloh).</summary>
+    internal void Say(string text) => Status = text;
+
     internal AppServices Services => _services;
 
     // the kept premieres, read once
@@ -565,6 +568,12 @@ public abstract class PremiereRow(MarkStore marks, string markKey, Watchlist wat
 
     /// <summary>"DNES", "zajtra", "o 3 dni", "o týždeň", "včera", "pred 3 dňami" …</summary>
     public string When => NewsTexts.When(SortDate);
+
+    /// <summary>Do poznámok (owner, 2. 11. 2026): the title as a note of Poznámky, opened to be edited.</summary>
+    public abstract RelayCommand ToNoteCommand { get; }
+
+    /// <summary>Do úloh: the title as a task of Plánované úlohy, due on its premiere.</summary>
+    public abstract RelayCommand ToTaskCommand { get; }
 }
 
 /// <summary>A row of a film table.</summary>
@@ -580,6 +589,7 @@ public sealed class PremiereFilmRow : PremiereRow
         _search = Words.Normalize($"{film.Caption} {film.LocalTitle} {film.EnglishTitle} {film.Production}");
         OpenTmdbCommand = new RelayCommand(() => Browser.Open(TitleLinks.Tmdb(MediaKind.Movie, film.TmdbId)!));
         OpenHistraCommand = new AsyncRelayCommand(() => page.OpenAsync(o => o.OpenHistraAsync(MediaKind.Movie, film.TmdbId, film.OriginalTitle, film.Year)));
+        (ToNoteCommand, ToTaskCommand) = NewsToAgenda.Commands(page.Services, () => NewsToAgenda.Film(film), page.Say);
     }
 
     public FilmPremiere Film { get; }
@@ -604,6 +614,10 @@ public sealed class PremiereFilmRow : PremiereRow
     public string Where => Film.PremiereNote;
 
     public string Availability => Film.Availability.Length > 0 ? Film.Availability : "–";
+
+    public override RelayCommand ToNoteCommand { get; }
+
+    public override RelayCommand ToTaskCommand { get; }
 
     public RelayCommand OpenTmdbCommand { get; }
 
@@ -632,7 +646,14 @@ public sealed class PremiereSeriesRow : PremiereRow
                 Browser.Open(link);
             }
         }, () => first.Link is not null);
+        (ToNoteCommand, ToTaskCommand) = NewsToAgenda.Commands(page.Services,
+            () => NewsToAgenda.Series(first, first.Kind == EpisodeKind.SeriesPremiere ? Loc.T("Premiéra seriálu") : Loc.F("Premiéra {0}. série", first.Season), premiere.Periodicity),
+            page.Say);
     }
+
+    public override RelayCommand ToNoteCommand { get; }
+
+    public override RelayCommand ToTaskCommand { get; }
 
     public SeriesPremiereRow Premiere { get; }
 

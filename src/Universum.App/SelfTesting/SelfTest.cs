@@ -261,6 +261,7 @@ internal static class SelfTest
         await TestMegaSourcesAsync(model, window, services, work);
         await TestMuxRecognitionAsync(model, window, work);
         await TestSrtConversionAsync(model, window, services, work);
+        await TestNewsToAgendaAsync(model, window, services);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -3730,6 +3731,50 @@ internal static class SelfTest
 
     // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,
     // with forced subtitles told by the file's name (invented speech and text)
+    // owner, 2. 11. 2026: a film of Premiéry and an episode of Novinky added to Poznámky and Plánované úlohy, opened to be
+    // edited there; the same film again opens its note (invented titles)
+    private static async Task TestNewsToAgendaAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var film = new Core.News.FilmPremiere
+        {
+            TmdbId = 990101, OriginalTitle = "Vymyslený agendový film", EnglishTitle = "Invented Agenda Film", Region = Core.News.NewsRegion.World,
+            Premiere = DateOnly.FromDateTime(DateTime.Now).AddDays(10), Year = DateTime.Now.Year,
+        };
+        var (note, task) = NewsToAgenda.Commands(services, () => NewsToAgenda.Film(film), _ => { });
+        note.Execute(null);
+        await Settle();
+        var kept = services.Agenda.Items.Where(i => i.Links.Any(l => l.Target == Core.News.MarkStore.Film(990101))).ToList();
+        Check(model.SelectedTool.Page == model.AgendaNotes && model.AgendaNotes.Editor is AgendaEditor && kept.Count == 1 && kept[0].Note is not null &&
+              kept[0].Text.Contains("Premiéra", StringComparison.Ordinal),
+            $"news → agenda: the film in Poznámky, opened to edit ({kept.Count} records)");
+        await Screenshot(window, "news-to-note.png");
+        (model.AgendaNotes.Editor as AgendaEditor)?.CancelCommand.Execute(null);
+        note.Execute(null);
+        Check(services.Agenda.Items.Count(i => i.Links.Any(l => l.Target == Core.News.MarkStore.Film(990101)) && i.Note is not null) == 1,
+            "news → agenda: the same film again – its note, not a second one");
+        (model.AgendaNotes.Editor as AgendaEditor)?.CancelCommand.Execute(null);
+
+        var episode = new Core.News.SeriesEpisode
+        {
+            Source = "Vymyslený zdroj", Region = Core.News.NewsRegion.World, Title = "Vymyslený agendový seriál", OriginalTitle = "Vymyslený agendový seriál",
+            AirDate = DateOnly.FromDateTime(DateTime.Now).AddDays(3), Season = 1, Number = 2,
+        };
+        var (_, episodeTask) = NewsToAgenda.Commands(services, () => NewsToAgenda.Episode(episode), _ => { });
+        episodeTask.Execute(null);
+        await Settle();
+        var due = services.Agenda.Items.FirstOrDefault(i => i.Task is not null && i.Links.Any(l => l.Kind == Core.Agenda.LinkKind.Episode))?.Task?.Due;
+        Check(model.SelectedTool.Page == model.AgendaTasks && model.AgendaTasks.Editor is not null && due == episode.AirDate,
+            $"news → agenda: the episode in Plánované úlohy, due on its airing ({due})");
+        await Screenshot(window, "news-to-task.png");
+        model.AgendaTasks.Editor?.CancelCommand.Execute(null);
+        foreach (var item in services.Agenda.Items.Where(i => i.Title.Contains("Vymyslený agendový", StringComparison.Ordinal)).ToList())
+        {
+            services.Agenda.Delete(item.Id);
+        }
+
+        services.Agenda.EmptyBin();
+    }
+
     // owner, 1. 11. 2026: subtitles of another format (WebVTT) written as SRT inside the result, only when ticked – in
     // Zlučovanie (a .vtt added to a film) and in Single spracovanie (WebVTT in the film); invented names
     private static async Task TestSrtConversionAsync(MainViewModel model, MainWindow window, AppServices services, string work)

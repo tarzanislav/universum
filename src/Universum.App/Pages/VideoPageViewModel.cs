@@ -419,11 +419,8 @@ public sealed class VideoPageViewModel : ObservableObject
             return false;
         }
 
-        if (edits is not null)
-        {
-            Restore(edits);
-        }
-
+        // the file's own edits, or a clean page (nothing left over from another video)
+        Restore(edits ?? new StudioVideo([], [], ExactCut: false, VideoRecipe.None, Aspect: null));
         _task = (analysed.Path, save, leave);
         OnPropertyChanged(nameof(IsTask));
         OnPropertyChanged(nameof(TaskText));

@@ -189,6 +189,35 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task SuperFastMovesHeaderOnlyFilesButNeverOneWithAnotherName()
+    {
+        // owner, 2. 11. 2026: Superrýchle – a header-only file becomes the result (moved, edited, Vrátiť puts it back); a file
+        // with another name (a hard link: a torrent's seed) is written anew and its original goes to the Recycle Bin
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var output = OriginalsMode.MoveIntoLibrary.Output();
+        Assert.True(output is { Original: OriginalHandling.Delete, MoveIntoLibrary: true } && OriginalsMode.DeleteAutomatically.Output() is { MoveIntoLibrary: false } &&
+                    OriginalsMode.DeleteManually.Output() is { Original: OriginalHandling.Keep }, "the choices and their output options");
+
+        var file = work.Copy("cz-only.mkv");
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file)) with { NewTitle = "Iný vymyslený názov" });
+        Assert.Equal(WriteMethod.HeaderEdit, plan.Method);
+        var moved = await processor.ProcessAsync(plan, work.Movie(plan), output);
+        Assert.True(moved is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
+                    !System.IO.File.Exists(file) && bin.Recycled.Count == 0, "moved into the library and edited there – " + string.Join("; ", moved.Messages));
+        Assert.Equal(0, (await processor.UndoAsync(moved.UndoRecordPath!)).Count, "Vrátiť originály");
+        Assert.True(System.IO.File.Exists(file) && !System.IO.File.Exists(moved.OutputPath!), "the original back in its place");
+
+        var withLink = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), bin, Path.Combine(work.Path, "journal"),
+            new LibraryIndex(Path.Combine(work.Path, "library-index-2.json"))) { DeleteOriginalsAllowed = true, Links = _ => 2 };
+        var copied = await withLink.ProcessAsync(EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file)) with { NewTitle = "Iný vymyslený názov" }), work.Movie(plan), output);
+        Assert.True(copied.Status == ProcessingStatus.Done && !copied.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
+                    copied.Messages.Contains(FileProcessor.OriginalRecycledMessage) && bin.Recycled.Count == 1,
+            "a file with another name: written anew, the original to the Recycle Bin – " + string.Join("; ", copied.Messages));
+    }
+
+    [Test]
     public async Task SameStreamIsNotWrittenTwiceAnotherGetsANumber()
     {
         using var work = new WorkFolder();

@@ -36,7 +36,7 @@ Celá složka najednou. UNIVERSUM soubory analyzuje, seřadí je do **skupin** (
 3. Zvolte druh *filmy* nebo *seriál*. U seriálu vyplňte **Seriál:** a klikněte na [TMDB], u filmu vyplňte **Film:**. Přesný titul zadáte i přes **TMDB ID**.
 4. Návrhy názvů zkontrolujte a přijměte: [Upřesnit názvy], [Přijmout návrhy názvů] nebo pro celou skupinu najednou [Přijmout vše ve skupině].
 5. V části **Stopy skupiny** nastavte **Jazyk**, **Název stopy**, **Forced** a pořadí. Rozhodnutí platí pro všechny soubory skupiny.
-6. U **Originál:** zvolte *zachovat*, *smazat automaticky* nebo *smazat ručně*.
+6. U **Originál:** zvolte *zachovat*, *smazat automaticky*, *smazat ručně* nebo *superrychle*.
 7. Klikněte na [Spustit]. Průběh uvidíte i ve Frontě úloh, konec se ukáže výrazným pruhem.
 
 ![Hromadné zpracování připravené ke spuštění](batch-ready.jpg)
@@ -66,6 +66,7 @@ Pokud zvuková stopa nemá jazyk, klikněte na [Rozpoznat jazyk audiostop ▾] a
 ![Epizody zařazené do seriálu a sezóny](batch-sorted-series.jpg)
 
 !pozor Při volbě *smazat automaticky* jde každý originál do Koše hned po zapsání a ověření nového souboru. Při volbě *smazat ručně* se během běhu nic nemaže, originály pošlete do Koše po dokončení tlačítkem [Smazat originály].
+!pozor Při volbě *superrychle* se soubor, kterému se mění jen hlavička a leží na disku svého výstupního adresáře, **přesune do knihovny a upraví tam** za pár sekund – originál se stane výsledkem a do Koše nejde. Ostatní soubory se zapíšou nově a originál jde do Koše. Soubor s dalším jménem (hard link), otevřený jiným programem nebo na jiném disku se nepřesouvá. Soubory, které ještě sdílíte (torrent), nechte na *zachovat*. Tlačítko [Vrátit originály] (i v MEGA [Vrátit originál]) je vrátí na původní místo s původní hlavičkou.
 
 @otvorit Batch Otevřít Hromadné zpracování
 

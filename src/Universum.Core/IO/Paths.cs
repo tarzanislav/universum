@@ -50,6 +50,15 @@ public static class Paths
     public static DiskIdentity Disk(string path) => DiskResolver(path);
 
     /// <summary>
+    /// Counts the names a file has (hard links; owner, 2. 11. 2026 – Superrýchle never edits a file another name shares, such
+    /// as a torrent's seed). The default knows none and says 1; on Windows the platform reads it, 2 when it cannot.
+    /// </summary>
+    public static Func<string, int> LinkCounter { get; set; } = _ => 1;
+
+    /// <summary>How many names (hard links) the file has.</summary>
+    public static int Links(string path) => LinkCounter(path);
+
+    /// <summary>
     /// Copies a file without overwriting, the progress reported (0–1). The default copies by streams; on Windows the
     /// platform uses the system's copy engine (unbuffered for large files, block cloning on ReFS).
     /// </summary>

@@ -141,6 +141,11 @@ public static partial class ProcessingWords
             return (CoreText.T("Originál je v Koši (výsledok je zapísaný a skontrolovaný)."), null);
         }
 
+        if (message == FileProcessor.MovedIntoLibraryMessage)
+        {
+            return (CoreText.T("Originál je presunutý do knižnice a upravený tam (superrýchle) – Vrátiť originál ho dá späť, ako bol."), null);
+        }
+
         if (message == FileProcessor.RestoredMessage)
         {
             return (CoreText.T("Originál je vrátený do pôvodného stavu."), null);

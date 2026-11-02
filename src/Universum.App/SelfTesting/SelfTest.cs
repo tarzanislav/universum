@@ -3798,6 +3798,8 @@ internal static class SelfTest
             Write($"disks: {path} – {disk.Detail} ({(disk.SolidState ? "SSD" : "not SSD or unknown")}, key {disk.Key})");
         }
 
+        await TestSuperFastAsync(services, main);
+
         var other = new[] { Path.GetTempPath(), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"C:\" }
             .FirstOrDefault(p => p.Length > 0 && Directory.Exists(p) && !Core.IO.Paths.SameVolume(p, main));
         if (other is null)
@@ -3847,6 +3849,58 @@ internal static class SelfTest
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 Write("disks: the test folder stays – " + ex.Message);
+            }
+        }
+    }
+
+    // owner, 2. 11. 2026: Superrýchle – a header-only file on the disk of the output folder is moved into the library and
+    // edited there; one with a hard link (a torrent's seed) is written anew; Vrátiť puts the moved one back
+    private static async Task TestSuperFastAsync(AppServices services, string main)
+    {
+        var folder = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(main).TrimEnd('\\'))!, "UNIVERSUM-selftest-fast-" + Guid.NewGuid().ToString("N")[..8]);
+        var library = new Core.Library.LibraryLayout(Path.Combine(folder, "VYSTUP"));
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var film = Path.Combine(folder, "Vymyslený rýchly film.mkv");
+            File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "cz-only.mkv"), film);
+            Check(Core.IO.Paths.Links(film) == 1, "superfast: a file of one name – " + Core.IO.Paths.Links(film));
+            var linked = Path.Combine(folder, "druhé meno.mkv");
+            var made = await services.Runner.RunAsync(new Core.Processes.ProcessRequest("cmd.exe", ["/c", "mklink", "/H", linked, film]));
+            Check(made.ExitCode == 0 && Core.IO.Paths.Links(film) == 2, $"superfast: a hard link is seen – {Core.IO.Paths.Links(film)} {made.StandardOutput.Trim()} {made.StandardError.Trim()}");
+
+            var installation = services.CurrentMkvToolNix!;
+            var processor = services.Processor(installation, deleteOriginals: true);
+            var inspector = services.Inspector(installation);
+            async Task<Core.Execution.ProcessingResult> Run(string path, string title)
+            {
+                var plan = Core.Planning.EditPlan.For(Core.Rules.UniversumRules.Apply(await inspector.InspectAsync(path)) with { NewTitle = title });
+                var place = library.Place(plan.Target, new Core.Library.TitleInfo(MediaKind.Movie, title, 2026), null, Core.Rules.RuleProfile.Default);
+                return await processor.ProcessAsync(plan, place, Core.Execution.OriginalsMode.MoveIntoLibrary.Output());
+            }
+
+            var copied = await Run(film, "Vymyslený zdieľaný film");
+            Check(copied.Status == Core.Execution.ProcessingStatus.Done && !copied.Messages.Contains(Core.Execution.FileProcessor.MovedIntoLibraryMessage) && File.Exists(linked),
+                "superfast: a file with a hard link is written anew, never edited in place – " + string.Join("; ", copied.Messages));
+
+            var single = Path.Combine(folder, "Vymyslený samostatný film.mkv");
+            File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "cz-only.mkv"), single);
+            var timed = System.Diagnostics.Stopwatch.StartNew();
+            var moved = await Run(single, "Vymyslený samostatný film");
+            Check(moved is { Status: Core.Execution.ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(Core.Execution.FileProcessor.MovedIntoLibraryMessage) && !File.Exists(single),
+                $"superfast: moved into the library and edited there in {timed.Elapsed.TotalSeconds:0.00} s – " + string.Join("; ", moved.Messages));
+            var problems = await processor.UndoAsync(moved.UndoRecordPath!);
+            Check(problems.Count == 0 && File.Exists(single) && !File.Exists(moved.OutputPath!), "superfast: Vrátiť originály puts it back – " + string.Join("; ", problems));
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Write("superfast: the test folder stays – " + ex.Message);
             }
         }
     }

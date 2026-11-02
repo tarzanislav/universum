@@ -255,6 +255,8 @@
                     </DataGrid.Columns>
                 </DataGrid>
                 <DockPanel Grid.Row="3" Margin="0,12,0,6">
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Vrátiť originál'}" Command="{Binding UndoOriginalCommand}" Padding="12,4" Margin="0,0,8,0"
+                            ToolTip="{loc:T 'Originál presunutý do knižnice (superrýchle) vráti na pôvodné miesto s pôvodnou hlavičkou'}" ToolTipService.ShowOnDisabled="True" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Vybrať súbor z dávky'}" Command="{Binding RemoveFileCommand}" Padding="12,4"
                             ToolTip="{loc:T 'Súbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný'}" />
                     <!-- owner, 2. 11. 2026: a file of Single spracovanie edited there again, saved back into the batch -->
@@ -2591,6 +2593,7 @@
                                     <MenuItem Header="{loc:T 'Upraviť v štúdiu (titulky)'}" Command="{Binding EditInStudioCommand}" />
                                     <MenuItem Header="{loc:T 'Upraviť v štúdiu (zvuk)'}" Command="{Binding EditSoundInStudioCommand}" />
                                     <MenuItem Header="{loc:T 'Upraviť v štúdiu (obraz)'}" Command="{Binding EditPictureInStudioCommand}" />
+                                    <MenuItem Header="{loc:T 'Vrátiť originály na pôvodné miesto'}" Command="{Binding UndoMovedCommand}" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -2834,6 +2837,12 @@
                                          ToolTip="{loc:T 'Každý originál ide do Koša hneď po zapísaní a overení nového súboru v knižnici – priebežne, súbor po súbore'}" />
                             <RadioButton Content="{loc:T 'zmazať ručne'}" IsChecked="{Binding DeleteManually}" GroupName="batchOriginal" Margin="0,0,8,0" IsEnabled="{Binding IsIdle}"
                                          ToolTip="{loc:T 'Počas spracovania sa nič nemaže; po dokončení pošle originály do Koša tlačidlo Zmazať originály'}" />
+                            <!-- owner, 2. 11. 2026: Superrýchle – a header-only file moved into the library and edited there -->
+                            <RadioButton Content="{loc:T 'superrýchle'}" IsChecked="{Binding MoveIntoLibrary}" GroupName="batchOriginal" Margin="0,0,8,0" IsEnabled="{Binding IsIdle}"
+                                         ToolTip="{loc:T 'Súbor, ktorému sa mení len hlavička a leží na disku výstupného priečinka, sa presunie do knižnice a upraví tam za pár sekúnd (originál sa stane výsledkom, Vrátiť originály ho dá späť); ostatné sa zapíšu nanovo a originál ide do Koša. Súbor s hard linkom, otvorený inde alebo na inom disku sa nepresúva.'}" />
+                            <Button Content="{Binding UndoMovedText}" Command="{Binding UndoMovedCommand}" Padding="10,3" Margin="0,0,8,0"
+                                    Visibility="{Binding MoveIntoLibrary, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="{loc:T 'Originály presunuté do knižnice (superrýchle) vráti na pôvodné miesto s pôvodnou hlavičkou – vybrané súbory, inak všetky z posledného behu'}" ToolTipService.ShowOnDisabled="True" />
                             <Button Content="{Binding DeleteOriginalsText}" Command="{Binding DeleteOriginalsCommand}" Padding="10,3" Margin="0,0,20,0"
                                     Visibility="{Binding CanDeleteOriginals, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="{loc:T 'Originály spracovaných súborov do Koša Windows – len tie, ktorých výsledok je v knižnici a ktoré sa od spracovania nezmenili'}" />

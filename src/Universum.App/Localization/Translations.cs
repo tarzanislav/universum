@@ -3026,6 +3026,7 @@ internal static class Translations
         ["{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude"] = "{0} → SRT uvnitř výsledku; původní formát v něm nebude",
         ["externé titulky sa vždy zapíšu ako SRT"] = "externí titulky se vždy zapíšou jako SRT",
         ["titulky {0} prevedené na SRT."] = "titulky {0} převedeny na SRT.",
+        ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "zvuk není česky ani slovensky – tyto titulky mají být Default a Enabled (Pravidla UNIVERSUM to nastaví).",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6048,5 +6049,6 @@ internal static class Translations
         ["{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude"] = "{0} → SRT inside the result; the original format is not kept",
         ["externé titulky sa vždy zapíšu ako SRT"] = "external subtitles are always written as SRT",
         ["titulky {0} prevedené na SRT."] = "subtitles {0} converted to SRT.",
+        ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "the audio is neither Czech nor Slovak – these subtitles should be Default and Enabled (UNIVERSUM rules set it).",
     };
 }

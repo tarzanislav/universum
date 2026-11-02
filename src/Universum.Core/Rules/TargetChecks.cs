@@ -22,6 +22,12 @@ public enum CheckKind
 
     /// <summary>Audio or subtitles are not in the order of the preferred languages (CZ → SK → others; commentary last).</summary>
     OrderNotPreferred,
+
+    /// <summary>
+    /// No audio in Czech or Slovak, but the Czech (else Slovak) subtitles are not Default and Enabled (owner, 2. 11. 2026:
+    /// always so with foreign audio).
+    /// </summary>
+    ForeignAudioWithoutSubtitles,
 }
 
 /// <param name="TrackId">Track concerned; null for the whole file.</param>
@@ -62,6 +68,12 @@ public static class TargetChecks
             }
         }
 
+        // owner, 2. 11. 2026: with foreign audio only, the Czech subtitles – else the Slovak ones – are Default and Enabled
+        if (ForeignAudioSubtitles(target, profile) is { } wanted && !(wanted.Flags.Default && wanted.Flags.Enabled))
+        {
+            findings.Add(new CheckFinding(CheckKind.ForeignAudioWithoutSubtitles, wanted.TrackId));
+        }
+
         // forced subtitles that are not default show only when another subtitle track is (foreign audio: full subtitles)
         var anyDefaultSubtitle = target.Tracks.Any(t => t.Type == TrackType.Subtitles && t.Flags.Default);
         foreach (var track in target.Tracks.Where(t => t.Type == TrackType.Subtitles && t.Flags.Forced && !t.Flags.Default && !anyDefaultSubtitle))
@@ -75,6 +87,26 @@ public static class TargetChecks
         }
 
         return findings;
+    }
+
+    /// <summary>
+    /// With no audio in a preferred language (commentary aside): the subtitles that must be Default and Enabled – the full
+    /// ones in the best preferred language (Czech, else Slovak), else those for the hearing impaired; null otherwise.
+    /// </summary>
+    public static TrackTarget? ForeignAudioSubtitles(TargetState target, RuleProfile? profile = null)
+    {
+        profile ??= RuleProfile.Default;
+        var audio = target.Tracks.Where(t => t.Type == TrackType.Audio && !IsCommentary(t, profile)).ToList();
+        if (audio.Count == 0 || audio.Any(a => profile.IsPreferred(a.Language.Primary)))
+        {
+            return null;
+        }
+
+        return target.Tracks
+            .Where(t => t.Type == TrackType.Subtitles && profile.IsPreferred(t.Language.Primary) && !t.Flags.Forced && !IsCommentary(t, profile))
+            .OrderBy(t => profile.Preference(t.Language.Primary))
+            .ThenBy(t => t.Flags.HearingImpaired ? 1 : 0)
+            .FirstOrDefault();
     }
 
     /// <summary>Preferred languages first in profile order, the rest after them; commentary tracks last.</summary>

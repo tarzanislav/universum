@@ -48,6 +48,12 @@ Nastavenia sú jedna dlhá stránka s blokmi – posúvajte ju nadol.
 ![Nastavenia](settings.jpg)
 - **Výstupný priečinok (knižnica)** – [Priečinok…] vyberie knižnicu. Filmy idú do *MOVIES\\Názov (rok)*, seriály do
   *TVSHOWS\\Názov (rok)\\Season 01*. Priečinky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
+- **Výstupné priečinky na ďalších diskoch** – [Pridať…] pridá výstupný priečinok na inom disku alebo diskovom poli (vlastné
+  MOVIES a TVSHOWS, pre Jellyfin ďalšia knižnica). Súbor sa zapíše **na disk, kde leží** – bez kopírovania medzi diskami;
+  súbor bez zmeny obsahu sa pri „zmazať originály“ len **presunie** (hneď). **Na koľkých diskoch naraz** – disky pracujú
+  súčasne, na každom vždy len jeden súbor (SSD/NVMe dva). Prekódovanie zvuku a obrazu beží len jedno naraz a nástroje
+  pracujú s **nízkou prioritou procesora aj disku** – počítač ostane použiteľný. Dva oddiely jedného disku UNIVERSUM
+  spozná ako jeden disk.
 - **Vstupný priečinok** – [Zmeniť…] ho vyberie, [Otvoriť] ho ukáže v Prieskumníkovi. Sem prichádzajú nové filmy a epizódy;
   súbory v ňom UNIVERSUM **len číta**. Voľba [Sledovať vstupný priečinok – upozorniť na nové filmy a epizódy] zapne lištu hore.
 - **Jazyk rozhrania (platí po reštarte)** – slovenčina, čeština alebo angličtina (menu, nadpisy, Nastavenia, tlačidlá).

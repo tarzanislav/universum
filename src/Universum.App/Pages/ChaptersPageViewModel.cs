@@ -365,7 +365,7 @@ public sealed class ChaptersPageViewModel : ObservableObject
     }
 
     private string LibraryPath(string? path) =>
-        path is null ? "" : _services.Library is { } layout && layout.Contains(path) ? Path.GetRelativePath(layout.Root, path) : path;
+        path is null ? "" : _services.Libraries?.Holding(path) is { } layout ? Path.GetRelativePath(layout.Root, path) : path;
 
     /// <summary>Puts back the chapters of a library file that was edited in place.</summary>
     private async Task UndoAsync()

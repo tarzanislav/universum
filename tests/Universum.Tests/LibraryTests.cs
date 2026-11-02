@@ -337,4 +337,77 @@ public sealed class LibraryTests
 
     private static MediaTrack Subtitles(string language, string? name = null) =>
         new() { Id = 0, Type = TrackType.Subtitles, Language = LanguageTag.FromCode(language), Name = name };
+
+    [Test]
+    public void EachFileGoesIntoTheOutputFolderOnItsOwnDisk()
+    {
+        // owner, 2. 11. 2026: output folders on other disks; the disks are told by the first folder under the test root here
+        var root = Path.Combine(Path.GetTempPath(), "universum-disks");
+        var resolver = Universum.Core.IO.Paths.VolumeResolver;
+        Universum.Core.IO.Paths.VolumeResolver = path => Path.GetRelativePath(root, Path.GetFullPath(path)).Split(Path.DirectorySeparatorChar)[0];
+        try
+        {
+            var main = new LibraryLayout(Path.Combine(root, "A", "KNIZNICA"));
+            var other = new LibraryLayout(Path.Combine(root, "B", "VYSTUP"));
+            var set = new LibrarySet(main, [other, new LibraryLayout(Path.Combine(root, "A", "KNIZNICA"))]);
+            Assert.True(set.Others.Count == 1, "the default folder is not listed twice");
+            Assert.Equal(other.Root, set.For(Path.Combine(root, "B", "Stiahnute", "film.mkv")).Root, "a file on disk B into B's output folder");
+            Assert.Equal(main.Root, set.For(Path.Combine(root, "A", "Vstup", "film.mkv")).Root, "a file on disk A into the default one");
+            Assert.Equal(main.Root, set.For(Path.Combine(root, "C", "film.mkv")).Root, "a disk without an output folder: the default one");
+            Assert.Equal(main.Root, new LibrarySet(main, [other], bySourceDisk: false).For(Path.Combine(root, "B", "film.mkv")).Root, "switched off: everything as before");
+            Assert.True(set.HoldsResult(Path.Combine(other.Movies, "Vymyslený film (2026)", "x.mkv")) && set.ResultFolders.Count == 4, "results of every output folder");
+            Assert.Equal(other.Root, LibraryLayout.RootOf(Path.Combine(other.Shows, "Vymyslený seriál (2025)", "Season 01")), "the output folder of a season folder");
+            Assert.Equal<string?>(null, LibraryLayout.RootOf(Path.Combine(root, "B", "Stiahnute")), "a folder outside MOVIES and TVSHOWS");
+        }
+        finally
+        {
+            Universum.Core.IO.Paths.VolumeResolver = resolver;
+        }
+    }
+
+    [Test]
+    public void DisksWorkAtTheSameTimeOneFileEachSolidStateTwo()
+    {
+        // lanes: files of one disk one after another, disks side by side; partitions of one disk are one disk; SSD: two lanes
+        var root = Path.Combine(Path.GetTempPath(), "universum-lanes");
+        var disks = Universum.Core.IO.Paths.DiskResolver;
+        Universum.Core.IO.Paths.DiskResolver = path =>
+        {
+            var first = Path.GetRelativePath(root, Path.GetFullPath(path)).Split(Path.DirectorySeparatorChar)[0];
+            // C and D are partitions of disk 0; S is an SSD
+            return first switch
+            {
+                "C" or "D" => new Universum.Core.IO.DiskIdentity("disk:0", false, "#0"),
+                "S" => new Universum.Core.IO.DiskIdentity("disk:2", true, "#2 NVMe SSD"),
+                _ => new Universum.Core.IO.DiskIdentity("disk:" + first, false, first),
+            };
+        };
+        try
+        {
+            Universum.Core.Batch.BatchItem Item(string source, string target)
+            {
+                var file = new MediaFile { Path = Path.Combine(root, source), Tracks = [] };
+                var state = UniversumRules.Apply(file);
+                return new Universum.Core.Batch.BatchItem(file, new Universum.Core.Batch.BatchGroup("x", 0), TrackDecisions.None, state, Universum.Core.Planning.EditPlan.For(state),
+                    new Universum.Core.Templates.TemplateMatch([], [], []), new Dictionary<Universum.Core.Batch.SlotKey, Universum.Core.Batch.LanguageEvidence>(), [])
+                {
+                    Placement = new Placement(Path.Combine(root, target), "x", "", new SizeClasses()),
+                };
+            }
+
+            var lanes = Universum.Core.Batch.BatchRunner.Lanes(
+            [
+                Item(Path.Combine("C", "a.mkv"), Path.Combine("D", "OUT")), Item(Path.Combine("D", "b.mkv"), Path.Combine("D", "OUT")),
+                Item(Path.Combine("E", "c.mkv"), Path.Combine("E", "OUT")), Item(Path.Combine("E", "d.mkv"), Path.Combine("E", "OUT")),
+                Item(Path.Combine("S", "e.mkv"), Path.Combine("S", "OUT")), Item(Path.Combine("S", "f.mkv"), Path.Combine("S", "OUT")),
+            ]);
+            Assert.Sequence([2, 2, 1, 1], lanes.Select(l => l.Count), "C+D one disk, E one, the SSD two lanes – " + string.Join(" | ", lanes.Select(l => string.Join(",", l.Select(i => Path.GetFileName(i.File.Path))))));
+            Assert.True(lanes[0].All(i => i.File.Path.Contains($"{Path.DirectorySeparatorChar}C{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+                                         i.File.Path.Contains($"{Path.DirectorySeparatorChar}D{Path.DirectorySeparatorChar}", StringComparison.Ordinal)), "partitions of one disk together");
+        }
+        finally
+        {
+            Universum.Core.IO.Paths.DiskResolver = disks;
+        }
+    }
 }

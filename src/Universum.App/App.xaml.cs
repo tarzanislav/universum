@@ -22,6 +22,7 @@ public partial class App : Application
         DispatcherUnhandledException += OnUnhandledException;
         QuickDropDowns.Register();
         Universum.Platform.Windows.WindowsVolumes.Register();
+        Universum.Platform.Windows.WindowsDisks.Register();
         var services = new AppServices();
         Localization.Loc.Init(services.Settings.UiLanguage);
 

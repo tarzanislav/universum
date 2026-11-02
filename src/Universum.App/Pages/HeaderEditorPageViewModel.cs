@@ -379,7 +379,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
     /// <summary>A path in the library, relative to it (or as it is).</summary>
     private string LibraryPath(string? path) =>
-        path is null ? "" : _services.Library is { } layout && layout.Contains(path) ? Path.GetRelativePath(layout.Root, path) : path;
+        path is null ? "" : _services.Libraries?.Holding(path) is { } layout ? Path.GetRelativePath(layout.Root, path) : path;
 
     private static string Count(int changes) => changes switch
     {

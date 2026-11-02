@@ -439,7 +439,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         Status = Loc.F("Hľadám {0} vo vstupnom priečinku…", Texts.Count(episodes.Count, Loc.T("epizódu"), Loc.T("epizódy"), Loc.T("epizód")));
         try
         {
-            var excluded = _services.Library?.ResultFolders;
+            var excluded = _services.Libraries?.ResultFolders;
             return await Task.Run(() => EpisodeFinder.Find(episodes, input, excluded));
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)

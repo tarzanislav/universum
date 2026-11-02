@@ -99,7 +99,7 @@ public sealed class MegaJob(
             return (null, CoreText.T("pravidlá ho blokujú – treba ho znova pripraviť v Hromadnom spracovaní"));
         }
 
-        var placement = new LibraryLayout(batch.LibraryRoot).Place(target, file.Title, file.Episode, profile).WithAddition(file.Addition);
+        var placement = new LibraryLayout(file.LibraryRoot ?? batch.LibraryRoot).Place(target, file.Title, file.Episode, profile).WithAddition(file.Addition);
         var group = new BatchGroup("MEGA", 0);
         group.Files.Add(media);
         var item = new BatchItem(media, group, file.Decisions(), target, EditPlan.For(target) with { Revision = file.Revision }, new TemplateMatch([], [], []),
@@ -162,9 +162,10 @@ public sealed class MegaJob(
         var muxes = waiting.Where(f => f.Mux is not null).ToList();
         var total = Math.Max(1, items.Count + muxes.Count);
         var finished = 0;
-        if (items.Count > 0)
+        // every output folder the files go into (owner, 2. 11. 2026: each file into the one on its own disk)
+        foreach (var root in items.Select(x => x.File.LibraryRoot ?? Batch.LibraryRoot).Distinct(IO.Paths.Comparer))
         {
-            new LibraryLayout(Batch.LibraryRoot).EnsureCreated();
+            new LibraryLayout(root).EnsureCreated();
         }
 
         // the files of Hromadné spracovanie as the batch says; those of Single spracovanie always keep their originals

@@ -3062,6 +3062,24 @@ internal static class Translations
         ["Otvorí súbor v Úprave audiostopy – posun, FPS, kodek, hlasitosť, dabing; Uložiť do úlohy vás vráti sem"] = "Otevře soubor v Úpravě zvukové stopy – posun, FPS, kodek, hlasitost, dabing; Uložit do úlohy vás vrátí sem",
         ["Súbor Single spracovania: {0}. Uložia sa časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – vrátite sa s nimi do Single spracovania (aj pre MEGA dávku). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa nepoužijú."] = "Soubor Single zpracování: {0}. Uloží se časy titulků (FPS, rychlost, posun), ponechání stop, jejich jazyk, Forced a přidané soubory titulků – vrátíte se s nimi do Single zpracování (i pro MEGA dávku). Název stopy a příznak pro neslyšící dají pravidla, opravy textu se nepoužijí.",
         ["Súbor Single spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."] = "Soubor Single zpracování: {0}. Změny zvuku (posun, změna FPS, kodek, hlasitost, jazyk, název, přidaný dabing) se uloží a vrátíte se s nimi do Single zpracování – zapíšou se při zpracování.",
+        // output folders on other disks (2. 11. 2026)
+        ["Odobrať"] = "Odebrat",
+        ["Výstupný priečinok na inom disku alebo diskovom poli – vznikne v ňom MOVIES, TVSHOWS a POSTER"] = "Výstupní složka na jiném disku nebo diskovém poli – vznikne v ní MOVIES, TVSHOWS a POSTER",
+        ["Výstupné priečinky na ďalších diskoch"] = "Výstupní složky na dalších discích",
+        ["Súbor sa zapíše do výstupného priečinka na tom istom disku, kde leží – bez kopírovania medzi diskami; súbor z disku bez vlastného ide do predvoleného. Každý je samostatná knižnica (pre Jellyfin ďalšia knižnica)."] = "Soubor se zapíše do výstupní složky na tom samém disku, kde leží – bez kopírování mezi disky; soubor z disku bez vlastní jde do výchozí. Každá je samostatná knihovna (pro Jellyfin další knihovna).",
+        ["Priečinok sa prestane používať; nič v ňom sa nezmení ani nezmaže"] = "Složka se přestane používat; nic v ní se nezmění ani nesmaže",
+        ["Súbor zapísať do výstupného priečinka na jeho disku"] = "Soubor zapsat do výstupní složky na jeho disku",
+        ["Vypnuté: všetko do predvoleného výstupného priečinka ako doteraz"] = "Vypnuto: vše do výchozí výstupní složky jako dosud",
+        ["Na koľkých diskoch naraz:"] = "Na kolika discích najednou:",
+        ["Na každom disku vždy len jeden súbor (inak by sa spomaľovali); prekódovanie zvuku a obrazu len jedno naraz a s nižšou prioritou – počítač ostane použiteľný. 1 = jeden súbor po druhom."] = "Na každém disku vždy jen jeden soubor (jinak by se zpomalovaly); překódování zvuku a obrazu jen jedno najednou a s nižší prioritou – počítač zůstane použitelný. 1 = jeden soubor po druhém.",
+        ["Výstupný priečinok na inom disku (vlastné MOVIES a TVSHOWS)"] = "Výstupní složka na jiném disku (vlastní MOVIES a TVSHOWS)",
+        ["Tento priečinok je na tom istom disku ako predvolený výstupný priečinok – na jeden disk stačí jeden. Zvoľte priečinok na inom disku."] = "Tato složka je na stejném disku jako výchozí výstupní složka – na jeden disk stačí jedna. Zvolte složku na jiném disku.",
+        ["Na tomto disku už výstupný priečinok je: {0}"] = "Na tomto disku už výstupní složka je: {0}",
+        ["Pridaný výstupný priečinok: {0} – súbory z tohto disku pôjdu sem."] = "Přidána výstupní složka: {0} – soubory z tohoto disku půjdou sem.",
+        ["Výstupný priečinok {0} sa už nepoužíva (nič v ňom sa nezmenilo)."] = "Výstupní složka {0} se už nepoužívá (nic v ní se nezměnilo).",
+        ["disk {0} · voľné {1:N0} GB"] = "disk {0} · volné {1:N0} GB",
+        ["disk {0} · nie je pripojený"] = "disk {0} · není připojen",
+        ["disk nie je dostupný"] = "disk není dostupný",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6120,5 +6138,23 @@ internal static class Translations
         ["Otvorí súbor v Úprave audiostopy – posun, FPS, kodek, hlasitosť, dabing; Uložiť do úlohy vás vráti sem"] = "Opens the file in Audio track editing – shift, FPS, codec, volume, dub; Save to the job brings you back here",
         ["Súbor Single spracovania: {0}. Uložia sa časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – vrátite sa s nimi do Single spracovania (aj pre MEGA dávku). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa nepoužijú."] = "A file of Single processing: {0}. The subtitle times (FPS, speed, shift), the tracks kept, their language, Forced and the added subtitle files are saved – you go back with them to Single processing (also for a MEGA batch). The track name and the hearing-impaired flag come from the rules; text repairs are not used.",
         ["Súbor Single spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."] = "A file of Single processing: {0}. The sound changes (shift, FPS change, codec, volume, language, name, added dub) are saved and you go back with them to Single processing – they are written when it is processed.",
+        // output folders on other disks (2. 11. 2026)
+        ["Odobrať"] = "Remove",
+        ["Výstupný priečinok na inom disku alebo diskovom poli – vznikne v ňom MOVIES, TVSHOWS a POSTER"] = "An output folder on another disk or disk array – MOVIES, TVSHOWS and POSTER are created in it",
+        ["Výstupné priečinky na ďalších diskoch"] = "Output folders on other disks",
+        ["Súbor sa zapíše do výstupného priečinka na tom istom disku, kde leží – bez kopírovania medzi diskami; súbor z disku bez vlastného ide do predvoleného. Každý je samostatná knižnica (pre Jellyfin ďalšia knižnica)."] = "A file is written into the output folder on the same disk it lies on – no copying between disks; a file from a disk without one goes into the default one. Each is a library of its own (another library for Jellyfin).",
+        ["Priečinok sa prestane používať; nič v ňom sa nezmení ani nezmaže"] = "The folder is no longer used; nothing in it is changed or deleted",
+        ["Súbor zapísať do výstupného priečinka na jeho disku"] = "Write a file into the output folder on its own disk",
+        ["Vypnuté: všetko do predvoleného výstupného priečinka ako doteraz"] = "Off: everything into the default output folder as before",
+        ["Na koľkých diskoch naraz:"] = "On how many disks at once:",
+        ["Na každom disku vždy len jeden súbor (inak by sa spomaľovali); prekódovanie zvuku a obrazu len jedno naraz a s nižšou prioritou – počítač ostane použiteľný. 1 = jeden súbor po druhom."] = "Only one file at a time on each disk (otherwise they would slow each other down); one audio or video re-encode at a time, at a lower priority – the computer stays usable. 1 = one file after another.",
+        ["Výstupný priečinok na inom disku (vlastné MOVIES a TVSHOWS)"] = "An output folder on another disk (its own MOVIES and TVSHOWS)",
+        ["Tento priečinok je na tom istom disku ako predvolený výstupný priečinok – na jeden disk stačí jeden. Zvoľte priečinok na inom disku."] = "This folder is on the same disk as the default output folder – one per disk is enough. Choose a folder on another disk.",
+        ["Na tomto disku už výstupný priečinok je: {0}"] = "This disk already has an output folder: {0}",
+        ["Pridaný výstupný priečinok: {0} – súbory z tohto disku pôjdu sem."] = "Output folder added: {0} – files from this disk go here.",
+        ["Výstupný priečinok {0} sa už nepoužíva (nič v ňom sa nezmenilo)."] = "The output folder {0} is no longer used (nothing in it was changed).",
+        ["disk {0} · voľné {1:N0} GB"] = "disk {0} · {1:N0} GB free",
+        ["disk {0} · nie je pripojený"] = "disk {0} · not connected",
+        ["disk nie je dostupný"] = "disk not available",
     };
 }

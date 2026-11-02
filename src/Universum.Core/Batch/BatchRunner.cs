@@ -29,9 +29,35 @@ public static class BatchRunner
         var finished = 0;
         var lanes = Lanes(work);
 
+        // owner, 2. 11. 2026: at most so many disks at the same time (one file per disk); the other lanes wait their turn
+        using var disks = new SemaphoreSlim(Math.Max(1, processor.ParallelDisks));
         await Task.WhenAll(lanes.Select(lane => Task.Run(
             async () =>
             {
+                try
+                {
+                    await disks.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+
+                try
+                {
+                    await RunLaneAsync(lane).ConfigureAwait(false);
+                }
+                finally
+                {
+                    disks.Release();
+                }
+            },
+            CancellationToken.None))).ConfigureAwait(false);
+
+        return results;
+
+        async Task RunLaneAsync(List<BatchItem> lane)
+        {
                 foreach (var item in lane)
                 {
                     try
@@ -71,16 +97,26 @@ public static class BatchRunner
                         return;
                     }
                 }
-            },
-            CancellationToken.None))).ConfigureAwait(false);
-
-        return results;
+        }
     }
 
-    /// <summary>Groups the items so that no two groups share a drive (source or target); order is kept inside a group.</summary>
+    /// <summary>
+    /// Groups the items so that no two groups share a physical disk (source or target; owner, 2. 11. 2026: two partitions of
+    /// one disk are one disk, a volume over several disks is one); order is kept inside a group. A group only on
+    /// solid-state disks (SSD, NVMe – no seek penalty) is split into two lanes: such a disk writes two files at once
+    /// without slowing down, a spinning one would seek between them.
+    /// </summary>
     internal static IReadOnlyList<List<BatchItem>> Lanes(IReadOnlyList<BatchItem> items)
     {
         var parent = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var solid = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        string DiskOf(string path)
+        {
+            var disk = Paths.Disk(path);
+            solid[disk.Key] = disk.SolidState;
+            return disk.Key;
+        }
+
         string Find(string drive)
         {
             parent.TryAdd(drive, drive);
@@ -92,17 +128,34 @@ public static class BatchRunner
             return drive;
         }
 
-        foreach (var item in items)
+        var disks = items.Select(i => (Item: i, Source: DiskOf(i.File.Path), Target: DiskOf(i.Placement!.Directory))).ToList();
+        foreach (var (_, source, target) in disks)
         {
-            var a = Find(Paths.Volume(item.File.Path));
-            var b = Find(Paths.Volume(item.Placement!.Directory));
+            var a = Find(source);
+            var b = Find(target);
             if (!string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
             {
                 parent[a] = b;
             }
         }
 
-        return items.GroupBy(i => Find(Paths.Volume(i.File.Path)), StringComparer.OrdinalIgnoreCase).Select(g => g.ToList()).ToList();
+        var lanes = new List<List<BatchItem>>();
+        foreach (var group in disks.GroupBy(d => Find(d.Source), StringComparer.OrdinalIgnoreCase))
+        {
+            var members = group.ToList();
+            var allSolid = parent.Keys.Where(k => string.Equals(Find(k), group.Key, StringComparison.OrdinalIgnoreCase)).All(k => solid.GetValueOrDefault(k));
+            if (allSolid && members.Count > 1)
+            {
+                lanes.Add(members.Where((_, i) => i % 2 == 0).Select(m => m.Item).ToList());
+                lanes.Add(members.Where((_, i) => i % 2 == 1).Select(m => m.Item).ToList());
+            }
+            else
+            {
+                lanes.Add(members.Select(m => m.Item).ToList());
+            }
+        }
+
+        return lanes;
     }
 
     /// <summary>Reports directly on the calling thread (no posting), for progress inside a lane.</summary>

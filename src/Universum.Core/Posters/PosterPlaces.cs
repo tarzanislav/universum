@@ -193,7 +193,7 @@ public sealed record WaitingPoster(MediaKind Kind, int TmdbId, string FolderName
 /// folder of the title as folder.jpg (an existing one renamed to folder-povodny.jpg) and stops waiting.
 /// </summary>
 /// <param name="libraryRoot">The output folder now (null: none) – a poster goes only into its MOVIES or TVSHOWS, never next to originals.</param>
-public sealed partial class PendingPosters(string folder, Func<string?> libraryRoot)
+public sealed partial class PendingPosters(string folder, Func<string?> libraryRoot, Func<IEnumerable<string>>? otherLibraryRoots = null)
 {
     private static readonly object Gate = new();
 
@@ -281,9 +281,12 @@ public sealed partial class PendingPosters(string folder, Func<string?> libraryR
             LibraryNames.ShowsFolder => MediaKind.Series,
             _ => (MediaKind?)null,
         };
-        // only into the library of the output folder (MOVIES, TVSHOWS), never into a folder of originals named so
+        // only into the library of an output folder (MOVIES, TVSHOWS), never into a folder of originals named so (owner,
+        // 2. 11. 2026: also the output folders on other disks)
         var root = libraryRoot();
-        if (kind is null || root is null || !Paths.Same(Path.GetDirectoryName(Path.GetDirectoryName(main)) ?? "", Path.GetFullPath(root)))
+        var parent = Path.GetDirectoryName(Path.GetDirectoryName(main)) ?? "";
+        if (kind is null || root is null ||
+            !(Paths.Same(parent, Path.GetFullPath(root)) || (otherLibraryRoots?.Invoke() ?? []).Any(r => Paths.Same(parent, Path.GetFullPath(r)))))
         {
             return null;
         }

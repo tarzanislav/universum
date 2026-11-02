@@ -614,7 +614,11 @@ public sealed class FileRow : ObservableObject
     public IReadOnlyList<string> AdditionChoices => Universum.Core.Library.LibraryNames.AdditionChoices;
 
     /// <summary>Planned place in the library, relative to the output folder.</summary>
-    public string Target => Item.PlannedPath is { } path && page.Library is { } library ? System.IO.Path.GetRelativePath(library.Layout.Root, path) : "";
+    public string Target => Item.PlannedPath is { } path && page.Library is { } library
+        ? library.Libraries.Holding(path) is { } held && !Universum.Core.IO.Paths.Same(held.Root, library.Layout.Root)
+            ? held.Root + " → " + System.IO.Path.GetRelativePath(held.Root, path)
+            : System.IO.Path.GetRelativePath(library.Layout.Root, path)
+        : "";
 
     /// <summary>Revízia is offered for a file whose result is in the library (and stays while chosen).</summary>
     public bool CanRevise => Item.AlreadyInLibraryAt is not null || Item.Plan.Revision;

@@ -50,7 +50,7 @@ public sealed class AppServices
         if (folder is not null)
         {
             folder = Path.GetFullPath(folder);
-            if (Library?.ResultFolders.Any(r => Universum.Core.IO.Paths.Same(r, folder) ||
+            if (Libraries?.ResultFolders.Any(r => Universum.Core.IO.Paths.Same(r, folder) ||
                     folder.StartsWith(Path.TrimEndingDirectorySeparator(r) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) == true)
             {
                 throw new ArgumentException(Loc.T("Vstupný priečinok nemôže byť v MOVIES ani v TVSHOWS knižnice – tam sú výsledky."));
@@ -88,7 +88,7 @@ public sealed class AppServices
         try
         {
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
-            _watch = new Universum.Core.IO.FolderWatch(folder, WatchSettle, path => Library?.HoldsResult(path) == true);
+            _watch = new Universum.Core.IO.FolderWatch(folder, WatchSettle, path => Libraries?.HoldsResult(path) == true);
             _watch.Arrived += files => dispatcher.BeginInvoke(() =>
             {
                 foreach (var file in files.Where(f => !Arrivals.Contains(f, Universum.Core.IO.Paths.Comparer)))
@@ -158,8 +158,45 @@ public sealed class AppServices
     /// <summary>The input folder as the pages show it (one for all of them).</summary>
     public Pages.InputFolderViewModel InputFolder => _inputFolder ??= new Pages.InputFolderViewModel(this);
 
-    /// <summary>The library in the output folder; null until the user chooses the folder.</summary>
+    /// <summary>The library in the (default) output folder; null until the user chooses the folder.</summary>
     public LibraryLayout? Library => Settings.OutputDirectory is { Length: > 0 } folder ? new LibraryLayout(folder) : null;
+
+    /// <summary>
+    /// Every output folder (owner, 2. 11. 2026 – práca na rôznych diskoch): the default one and those on other disks; a file
+    /// goes into the one on its own disk. Null until the default output folder is chosen.
+    /// </summary>
+    public LibrarySet? Libraries => Library is { } library
+        ? new LibrarySet(library, Settings.OtherOutputDirectories.Where(f => f.Trim().Length > 0).Select(f => new LibraryLayout(f)).ToList(), Settings.OutputBySourceDisk)
+        : null;
+
+    /// <summary>The library a file is written into: the output folder on its disk, else the default one.</summary>
+    public LibraryLayout? LibraryFor(string? sourcePath) => Libraries is { } libraries ? sourcePath is { Length: > 0 } path ? libraries.For(path) : libraries.Default : null;
+
+    /// <summary>Adds an output folder on another disk (MOVIES, TVSHOWS and POSTER are created in it).</summary>
+    public void AddOutputDirectory(string folder)
+    {
+        var layout = new LibraryLayout(Path.GetFullPath(folder));
+        if (Settings.OtherOutputDirectories.Any(f => Universum.Core.IO.Paths.Same(f, layout.Root)) ||
+            Settings.OutputDirectory is { } main && Universum.Core.IO.Paths.Same(main, layout.Root))
+        {
+            return;
+        }
+
+        layout.EnsureCreated();
+        Settings.OtherOutputDirectories.Add(layout.Root);
+        Settings.Save();
+        LibraryChanged?.Invoke();
+    }
+
+    /// <summary>Removes an output folder on another disk from the list (nothing in it is touched).</summary>
+    public void RemoveOutputDirectory(string folder)
+    {
+        if (Settings.OtherOutputDirectories.RemoveAll(f => Universum.Core.IO.Paths.Same(f, folder)) > 0)
+        {
+            Settings.Save();
+            LibraryChanged?.Invoke();
+        }
+    }
 
     /// <summary>Raised when the output folder changes, so the pages can update.</summary>
     public event Action? LibraryChanged;
@@ -189,6 +226,7 @@ public sealed class AppServices
         {
             DeleteOriginalsAllowed = deleteOriginals,
             WaitingPosters = WaitingPosters,
+            ParallelDisks = Math.Clamp(Settings.ParallelDisks, 1, 8),
             // a sound written anew (Úprava audiostopy, also in Hromadné spracovanie and MEGA): FFmpeg of the installation
             FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
         };
@@ -491,7 +529,7 @@ public sealed class AppServices
     private Universum.Core.Posters.PendingPosters? _waitingPosters;
 
     /// <summary>Posters waiting for their titles to be processed (Zlúčiť poster s filmom/seriálom).</summary>
-    public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory, () => Settings.OutputDirectory);
+    public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory, () => Settings.OutputDirectory, () => Settings.OtherOutputDirectories);
 
     // drawing takes up to a minute or two
     private static readonly HttpClient DraftHttp = new() { Timeout = TimeSpan.FromMinutes(3) };
@@ -899,6 +937,18 @@ public sealed class AppSettings
 
     /// <summary>Output folder with MOVIES and TVSHOWS (specification, section 13); must be set before processing.</summary>
     public string? OutputDirectory { get; set; }
+
+    /// <summary>
+    /// Output folders on other disks or disk arrays (owner, 2. 11. 2026): each a library of its own (MOVIES, TVSHOWS); a
+    /// file goes into the one on its own disk.
+    /// </summary>
+    public List<string> OtherOutputDirectories { get; set; } = [];
+
+    /// <summary>A file goes into the output folder on its own disk (off: every file into the default one, as before).</summary>
+    public bool OutputBySourceDisk { get; set; } = true;
+
+    /// <summary>On how many disks files are written at the same time (one file per disk; 1 = one after another).</summary>
+    public int ParallelDisks { get; set; } = 2;
 
     /// <summary>Where new films and episodes come (Novinky look there); null until the user chooses it.</summary>
     public string? InputDirectory { get; set; }

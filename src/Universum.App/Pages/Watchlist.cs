@@ -142,7 +142,7 @@ public sealed class InputWatch(AppServices services)
         var episodes = SeriesNews.Merge(schedule.Concat(history))
             .Where(e => e.AirDate <= today && e.AirDate >= today.AddDays(-DaysBack) && e.Code.Length > 0).ToList();
         var films = services.PremiereStore.Load().Films.Where(f => chosen.Contains(MarkStore.Film(f.TmdbId))).DistinctBy(f => f.TmdbId).ToList();
-        var excluded = services.Library?.ResultFolders;
+        var excluded = services.Libraries?.ResultFolders;
         try
         {
             var (foundEpisodes, foundFilms) = await Task.Run(() => (EpisodeFinder.Find(episodes, input, excluded), FilmFinder.Find(films, input, excluded)));

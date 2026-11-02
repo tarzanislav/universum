@@ -910,6 +910,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             CheckKind.ForcedWithoutDefault => where + Loc.T("forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí."),
             CheckKind.TagsRemain => Loc.T("Výsledok si ponechá tagy zo vstupov."),
             CheckKind.OrderNotPreferred => Loc.F("Poradie {0} nie je CZ → SK → ostatné (komentáre na koniec).", kind),
+            CheckKind.ForeignAudioWithoutSubtitles => where + Loc.T("zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."),
             _ => finding.Kind.ToString(),
         };
     }

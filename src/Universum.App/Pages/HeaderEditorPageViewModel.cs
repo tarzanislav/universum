@@ -407,6 +407,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             CheckKind.ForcedWithoutDefault => where + Loc.T("forced titulky bez Default – väčšina prehrávačov ich sama nezobrazí."),
             CheckKind.TagsRemain => Loc.T("Súbor si ponechá tagy (názvy, štatistiky, údaje o kódovaní)."),
             CheckKind.OrderNotPreferred => Loc.F("Poradie {0} nie je CZ → SK → ostatné (komentáre na koniec).", kind),
+            CheckKind.ForeignAudioWithoutSubtitles => where + Loc.T("zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."),
             _ => finding.Kind.ToString(),
         };
     }

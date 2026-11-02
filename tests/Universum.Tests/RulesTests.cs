@@ -61,6 +61,33 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void ForeignAudioAlwaysMakesCzechOrSlovakSubtitlesDefaultAndEnabled()
+    {
+        // owner, 2. 11. 2026: with foreign audio only the Czech (else Slovak) subtitles are ALWAYS Default and Enabled – also
+        // when they are subtitles for the hearing impaired, also when the file had them off
+        var sdh = Subs(3, "cze", "CZ SDH", isDefault: false) with { Flags = new TrackFlags(Default: false, Enabled: false, HearingImpaired: true) };
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Audio(2, "ger", null), Subs(4, "eng", null), sdh));
+        var czech = target.For(3);
+        Assert.True(czech.Flags is { Default: true, Enabled: true, Forced: false, HearingImpaired: true }, "Czech SDH: Default and Enabled – " + czech.Flags);
+        AssertFlags(target.For(4), false, false, "English subtitles");
+
+        // full Czech beside Czech SDH: the full ones
+        var both = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", "CZ SDH") with { Flags = new TrackFlags(HearingImpaired: true) }, Subs(3, "cze", "Czech", isDefault: false)));
+        Assert.True(both.For(3).Flags is { Default: true, Enabled: true } && !both.For(2).Flags.Default, "the full Czech ones are default");
+
+        // Slovak when there are no Czech
+        var slovak = UniversumRules.Apply(File(Video(0), Audio(1, "fre", null), Subs(2, "eng", null), Subs(3, "slo", null, isDefault: false) with { Flags = new TrackFlags(Default: false, Enabled: false) }));
+        Assert.True(slovak.For(3).Flags is { Default: true, Enabled: true }, "Slovak subtitles Default and Enabled");
+        Assert.True(!TargetChecks.Review(target).Any(f => f.Kind == CheckKind.ForeignAudioWithoutSubtitles), "after the rules nothing to check");
+
+        // as the file has them (Zlučovanie, Úprava hlavičky): the check says it
+        var asIs = ManualTarget.Create(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", null, isDefault: false)), ManualTarget.AsIs(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", null, isDefault: false))));
+        Assert.True(TargetChecks.Review(asIs).Any(f => f is { Kind: CheckKind.ForeignAudioWithoutSubtitles, TrackId: 2 }), "Czech subtitles without Default: found");
+        var czechAudio = ManualTarget.Create(File(Video(0), Audio(1, "cze", null), Subs(2, "cze", null, isDefault: false)), ManualTarget.AsIs(File(Video(0), Audio(1, "cze", null), Subs(2, "cze", null, isDefault: false))));
+        Assert.True(!TargetChecks.Review(czechAudio).Any(f => f.Kind == CheckKind.ForeignAudioWithoutSubtitles), "Czech audio: no such finding");
+    }
+
+    [Test]
     public void SlovakSubtitlesWhenThereAreNoCzech()
     {
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "eng", null), Subs(3, "slo", null)));

@@ -128,10 +128,12 @@ public static class UniversumRules
         Classified? defaultSubtitle = null;
         if (!preferredAudio)
         {
-            // foreign audio: full subtitles in the best preferred language
+            // foreign audio (owner, 29. 10. and 2. 11. 2026 – ALWAYS): Czech subtitles, without them Slovak, Default and Enabled
+            // on – the full ones; subtitles for the hearing impaired when they are the only full ones of the language
             defaultSubtitle = subtitles
-                .Where(s => s.Role == TrackRole.Main && profile.IsPreferred(s.Language.Primary))
+                .Where(s => s.Role is TrackRole.Main or TrackRole.HearingImpaired && profile.IsPreferred(s.Language.Primary))
                 .OrderBy(s => profile.Preference(s.Language.Primary))
+                .ThenBy(s => s.Role == TrackRole.Main ? 0 : 1)
                 .FirstOrDefault();
             if (defaultSubtitle is null && activeForced is null && subtitles.Count > 0)
             {
@@ -142,7 +144,7 @@ public static class UniversumRules
         var forcedIsDefault = defaultSubtitle is null;
         return subtitles.Select(s => new TrackTarget(
             s.Track, s.Role == TrackRole.Forced ? ForcedName : null, s.Language,
-            ReferenceEquals(s, defaultSubtitle) ? new TrackFlags(Default: true, Enabled: true)
+            ReferenceEquals(s, defaultSubtitle) ? new TrackFlags(Default: true, Enabled: true, HearingImpaired: s.Role == TrackRole.HearingImpaired)
             : ReferenceEquals(s, activeForced) ? new TrackFlags(Default: forcedIsDefault, Enabled: true, Forced: true)
             : s.Track.Flags with
             {

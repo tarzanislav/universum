@@ -29,6 +29,23 @@ public static partial class WindowsDisks
         Paths.DiskResolver = DiskOf;
         Paths.CopyFile = CopyAsync;
         Universum.Core.Processes.ProcessRunner.LowerPriority = LowerIoPriority;
+        Paths.LinkCounter = LinksOf;
+    }
+
+    /// <summary>The names (hard links) of a file; 2 when they cannot be read (such a file is never edited in place).</summary>
+    public static int LinksOf(string path)
+    {
+        try
+        {
+            using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            // BY_HANDLE_FILE_INFORMATION: NumberOfLinks after the attributes, three times, serial number and size
+            var information = new byte[52];
+            return GetFileInformationByHandle(handle, information) ? Math.Max(1, BitConverter.ToInt32(information, 40)) : 2;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return 2;
+        }
     }
 
     /// <summary>The disks of the volume a path lies on (read once per volume).</summary>
@@ -212,6 +229,10 @@ public static partial class WindowsDisks
     [DllImport("kernel32.dll", EntryPoint = "CopyFileExW", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CopyFileEx(string existing, string target, CopyProgressRoutine progress, IntPtr data, ref int cancel, uint flags);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetFileInformationByHandle(SafeFileHandle file, [Out] byte[] information);
 
     [LibraryImport("ntdll.dll")]
     private static partial int NtSetInformationProcess(IntPtr process, int informationClass, ref int information, int length);

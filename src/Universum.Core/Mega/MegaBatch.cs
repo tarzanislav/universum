@@ -203,8 +203,11 @@ public sealed class MegaFile
     /// <summary>The result in the library after the run (written now, or the same stream found there).</summary>
     public string? ResultPath { get; set; }
 
-    /// <summary>The original went to the Recycle Bin (during the run or with Zmazať originály).</summary>
+    /// <summary>The original went to the Recycle Bin (during the run or with Zmazať originály), or was moved into the library (Superrýchle).</summary>
     public bool OriginalRemoved { get; set; }
+
+    /// <summary>Superrýchle: the record that puts the original moved into the library back (Vrátiť originál); null: none.</summary>
+    public string? UndoRecord { get; set; }
 
     /// <summary>The decisions for the rules.</summary>
     public TrackDecisions Decisions() => new()

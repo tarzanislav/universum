@@ -176,10 +176,9 @@ public sealed class MegaJob(
                 continue;
             }
 
-            var deletes = !keep && Batch.Originals == OriginalsMode.DeleteAutomatically;
             var start = (double)finished / total;
             results.AddRange(await BatchRunner.RunAsync(
-                run.Select(x => x.Item).ToList(), keep ? keeping ?? processor : processor, new OutputOptions(deletes ? OriginalHandling.Delete : OriginalHandling.Keep, MoveIntoLibrary: false),
+                run.Select(x => x.Item).ToList(), keep ? keeping ?? processor : processor, keep ? new OutputOptions(OriginalHandling.Keep, MoveIntoLibrary: false) : Batch.Originals.Output(),
                 new Reporter(context, start, (double)run.Count / total, (item, result) =>
                 {
                     var file = byPath[item.File.Path];
@@ -192,7 +191,8 @@ public sealed class MegaJob(
                     };
                     file.Note = result.OutputPath ?? string.Join(" | ", result.Messages);
                     file.ResultPath = result.Status is ProcessingStatus.Done or ProcessingStatus.AlreadyInLibrary ? result.OutputPath : null;
-                    file.OriginalRemoved = result.Messages.Contains(FileProcessor.OriginalRecycledMessage);
+                    file.OriginalRemoved = result.Messages.Contains(FileProcessor.OriginalRecycledMessage) || result.Messages.Contains(FileProcessor.MovedIntoLibraryMessage);
+                    file.UndoRecord = result.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) ? result.UndoRecordPath : null;
                     Log(ProcessingWords.Describe(item.File.Path, item.Plan, result));
                     changed?.Invoke(Batch);
                 }),

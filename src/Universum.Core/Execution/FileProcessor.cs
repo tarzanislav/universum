@@ -72,6 +72,9 @@ public sealed class FileProcessor(
     /// </summary>
     public bool DeleteOriginalsAllowed { get; init; }
 
+    /// <summary>The names (hard links) a file has – a file with more is never moved into the library and edited (Superrýchle).</summary>
+    public Func<string, int> Links { get; init; } = Paths.Links;
+
     /// <summary>
     /// On how many disks files are written at the same time (owner, 2. 11. 2026 – práca na rôznych diskoch): one file per
     /// disk at most, never two on one disk; 1 writes one file after another.
@@ -168,9 +171,11 @@ public sealed class FileProcessor(
                 result = await ReworkInLibraryAsync(plan, placement, temporary, progress, cancellationToken);
             }
             else if (plan.Method != WriteMethod.Remux && output.Original == OriginalHandling.Delete && output.MoveIntoLibrary &&
-                     Paths.SameVolume(source, placement.Directory) && CanEditInPlace(source))
+                     Paths.SameVolume(source, placement.Directory) && Links(source) == 1 && CanEditInPlace(source) &&
+                     await MoveIntoLibraryAsync(plan, placement, cancellationToken) is { } moved)
             {
-                result = await MoveIntoLibraryAsync(plan, placement, cancellationToken);
+                // a file with another name elsewhere (a hard link – a torrent's seed, another library) is never edited in place
+                result = moved;
             }
             else
             {
@@ -491,8 +496,11 @@ public sealed class FileProcessor(
         }
     }
 
-    /// <summary>Header-only change, original to be removed, same drive: move the original into the library and edit it there.</summary>
-    private async Task<ProcessingResult> MoveIntoLibraryAsync(EditPlan plan, Placement placement, CancellationToken cancellationToken)
+    /// <summary>
+    /// Header-only change, original to be removed, same drive: move the original into the library and edit it there. Null
+    /// when it cannot be moved (another program holds it): it is then written anew as any other file.
+    /// </summary>
+    private async Task<ProcessingResult?> MoveIntoLibraryAsync(EditPlan plan, Placement placement, CancellationToken cancellationToken)
     {
         var source = plan.Target.Source.Path;
         Directory.CreateDirectory(placement.Directory);
@@ -505,7 +513,12 @@ public sealed class FileProcessor(
             cancellationToken.ThrowIfCancellationRequested();
             Paths.Rename(source, moving);
         }
-        catch (Exception ex) when (IsFileError(ex) || ex is OperationCanceledException)
+        catch (Exception ex) when (IsFileError(ex))
+        {
+            DeleteRecord(undoPath);
+            return null;
+        }
+        catch (OperationCanceledException)
         {
             DeleteRecord(undoPath);
             throw;
@@ -535,6 +548,11 @@ public sealed class FileProcessor(
 
             current = Rename(current, placement);
             Relocate(undoPath, current, Paths.Same(current, home) ? null : home);
+            if (movedFrom is not null)
+            {
+                messages.Add(MovedIntoLibraryMessage);
+            }
+
             return Result(plan, ProcessingStatus.Done, current, undoPath, messages);
         }
         catch (Exception ex)
@@ -548,6 +566,9 @@ public sealed class FileProcessor(
 
     /// <summary>The original went to the Recycle Bin after its result was verified in the library.</summary>
     public const string OriginalRecycledMessage = "the original went to the Recycle Bin";
+
+    /// <summary>Superrýchle: the original was moved into the library and edited there (its undo record puts it back).</summary>
+    public const string MovedIntoLibraryMessage = "the original was moved into the library and edited there";
 
     /// <summary>Start of the message of an original that was to be deleted but stays.</summary>
     public const string OriginalKeptPrefix = "the original stays in place: ";

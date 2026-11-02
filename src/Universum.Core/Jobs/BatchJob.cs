@@ -72,7 +72,8 @@ public sealed class BatchJob(
             ProcessingStatus.Done when result.Messages.FirstOrDefault(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)) is { } kept =>
                 (JobSeverity.Warning, CoreText.F("OK: {0} → {1} · originál ostal ({2})", name, result.OutputPath, kept[FileProcessor.OriginalKeptPrefix.Length..])),
             ProcessingStatus.Done => (JobSeverity.Info, $"OK: {name} → {result.OutputPath}" +
-                                                         (result.Messages.Contains(FileProcessor.OriginalRecycledMessage) ? CoreText.T(" · originál v Koši") : "")),
+                                                         (result.Messages.Contains(FileProcessor.OriginalRecycledMessage) ? CoreText.T(" · originál v Koši")
+                                                          : result.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) ? CoreText.T(" · originál presunutý do knižnice") : "")),
             ProcessingStatus.AlreadyInLibrary => (JobSeverity.Info, CoreText.F("Už v knižnici: {0} ({1})", name, result.OutputPath)),
             ProcessingStatus.Unchanged => (JobSeverity.Info, CoreText.F("Bez zmien: {0}", name)),
             ProcessingStatus.Cancelled => (JobSeverity.Warning, CoreText.F("Zrušené: {0} – originál ostal nezmenený", name)),

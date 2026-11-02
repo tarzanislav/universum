@@ -43,6 +43,8 @@ public sealed class MegaPageViewModel : ObservableObject
         EditFileCommand = new RelayCommand(() => EditSingleRequested?.Invoke(_selected!.Batch, _selectedFile!.File),
             () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } &&
                   _selectedFile?.File is { State: MegaFileState.Waiting, Source: MegaSource.Single });
+        // owner, 2. 11. 2026: Superrýchle – an original moved into the library put back as it was
+        UndoOriginalCommand = new AsyncRelayCommand(UndoOriginalAsync, () => _selected?.Batch is { State: not MegaBatchState.Queued } && _selectedFile?.File.UndoRecord is not null);
         EditCommand = new RelayCommand(() => EditRequested?.Invoke(_selected!.Batch),
             () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } batch &&
                   batch.Files.Any(f => f.State == MegaFileState.Waiting && f.FromBatch));
@@ -87,6 +89,7 @@ public sealed class MegaPageViewModel : ObservableObject
             {
                 RemoveFileCommand.NotifyCanExecuteChanged();
                 EditFileCommand.NotifyCanExecuteChanged();
+                UndoOriginalCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -159,6 +162,34 @@ public sealed class MegaPageViewModel : ObservableObject
     /// <summary>Upraviť v Single spracovaní: the selected file of Single spracovanie opened there with its decisions.</summary>
     public RelayCommand EditFileCommand { get; }
 
+    /// <summary>Vrátiť originál: the selected file's original, moved into the library by Superrýchle, back as it was.</summary>
+    public AsyncRelayCommand UndoOriginalCommand { get; }
+
+    private async Task UndoOriginalAsync()
+    {
+        if (_selectedFile?.File is not { UndoRecord: { } record } file || _services.CurrentMkvToolNix is not { } installation ||
+            !Confirm(Loc.F("Vrátiť originál na pôvodné miesto?\n\n{0}\n\nSúbor presunutý do knižnice (superrýchle) sa vráti tam, odkiaľ prišiel, s pôvodnou hlavičkou; z knižnice zmizne.", Path.GetFileName(file.Path))))
+        {
+            return;
+        }
+
+        var problems = await _services.Processor(installation).UndoAsync(record);
+        _services.Inspector(installation).Invalidate(file.Path);
+        if (problems.Count == 0)
+        {
+            file.UndoRecord = null;
+            file.OriginalRemoved = false;
+            file.ResultPath = null;
+            file.State = MegaFileState.Cancelled;
+            file.Note = Loc.T("Originál je vrátený na pôvodné miesto.");
+            Save();
+            _services.NotifyMegaChanged();
+        }
+
+        Message = problems.Count == 0 ? Loc.F("{0}: originál je späť na pôvodnom mieste.", Path.GetFileName(file.Path))
+            : Loc.T("Vrátenie sa nepodarilo:\n") + string.Join("\n", problems);
+    }
+
     /// <summary>A file of Single spracovanie is to be edited there (its batch, the file as the batch keeps it).</summary>
     public event Action<MegaBatch, MegaFile>? EditSingleRequested;
 
@@ -197,7 +228,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
         var inspector = _services.Inspector(installation);
         // files of Single spracovanie keep their originals; results of Zlučovanie are written by the multiplexer (owner, 1. 11. 2026)
-        var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals == OriginalsMode.DeleteAutomatically), (path, token) => inspector.InspectAsync(path, token),
+        var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals.RemovesWhileRunning()), (path, token) => inspector.InspectAsync(path, token),
             b => JobRow.OnUi(() => Saved(b)), keeping: _services.Processor(installation, deleteOriginals: false), mux: new Core.Muxing.Multiplexer(installation, _services.Runner).MuxAsync);
         job.Changed += j =>
         {
@@ -448,7 +479,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
-        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand, EditFileCommand, DeleteOriginalsCommand })
+        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand, EditFileCommand, DeleteOriginalsCommand, UndoOriginalCommand })
         {
             command.NotifyCanExecuteChanged();
         }
@@ -507,6 +538,7 @@ public sealed class MegaBatchRow(MegaBatch batch, MegaPageViewModel page) : Obse
     {
         OriginalsMode.DeleteAutomatically => Loc.T("mazať automaticky"),
         OriginalsMode.DeleteManually => Loc.T("mazať ručne"),
+        OriginalsMode.MoveIntoLibrary => Loc.T("superrýchle (presun do knižnice)"),
         _ => Loc.T("zachovať"),
     };
 

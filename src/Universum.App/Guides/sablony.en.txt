@@ -37,7 +37,7 @@ A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups**
 3. Choose the kind, *films* or *series*. For a series, fill in **Series:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
 4. Check and accept the suggested names: [Refine the titles], [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
 5. In **Group tracks**, set **Language**, **Track name**, **Forced** and the order. The decision applies to all files in the group.
-6. At **Original:**, choose *keep*, *delete automatically* or *delete manually*.
+6. At **Original:**, choose *keep*, *delete automatically*, *delete manually* or *super fast*.
 7. Click [Start]. You can follow the progress in the Job queue too; a prominent bar shows when it has finished.
 
 ![Batch processing ready to start](batch-ready.jpg)
@@ -67,6 +67,7 @@ If an audio track has no language, click [Recognize the audio languages ▾] and
 ![Episodes sorted into series and seasons](batch-sorted-series.jpg)
 
 !pozor With *delete automatically*, each original goes to the Recycle Bin as soon as the new file has been written and verified. With *delete manually*, nothing is deleted during the run; send the originals to the Recycle Bin afterwards with [Delete the originals].
+!pozor With *super fast*, a file whose header only changes and that lies on the disk of its output folder is **moved into the library and edited there** in a few seconds – the original becomes the result and does not go to the Recycle Bin. Other files are written anew and their original goes to the Recycle Bin. A file with another name (hard link), open in another program or on another disk is not moved. Leave files you are still sharing (torrent) on *keep*. [Return the originals] (in MEGA [Return the original]) puts them back in their place with their original header.
 
 @otvorit Batch Open Batch processing
 

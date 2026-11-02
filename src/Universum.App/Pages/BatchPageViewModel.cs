@@ -74,6 +74,7 @@ public sealed class BatchPageViewModel : ObservableObject
             () => !Busy && _subtitleReading is null && SelectedGroup?.Group.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles) == true);
         DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
         DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
+        UndoMovedCommand = new AsyncRelayCommand(UndoMovedAsync, () => !Busy && !_running && MovedOriginals().Count > 0);
         DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All), () => !Busy && _analysis is { Groups.Count: > 0 });
         EditTemplateCommand = new RelayCommand(EditTemplate, () => !Busy);
         TemplateFromGroupCommand = new RelayCommand(TemplateFromGroup, () => !Busy && SelectedGroup is not null);
@@ -779,6 +780,78 @@ public sealed class BatchPageViewModel : ObservableObject
         set => SetOriginals(value, OriginalsMode.DeleteManually);
     }
 
+    /// <summary>
+    /// Superrýchle (owner, 2. 11. 2026): a file whose header only changes is moved into the library and edited there; any
+    /// other one is written anew and its original goes to the Recycle Bin.
+    /// </summary>
+    public bool MoveIntoLibrary
+    {
+        get => Originals == OriginalsMode.MoveIntoLibrary;
+        set => SetOriginals(value, OriginalsMode.MoveIntoLibrary);
+    }
+
+    /// <summary>Vrátiť originály: the originals moved into the library by Superrýchle put back as they were (selected files, else all).</summary>
+    public AsyncRelayCommand UndoMovedCommand { get; }
+
+    public string UndoMovedText => MovedOriginals().Count is var count and > 0 ? Loc.F("Vrátiť originály ({0})", count) : Loc.T("Vrátiť originály");
+
+    // the results of the last run whose original was moved into the library (of the selected files when some are moved)
+    private List<ProcessingResult> MovedOriginals()
+    {
+        var moved = _results.Where(r => r.UndoRecordPath is not null && r.Messages.Contains(FileProcessor.MovedIntoLibraryMessage)).ToList();
+        var selected = moved.Where(r => _selectedFiles.Any(f => Paths.Same(f.Item.File.Path, r.SourcePath))).ToList();
+        return selected.Count > 0 ? selected : moved;
+    }
+
+    private async Task UndoMovedAsync()
+    {
+        var moved = MovedOriginals();
+        if (moved.Count == 0 || _services.CurrentMkvToolNix is not { } installation ||
+            !Confirm(Loc.F("Vrátiť {0} na pôvodné miesto?", Texts.Count(moved.Count, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) + "\n\n" +
+                     Loc.T("Súbory presunuté do knižnice (Superrýchle) sa vrátia tam, odkiaľ prišli, s pôvodnou hlavičkou a časom zmeny; z knižnice zmiznú.")))
+        {
+            return;
+        }
+
+        Busy = true;
+        RefreshCommands();
+        try
+        {
+            var processor = _services.Processor(installation);
+            var cache = _services.Inspector(installation);
+            var problems = new List<string>();
+            var back = new List<ProcessingResult>();
+            foreach (var result in moved)
+            {
+                var failed = await processor.UndoAsync(result.UndoRecordPath!);
+                cache.Invalidate(result.SourcePath);
+                if (result.OutputPath is not null)
+                {
+                    cache.Invalidate(result.OutputPath);
+                }
+
+                if (failed.Count == 0)
+                {
+                    back.Add(result);
+                }
+                else
+                {
+                    problems.Add($"{Path.GetFileName(result.SourcePath)}: {string.Join("; ", failed)}");
+                }
+            }
+
+            _results = _results.Except(back).ToList();
+            RunState = Loc.F("Vrátené na pôvodné miesto: {0}.", back.Count) + (problems.Count > 0 ? Loc.T(" Nepodarilo sa: ") + string.Join(" | ", problems) : "") +
+                       Loc.T(" Pre ďalší beh dajte Analyzovať.");
+        }
+        finally
+        {
+            Busy = false;
+            RefreshCommands();
+            OnPropertyChanged(nameof(UndoMovedText));
+        }
+    }
+
     /// <summary>Zmazať originály – enabled after a run (never during it).</summary>
     public AsyncRelayCommand DeleteOriginalsCommand { get; }
 
@@ -859,7 +932,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         _services.Settings.BatchOriginals = mode;
         _services.Settings.Save();
-        foreach (var name in new[] { nameof(Originals), nameof(KeepOriginal), nameof(DeleteAutomatically), nameof(DeleteManually), nameof(CanDeleteOriginals), nameof(DeleteOriginalsText) })
+        foreach (var name in new[] { nameof(Originals), nameof(KeepOriginal), nameof(DeleteAutomatically), nameof(DeleteManually), nameof(MoveIntoLibrary), nameof(CanDeleteOriginals), nameof(DeleteOriginalsText) })
         {
             OnPropertyChanged(name);
         }
@@ -2700,6 +2773,8 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         _selectedFiles = files.ToList();
         DetectAudioSelectedCommand.NotifyCanExecuteChanged();
+        UndoMovedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(UndoMovedText));
         OnFilmChanged();
     }
 
@@ -2730,7 +2805,18 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        var handling = originals == OriginalsMode.DeleteAutomatically ? OriginalHandling.Delete : OriginalHandling.Keep;
+        // owner, 2. 11. 2026: Superrýchle – the originals of header-only files become the results (moved, not copied)
+        if (originals == OriginalsMode.MoveIntoLibrary &&
+            !Confirm(Loc.T("Spustiť SUPERRÝCHLO – originály sa presunú do knižnice?") + "\n\n" +
+                     Loc.F("Súbor, ktorému sa mení len hlavička a leží na disku svojho výstupného priečinka, sa presunie do knižnice a upraví tam za pár sekúnd – " +
+                           "originál sa stane výsledkom (nejde do Koša; Vrátiť originály ho dá späť, ako bol). Ostatné súbory sa zapíšu nanovo a originál pôjde do Koša ({0}).",
+                         Texts.Count(_items.Count(i => i.NeedsWork), Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov"))) + "\n\n" +
+                     Loc.T("Nepresunie sa súbor s ďalším menom (hard link), otvorený iným programom ani na inom disku. Súbory, ktoré ešte zdieľate (torrent), nechajte radšej na Zachovať.")))
+        {
+            return;
+        }
+
+        var output = originals.Output();
         RememberSeries(_items.Where(i => i.NeedsWork));
 
         Busy = true;
@@ -2741,7 +2827,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            var processor = _services.Processor(installation, deleteOriginals: handling == OriginalHandling.Delete);
+            var processor = _services.Processor(installation, deleteOriginals: originals.RemovesWhileRunning());
             // every output folder the files go into (each file into the one on its own disk)
             foreach (var root in _items.Where(i => i.NeedsWork && i.Placement is not null).Select(i => LibraryLayout.RootOf(i.Placement!.Directory) ?? _library.Layout.Root)
                          .Append(_library.Layout.Root).Distinct(Paths.Comparer))
@@ -2752,7 +2838,7 @@ public sealed class BatchPageViewModel : ObservableObject
             // owner, 29. 10. 2026: the run is a job of the job queue – seen in Fronta úloh and Výstup úloh
             var job = new Core.Jobs.BatchJob(
                 Loc.F("Hromadné spracovanie: {0} → knižnica", Path.GetFileName(Path.TrimEndingDirectorySeparator(_analysis.Folder))),
-                _items, processor, new OutputOptions(handling, MoveIntoLibrary: false),
+                _items, processor, output,
                 new Progress<BatchProgress>(p =>
                 {
                     Progress = p.Total == 0 ? 0 : (p.Finished + (p.Result is null ? p.FileFraction : 0)) / p.Total;
@@ -2779,6 +2865,7 @@ public sealed class BatchPageViewModel : ObservableObject
             _written.AddRange(OriginalCleanup.Collect(_results));
             var recycled = _results.Count(r => r.Messages.Contains(FileProcessor.OriginalRecycledMessage));
             var stayed = _results.Count(r => r.Messages.Any(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)));
+            var movedIn = _results.Count(r => r.Messages.Contains(FileProcessor.MovedIntoLibraryMessage));
             var cache = _services.Inspector(installation);
             foreach (var result in _results.Where(r => r.Status == ProcessingStatus.Done))
             {
@@ -2819,6 +2906,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 (failed > 0 ? Loc.F(" · {0} s chybou – podrobnosti v Uložiť správu…", failed) : "") +
                 (recycled > 0 ? Loc.F(" · {0} v Koši", Texts.Count(recycled, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) : "") +
                 (stayed > 0 ? Loc.F(" · {0} originálov ostalo (Kôš nie je k dispozícii – pozri Výstup úloh)", stayed) : "") +
+                (movedIn > 0 ? Loc.F(" · {0} presunutých do knižnice (superrýchle; Vrátiť originály ich dá späť)", movedIn) : "") +
                 (originals == OriginalsMode.DeleteManually && PendingOriginals().Count > 0 ? Loc.T(" · originály zmažete tlačidlom Zmazať originály") : "") +
                 Loc.F(" · trvanie {0} · úloha {1} vo Fronte úloh", time, job.Id));
         }
@@ -2828,6 +2916,7 @@ public sealed class BatchPageViewModel : ObservableObject
             Busy = false;
             OnPropertyChanged(nameof(PauseText));
             OnPropertyChanged(nameof(DeleteOriginalsText));
+            OnPropertyChanged(nameof(UndoMovedText));
             OnPropertyChanged(nameof(IsIdle));
             RefreshCommands();
         }
@@ -2921,6 +3010,7 @@ public sealed class BatchPageViewModel : ObservableObject
     {
         OriginalsMode.DeleteAutomatically => Loc.T("zmažú sa automaticky (do Koša hneď po overení výsledku)"),
         OriginalsMode.DeleteManually => Loc.T("zmažete ich ručne po dokončení dávky (do Koša)"),
+        OriginalsMode.MoveIntoLibrary => Loc.T("superrýchle – súbor s inou len hlavičkou sa presunie do knižnice, ostatné originály do Koša"),
         _ => Loc.T("zachovajú sa"),
     };
 
@@ -3401,7 +3491,7 @@ public sealed class BatchPageViewModel : ObservableObject
         foreach (var command in new IRelayCommand[]
                  {
                      ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
-                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand, EditSoundInStudioCommand, EditPictureInStudioCommand,
+                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand, EditSoundInStudioCommand, EditPictureInStudioCommand, UndoMovedCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,

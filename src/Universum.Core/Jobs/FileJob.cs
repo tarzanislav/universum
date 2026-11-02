@@ -81,7 +81,7 @@ public sealed class FileJob(string description, FileProcessor processor, EditPla
         message.StartsWith("Warning:", StringComparison.Ordinal) || message.StartsWith("#GUI#warning", StringComparison.Ordinal) ? JobSeverity.Warning
         : message.StartsWith("Error:", StringComparison.Ordinal) || message.StartsWith("#GUI#error", StringComparison.Ordinal) ? JobSeverity.Error
         : status is ProcessingStatus.Failed ? JobSeverity.Error
-        : message == FileProcessor.RestoredMessage || message == FileProcessor.OriginalRecycledMessage ||
+        : message == FileProcessor.RestoredMessage || message == FileProcessor.OriginalRecycledMessage || message == FileProcessor.MovedIntoLibraryMessage ||
           message.StartsWith(FileProcessor.ReplacedPreviousPrefix, StringComparison.Ordinal) ? JobSeverity.Info
         : JobSeverity.Warning;
 

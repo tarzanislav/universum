@@ -820,6 +820,46 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task MegaSuperFastMovesHeaderOnlyOriginalsIntoTheLibrary()
+    {
+        // owner, 2. 11. 2026: Superrýchle – a header-only original becomes its result (Vrátiť originál puts it back), the
+        // others are written anew and their originals go to the Recycle Bin
+        using var work = await SeriesFolderAsync();
+        var analysis = await AnalyzeAsync(work.Path);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Subtitles, 0)] = LanguageTag.FromCode("cs");
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        library.Series = new TitleInfo(MediaKind.Series, "Seriál", 2026);
+        var all = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library);
+        var ready = all.Where(i => i.NeedsWork && i.Placement is not null).ToList();
+        var headerOnly = ready.Count(i => i.Plan.Method != Universum.Core.Planning.WriteMethod.Remux);
+        Assert.True(headerOnly > 0 && headerOnly < ready.Count, $"header-only files and others ({headerOnly} of {ready.Count})");
+        var store = new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json"));
+        var batch = store.Add("Test", library.Layout.Root, RuleProfile.Default, OriginalsMode.MoveIntoLibrary, ready)!;
+        Assert.Equal(OriginalsMode.MoveIntoLibrary, new Universum.Core.Mega.MegaStore(Path.Combine(work.Path, "mega.json")).Batches[0].Originals, "kept with the batch");
+
+        var bin = new RecordingRecycleBin(Path.Combine(work.Path, "bin"));
+        var processor = new FileProcessor(await TestData.RequireMkvToolNixAsync(), new ProcessRunner(), bin, Path.Combine(work.Path, "_journal")) { DeleteOriginalsAllowed = true };
+        var inspector = await InspectorAsync();
+        var queue = new Universum.Core.Jobs.JobQueue();
+        var job = new Universum.Core.Mega.MegaJob(batch, processor, (path, token) => inspector.InspectAsync(path, token));
+        queue.Add(job);
+        await queue.Start();
+
+        Assert.Equal(Universum.Core.Jobs.JobStatus.Done, job.Status, string.Join(" | ", job.Messages.Select(m => m.Text)));
+        var moved = batch.Files.Where(f => f.UndoRecord is not null).ToList();
+        Assert.True(batch.Files.All(f => f.State == Universum.Core.Mega.MegaFileState.Done && f.OriginalRemoved && !File.Exists(f.Path) && File.Exists(f.ResultPath!)) &&
+                    moved.Count == headerOnly && bin.Recycled.Count == ready.Count - headerOnly &&
+                    job.Messages.Count(m => m.Text.EndsWith("originál presunutý do knižnice", StringComparison.Ordinal)) == headerOnly,
+            $"moved {moved.Count} of {headerOnly} header-only, {bin.Recycled.Count} in the Recycle Bin – " + string.Join(" | ", job.Messages.Select(m => m.Text)));
+        if (moved.FirstOrDefault() is { } back)
+        {
+            Assert.Equal(0, (await processor.UndoAsync(back.UndoRecord!)).Count, "Vrátiť originál");
+            Assert.True(File.Exists(back.Path) && !File.Exists(back.ResultPath!), "the original back in its place");
+        }
+    }
+
+    [Test]
     public async Task MegaNeverWritesAnotherFileOrOlderDecisions()
     {
         // review of 29. 10. 2026: a file replaced by another one with the same tracks is not the prepared file, and a

@@ -16,6 +16,9 @@ zpracování a z vašich výběrů čerpá i Přehled.
 - Filmy mají sloupce **Název filmu**, **Žánr**, **Produkce**, **Premiéra**, **Kdy**, **Den**, **VOD / TV / kino**.
 - Seriály mají navíc **Série · epizoda**, **Periodicita** a **Epizody**.
 - U názvu jsou odkazy [TMDB] a [HISTRA]; zelený řádek **▶ služba (země)** říká, kde se dá titul legálně sledovat.
+- [Do poznámek] a [Do úkolů] u názvu (i u každé epizody v Novinkách) přidají film, seriál nebo epizodu do **Poznámek**
+  nebo **Plánovaných úkolů** (úkol s termínem premiéry či vysílání) a hned je otevřou k úpravě. Druhé kliknutí
+  otevře tentýž záznam – nic se nepřidá dvakrát.
 - [Zobrazit i plakáty] přidá plakáty, posuvník **Velikost POSTERU** je zvětší až 2×. Pole [Hledat:] hledá i bez diakritiky.
 !tip Premiéra přejde do **Historie** den po svém datu a zůstane tam natrvalo.
 !pozor České a slovenské seriály potřebují zdroj – přidáte ho v **Nastavení → Zdroje novinek**.

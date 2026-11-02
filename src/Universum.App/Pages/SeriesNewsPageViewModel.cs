@@ -546,6 +546,9 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         SendCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>A line about what was done (Do poznámok, Do úloh).</summary>
+    internal void Say(string text) => Status = text;
+
     internal AppServices Services => _services;
 
     internal async Task OpenAsync(Func<TitleOpener, Task<string?>> open)
@@ -706,7 +709,14 @@ public sealed class NewsSeriesRow : MarkedRow
                 Browser.Open(link);
             }
         }, () => HasSource);
+        (ToNoteCommand, ToTaskCommand) = NewsToAgenda.Commands(page.Services, () => NewsToAgenda.Series(first, Loc.T("Najbližšia epizóda"), rhythm), page.Say);
     }
+
+    /// <summary>Do poznámok (owner, 2. 11. 2026): the series as a note of Poznámky, opened to be edited.</summary>
+    public RelayCommand ToNoteCommand { get; }
+
+    /// <summary>Do úloh: the series as a task of Plánované úlohy, due on its nearest episode.</summary>
+    public RelayCommand ToTaskCommand { get; }
 
     /// <summary>The episodes of the view, the earliest first.</summary>
     public IReadOnlyList<NewsEpisodeRow> Episodes { get; }
@@ -836,7 +846,14 @@ public sealed class NewsEpisodeRow : ObservableObject
     {
         Episode = episode;
         _page = page;
+        (ToNoteCommand, ToTaskCommand) = NewsToAgenda.Commands(page.Services, () => NewsToAgenda.Episode(episode), page.Say);
     }
+
+    /// <summary>Do poznámok (owner, 2. 11. 2026): the episode as a note of Poznámky, opened to be edited.</summary>
+    public RelayCommand ToNoteCommand { get; }
+
+    /// <summary>Do úloh: the episode as a task of Plánované úlohy, due on its airing.</summary>
+    public RelayCommand ToTaskCommand { get; }
 
     public SeriesEpisode Episode { get; }
 

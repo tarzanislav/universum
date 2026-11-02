@@ -75,4 +75,35 @@ public sealed class AgendaTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Test]
+    public void ATitleOfPremieresBecomesANoteOrATaskOnce()
+    {
+        // owner, 2. 11. 2026: a film, a series or an episode of Premiéry and Novinky added to Poznámky or Plánované úlohy
+        var folder = Directory.CreateTempSubdirectory("universum-agenda-title-").FullName;
+        try
+        {
+            var store = new AgendaStore(Path.Combine(folder, "agenda.json"));
+            var today = new DateOnly(2026, 11, 2);
+            var film = new TitleDraft("Vymyslený film (2026)", "Premiéra: 20. 11. 2026", new DateOnly(2026, 11, 20),
+                new AgendaLink(LinkKind.Title, "movie:990001", "Vymyslený film (2026)"), "film", new Uri("https://www.themoviedb.org/movie/990001"));
+            var (note, existing) = TitleRecords.Take(store, film, asNote: true, today);
+            Assert.True(!existing && note.Note is not null && note.Task is null && note.Tags.SequenceEqual(["film"]) && note.Links.Count == 2 &&
+                        store.Find(note.Id) is not null, "a new note, kept at once, with the title's link and its page");
+            Assert.True(TitleRecords.Take(store, film, asNote: true, today) is { Existing: true } again && again.Item.Id == note.Id, "the same note again, not a second one");
+
+            var (task, _) = TitleRecords.Take(store, film, asNote: false, today);
+            Assert.True(task.Task is { Due: { } due } && due == new DateOnly(2026, 11, 20) && task.Note is null && task.Id != note.Id, "a task due on the premiere");
+            task.Task!.State = TaskState.Done;
+            store.Save(task);
+            Assert.True(TitleRecords.Take(store, film, asNote: false, today).Item.Id != task.Id, "a done task: a new one");
+
+            var aired = new TitleDraft("Vymyslený seriál S02E05", "", new DateOnly(2026, 10, 30), new AgendaLink(LinkKind.Episode, "tv:990002:S02E05", "Vymyslený seriál S02E05"), "epizóda");
+            Assert.True(TitleRecords.Take(store, aired, asNote: false, today).Item.Task?.Due == today, "an episode aired already: due today");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
 }

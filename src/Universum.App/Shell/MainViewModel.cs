@@ -64,6 +64,21 @@ public sealed class MainViewModel : ObservableObject
             OpenLog = OpenProcessingLog,
         };
         AgendaNotes = new NotesPageViewModel(services);
+
+        // owner, 2. 11. 2026: a title of Premiéry or Novinky added to Poznámky or Plánované úlohy opens there to be edited
+        Pages.NewsToAgenda.Open = (item, asNote) =>
+        {
+            if (asNote)
+            {
+                Open(AgendaNotes);
+                AgendaNotes.Edit(item);
+            }
+            else
+            {
+                Open(AgendaTasks);
+                AgendaTasks.Edit(item);
+            }
+        };
         // owner, 31. 10. 2026: a guide under each group (POZNÁMKY, EDITÁCIA VIDEOSTÔP under Úprava titulkostopy, ŠABLÓNY under MEGA)
         NotesGuide = new GuidePageViewModel(services, "poznamky", CalendarColors.Group, OpenNamed);
         StudiosGuide = new GuidePageViewModel(services, "editacia", Color.FromRgb(0x2B, 0xA6, 0xA6), OpenNamed);

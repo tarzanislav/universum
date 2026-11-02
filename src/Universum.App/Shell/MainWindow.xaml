@@ -140,6 +140,13 @@
                         <Button Content="{loc:T 'HISTRA'}" Command="{Binding OpenHistraCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Otvoriť na HISTRA'}" />
                         <Button Content="{loc:T 'Zdroj'}" Command="{Binding OpenSourceCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Otvoriť v zdroji'}"
                                 Visibility="{Binding HasSource, Converter={StaticResource BoolToVisibility}}" />
+                        <!-- owner, 2. 11. 2026: the title into Poznámky or Plánované úlohy, opened there to be edited -->
+                        <Button Command="{Binding ToNoteCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať do Poznámok (a otvoriť na úpravu)'}">
+                            <TextBlock><Run Text="&#xE70B;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do poznámok'}" /></TextBlock>
+                        </Button>
+                        <Button Command="{Binding ToTaskCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať do Plánovaných úloh s termínom premiéry (a otvoriť na úpravu)'}">
+                            <TextBlock><Run Text="&#xE9D5;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do úloh'}" /></TextBlock>
+                        </Button>
                     </WrapPanel>
                     <TextBlock Text="{Binding LocalTitle}" Style="{StaticResource NewsSubtitle}" />
                     <TextBlock Text="{Binding Rhythm, FallbackValue=''}" Style="{StaticResource NewsSubtitle}" FontWeight="SemiBold"
@@ -3144,7 +3151,16 @@
                                                         <ColumnDefinition Width="100" />
                                                         <ColumnDefinition Width="110" />
                                                         <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Command="{Binding ToNoteCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať epizódu do Poznámok (a otvoriť na úpravu)'}">
+                                                            <TextBlock><Run Text="&#xE70B;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do poznámok'}" /></TextBlock>
+                                                        </Button>
+                                                        <Button Command="{Binding ToTaskCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať epizódu do Plánovaných úloh s termínom vysielania (a otvoriť na úpravu)'}">
+                                                            <TextBlock><Run Text="&#xE9D5;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do úloh'}" /></TextBlock>
+                                                        </Button>
+                                                    </StackPanel>
                                                     <TextBlock Text="•" Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" VerticalAlignment="Center" />
                                                     <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanCheck}" MinWidth="0" VerticalAlignment="Center"
                                                               ToolTip="{loc:T 'Zaškrtnuté epizódy odošlete tlačidlom Odoslať na spracovanie (len odvysielané)'}">

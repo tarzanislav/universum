@@ -134,9 +134,10 @@ public sealed class MegaPageViewModel : ObservableObject
 
         var layout = new Core.Library.LibraryLayout(batch.LibraryRoot);
         var index = _services.LibraryIndex;
-        var current = _services.Library;
+        var current = _services.Libraries;
+        var roots = batch.Files.Select(f => f.LibraryRoot).OfType<string>().Distinct(Core.IO.Paths.Comparer).Select(r => new Core.Library.LibraryLayout(r)).ToList();
         var (removed, kept) = await Task.Run(() => OriginalCleanup.RemoveAsync(originals, index, new Platform.Windows.WindowsRecycleBin(),
-            path => layout.HoldsResult(path) || current?.HoldsResult(path) == true));
+            path => layout.HoldsResult(path) || roots.Any(r => r.HoldsResult(path)) || current?.HoldsResult(path) == true));
         foreach (var file in batch.Files.Where(f => removed.Contains(f.Path, Core.IO.Paths.Comparer)))
         {
             file.OriginalRemoved = true;

@@ -180,6 +180,7 @@ public static partial class VideoEncoder
         var result = await runner.RunAsync(new ProcessRequest(ffmpeg, arguments)
         {
             Timeout = TimeSpan.FromHours(24),
+            Background = true,
             OnOutputLine = line =>
             {
                 if (progress is not null && duration is { TotalSeconds: > 0 } length && ProgressTime().Match(line) is { Success: true } match &&

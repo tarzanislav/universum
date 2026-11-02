@@ -144,7 +144,7 @@ public sealed class BatchPageViewModel : ObservableObject
             if (_analysis is not null && _services.Library is { } layout)
             {
                 // files of the analysis that now lie among the results (MOVIES, TVSHOWS) must be left out: analysed again first
-                if (_analysis.Groups.SelectMany(g => g.Files).Any(f => layout.HoldsResult(f.Path)))
+                if (_analysis.Groups.SelectMany(g => g.Files).Any(f => _services.Libraries?.HoldsResult(f.Path) == true))
                 {
                     _needsAnalysis = true;
                     Summary = Loc.T("V MOVIES alebo TVSHOWS nového výstupného priečinka sú analyzované súbory – analyzujte priečinok znova (tie sa vynechajú).");
@@ -153,6 +153,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 }
 
                 _library = LibraryJob.Guess(layout, _analysis);
+                _library.Libraries = _services.Libraries ?? _library.Libraries;
                 SortGroups();
                 if (ApplySeriesMemory() is { Length: > 0 } hint)
                 {
@@ -807,7 +808,7 @@ public sealed class BatchPageViewModel : ObservableObject
         RefreshCommands();
         try
         {
-            var library = _services.Library;
+            var library = _services.Libraries;
             var index = _services.LibraryIndex;
             var (removed, kept) = await Task.Run(() => OriginalCleanup.RemoveAsync(pending, index, new WindowsRecycleBin(), path => library?.HoldsResult(path) == true));
             _written.RemoveAll(o => removed.Contains(o.Source, Paths.Comparer));
@@ -1320,7 +1321,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         // the groups grow while the folder is read (a group is final once the whole folder is read)
         var recursive = Recursive;
-        var skipped = _services.Library?.ResultFolders;
+        var skipped = _services.Libraries?.ResultFolders;
         var libraryAtStart = _services.Library?.Root;
         using var cancellation = new CancellationTokenSource();
         _analysisCancellation = cancellation;
@@ -1380,6 +1381,12 @@ public sealed class BatchPageViewModel : ObservableObject
             _analysisCancellation = null;
             OnPropertyChanged(nameof(IsAnalyzing));
             _library = _services.Library is { } layout ? LibraryJob.Guess(layout, _analysis, splitTitles: _only is null) : null;
+            if (_library is not null && _services.Libraries is { } libraries)
+            {
+                // owner, 2. 11. 2026: each file into the output folder on its own disk
+                _library.Libraries = libraries;
+            }
+
             SortGroups();
             ApplySentSeries();
             var hint = ApplySeriesMemory();
@@ -1391,9 +1398,9 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 _analysis = _analysis.SplitBy(sorted.UnitOf);
             }
-            IReadOnlyList<string> inLibrary = _services.Library?.FindLeftovers() ?? Array.Empty<string>();
+            IReadOnlyList<string> inLibrary = _services.Libraries?.FindLeftovers() ?? Array.Empty<string>();
             _leftovers = [.. _analysis.LeftoverTemporaryFiles, .. inLibrary];
-            _interrupted = _services.Library?.FindInterrupted() ?? Array.Empty<string>();
+            _interrupted = _services.Libraries?.FindInterrupted() ?? Array.Empty<string>();
             _ranSinceAnalysis = false;
             _needsAnalysis = false;
             TrySave(inspector);
@@ -2717,7 +2724,12 @@ public sealed class BatchPageViewModel : ObservableObject
         try
         {
             var processor = _services.Processor(installation, deleteOriginals: handling == OriginalHandling.Delete);
-            _library.Layout.EnsureCreated();
+            // every output folder the files go into (each file into the one on its own disk)
+            foreach (var root in _items.Where(i => i.NeedsWork && i.Placement is not null).Select(i => LibraryLayout.RootOf(i.Placement!.Directory) ?? _library.Layout.Root)
+                         .Append(_library.Layout.Root).Distinct(Paths.Comparer))
+            {
+                new LibraryLayout(root).EnsureCreated();
+            }
 
             // owner, 29. 10. 2026: the run is a job of the job queue – seen in Fronta úloh and Výstup úloh
             var job = new Core.Jobs.BatchJob(

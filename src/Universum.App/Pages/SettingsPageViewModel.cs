@@ -637,6 +637,81 @@ public sealed class SettingsPageViewModel : ObservableObject
         }
     }
 
+    // ---------------------------------------------------------------- output folders on other disks (owner, 2. 11. 2026)
+
+    /// <summary>The output folders on other disks, each with what it holds and its disk.</summary>
+    public IReadOnlyList<OtherOutputRow> OtherOutputs => [.. _services.Settings.OtherOutputDirectories.Select(f => new OtherOutputRow(f, this))];
+
+    /// <summary>A file goes into the output folder on its own disk (off: every file into the default one).</summary>
+    public bool OutputBySourceDisk
+    {
+        get => _services.Settings.OutputBySourceDisk;
+        set
+        {
+            if (_services.Settings.OutputBySourceDisk != value)
+            {
+                _services.Settings.OutputBySourceDisk = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    /// <summary>The choices of Na koľkých diskoch naraz.</summary>
+    public IReadOnlyList<int> ParallelDiskChoices { get; } = [1, 2, 3, 4];
+
+    /// <summary>On how many disks files are written at the same time (one file per disk).</summary>
+    public int ParallelDisks
+    {
+        get => Math.Clamp(_services.Settings.ParallelDisks, 1, 4);
+        set
+        {
+            if (_services.Settings.ParallelDisks != value)
+            {
+                _services.Settings.ParallelDisks = Math.Clamp(value, 1, 4);
+                _services.Settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public RelayCommand AddOtherOutputCommand => _addOtherOutput ??= new RelayCommand(AddOtherOutput, () => _services.Library is not null);
+
+    private RelayCommand? _addOtherOutput;
+
+    private void AddOtherOutput()
+    {
+        var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok na inom disku (vlastné MOVIES a TVSHOWS)") };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var chosen = Path.GetFullPath(dialog.FolderName);
+        if (_services.Library is { } main && Universum.Core.IO.Paths.SameVolume(chosen, main.Root))
+        {
+            Message = Loc.T("Tento priečinok je na tom istom disku ako predvolený výstupný priečinok – na jeden disk stačí jeden. Zvoľte priečinok na inom disku.");
+            return;
+        }
+
+        if (_services.Settings.OtherOutputDirectories.FirstOrDefault(f => Universum.Core.IO.Paths.SameVolume(f, chosen)) is { } taken)
+        {
+            Message = Loc.F("Na tomto disku už výstupný priečinok je: {0}", taken);
+            return;
+        }
+
+        _services.AddOutputDirectory(chosen);
+        Message = Loc.F("Pridaný výstupný priečinok: {0} – súbory z tohto disku pôjdu sem.", chosen);
+        OnPropertyChanged(nameof(OtherOutputs));
+    }
+
+    internal void RemoveOtherOutput(string folder)
+    {
+        _services.RemoveOutputDirectory(folder);
+        Message = Loc.F("Výstupný priečinok {0} sa už nepoužíva (nič v ňom sa nezmenilo).", folder);
+        OnPropertyChanged(nameof(OtherOutputs));
+    }
+
     private void ChooseOutputDirectory()
     {
         var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
@@ -718,3 +793,32 @@ public sealed class SettingsPageViewModel : ObservableObject
 
 /// <summary>A language of the window in the list: its code and its name in that language.</summary>
 public sealed record LanguageOption(string Code, string Name);
+
+/// <summary>An output folder on another disk, in Nastavenia (owner, 2. 11. 2026).</summary>
+public sealed class OtherOutputRow(string folder, SettingsPageViewModel page)
+{
+    public string Folder { get; } = folder;
+
+    /// <summary>"disk E:\ · voľné 1 234 GB".</summary>
+    public string Detail
+    {
+        get
+        {
+            try
+            {
+                var root = Path.GetPathRoot(Path.GetFullPath(Folder)) ?? "";
+                var drive = new DriveInfo(root);
+                return drive.IsReady
+                    ? Loc.F("disk {0} · voľné {1:N0} GB", root, drive.AvailableFreeSpace / (1024.0 * 1024 * 1024))
+                    : Loc.F("disk {0} · nie je pripojený", root);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return Loc.T("disk nie je dostupný");
+            }
+        }
+    }
+
+    public CommunityToolkit.Mvvm.Input.RelayCommand RemoveCommand => new(() => page.RemoveOtherOutput(Folder));
+}
+

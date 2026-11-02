@@ -197,8 +197,9 @@ public sealed class LibraryTargetPicker : ObservableObject
     public void Update()
     {
         _placement = null;
-        var layout = _services.Library;
         var target = _target();
+        // owner, 2. 11. 2026: the output folder on the disk the file lies on (else the default one)
+        var layout = _services.LibraryFor(target?.Source.Path);
         var title = TitleGuess.Typed(_kind, TitleText);
         var episode = EpisodeNumber.TryParse(EpisodeText);
         // a title waiting for confirmation (HISTRA did not confirm it, or it was found nowhere) names nothing yet
@@ -232,7 +233,8 @@ public sealed class LibraryTargetPicker : ObservableObject
         {
             _placement = layout.Place(target, title, episode, _services.Profile).WithAddition(_addition);
             var size = File.Exists(target.Source.Path) ? new FileInfo(target.Source.Path).Length : 0;
-            Description = Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
+            Description = (_services.Library is { } main && !Universum.Core.IO.Paths.Same(main.Root, layout.Root) ? layout.Root + " → " : "") +
+                          Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
                           (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? Loc.T("  – cesta je príliš dlhá pre Windows") : "") +
                           (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? Loc.T("  – TMDB takú epizódu nepozná") : "") +
                           (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");

@@ -48,6 +48,12 @@ Nastavení je jedna dlouhá stránka s bloky – posouvejte ji dolů.
 ![Nastavení](settings.jpg)
 - **Výstupní složka (knihovna)** – [Složka…] vybere knihovnu. Filmy jdou do *MOVIES\\Název (rok)*, seriály do
   *TVSHOWS\\Název (rok)\\Season 01*. Složky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
+- **Výstupní složky na dalších discích** – [Přidat…] přidá výstupní složku na jiném disku nebo diskovém poli (vlastní
+  MOVIES a TVSHOWS, pro Jellyfin další knihovna). Soubor se zapíše **na disk, kde leží** – bez kopírování mezi disky;
+  soubor beze změny obsahu se při „smazat originály“ jen **přesune** (hned). **Na kolika discích najednou** – disky pracují
+  současně, na každém vždy jen jeden soubor (SSD/NVMe dva). Překódování zvuku a obrazu běží jen jedno najednou a nástroje
+  pracují s **nízkou prioritou procesoru i disku** – počítač zůstane použitelný. Dva oddíly jednoho disku UNIVERSUM
+  pozná jako jeden disk.
 - **Vstupní složka** – [Změnit…] ji vybere, [Otevřít] ji ukáže v Průzkumníkovi. Sem přicházejí nové filmy a epizody;
   soubory v ní UNIVERSUM **jen čte**. Volba [Sledovat vstupní složku – upozornit na nové filmy a epizody] zapne lištu nahoře.
 - **Jazyk rozhraní (platí po restartu)** – slovenština, čeština nebo angličtina (menu, nadpisy, Nastavení, tlačítka).

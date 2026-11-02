@@ -15,6 +15,12 @@ public sealed class LibraryJob(LibraryLayout layout)
 
     public LibraryLayout Layout { get; } = layout;
 
+    /// <summary>
+    /// The output folders the files go into (owner, 2. 11. 2026: each file into the one on its own disk); by default only
+    /// <see cref="Layout"/>.
+    /// </summary>
+    public LibrarySet Libraries { get; set; } = new(layout);
+
     /// <summary>The analysed folder (one series, or films); season folders are looked for only below it.</summary>
     public string? Root { get; private set; }
 

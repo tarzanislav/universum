@@ -170,6 +170,12 @@ public sealed class MegaFile
     /// <summary>Where the result was planned when the batch was made (shown on the page).</summary>
     public string PlannedPath { get; init; } = "";
 
+    /// <summary>
+    /// The output folder the file is written into (owner, 2. 11. 2026: the one on the file's own disk); null: the batch's
+    /// (<see cref="MegaBatch.LibraryRoot"/>, files of older batches).
+    /// </summary>
+    public string? LibraryRoot { get; init; }
+
     /// <summary>The page it came from (older batches: Hromadné spracovanie).</summary>
     public MegaSource Source { get; init; }
 
@@ -212,7 +218,7 @@ public sealed class MegaFile
     /// original is always kept.
     /// </summary>
     public static MegaFile FromSingle(MediaFile file, TrackDecisions decisions, TitleInfo title, EpisodeNumber? episode, string? addition, bool revision,
-        RuleProfile profile, string plannedPath, StudioEdits? studio = null)
+        RuleProfile profile, string plannedPath, StudioEdits? studio = null, string? libraryRoot = null)
     {
         var info = new FileInfo(file.Path);
         return new MegaFile
@@ -232,6 +238,7 @@ public sealed class MegaFile
             Names = decisions.Names.ToDictionary(),
             ToSrt = [.. decisions.ToSrt],
             PlannedPath = plannedPath,
+            LibraryRoot = libraryRoot,
             Addition = addition,
             Revision = revision,
             Profile = profile,
@@ -289,6 +296,7 @@ public sealed class MegaFile
             ToSrt = [.. item.Decisions.ToSrt],
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
+            LibraryRoot = item.Placement is { } placement ? LibraryLayout.RootOf(placement.Directory) : null,
             ProcessAnyway = item.Group.Decisions.ProcessAnyway.Contains(item.File.Path),
             Addition = item.Group.Decisions.Additions.GetValueOrDefault(item.File.Path),
             Revision = item.Plan.Revision,

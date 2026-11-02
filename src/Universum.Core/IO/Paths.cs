@@ -38,4 +38,26 @@ public static class Paths
 
     /// <summary>True when a file can be moved between the two paths by renaming (no copying).</summary>
     public static bool SameVolume(string a, string b) => string.Equals(Volume(a), Volume(b), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Finds the physical disk(s) of a path (owner, 2. 11. 2026 – práca na rôznych diskoch). The default takes the volume
+    /// for the disk; on Windows the platform reads the real disks (two partitions of one disk are one disk, a volume over
+    /// several disks is one lane) and whether they are solid-state.
+    /// </summary>
+    public static Func<string, DiskIdentity> DiskResolver { get; set; } = path => new DiskIdentity("volume:" + Volume(path), SolidState: false, Detail: Volume(path));
+
+    /// <summary>The physical disk(s) of a path.</summary>
+    public static DiskIdentity Disk(string path) => DiskResolver(path);
+
+    /// <summary>
+    /// Copies a file without overwriting, the progress reported (0–1). The default copies by streams; on Windows the
+    /// platform uses the system's copy engine (unbuffered for large files, block cloning on ReFS).
+    /// </summary>
+    public static Func<string, string, IProgress<double>?, CancellationToken, Task>? CopyFile { get; set; }
 }
+
+/// <summary>
+/// The physical disk(s) behind a path: <see cref="Key"/> is the same for paths on one disk (or one array of disks);
+/// a solid-state disk (SSD, NVMe – no seek penalty) takes two files at once without slowing down.
+/// </summary>
+public sealed record DiskIdentity(string Key, bool SolidState, string Detail);

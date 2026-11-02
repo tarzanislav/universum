@@ -7,6 +7,12 @@ namespace Universum.Core.Processes;
 /// <summary>Runs external tools without a shell and without a console window, reading output as UTF-8.</summary>
 public sealed class ProcessRunner : IProcessRunner
 {
+    /// <summary>
+    /// Lowers more than the processor's priority of a background tool (on Windows: its input and output, so the user's work
+    /// on the same disk goes first); set by the platform.
+    /// </summary>
+    public static Action<Process>? LowerPriority { get; set; }
+
     public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
         var startInfo = new ProcessStartInfo(request.FileName)
@@ -59,6 +65,7 @@ public sealed class ProcessRunner : IProcessRunner
             try
             {
                 process.PriorityClass = ProcessPriorityClass.BelowNormal;
+                LowerPriority?.Invoke(process);
             }
             catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
             {

@@ -699,7 +699,8 @@ public sealed class RulesPageViewModel : ObservableObject
     private void UpdateTarget()
     {
         _placement = null;
-        var layout = _services.Library;
+        // owner, 2. 11. 2026: the output folder on the disk the file lies on (else the default one)
+        var layout = _services.LibraryFor(_file?.Path);
         var title = TitleGuess.Typed(_kind, TitleText);
         var episode = EpisodeNumber.TryParse(EpisodeText);
         if (_plan is null)
@@ -732,7 +733,8 @@ public sealed class RulesPageViewModel : ObservableObject
             var size = SourceSize();
             Target = _placement.Holds(_plan.Target.Source.Path, size) && _plan.Method == WriteMethod.None
                 ? Loc.T("Súbor už je v knižnici na svojom mieste.")
-                : Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
+                : (_services.Library is { } main && !Core.IO.Paths.Same(main.Root, layout.Root) ? layout.Root + " → " : "") +
+                  Path.GetRelativePath(layout.Root, _placement.PathFor(size)) +
                   (_placement.EstimatedPathLength(size) > LibraryNames.MaxPathLength ? Loc.T("  – cesta je príliš dlhá pre Windows") : "") +
                   (episode is not null && _tmdbTitle is { Kind: MediaKind.Series } series && !series.HasEpisode(episode) ? Loc.T("  – TMDB takú epizódu nepozná") : "") +
                   (_kind == MediaKind.Series && _episodeNote.Length > 0 ? "  – " + _episodeNote : "");
@@ -803,13 +805,14 @@ public sealed class RulesPageViewModel : ObservableObject
     /// </summary>
     private void SendToMega()
     {
-        if (!CanSendToMega() || TitleGuess.Typed(_kind, TitleText) is not { Problem: null } title || _services.Library is not { } library)
+        if (!CanSendToMega() || TitleGuess.Typed(_kind, TitleText) is not { Problem: null } title || _services.Library is not { } main ||
+            _services.LibraryFor(_file?.Path) is not { } library)
         {
             return;
         }
 
         var file = Core.Mega.MegaFile.FromSingle(Studied(), Decisions(), title, EpisodeNumber.TryParse(EpisodeText), _addition.Length > 0 ? _addition : null, revision: false,
-            _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())), _studio);
+            _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())), _studio, library.Root);
         if (_megaBatch is { } batch)
         {
             // owner, 2. 11. 2026: the file opened from MEGA spracovanie goes back into its batch with the new decisions
@@ -837,7 +840,7 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        Result = Mega.Send([file], Loc.T("Single spracovanie: ") + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), library.Root, _services.Profile);
+        Result = Mega.Send([file], Loc.T("Single spracovanie: ") + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), main.Root, _services.Profile);
         _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
     }
 

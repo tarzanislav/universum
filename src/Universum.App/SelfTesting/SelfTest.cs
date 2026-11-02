@@ -262,6 +262,7 @@ internal static class SelfTest
         await TestMuxRecognitionAsync(model, window, work);
         await TestSrtConversionAsync(model, window, services, work);
         await TestNewsToAgendaAsync(model, window, services);
+        await TestDisksAsync(model, window, services);
         await TestChaptersAsync(model, window, work);
         await TestSubtitlesAsync(model, window, services, work);
         await TestAudioAsync(model, window, services, work);
@@ -3757,6 +3758,70 @@ internal static class SelfTest
 
     // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,
     // with forced subtitles told by the file's name (invented speech and text)
+    // owner, 2. 11. 2026 – práca na rôznych diskoch: what Windows says of the disks, and a file on another disk written into
+    // the output folder on that disk (no copying between disks); invented names
+    private static async Task TestDisksAsync(MainViewModel model, MainWindow window, AppServices services)
+    {
+        var main = services.Library!.Root;
+        foreach (var path in new[] { main, Path.GetTempPath(), Environment.GetFolderPath(Environment.SpecialFolder.Windows) }.Distinct())
+        {
+            var disk = Core.IO.Paths.Disk(path);
+            Write($"disks: {path} – {disk.Detail} ({(disk.SolidState ? "SSD" : "not SSD or unknown")}, key {disk.Key})");
+        }
+
+        var other = new[] { Path.GetTempPath(), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"C:\" }
+            .FirstOrDefault(p => p.Length > 0 && Directory.Exists(p) && !Core.IO.Paths.SameVolume(p, main));
+        if (other is null)
+        {
+            Write("disks: one volume only – the output folder on another disk is not tried");
+            return;
+        }
+
+        var folder = Path.Combine(other, "UNIVERSUM-selftest-disk-" + Guid.NewGuid().ToString("N")[..8]);
+        var output = Path.Combine(folder, "VYSTUP");
+        var source = Path.Combine(folder, "Stiahnute", "Vymyslený film na druhom disku.mkv");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+            File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-und-cz-forced.mkv"), source);
+            services.AddOutputDirectory(output);
+            Check(services.LibraryFor(source)?.Root == Path.GetFullPath(output) && services.LibraryFor(Path.Combine(main, "x.mkv"))?.Root == main &&
+                  Directory.Exists(Path.Combine(output, "MOVIES")),
+                $"disks: a file on the other disk goes into the output folder there ({services.LibraryFor(source)?.Root})");
+            model.Open(model.Rules);
+            await model.Rules.LoadAsync(source);
+            for (var wait = 0; wait < 600 && model.Rules.IsReadingSubtitles; wait++)
+            {
+                await Task.Delay(100);
+            }
+
+            model.Rules.ChooseLanguage(2, "cs");
+            model.Rules.ChooseLanguage(3, "cs");
+            model.Rules.KeepOriginal = true;
+            model.Rules.IsMovie = true;
+            model.Rules.TitleText = "Vymyslený film na druhom disku (2026)";
+            Check(model.Rules.Target.StartsWith(Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase), "disks: Single shows the output folder of the other disk – " + model.Rules.Target);
+            var timed = System.Diagnostics.Stopwatch.StartNew();
+            await model.Rules.ApplyCommand.ExecuteAsync(null);
+            var written = Directory.EnumerateFiles(Path.Combine(output, "MOVIES"), "*.mkv", SearchOption.AllDirectories).ToList();
+            Check(model.Rules.Result.StartsWith("Hotovo", StringComparison.Ordinal) && written.Count == 1 && File.Exists(source),
+                $"disks: written on the same disk in {timed.Elapsed.TotalSeconds:0.0} s, original kept – {model.Rules.Result}");
+            await Screenshot(window, "disks-single.png");
+        }
+        finally
+        {
+            services.RemoveOutputDirectory(output);
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Write("disks: the test folder stays – " + ex.Message);
+            }
+        }
+    }
+
     // owner, 2. 11. 2026: a film of Premiéry and an episode of Novinky added to Poznámky and Plánované úlohy, opened to be
     // edited there; the same film again opens its note (invented titles)
     private static async Task TestNewsToAgendaAsync(MainViewModel model, MainWindow window, AppServices services)

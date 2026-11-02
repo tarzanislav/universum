@@ -194,6 +194,23 @@ public sealed record LibraryLayout(string Root)
             sizes);
     }
 
+    /// <summary>
+    /// The output folder a folder of results lies in: the parent of its MOVIES or TVSHOWS (null when it lies in neither).
+    /// </summary>
+    public static string? RootOf(string resultDirectory)
+    {
+        for (var folder = new DirectoryInfo(Path.GetFullPath(resultDirectory)); folder is not null; folder = folder.Parent)
+        {
+            if (folder.Parent is { } parent && (folder.Name.Equals(LibraryNames.MoviesFolder, StringComparison.OrdinalIgnoreCase) ||
+                                                folder.Name.Equals(LibraryNames.ShowsFolder, StringComparison.OrdinalIgnoreCase)))
+            {
+                return parent.FullName;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>True when <paramref name="path"/> lies in MOVIES or TVSHOWS (where results are written).</summary>
     public bool HoldsResult(string path) =>
         ResultFolders.Any(folder => Path.GetFullPath(path).StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar, Paths.Comparison));

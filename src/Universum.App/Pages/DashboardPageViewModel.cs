@@ -305,8 +305,8 @@ public sealed class DashboardPageViewModel : ObservableObject
             : Loc.T("Nie je otvorený žiadny priečinok");
         Batch.Attention = unverified > 0;
 
-        Library.Text = _services.Library is { } library
-            ? library.Root + (_libraryCounts is { } counts ? Loc.F(" · filmy: {0} · seriály: {1}", counts.Movies, counts.Shows) : "")
+        Library.Text = _services.Libraries is { } libraries
+            ? string.Join(" · ", libraries.All.Select(l => l.Root)) + (_libraryCounts is { } counts ? Loc.F(" · filmy: {0} · seriály: {1}", counts.Movies, counts.Shows) : "")
             : Loc.T("Nie je nastavená – výstupný priečinok zvolíte v Nastaveniach");
         Library.Attention = _services.Library is null;
 
@@ -368,8 +368,8 @@ public sealed class DashboardPageViewModel : ObservableObject
             do
             {
                 _countAgain = false;
-                _libraryCounts = _services.Library is { } library
-                    ? await Task.Run(() => (Count(library.Movies), Count(library.Shows)))
+                _libraryCounts = _services.Libraries is { } libraries
+                    ? await Task.Run(() => (libraries.All.Sum(l => Count(l.Movies)), libraries.All.Sum(l => Count(l.Shows))))
                     : null;
             }
             while (_countAgain);

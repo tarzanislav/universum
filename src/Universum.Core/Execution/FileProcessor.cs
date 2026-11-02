@@ -72,6 +72,18 @@ public sealed class FileProcessor(
     /// </summary>
     public bool DeleteOriginalsAllowed { get; init; }
 
+    /// <summary>
+    /// On how many disks files are written at the same time (owner, 2. 11. 2026 – práca na rôznych diskoch): one file per
+    /// disk at most, never two on one disk; 1 writes one file after another.
+    /// </summary>
+    public int ParallelDisks { get; init; } = 2;
+
+    /// <summary>
+    /// Work that keeps the processor busy (sounds and pictures written anew by FFmpeg): one at a time in the whole program,
+    /// at a lower priority – the files of other disks go on being copied meanwhile and the computer stays usable.
+    /// </summary>
+    private static readonly SemaphoreSlim HeavyWork = new(1, 1);
+
     /// <summary>A new, unique temporary name in <paramref name="directory"/>; left-overs after a crash are recognised by it.</summary>
     public static string TemporaryPath(string directory, string sourcePath) => UniquePath(directory, sourcePath, TemporaryExtension);
 
@@ -800,8 +812,27 @@ public sealed class FileProcessor(
                     return [problem];
                 }
 
-                // sounds written anew (Úprava audiostopy) first, each into its own file; mkvmerge then takes them
-                var (encoded, encodingProblem) = await EncodeAsync(written, folder, progress, cancellationToken).ConfigureAwait(false);
+                // sounds written anew (Úprava audiostopy) first, each into its own file; mkvmerge then takes them – one such
+                // work at a time in the whole program (the processor), the other disks' copying goes on meanwhile
+                IReadOnlyDictionary<int, string> encoded;
+                string? encodingProblem;
+                if (written.Tracks.Any(t => t.IsAdded && (t.Source.Encode is not null || t.Source.VideoEncode is not null)))
+                {
+                    await HeavyWork.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        (encoded, encodingProblem) = await EncodeAsync(written, folder, progress, cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        HeavyWork.Release();
+                    }
+                }
+                else
+                {
+                    (encoded, encodingProblem) = (new Dictionary<int, string>(), null);
+                }
+
                 if (encodingProblem is not null)
                 {
                     return [encodingProblem];
@@ -1146,7 +1177,7 @@ public sealed class FileProcessor(
     {
         using var options = MkvToolNixOptionsFile.Create(arguments);
         return await runner.RunAsync(
-            new ProcessRequest(installation.ToolPath(tool), [options.Argument]) { OnOutputLine = progress is null ? null : line => ReportProgress(line, progress) },
+            new ProcessRequest(installation.ToolPath(tool), [options.Argument]) { OnOutputLine = progress is null ? null : line => ReportProgress(line, progress), Background = true },
             cancellationToken);
     }
 
@@ -1162,8 +1193,21 @@ public sealed class FileProcessor(
 
     private static async Task CopyAsync(string source, string target, IProgress<double>? progress, CancellationToken cancellationToken)
     {
+        // owner, 2. 11. 2026: the system's copy engine when the platform offers it (no file cache flooded by a film, block
+        // cloning on ReFS); the copy is checked the same way
+        if (Paths.CopyFile is { } copy)
+        {
+            await copy(source, target, progress, cancellationToken).ConfigureAwait(false);
+            if (new FileInfo(target).Length != new FileInfo(source).Length)
+            {
+                throw new IOException($"the copy of {source} is incomplete");
+            }
+
+            return;
+        }
+
         long length;
-        await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, useAsync: true))
+        await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous | FileOptions.SequentialScan))
         await using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 20, useAsync: true))
         {
             length = input.Length;

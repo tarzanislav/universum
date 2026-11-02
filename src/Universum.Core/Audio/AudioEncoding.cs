@@ -273,6 +273,7 @@ public static partial class AudioEncoder
         var result = await runner.RunAsync(new ProcessRequest(ffmpeg, arguments)
         {
             Timeout = TimeSpan.FromHours(6),
+            Background = true,
             OnOutputLine = line => Report(line, stretched, progress, share),
         }, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0 || !File.Exists(output))
@@ -314,6 +315,7 @@ public static partial class AudioEncoder
         var result = await runner.RunAsync(new ProcessRequest(ffmpeg, arguments)
         {
             Timeout = TimeSpan.FromHours(6),
+            Background = true,
             OnOutputLine = line => Report(line, duration, progress, (0, 0.5)),
         }, cancellationToken).ConfigureAwait(false);
         return result.ExitCode == 0 ? SecondPass(result.StandardError) : null;

@@ -3046,6 +3046,7 @@ internal static class Translations
         ["Premiéra seriálu"] = "Premiéra seriálu",
         ["Premiéra {0}. série"] = "Premiéra {0}. řady",
         ["Najbližšia epizóda"] = "Nejbližší epizoda",
+        ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "zvuk není česky ani slovensky – tyto titulky mají být Default a Enabled (Pravidla UNIVERSUM to nastaví).",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6088,5 +6089,6 @@ internal static class Translations
         ["Premiéra seriálu"] = "Series premiere",
         ["Premiéra {0}. série"] = "Season {0} premiere",
         ["Najbližšia epizóda"] = "Next episode",
+        ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "the audio is neither Czech nor Slovak – these subtitles should be Default and Enabled (UNIVERSUM rules set it).",
     };
 }

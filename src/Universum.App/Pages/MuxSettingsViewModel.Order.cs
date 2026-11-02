@@ -74,11 +74,56 @@ public sealed partial class MuxSettingsViewModel
             }
 
             _sortLater.Clear();
+            moved |= DefaultSubtitlesForForeignAudio();
             if (moved)
             {
                 Changed();
             }
         });
+    }
+
+    /// <summary>
+    /// Owner, 2. 11. 2026 (always): with no audio in Czech or Slovak the Czech subtitles – else the Slovak ones – are Default
+    /// and Enabled, the other subtitles not Default. True when a flag was changed.
+    /// </summary>
+    internal bool DefaultSubtitlesForForeignAudio()
+    {
+        var taken = Tracks.Where(t => t.Include).ToList();
+        if (taken.Count == 0)
+        {
+            return false;
+        }
+
+        var target = MuxRules.Target(Inputs.Select(i => i.ToSource()).ToList(), taken.Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList());
+        if (Core.Rules.TargetChecks.ForeignAudioSubtitles(target, _services.Profile) is not { } wanted || wanted.TrackId < 0 || wanted.TrackId >= taken.Count)
+        {
+            return false;
+        }
+
+        var row = taken[wanted.TrackId];
+        if (row.IsDefault && row.IsEnabled && !taken.Any(t => t != row && t.Kind == TrackType.Subtitles && t.IsDefault))
+        {
+            return false;
+        }
+
+        var loading = _loading;
+        _loading = true;
+        try
+        {
+            foreach (var other in taken.Where(t => t != row && t.Kind == TrackType.Subtitles && t.IsDefault))
+            {
+                other.IsDefault = false;
+            }
+
+            row.IsDefault = true;
+            row.IsEnabled = true;
+        }
+        finally
+        {
+            _loading = loading;
+        }
+
+        return true;
     }
 
     private readonly ArrangeLater _arrangeLater = new();

@@ -41,8 +41,13 @@ public sealed partial class SubtitlesPageViewModel
     /// <summary>The studio edits a file of Hromadné spracovanie (Upraviť v štúdiu): the changes go into the task.</summary>
     public bool IsTask => _task is not null;
 
+    /// <summary>The task comes from Single spracovanie (owner, 2. 11. 2026), not from Hromadné spracovanie.</summary>
+    public bool TaskFromSingle { get; set; }
+
     public string TaskText => _task is { } task
-        ? Loc.F("Úloha Hromadného spracovania: {0}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa v úlohe nepoužijú.",
+        ? Loc.F(TaskFromSingle
+                ? "Súbor Single spracovania: {0}. Uložia sa časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – vrátite sa s nimi do Single spracovania (aj pre MEGA dávku). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa nepoužijú."
+                : "Úloha Hromadného spracovania: {0}. Do úlohy sa uložia časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – súbor sa spracuje s ostatnými (aj v MEGA dávke). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa v úlohe nepoužijú.",
             System.IO.Path.GetFileName(task.Path))
         : "";
 

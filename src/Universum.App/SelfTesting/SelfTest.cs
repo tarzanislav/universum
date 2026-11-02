@@ -522,6 +522,32 @@ internal static class SelfTest
             "mega: where the files came from; nothing to open in Hromadné spracovanie");
         await Screenshot(window, "mega-sources.png");
 
+        // owner, 2. 11. 2026: the file of Single spracovanie edited there again (with its decisions) and saved back into its batch
+        model.Mega.SelectedFile = model.Mega.Files.First(f => f.File.Source == Core.Mega.MegaSource.Single);
+        Check(model.Mega.EditFileCommand.CanExecute(null), "mega: Upraviť v Single spracovaní offered for the file of Single");
+        model.Mega.EditFileCommand.Execute(null);
+        for (var wait = 0; wait < 600 && (model.Rules.MegaBatch is null || model.Rules.IsReadingSubtitles || model.Rules.Plan is null); wait++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(model.SelectedTool.Page == model.Rules && model.Rules.MegaBatch == batch && model.Rules.TitleText == "Vymyslený film pre MEGA (2026)" &&
+              model.Rules.SendToMegaText.Contains(batch.Label, StringComparison.Ordinal) && model.Rules.Plan?.Target.For(2).Language.Primary == "cs",
+            $"mega/single: the file opened in Single spracovanie with its decisions – {model.Rules.TitleText} · {model.Rules.SendToMegaText} · {model.Rules.Result}");
+        Check(model.Rules.EditInStudioCommand.CanExecute(null) && model.Rules.EditSoundInStudioCommand.CanExecute(null), "mega/single: the studios offered from Single spracovanie");
+        await Screenshot(window, "mega-edit-single.png");
+        // what a studio saves comes back into Single spracovanie (here: the English subtitles left out in Úprava titulkostopy)
+        var refused = model.Rules.SaveStudio(single, new Core.Batch.StudioEdits { Removed = [5] });
+        Check(refused is null && model.Rules.Plan?.Target.Tracks.All(t => t.TrackId != 5) == true && model.Rules.StudioText.Length > 0,
+            $"mega/single: a studio's edits back in Single spracovanie – {refused} {model.Rules.StudioText}");
+        model.Rules.Addition = "Remaster";
+        model.Rules.SendToMegaCommand.Execute(null);
+        var edited = batch.Files.Where(f => f.Source == Core.Mega.MegaSource.Single).ToList();
+        Check(batch.Files.Count == 2 && edited is [{ Addition: "Remaster" } one] && one.Languages.TryGetValue(2, out var kept) && kept.Primary == "cs" &&
+              one.Studio is { Removed: [5] } && one.Removed.Contains(5) &&
+              model.SelectedTool.Page == model.Mega && model.Rules.MegaBatch is null,
+            "mega/single: the changes saved back into the batch, back in MEGA spracovanie – " + model.Rules.Result);
+
         // MEGA writes both
         await model.Mega.StartAsync(batch);
         for (var wait = 0; wait < 600 && model.Mega.LastJob is { IsFinished: false }; wait++)

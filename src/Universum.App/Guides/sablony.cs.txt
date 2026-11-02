@@ -96,6 +96,9 @@ Do dávky pošlete soubory z **Hromadného zpracování**, **Single zpracování
 - Soubor ze Single zpracování a výsledek Slučování si **originály vždy ponechají**, ať má dávka zvoleno cokoli.
 - Výsledek Slučování se zapíše celý podle svých nastavení; když se některý jeho soubor mezitím změní, **přeskočí se**.
 - [Upravit v Hromadném zpracování] otevře jen soubory, které přišly z Hromadného zpracování.
+- [Upravit v Single zpracování] (u souboru dávky) otevře soubor, který přišel ze Single zpracování, se všemi
+  rozhodnutími; v Single ho můžete poslat i do [Titulky ve studiu] a [Zvuk ve studiu] – [Uložit do úlohy] vás vrátí
+  zpět. Tlačítko [Uložit do Dávka N] změny zapíše do dávky a vrátí vás do MEGA zpracování.
 
 @otvorit Mega Otevřít MEGA zpracování
 

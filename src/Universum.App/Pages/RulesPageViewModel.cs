@@ -294,6 +294,8 @@ public sealed class RulesPageViewModel : ObservableObject
         Result = "";
         _undoRecord = null;
         CanRevise = false;
+        SetMegaBatch(null);
+        _studio = null;
         _languages.Clear();
         _videoNames.Clear();
         _kept.Clear();
@@ -416,8 +418,8 @@ public sealed class RulesPageViewModel : ObservableObject
             languages[id] = chosen;
         }
 
-        var target = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt });
+        var target = UniversumRules.Apply(Studied(), _services.Profile,
+            WithStudio(new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt }));
         foreach (var video in target.Tracks.Where(t => t.Type == TrackType.Video && t.Name is not null))
         {
             _videoNames[video.TrackId] = video.Name!;
@@ -556,8 +558,8 @@ public sealed class RulesPageViewModel : ObservableObject
             languages[id] = chosen;
         }
 
-        var rules = UniversumRules.Apply(_file, _services.Profile,
-            new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt });
+        var rules = UniversumRules.Apply(Studied(), _services.Profile,
+            WithStudio(new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt }));
         if ((rules.Tracks.FirstOrDefault(t => t.TrackId == trackId)?.Name ?? "") != name)
         {
             _names[trackId] = name;
@@ -806,10 +808,150 @@ public sealed class RulesPageViewModel : ObservableObject
             return;
         }
 
-        var file = Core.Mega.MegaFile.FromSingle(_file!, Decisions(), title, EpisodeNumber.TryParse(EpisodeText), _addition.Length > 0 ? _addition : null, revision: false,
-            _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())));
+        var file = Core.Mega.MegaFile.FromSingle(Studied(), Decisions(), title, EpisodeNumber.TryParse(EpisodeText), _addition.Length > 0 ? _addition : null, revision: false,
+            _services.Profile, Path.GetRelativePath(library.Root, _placement!.PathFor(SourceSize())), _studio);
+        if (_megaBatch is { } batch)
+        {
+            // owner, 2. 11. 2026: the file opened from MEGA spracovanie goes back into its batch with the new decisions
+            if (batch.State is not (Core.Mega.MegaBatchState.Waiting or Core.Mega.MegaBatchState.Missed))
+            {
+                Result = Loc.F("{0} už nečaká (spúšťa sa alebo beží) – zmeny sa do nej nedajú uložiť.", batch.Label);
+                return;
+            }
+
+            try
+            {
+                _services.Mega.Put(batch, [file]);
+                _services.NotifyMegaChanged();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                Result = Loc.T("Do MEGA sa to nepodarilo uložiť: ") + ex.Message;
+                return;
+            }
+
+            Result = Loc.F("Zmeny sú uložené v {0} MEGA spracovania.", batch.Label);
+            _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
+            SetMegaBatch(null);
+            BackToMega?.Invoke();
+            return;
+        }
+
         Result = Mega.Send([file], Loc.T("Single spracovanie: ") + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), library.Root, _services.Profile);
         _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
+    }
+
+    // ---------------------------------------------------------------- the studios (owner, 2. 11. 2026)
+
+    private Core.Batch.StudioEdits? _studio;
+
+    /// <summary>The edits of Úprava titulkostopy and audiostopy kept for the opened file (Uložiť do úlohy); null: none.</summary>
+    public Core.Batch.StudioEdits? Studio => _studio;
+
+    /// <summary>What the studios changed, in words ("" without edits).</summary>
+    public string StudioText => _studio is { } studio ? Loc.F("Úpravy zo štúdií: {0}", studio.Describe()) : "";
+
+    /// <summary>Titulky v štúdiu: the opened file in Úprava titulkostopy, its edits back here.</summary>
+    public RelayCommand EditInStudioCommand => _editInStudio ??= new RelayCommand(() => StudioRequested?.Invoke(_file!, _studio, _names), () => !Busy && _file is not null);
+
+    /// <summary>Zvuk v štúdiu: the opened file in Úprava audiostopy, its edits back here.</summary>
+    public RelayCommand EditSoundInStudioCommand => _editSoundInStudio ??= new RelayCommand(() => SoundStudioRequested?.Invoke(_file!, _studio, _names), () => !Busy && _file is not null);
+
+    private RelayCommand? _editInStudio;
+    private RelayCommand? _editSoundInStudio;
+
+    /// <summary>The subtitle studio should open the file (with its edits so far and the names written here).</summary>
+    public event Action<MediaFile, Core.Batch.StudioEdits?, IReadOnlyDictionary<int, string>>? StudioRequested;
+
+    /// <summary>The sound studio should open the file.</summary>
+    public event Action<MediaFile, Core.Batch.StudioEdits?, IReadOnlyDictionary<int, string>>? SoundStudioRequested;
+
+    /// <summary>Uložiť a vrátiť sa: a studio's edits of the opened file (none: forgotten); null when taken, else why not.</summary>
+    public string? SaveStudio(string path, Core.Batch.StudioEdits edits)
+    {
+        if (_file is null || !Core.IO.Paths.Same(_file.Path, path))
+        {
+            return Loc.T("V Single spracovaní je teraz otvorený iný súbor – otvorte ho znova a úpravu uložte potom.");
+        }
+
+        if (Busy)
+        {
+            return Loc.T("Single spracovanie práve zapisuje – úpravu uložte po jeho skončení.");
+        }
+
+        _studio = edits.IsEmpty ? null : edits;
+        OnPropertyChanged(nameof(StudioText));
+        Recalculate();
+        Result = _studio is null ? Loc.T("Úpravy zo štúdií sú zrušené.") : StudioText;
+        return null;
+    }
+
+    // the file with the studios' tracks (subtitle files, sounds written anew), and the decisions they bring
+    private MediaFile Studied() => _studio is { } studio && _file is { } file ? studio.Apply(file) : _file!;
+
+    private TrackDecisions WithStudio(TrackDecisions decisions) => _studio is { } studio && _file is not null ? studio.Apply(decisions, Studied()) : decisions;
+
+    // ---------------------------------------------------------------- a file of MEGA spracovanie edited here
+
+    private Core.Mega.MegaBatch? _megaBatch;
+
+    /// <summary>The batch of MEGA spracovanie whose file is edited here; null for a file opened in Single spracovanie.</summary>
+    public Core.Mega.MegaBatch? MegaBatch => _megaBatch;
+
+    /// <summary>"Odoslať do MEGA", or "Uložiť do Dávka 2" for a file opened from MEGA spracovanie.</summary>
+    public string SendToMegaText => _megaBatch is { } batch ? Loc.F("Uložiť do {0}", batch.Label) : Loc.T("Odoslať do MEGA");
+
+    /// <summary>After Uložiť do dávky: back to MEGA spracovanie.</summary>
+    public event Action? BackToMega;
+
+    private void SetMegaBatch(Core.Mega.MegaBatch? batch)
+    {
+        _megaBatch = batch;
+        OnPropertyChanged(nameof(MegaBatch));
+        OnPropertyChanged(nameof(SendToMegaText));
+    }
+
+    /// <summary>
+    /// Upraviť v Single spracovaní (owner, 2. 11. 2026): the file of a waiting batch opened with every decision the batch
+    /// keeps – languages, forced, kept and ordered tracks, names, SRT, title, episode and addition; Uložiť do dávky puts it
+    /// back with the changes.
+    /// </summary>
+    public async Task EditForMegaAsync(Core.Mega.MegaBatch batch, Core.Mega.MegaFile file)
+    {
+        await LoadAsync(file.Path);
+        if (_file is null)
+        {
+            Result = Loc.F("Súbor sa nedá otvoriť: {0}", file.Path);
+            return;
+        }
+
+        foreach (var (id, language) in file.Languages)
+        {
+            _languages[id] = language;
+        }
+
+        foreach (var (id, forced) in file.Forced)
+        {
+            _forced[id] = forced;
+        }
+
+        _kept.UnionWith(file.Kept);
+        _order.AddRange(file.Order);
+        foreach (var (id, name) in file.Names)
+        {
+            _names[id] = name;
+        }
+
+        _toSrt.UnionWith(file.ToSrt);
+        _studio = file.Studio;
+        IsMovie = file.Title.Kind == MediaKind.Movie;
+        IsSeries = file.Title.Kind == MediaKind.Series;
+        TitleText = file.Title.FolderName;
+        EpisodeText = file.Episode?.Tag ?? "";
+        Addition = file.Addition ?? "";
+        SetMegaBatch(batch);
+        Recalculate();
+        Result = Loc.F("Súbor z {0} MEGA spracovania – upravte ho a dajte {1}.", batch.Label, SendToMegaText);
     }
 
     // the decisions of the page: the languages read from the subtitles, then the user's choices over them
@@ -821,7 +963,7 @@ public sealed class RulesPageViewModel : ObservableObject
             languages[id] = chosen;
         }
 
-        return new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt };
+        return WithStudio(new TrackDecisions { Languages = languages, VideoNames = _videoNames, Kept = _kept, Order = _order, Forced = _forced, Names = _names, ToSrt = _toSrt });
     }
 
     private bool CanApply() =>
@@ -992,6 +1134,9 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
+        _editInStudio?.NotifyCanExecuteChanged();
+        _editSoundInStudio?.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(StudioText));
         OpenCommand.NotifyCanExecuteChanged();
         ClearCommand?.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();

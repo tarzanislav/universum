@@ -158,8 +158,13 @@ public sealed class AudioPageViewModel : ObservableObject
     /// <summary>A file of Hromadné spracovanie is edited (its changes go back into the task).</summary>
     public bool IsTask => _task is not null;
 
+    /// <summary>The task comes from Single spracovanie (owner, 2. 11. 2026), not from Hromadné spracovanie.</summary>
+    public bool TaskFromSingle { get; set; }
+
     public string TaskText => _task is { } task
-        ? Loc.F("Úloha Hromadného spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia do úlohy – zapíšu sa pri jej behu.", Path.GetFileName(task.Path))
+        ? Loc.F(TaskFromSingle
+            ? "Súbor Single spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."
+            : "Úloha Hromadného spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia do úlohy – zapíšu sa pri jej behu.", Path.GetFileName(task.Path))
         : "";
 
     /// <summary>Work is saved for the video.</summary>

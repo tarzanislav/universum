@@ -39,6 +39,10 @@ public sealed class MegaPageViewModel : ObservableObject
         ClearFinishedCommand = new RelayCommand(ClearFinished, () => _services.Mega.Batches.Any(b => !b.IsOpen));
         DeleteOriginalsCommand = new AsyncRelayCommand(DeleteOriginalsAsync, () => _selected?.Batch is { Originals: not OriginalsMode.Keep, State: not MegaBatchState.Queued } batch &&
                                                                                    !batch.IsOpen && Originals(batch).Count > 0);
+        // owner, 2. 11. 2026: a file sent from Single spracovanie is edited there again (and saved back into its batch)
+        EditFileCommand = new RelayCommand(() => EditSingleRequested?.Invoke(_selected!.Batch, _selectedFile!.File),
+            () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } &&
+                  _selectedFile?.File is { State: MegaFileState.Waiting, Source: MegaSource.Single });
         EditCommand = new RelayCommand(() => EditRequested?.Invoke(_selected!.Batch),
             () => _selected?.Batch is { State: MegaBatchState.Waiting or MegaBatchState.Missed, IsBeingEdited: false } batch &&
                   batch.Files.Any(f => f.State == MegaFileState.Waiting && f.FromBatch));
@@ -82,6 +86,7 @@ public sealed class MegaPageViewModel : ObservableObject
             if (SetProperty(ref _selectedFile, value))
             {
                 RemoveFileCommand.NotifyCanExecuteChanged();
+                EditFileCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -149,6 +154,12 @@ public sealed class MegaPageViewModel : ObservableObject
 
     /// <summary>The main window opens Hromadné spracovanie with the batch.</summary>
     public event Action<MegaBatch>? EditRequested;
+
+    /// <summary>Upraviť v Single spracovaní: the selected file of Single spracovanie opened there with its decisions.</summary>
+    public RelayCommand EditFileCommand { get; }
+
+    /// <summary>A file of Single spracovanie is to be edited there (its batch, the file as the batch keeps it).</summary>
+    public event Action<MegaBatch, MegaFile>? EditSingleRequested;
 
     /// <summary>Asks before something is removed (the self-test answers itself).</summary>
     public Func<string, bool> Confirm { get; set; } = question =>
@@ -436,7 +447,7 @@ public sealed class MegaPageViewModel : ObservableObject
 
     private void RefreshCommands()
     {
-        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand, DeleteOriginalsCommand })
+        foreach (var command in new IRelayCommand[] { StartCommand, RetryCommand, MoveUpCommand, MoveDownCommand, RemoveCommand, RemoveFileCommand, ClearFinishedCommand, EditCommand, EditFileCommand, DeleteOriginalsCommand })
         {
             command.NotifyCanExecuteChanged();
         }

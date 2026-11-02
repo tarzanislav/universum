@@ -57,7 +57,7 @@ public static class UniversumRules
         }
 
         var targets = new List<TrackTarget>();
-        targets.AddRange(videos.Select(v => new TrackTarget(v, decisions.VideoNames.TryGetValue(v.Id, out var name) ? name : VideoName(v, profile), v.Language, v.Flags with { Default = true, Enabled = true, Forced = false }, TrackRole.Main)));
+        targets.AddRange(videos.Select(v => new TrackTarget(v, decisions.VideoNames.TryGetValue(v.Id, out var name) ? name : VideoName(v, profile), v.Language, v.Flags with { Default = true, Enabled = true, Forced = false }, TrackRole.Main) { AspectRatio = decisions.VideoAspect }));
 
         // audio: exactly one default – the first regular track after ordering
         var defaultAudio = audio.FirstOrDefault(a => a.Role != TrackRole.Commentary) ?? audio.FirstOrDefault();
@@ -103,6 +103,7 @@ public static class UniversumRules
             RemovedEmpty = file.Tracks.Where(t => empty.Contains(t.Id)).ToList(),
             RepairIndex = missingIndex && profile.RepairIndex,
             NewTitle = "",
+            Cut = decisions.Cut is { Count: > 0 } cut ? cut : null,
         };
     }
 

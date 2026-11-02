@@ -848,7 +848,7 @@ public sealed class RulesPageViewModel : ObservableObject
 
     private Core.Batch.StudioEdits? _studio;
 
-    /// <summary>The edits of Úprava titulkostopy and audiostopy kept for the opened file (Uložiť do úlohy); null: none.</summary>
+    /// <summary>The edits of Úprava titulkostopy, audiostopy and videostopy kept for the opened file (Uložiť do úlohy); null: none.</summary>
     public Core.Batch.StudioEdits? Studio => _studio;
 
     /// <summary>What the studios changed, in words ("" without edits).</summary>
@@ -860,8 +860,15 @@ public sealed class RulesPageViewModel : ObservableObject
     /// <summary>Zvuk v štúdiu: the opened file in Úprava audiostopy, its edits back here.</summary>
     public RelayCommand EditSoundInStudioCommand => _editSoundInStudio ??= new RelayCommand(() => SoundStudioRequested?.Invoke(_file!, _studio, _names), () => !Busy && _file is not null);
 
+    /// <summary>Obraz v štúdiu: the opened file in Úprava videostopy (strih, pomer strán, otočenie, rozlíšenie, kodek), its edits back here.</summary>
+    public RelayCommand EditPictureInStudioCommand => _editPictureInStudio ??= new RelayCommand(() => PictureStudioRequested?.Invoke(_file!, _studio), () => !Busy && _file is not null);
+
     private RelayCommand? _editInStudio;
     private RelayCommand? _editSoundInStudio;
+    private RelayCommand? _editPictureInStudio;
+
+    /// <summary>The picture studio should open the file (with its edits so far).</summary>
+    public event Action<MediaFile, Core.Batch.StudioEdits?>? PictureStudioRequested;
 
     /// <summary>The subtitle studio should open the file (with its edits so far and the names written here).</summary>
     public event Action<MediaFile, Core.Batch.StudioEdits?, IReadOnlyDictionary<int, string>>? StudioRequested;
@@ -1139,6 +1146,7 @@ public sealed class RulesPageViewModel : ObservableObject
     {
         _editInStudio?.NotifyCanExecuteChanged();
         _editSoundInStudio?.NotifyCanExecuteChanged();
+        _editPictureInStudio?.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(StudioText));
         OpenCommand.NotifyCanExecuteChanged();
         ClearCommand?.NotifyCanExecuteChanged();

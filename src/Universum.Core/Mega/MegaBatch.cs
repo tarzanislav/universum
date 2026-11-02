@@ -143,7 +143,13 @@ public sealed class MegaFile
     /// <summary>Subtitle tracks written as SRT (by track ID; owner, 1. 11. 2026).</summary>
     public List<int> ToSrt { get; init; } = [];
 
-    /// <summary>The edits of Úprava titulkostopy, to be opened again in Hromadné spracovanie; null = none.</summary>
+    /// <summary>The parts of the film kept (Úprava videostopy, owner, 2. 11. 2026); null = the whole film.</summary>
+    public List<Video.CutPart>? Cut { get; init; }
+
+    /// <summary>The proportions the picture is shown at ("16/9"); null = as it is.</summary>
+    public string? VideoAspect { get; init; }
+
+    /// <summary>The edits of the studios, to be opened again in Single or Hromadné spracovanie; null = none.</summary>
     public StudioEdits? Studio { get; init; }
 
     /// <summary>
@@ -211,6 +217,8 @@ public sealed class MegaFile
         Timings = Timings,
         Names = Names,
         ToSrt = ToSrt.ToHashSet(),
+        Cut = Cut,
+        VideoAspect = VideoAspect,
     };
 
     /// <summary>
@@ -237,6 +245,8 @@ public sealed class MegaFile
             Timings = decisions.Timings.ToDictionary(),
             Names = decisions.Names.ToDictionary(),
             ToSrt = [.. decisions.ToSrt],
+            Cut = decisions.Cut is { Count: > 0 } cut ? [.. cut] : null,
+            VideoAspect = decisions.VideoAspect,
             PlannedPath = plannedPath,
             LibraryRoot = libraryRoot,
             Addition = addition,
@@ -294,6 +304,8 @@ public sealed class MegaFile
             Timings = item.Decisions.Timings.ToDictionary(),
             Names = item.Decisions.Names.ToDictionary(),
             ToSrt = [.. item.Decisions.ToSrt],
+            Cut = item.Decisions.Cut is { Count: > 0 } cut ? [.. cut] : null,
+            VideoAspect = item.Decisions.VideoAspect,
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),
             PlannedPath = item.PlannedPath ?? "",
             LibraryRoot = item.Placement is { } placement ? LibraryLayout.RootOf(placement.Directory) : null,

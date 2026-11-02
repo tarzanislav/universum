@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Universum.App.Localization;
+using Universum.Core.Batch;
 using Universum.Core.Execution;
 using Universum.Core.Media;
 using Universum.Core.MkvToolNix;
@@ -68,6 +69,8 @@ public sealed class VideoPageViewModel : ObservableObject
     private double _progress;
     private CancellationTokenSource? _work;
     private CancellationTokenSource _reading = new();
+    private (string Path, Func<StudioEdits, string?> Save, Action Leave)? _task;
+    private int _taskLoad;
 
     public VideoPageViewModel(AppServices services)
     {
@@ -104,6 +107,13 @@ public sealed class VideoPageViewModel : ObservableObject
         }, () => !_busy && _parts.Count > 0);
         SeekToPartCommand = new AsyncRelayCommand<CutRow>(row => row is null ? Task.CompletedTask : Player.SeekAsync(row.Part.Start));
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
+        SaveToTaskCommand = new RelayCommand(SaveToTask, () => !_busy && _task is not null && _file is not null && Problem is null);
+        LeaveTaskCommand = new RelayCommand(() =>
+        {
+            var leave = _task?.Leave;
+            EndTask();
+            leave?.Invoke();
+        }, () => _task is not null);
         StopCommand = new RelayCommand(() => _work?.Cancel(), () => _work is { IsCancellationRequested: false });
         ClearCommand = new RelayCommand(() =>
         {
@@ -146,15 +156,30 @@ public sealed class VideoPageViewModel : ObservableObject
 
     public RelayCommand StopCommand { get; }
 
+    /// <summary>Uložiť do úlohy: the picture's edits back into Single or Hromadné spracovanie (written when it runs).</summary>
+    public RelayCommand SaveToTaskCommand { get; }
+
+    /// <summary>Späť bez uloženia.</summary>
+    public RelayCommand LeaveTaskCommand { get; }
+
+    /// <summary>A file of Single or Hromadné spracovanie is edited (owner, 2. 11. 2026): its changes go back there.</summary>
+    public bool IsTask => _task is not null;
+
+    /// <summary>The task comes from Single spracovanie, not from Hromadné spracovanie.</summary>
+    public bool TaskFromSingle { get; set; }
+
+    public string TaskText => _task is { } task
+        ? Loc.F(TaskFromSingle
+            ? "Súbor Single spracovania: {0}. Strih, pomer strán, otočenie, výška a kodek obrazu sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."
+            : "Úloha Hromadného spracovania: {0}. Strih, pomer strán, otočenie, výška a kodek obrazu sa uložia do úlohy – zapíšu sa pri jej behu.", Path.GetFileName(task.Path))
+        : "";
+
     public RelayCommand ClearCommand { get; }
 
     /// <summary>The parts kept, as marked and as they will be written.</summary>
     public ObservableCollection<CutRow> Parts { get; } = [];
 
-    public IReadOnlyList<VideoChoice<string?>> Aspects { get; } =
-    [
-        new(null, Loc.T("Ponechať")), new("16/9", "16:9"), new("4/3", "4:3"), new("37/20", "1,85:1"), new("47/20", "2,35:1"), new("12/5", "2,40:1"), new("64/27", "21:9"), new("1/1", "1:1"),
-    ];
+    public IReadOnlyList<VideoChoice<string?>> Aspects { get; } = [new(null, Loc.T("Ponechať")), .. VideoAspects.All.Select(a => new VideoChoice<string?>(a.Value, a.Name))];
 
     public IReadOnlyList<VideoChoice<int>> Rotations { get; } = [new(0, Loc.T("neotáčať")), new(90, Loc.T("o 90° doprava")), new(180, Loc.T("o 180°")), new(270, Loc.T("o 90° doľava"))];
 
@@ -277,7 +302,7 @@ public sealed class VideoPageViewModel : ObservableObject
     public bool HasOwnChange => _parts.Count > 0 || Aspect.Value is not null || WritesPicture;
 
     /// <summary>Why the video cannot be written by the rules; empty when it can.</summary>
-    public string Blocked => _file is null || !UseRules || Target() is not { IsBlocked: true } target ? ""
+    public string Blocked => _file is null || _task is not null || !UseRules || Target() is not { IsBlocked: true } target ? ""
         : Loc.T("Pravidlá UNIVERSUM: ") + string.Join(" ", target.Issues.Where(i => i.IsBlocking).Select(i => i.Kind switch
         {
             RuleIssueKind.UndeterminedLanguage => Loc.F("stopa {0} má neurčený jazyk.", i.TrackId),
@@ -374,6 +399,91 @@ public sealed class VideoPageViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Obraz v štúdiu: a file of Single or Hromadné spracovanie (as analysed) with the picture's edits so far;
+    /// <paramref name="save"/> takes the edits (null when taken, else why not), <paramref name="leave"/> goes back. False
+    /// when it could not be opened.
+    /// </summary>
+    public async Task<bool> EditForTaskAsync(MediaFile analysed, StudioVideo? edits, Func<StudioEdits, string?> save, Action leave)
+    {
+        if (_busy)
+        {
+            Status = Loc.T("Štúdio práve pracuje – skúste Obraz v štúdiu o chvíľu.");
+            return false;
+        }
+
+        var load = ++_taskLoad;
+        await LoadVideoAsync(analysed.Path);
+        if (load != _taskLoad || _file is null || !Core.IO.Paths.Same(_file.Path, analysed.Path))
+        {
+            return false;
+        }
+
+        // the file's own edits, or a clean page (nothing left over from another video)
+        Restore(edits ?? new StudioVideo([], [], ExactCut: false, VideoRecipe.None, Aspect: null));
+        _task = (analysed.Path, save, leave);
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        Changed();
+        return true;
+    }
+
+    // the page as it was left: the parts as marked and the choices
+    private void Restore(StudioVideo edits)
+    {
+        _parts.Clear();
+        _parts.AddRange(Cut.Normalized(edits.Parts));
+        _aspect = Aspects.FirstOrDefault(a => a.Value == edits.Aspect) ?? Aspects[0];
+        _rotation = Rotations.FirstOrDefault(r => r.Value == edits.Recipe.Rotation % 360) ?? Rotations[0];
+        _height = Heights.FirstOrDefault(h => h.Value == edits.Recipe.Height) ?? Heights[0];
+        _codec = Codecs.FirstOrDefault(c => c.Value == edits.Recipe.Codec) ?? Codecs[0];
+        _quality = Math.Clamp(edits.Recipe.Quality, 1, 100);
+        _exactCut = edits.ExactCut;
+        foreach (var name in new[] { nameof(Aspect), nameof(Rotation), nameof(Height), nameof(Codec), nameof(Quality), nameof(ExactCut) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    private void SaveToTask()
+    {
+        if (_task is not { } task || _file is null)
+        {
+            return;
+        }
+
+        if (!Core.IO.Paths.Same(_file.Path, task.Path))
+        {
+            Status = Loc.T("V štúdiu je iné video ako to z úlohy – otvorte ho znova cez Obraz v štúdiu.");
+            EndTask();
+            return;
+        }
+
+        if (Problem is { } problem)
+        {
+            Status = problem;
+            return;
+        }
+
+        // the parts as marked (shown again) and as they will be written (moved to the key frames read here)
+        var video = new StudioVideo(Cut.Normalized(_parts), _parts.Count > 0 ? WrittenParts() : [], ExactCut, Recipe, Aspect.Value);
+        if (task.Save(new StudioEdits { Video = video }) is { } refused)
+        {
+            Status = refused;
+            return;
+        }
+
+        EndTask();
+    }
+
+    private void EndTask()
+    {
+        _task = null;
+        OnPropertyChanged(nameof(IsTask));
+        OnPropertyChanged(nameof(TaskText));
+        Changed();
+    }
+
     // the key frames of the picture (ffprobe beside FFmpeg reads the packets only): where a cut without writing lands
     private async Task ReadKeyframesAsync(MediaFile file, CancellationToken cancellationToken)
     {
@@ -409,6 +519,14 @@ public sealed class VideoPageViewModel : ObservableObject
     private void Clear()
     {
         _work?.Cancel();
+        if (_task is not null)
+        {
+            // another video: the task is left (its file is not here any more)
+            _task = null;
+            OnPropertyChanged(nameof(IsTask));
+            OnPropertyChanged(nameof(TaskText));
+        }
+
         _reading.Cancel();
         _reading.Dispose();
         _reading = new CancellationTokenSource();
@@ -484,15 +602,12 @@ public sealed class VideoPageViewModel : ObservableObject
         return target with
         {
             Cut = _parts.Count > 0 && WrittenParts() is { Count: > 0 } kept ? kept : null,
-            Tracks = target.Tracks.Select(t => t.TrackId == picture && Aspect.Value is { } aspect ? t with { AspectRatio = Turned ? Upright(aspect) : aspect } : t).ToList(),
+            Tracks = target.Tracks.Select(t => t.TrackId == picture && Aspect.Value is { } aspect ? t with { AspectRatio = Turned ? VideoAspects.Upright(aspect) : aspect } : t).ToList(),
         };
     }
 
-    // "16/9" of a picture turned by 90°: "9/16"
-    private static string Upright(string aspect) => aspect.Split('/') is [var width, var height] ? $"{height}/{width}" : aspect;
-
     private bool CanSave() =>
-        !_busy && _file is not null && HasOwnChange && Library.Placement is not null && Problem is null && Blocked.Length == 0 && Target() is { HasChanges: true };
+        !_busy && _task is null && _file is not null && HasOwnChange && Library.Placement is not null && Problem is null && Blocked.Length == 0 && Target() is { HasChanges: true };
 
     private async Task SaveAsync()
     {
@@ -545,6 +660,8 @@ public sealed class VideoPageViewModel : ObservableObject
         RemovePartCommand?.NotifyCanExecuteChanged();
         WholeFilmCommand?.NotifyCanExecuteChanged();
         SaveCommand?.NotifyCanExecuteChanged();
+        SaveToTaskCommand?.NotifyCanExecuteChanged();
+        LeaveTaskCommand?.NotifyCanExecuteChanged();
         StopCommand?.NotifyCanExecuteChanged();
         ClearCommand?.NotifyCanExecuteChanged();
     }

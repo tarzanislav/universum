@@ -198,8 +198,9 @@ public sealed class MainViewModel : ObservableObject
         Mux.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.InfoRequested += path => _ = ShowInfoAsync(path);
         Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
-        Batch.StudioRequested += (file, edits, names) => _ = EditInStudioAsync(file, edits, names);
-        Batch.SoundStudioRequested += (file, edits, names) => _ = EditSoundInStudioAsync(file, edits, names);
+        Batch.StudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Subtitles, fromSingle: false, file, edits, names);
+        Batch.SoundStudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Sound, fromSingle: false, file, edits, names);
+        Batch.PictureStudioRequested += (file, edits) => _ = OpenStudioAsync(StudioPart.Picture, fromSingle: false, file, edits, null);
         Mega.EditRequested += batch => _ = EditMegaBatchAsync(batch);
         // owner, 2. 11. 2026: a file of Single spracovanie edited there again, back to MEGA spracovanie after Uložiť do dávky
         Mega.EditSingleRequested += (batch, file) =>
@@ -208,76 +209,61 @@ public sealed class MainViewModel : ObservableObject
             _ = Rules.EditForMegaAsync(batch, file);
         };
         Rules.BackToMega += () => Open(Mega);
-        Rules.StudioRequested += (file, edits, names) => _ = EditSingleInStudioAsync(file, edits, names, sound: false);
-        Rules.SoundStudioRequested += (file, edits, names) => _ = EditSingleInStudioAsync(file, edits, names, sound: true);
+        Rules.StudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Subtitles, fromSingle: true, file, edits, names);
+        Rules.SoundStudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Sound, fromSingle: true, file, edits, names);
+        Rules.PictureStudioRequested += (file, edits) => _ = OpenStudioAsync(StudioPart.Picture, fromSingle: true, file, edits, null);
     }
 
-    // owner, 30. 10. 2026: Upraviť v štúdiu – a file of Hromadné spracovanie in Úprava titulkostopy, back with Uložiť do úlohy
-    private async Task EditInStudioAsync(Core.Media.MediaFile file, Core.Batch.StudioEdits? edits, IReadOnlyDictionary<int, string> names)
+    // the studios of Editácia videostôp for a file of Hromadné (owner, 30. 10. 2026) or Single spracovanie (2. 11. 2026,
+    // also a file of a MEGA batch opened there): the studio saves its part over the edits as they are now (another studio
+    // may have saved its part meanwhile) and goes back with Uložiť do úlohy
+    private enum StudioPart
     {
-        var batch = Tools.First(t => t.Page == Batch);
-        SelectedTool = Tools.First(t => t.Page == Subtitles);
-        Subtitles.TaskFromSingle = false;
-        await Subtitles.EditForBatchAsync(file, edits, saved =>
-        {
-            // the subtitles' part over the task as it is now (the sounds' part may have been saved meanwhile)
-            var refused = Batch.SaveStudio(file.Path, saved.WithSoundsOf(Batch.StudioOf(file.Path)));
-            if (refused is null)
-            {
-                SelectedTool = batch;
-            }
-
-            return refused;
-        }, () => SelectedTool = batch, names);
+        Subtitles,
+        Sound,
+        Picture,
     }
 
-    // owner, 2. 11. 2026: the file of Single spracovanie in Úprava titulkostopy or audiostopy, back to Single with its edits
-    private async Task EditSingleInStudioAsync(Core.Media.MediaFile file, Core.Batch.StudioEdits? edits, IReadOnlyDictionary<int, string> names, bool sound)
+    private async Task OpenStudioAsync(StudioPart part, bool fromSingle, Core.Media.MediaFile file, Core.Batch.StudioEdits? edits, IReadOnlyDictionary<int, string>? names)
     {
-        var single = Tools.First(t => t.Page == Rules);
+        var back = Tools.First(t => t.Page == (fromSingle ? Rules : (object)Batch));
         string? Save(Core.Batch.StudioEdits saved)
         {
-            // this studio's part over the edits as they are now (the other studio's part may have been saved meanwhile)
-            var refused = Rules.SaveStudio(file.Path, sound ? saved.WithSubtitlesOf(Rules.Studio) : saved.WithSoundsOf(Rules.Studio));
+            var current = fromSingle ? Rules.Studio : Batch.StudioOf(file.Path);
+            var merged = part switch
+            {
+                StudioPart.Subtitles => saved.SubtitlesOver(current),
+                StudioPart.Sound => saved.SoundsOver(current),
+                _ => saved.VideoOver(current),
+            };
+            var refused = fromSingle ? Rules.SaveStudio(file.Path, merged) : Batch.SaveStudio(file.Path, merged);
             if (refused is null)
             {
-                SelectedTool = single;
+                SelectedTool = back;
             }
 
             return refused;
         }
 
-        if (sound)
+        void Leave() => SelectedTool = back;
+        switch (part)
         {
-            SelectedTool = Tools.First(t => t.Page == Audio);
-            Audio.TaskFromSingle = true;
-            await Audio.EditForBatchAsync(file, edits, Save, () => SelectedTool = single, names);
+            case StudioPart.Subtitles:
+                SelectedTool = Tools.First(t => t.Page == Subtitles);
+                Subtitles.TaskFromSingle = fromSingle;
+                await Subtitles.EditForBatchAsync(file, edits, Save, Leave, names);
+                break;
+            case StudioPart.Sound:
+                SelectedTool = Tools.First(t => t.Page == Audio);
+                Audio.TaskFromSingle = fromSingle;
+                await Audio.EditForBatchAsync(file, edits, Save, Leave, names);
+                break;
+            default:
+                SelectedTool = Tools.First(t => t.Page == Video);
+                Video.TaskFromSingle = fromSingle;
+                await Video.EditForTaskAsync(file, edits?.Video, Save, Leave);
+                break;
         }
-        else
-        {
-            SelectedTool = Tools.First(t => t.Page == Subtitles);
-            Subtitles.TaskFromSingle = true;
-            await Subtitles.EditForBatchAsync(file, edits, Save, () => SelectedTool = single, names);
-        }
-    }
-
-    // Upraviť zvuk v štúdiu – a file of Hromadné spracovanie in Úprava audiostopy, back with Uložiť do úlohy
-    private async Task EditSoundInStudioAsync(Core.Media.MediaFile file, Core.Batch.StudioEdits? edits, IReadOnlyDictionary<int, string> names)
-    {
-        var batch = Tools.First(t => t.Page == Batch);
-        SelectedTool = Tools.First(t => t.Page == Audio);
-        Audio.TaskFromSingle = false;
-        await Audio.EditForBatchAsync(file, edits, saved =>
-        {
-            // the sounds' part over the task as it is now (the subtitles' part may have been saved meanwhile)
-            var refused = Batch.SaveStudio(file.Path, saved.WithSubtitlesOf(Batch.StudioOf(file.Path)));
-            if (refused is null)
-            {
-                SelectedTool = batch;
-            }
-
-            return refused;
-        }, () => SelectedTool = batch, names);
     }
 
     /// <summary>

@@ -97,6 +97,9 @@ A batch takes files from **Batch processing**, **Single processing** and results
 - A file of Single processing and a result of Merging **always keep their originals**, whatever the batch has chosen.
 - A result of Merging is written whole by its settings; if one of its files changes meanwhile, it is **skipped**.
 - [Edit in Batch processing] opens only the files that came from Batch processing.
+- [Edit in Single processing] (at a file of the batch) opens a file that came from Single processing with all its
+  decisions; in Single you can also send it to [Subtitles in studio] and [Audio in studio] – [Save to the job] brings
+  you back. The button [Save to Batch N] writes the changes into the batch and takes you back to MEGA processing.
 
 @otvorit Mega Open MEGA processing
 

@@ -3047,6 +3047,21 @@ internal static class Translations
         ["Premiéra {0}. série"] = "Premiéra {0}. řady",
         ["Najbližšia epizóda"] = "Nejbližší epizoda",
         ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "zvuk není česky ani slovensky – tyto titulky mají být Default a Enabled (Pravidla UNIVERSUM to nastaví).",
+        // MEGA → Single, Single → studios (2. 11. 2026)
+        ["Upraviť v Single spracovaní"] = "Upravit v Single zpracování",
+        ["Otvorí súbor so všetkými rozhodnutiami v Single spracovaní – opravíte ho (aj v štúdiách) a dáte Uložiť do dávky"] = "Otevře soubor se všemi rozhodnutími v Single zpracování – opravíte ho (i ve studiích) a dáte Uložit do dávky",
+        ["{0} už nečaká (spúšťa sa alebo beží) – zmeny sa do nej nedajú uložiť."] = "{0} už nečeká (spouští se nebo běží) – změny do ní nelze uložit.",
+        ["Zmeny sú uložené v {0} MEGA spracovania."] = "Změny jsou uloženy v {0} MEGA zpracování.",
+        ["Súbor sa nedá otvoriť: {0}"] = "Soubor nelze otevřít: {0}",
+        ["Súbor z {0} MEGA spracovania – upravte ho a dajte {1}."] = "Soubor z {0} MEGA zpracování – upravte ho a dejte {1}.",
+        ["Úpravy zo štúdií: {0}"] = "Úpravy ze studií: {0}",
+        ["V Single spracovaní je teraz otvorený iný súbor – otvorte ho znova a úpravu uložte potom."] = "V Single zpracování je teď otevřený jiný soubor – otevřete ho znovu a úpravu uložte potom.",
+        ["Single spracovanie práve zapisuje – úpravu uložte po jeho skončení."] = "Single zpracování právě zapisuje – úpravu uložte po jeho skončení.",
+        ["Úpravy zo štúdií sú zrušené."] = "Úpravy ze studií jsou zrušeny.",
+        ["Otvorí súbor v Úprave titulkostopy – časy, jazyk, Forced, pridané titulky; Uložiť do úlohy vás vráti sem"] = "Otevře soubor v Úpravě titulkové stopy – časy, jazyk, Forced, přidané titulky; Uložit do úlohy vás vrátí sem",
+        ["Otvorí súbor v Úprave audiostopy – posun, FPS, kodek, hlasitosť, dabing; Uložiť do úlohy vás vráti sem"] = "Otevře soubor v Úpravě zvukové stopy – posun, FPS, kodek, hlasitost, dabing; Uložit do úlohy vás vrátí sem",
+        ["Súbor Single spracovania: {0}. Uložia sa časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – vrátite sa s nimi do Single spracovania (aj pre MEGA dávku). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa nepoužijú."] = "Soubor Single zpracování: {0}. Uloží se časy titulků (FPS, rychlost, posun), ponechání stop, jejich jazyk, Forced a přidané soubory titulků – vrátíte se s nimi do Single zpracování (i pro MEGA dávku). Název stopy a příznak pro neslyšící dají pravidla, opravy textu se nepoužijí.",
+        ["Súbor Single spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."] = "Soubor Single zpracování: {0}. Změny zvuku (posun, změna FPS, kodek, hlasitost, jazyk, název, přidaný dabing) se uloží a vrátíte se s nimi do Single zpracování – zapíšou se při zpracování.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6090,5 +6105,20 @@ internal static class Translations
         ["Premiéra {0}. série"] = "Season {0} premiere",
         ["Najbližšia epizóda"] = "Next episode",
         ["zvuk nie je po česky ani po slovensky – tieto titulky majú byť Default a Enabled (Pravidlá UNIVERSUM to nastavia)."] = "the audio is neither Czech nor Slovak – these subtitles should be Default and Enabled (UNIVERSUM rules set it).",
+        // MEGA → Single, Single → studios (2. 11. 2026)
+        ["Upraviť v Single spracovaní"] = "Edit in Single processing",
+        ["Otvorí súbor so všetkými rozhodnutiami v Single spracovaní – opravíte ho (aj v štúdiách) a dáte Uložiť do dávky"] = "Opens the file with all its decisions in Single processing – fix it (also in the studios) and choose Save to batch",
+        ["{0} už nečaká (spúšťa sa alebo beží) – zmeny sa do nej nedajú uložiť."] = "{0} is no longer waiting (starting or running) – the changes cannot be saved into it.",
+        ["Zmeny sú uložené v {0} MEGA spracovania."] = "The changes are saved in {0} of MEGA processing.",
+        ["Súbor sa nedá otvoriť: {0}"] = "The file cannot be opened: {0}",
+        ["Súbor z {0} MEGA spracovania – upravte ho a dajte {1}."] = "A file of {0} of MEGA processing – edit it and choose {1}.",
+        ["Úpravy zo štúdií: {0}"] = "Studio edits: {0}",
+        ["V Single spracovaní je teraz otvorený iný súbor – otvorte ho znova a úpravu uložte potom."] = "Another file is open in Single processing now – open this one again and save the edits then.",
+        ["Single spracovanie práve zapisuje – úpravu uložte po jeho skončení."] = "Single processing is writing now – save the edits when it has finished.",
+        ["Úpravy zo štúdií sú zrušené."] = "The studio edits are cancelled.",
+        ["Otvorí súbor v Úprave titulkostopy – časy, jazyk, Forced, pridané titulky; Uložiť do úlohy vás vráti sem"] = "Opens the file in Subtitle track editing – times, language, Forced, added subtitles; Save to the job brings you back here",
+        ["Otvorí súbor v Úprave audiostopy – posun, FPS, kodek, hlasitosť, dabing; Uložiť do úlohy vás vráti sem"] = "Opens the file in Audio track editing – shift, FPS, codec, volume, dub; Save to the job brings you back here",
+        ["Súbor Single spracovania: {0}. Uložia sa časy titulkov (FPS, rýchlosť, posun), ponechanie stôp, ich jazyk, Forced a pridané súbory titulkov – vrátite sa s nimi do Single spracovania (aj pre MEGA dávku). Názov stopy a príznak pre nepočujúcich dajú pravidlá, opravy textu sa nepoužijú."] = "A file of Single processing: {0}. The subtitle times (FPS, speed, shift), the tracks kept, their language, Forced and the added subtitle files are saved – you go back with them to Single processing (also for a MEGA batch). The track name and the hearing-impaired flag come from the rules; text repairs are not used.",
+        ["Súbor Single spracovania: {0}. Zmeny zvuku (posun, zmena FPS, kodek, hlasitosť, jazyk, názov, pridaný dabing) sa uložia a vrátite sa s nimi do Single spracovania – zapíšu sa pri spracovaní."] = "A file of Single processing: {0}. The sound changes (shift, FPS change, codec, volume, language, name, added dub) are saved and you go back with them to Single processing – they are written when it is processed.",
     };
 }

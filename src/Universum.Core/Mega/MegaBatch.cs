@@ -212,7 +212,7 @@ public sealed class MegaFile
     /// original is always kept.
     /// </summary>
     public static MegaFile FromSingle(MediaFile file, TrackDecisions decisions, TitleInfo title, EpisodeNumber? episode, string? addition, bool revision,
-        RuleProfile profile, string plannedPath)
+        RuleProfile profile, string plannedPath, StudioEdits? studio = null)
     {
         var info = new FileInfo(file.Path);
         return new MegaFile
@@ -236,6 +236,7 @@ public sealed class MegaFile
             Revision = revision,
             Profile = profile,
             Externals = file.Tracks.Where(t => t.ExternalFile is not null).Select(MegaExternal.Of).ToList(),
+            Studio = studio,
             Source = MegaSource.Single,
             KeepOriginal = true,
         };

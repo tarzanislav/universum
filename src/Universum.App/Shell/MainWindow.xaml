@@ -257,6 +257,9 @@
                 <DockPanel Grid.Row="3" Margin="0,12,0,6">
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Vybrať súbor z dávky'}" Command="{Binding RemoveFileCommand}" Padding="12,4"
                             ToolTip="{loc:T 'Súbor sa nemení; v Hromadnom spracovaní sa znova ukáže ako voľný'}" />
+                    <!-- owner, 2. 11. 2026: a file of Single spracovanie edited there again, saved back into the batch -->
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Upraviť v Single spracovaní'}" Command="{Binding EditFileCommand}" Padding="12,4" Margin="0,0,8,0"
+                            ToolTip="{loc:T 'Otvorí súbor so všetkými rozhodnutiami v Single spracovaní – opravíte ho (aj v štúdiách) a dáte Uložiť do dávky'}" />
                     <TextBlock Text="{loc:T 'Súbory vybranej dávky'}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </DockPanel>
                 <DataGrid Grid.Row="4" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" AutoGenerateColumns="False" IsReadOnly="True"
@@ -552,6 +555,14 @@
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap">
                             <Run Text="{Binding Tmdb.Message, Mode=OneWay}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" />
                         </TextBlock>
+                        <!-- owner, 2. 11. 2026: the file in the studios and back with their edits (also a file of a MEGA batch) -->
+                        <WrapPanel Margin="0,8,0,0">
+                            <Button Content="{loc:T 'Titulky v štúdiu'}" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
+                                    ToolTip="{loc:T 'Otvorí súbor v Úprave titulkostopy – časy, jazyk, Forced, pridané titulky; Uložiť do úlohy vás vráti sem'}" />
+                            <Button Content="{loc:T 'Zvuk v štúdiu'}" Command="{Binding EditSoundInStudioCommand}" Padding="10,3" Margin="0,0,12,0"
+                                    ToolTip="{loc:T 'Otvorí súbor v Úprave audiostopy – posun, FPS, kodek, hlasitosť, dabing; Uložiť do úlohy vás vráti sem'}" />
+                            <TextBlock Text="{Binding StudioText}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="600" />
+                        </WrapPanel>
                         <DockPanel Margin="0,12,0,0">
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
@@ -562,7 +573,7 @@
                                 <!-- owner, 1. 11. 2026: the file to MEGA spracovanie, written later; its original is kept -->
                                 <ComboBox ItemsSource="{Binding Mega.Targets}" SelectedItem="{Binding Mega.Selected}" DisplayMemberPath="Label" MaxWidth="200" Margin="0,0,4,0"
                                           VerticalAlignment="Center" ToolTip="{loc:T 'Do novej dávky MEGA spracovania, alebo doplniť čakajúcu dávku'}" />
-                                <Button Content="{loc:T 'Odoslať do MEGA'}" Command="{Binding SendToMegaCommand}" Margin="0,0,8,0" Padding="16,6"
+                                <Button Content="{Binding SendToMegaText}" Command="{Binding SendToMegaCommand}" Margin="0,0,8,0" Padding="16,6"
                                         ToolTip="{loc:T 'Súbor sa so všetkými rozhodnutiami zapíše neskôr v MEGA spracovaní (keď dávku spustíte alebo v nastavenom čase); originál ostane'}" />
                                 <Button Content="{loc:T 'Použiť pravidlá'}" Command="{Binding ApplyCommand}" Padding="16,6" />
                             </StackPanel>

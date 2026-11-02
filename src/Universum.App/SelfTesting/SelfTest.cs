@@ -535,17 +535,28 @@ internal static class SelfTest
         Check(model.SelectedTool.Page == model.Rules && model.Rules.MegaBatch == batch && model.Rules.TitleText == "Vymyslený film pre MEGA (2026)" &&
               model.Rules.SendToMegaText.Contains(batch.Label, StringComparison.Ordinal) && model.Rules.Plan?.Target.For(2).Language.Primary == "cs",
             $"mega/single: the file opened in Single spracovanie with its decisions – {model.Rules.TitleText} · {model.Rules.SendToMegaText} · {model.Rules.Result}");
-        Check(model.Rules.EditInStudioCommand.CanExecute(null) && model.Rules.EditSoundInStudioCommand.CanExecute(null), "mega/single: the studios offered from Single spracovanie");
+        Check(model.Rules.EditInStudioCommand.CanExecute(null) && model.Rules.EditSoundInStudioCommand.CanExecute(null) && model.Rules.EditPictureInStudioCommand.CanExecute(null),
+            "mega/single: the studios offered from Single spracovanie");
         await Screenshot(window, "mega-edit-single.png");
         // what a studio saves comes back into Single spracovanie (here: the English subtitles left out in Úprava titulkostopy)
         var refused = model.Rules.SaveStudio(single, new Core.Batch.StudioEdits { Removed = [5] });
         Check(refused is null && model.Rules.Plan?.Target.Tracks.All(t => t.TrackId != 5) == true && model.Rules.StudioText.Length > 0,
             $"mega/single: a studio's edits back in Single spracovanie – {refused} {model.Rules.StudioText}");
+        // owner, 2. 11. 2026: Obraz v štúdiu – the proportions chosen in Úprava videostopy, back with Uložiť do úlohy (the
+        // subtitles' edits stay)
+        model.Rules.EditPictureInStudioCommand.Execute(null);
+        await WaitFor(() => model.Video.IsTask && model.SelectedTool.Page == model.Video && model.Video.IsVideo);
+        model.Video.Aspect = model.Video.Aspects.First(a => a.Value == "4/3");
+        await Screenshot(window, "studio-video-single.png");
+        model.Video.SaveToTaskCommand.Execute(null);
+        Check(model.SelectedTool.Page == model.Rules && model.Rules.Plan?.Target.Tracks.Single(t => t.Type == TrackType.Video).AspectRatio == "4/3" &&
+              model.Rules.Plan.Target.Tracks.All(t => t.TrackId != 5) && model.Rules.StudioText.Contains("4:3", StringComparison.Ordinal),
+            $"mega/single: Obraz v štúdiu → Uložiť do úlohy – the proportions back in Single spracovanie, the subtitles' edits stay – {model.Rules.StudioText}");
         model.Rules.Addition = "Remaster";
         model.Rules.SendToMegaCommand.Execute(null);
         var edited = batch.Files.Where(f => f.Source == Core.Mega.MegaSource.Single).ToList();
         Check(batch.Files.Count == 2 && edited is [{ Addition: "Remaster" } one] && one.Languages.TryGetValue(2, out var kept) && kept.Primary == "cs" &&
-              one.Studio is { Removed: [5] } && one.Removed.Contains(5) &&
+              one.Studio is { Removed: [5], Video.Aspect: "4/3" } && one.Removed.Contains(5) && one.VideoAspect == "4/3" &&
               model.SelectedTool.Page == model.Mega && model.Rules.MegaBatch is null,
             "mega/single: the changes saved back into the batch, back in MEGA spracovanie – " + model.Rules.Result);
 
@@ -3587,7 +3598,7 @@ internal static class SelfTest
         model.Subtitles.SaveToTaskCommand.Execute(null);
         var studied = batch.Items.First(i => i.File.Path == studioItem.File.Path);
         Check(model.SelectedTool.Page == batch && studied.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500) &&
-              batch.RunState.Contains("úprava titulkostopy v úlohe", StringComparison.Ordinal),
+              batch.RunState.Contains("úpravy zo štúdií v úlohe", StringComparison.Ordinal),
             $"batch: Upraviť v štúdiu → Uložiť do úlohy – the new times in the task ({studied.Target.For(studioTrack).Timing?.MkvMergeValue}) – {batch.RunState}");
         // owner, 30. 10. 2026: Zvuk v štúdiu – the file's sound shifted, back with Uložiť do úlohy; the subtitles' edits stay
         batch.SelectedGroup = batch.Groups.First(g => g.Group == studioItem.Group);
@@ -3607,6 +3618,24 @@ internal static class SelfTest
                   both.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500),
                 $"batch: Zvuk v štúdiu → Uložiť do úlohy – the sound's shift and name in the task, the subtitles' times stay – {both.Target.For(studioSound.Track.Id).Timing?.MkvMergeValue} {both.Target.For(studioSound.Track.Id).Name}");
         }
+
+        // owner, 2. 11. 2026: Obraz v štúdiu – a part kept and the proportions, the picture written anew (exact cut); the
+        // subtitles' and the sound's edits stay
+        batch.SelectedGroup = batch.Groups.First(g => g.Group == studioItem.Group);
+        batch.SelectedFile = batch.FileRows.First(f => f.Item.File.Path == studioItem.File.Path);
+        batch.EditPictureInStudioCommand.Execute(null);
+        await WaitFor(() => model.Video.IsTask && model.SelectedTool.Page == model.Video && model.Video.IsVideo);
+        model.Video.ExactCut = true;
+        model.Video.AddPart(TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        model.Video.Aspect = model.Video.Aspects.First(a => a.Value == "4/3");
+        await Screenshot(window, "studio-video-task.png");
+        model.Video.SaveToTaskCommand.Execute(null);
+        var pictured = batch.Items.First(i => i.File.Path == studioItem.File.Path);
+        Check(model.SelectedTool.Page == batch && pictured.Target.Cut is { Count: 1 } &&
+              pictured.Target.Tracks.Single(t => t.Type == TrackType.Video) is { AspectRatio: "4/3", Source.VideoEncode: not null } &&
+              pictured.Target.For(studioTrack).Timing == Core.Subtitles.SubtitleTiming.Delay(1500),
+            $"batch: Obraz v štúdiu → Uložiť do úlohy – the cut, the proportions and the picture anew in the task, the subtitles' times stay – {batch.RunState}");
+        await Screenshot(window, "studio-video-back.png");
 
         batch.SaveStudio(studioItem.File.Path, new Core.Batch.StudioEdits());
         Check(batch.Items.First(i => i.File.Path == studioItem.File.Path).Target.For(studioTrack).Timing is null, "batch: the edits of the studio forgotten again");

@@ -103,6 +103,13 @@ public sealed class BatchPageViewModel : ObservableObject
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
         EditInStudioCommand = new RelayCommand(() => EditInStudio(sound: false), () => !Busy && !IsRunning && _selectedFile is not null);
         EditSoundInStudioCommand = new RelayCommand(() => EditInStudio(sound: true), () => !Busy && !IsRunning && _selectedFile is not null);
+        EditPictureInStudioCommand = new RelayCommand(() =>
+        {
+            if (Analysed() is var (analysed, group))
+            {
+                PictureStudioRequested?.Invoke(analysed, group.Decisions.Studio.GetValueOrDefault(analysed.Path));
+            }
+        }, () => !Busy && !IsRunning && _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
             (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
@@ -388,6 +395,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 ShowInfoCommand.NotifyCanExecuteChanged();
                 EditInStudioCommand.NotifyCanExecuteChanged();
                 EditSoundInStudioCommand.NotifyCanExecuteChanged();
+                EditPictureInStudioCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -413,17 +421,27 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>Úprava audiostopy should open a file of the batch, as <see cref="StudioRequested"/>.</summary>
     public event Action<MediaFile, StudioEdits?, IReadOnlyDictionary<int, string>>? SoundStudioRequested;
 
+    /// <summary>Úprava videostopy for the selected file (owner, 2. 11. 2026: Obraz v štúdiu → Uložiť do úlohy).</summary>
+    public RelayCommand EditPictureInStudioCommand { get; }
+
+    /// <summary>Úprava videostopy should open a file of the batch (as analysed) with its edits so far.</summary>
+    public event Action<MediaFile, StudioEdits?>? PictureStudioRequested;
+
+    // the selected file as the analysis has it (with the subtitle files found with it) and its group
+    private (MediaFile File, BatchGroup Group)? Analysed() =>
+        _selectedFile?.Item is { } item && item.Group.Files.FirstOrDefault(f => Paths.Same(f.Path, item.File.Path)) is { } analysed ? (analysed, item.Group) : null;
+
     private void EditInStudio(bool sound)
     {
-        if (_selectedFile?.Item is not { } item || item.Group.Files.FirstOrDefault(f => Paths.Same(f.Path, item.File.Path)) is not { } analysed)
+        if (Analysed() is not var (analysed, group))
         {
             return;
         }
 
         // the names the group gives the file's own tracks: the studio shows them until a name of its own is written
-        var names = SlotKey.Of(analysed).Where(x => x.Track.ExternalFile is null && item.Group.Decisions.Names.ContainsKey(x.Key))
-            .ToDictionary(x => x.Track.Id, x => item.Group.Decisions.Names[x.Key]);
-        (sound ? SoundStudioRequested : StudioRequested)?.Invoke(analysed, item.Group.Decisions.Studio.GetValueOrDefault(analysed.Path), names);
+        var names = SlotKey.Of(analysed).Where(x => x.Track.ExternalFile is null && group.Decisions.Names.ContainsKey(x.Key))
+            .ToDictionary(x => x.Track.Id, x => group.Decisions.Names[x.Key]);
+        (sound ? SoundStudioRequested : StudioRequested)?.Invoke(analysed, group.Decisions.Studio.GetValueOrDefault(analysed.Path), names);
     }
 
     /// <summary>The studios' edits of a file of the batch now (each studio saves its part over them).</summary>
@@ -461,7 +479,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         Replan();
-        RunState = Loc.F("{0}: úprava titulkostopy v úlohe – {1}.", Path.GetFileName(path), edits.Describe());
+        RunState = Loc.F("{0}: úpravy zo štúdií v úlohe – {1}.", Path.GetFileName(path), edits.Describe());
         return null;
     }
 
@@ -3383,7 +3401,7 @@ public sealed class BatchPageViewModel : ObservableObject
         foreach (var command in new IRelayCommand[]
                  {
                      ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
-                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand, EditSoundInStudioCommand,
+                     DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand, EditSoundInStudioCommand, EditPictureInStudioCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
                      StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
                      AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,

@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
 using Universum.Core.Audio;
 using Universum.Core.IO;
 using Universum.Core.Media;
 using Universum.Core.Rules;
 using Universum.Core.Subtitles;
 using Universum.Core.Text;
+using Universum.Core.Video;
 
 namespace Universum.Core.Batch;
 
@@ -33,6 +35,75 @@ public sealed record StudioSound(string Path, int Ordinal, MediaTrack Source, La
     public bool Is(MediaTrack track) =>
         track.ExternalFile is { } file && Paths.Same(file, Path) &&
         (track.Encode is { } encode ? encode.Source.ExternalTrack == Source.ExternalTrack : track.ExternalTrack == Source.ExternalTrack);
+}
+
+/// <summary>
+/// What Úprava videostopy decided for a file of Single or Hromadné spracovanie (owner, 2. 11. 2026: Obraz v štúdiu →
+/// Uložiť do úlohy, also for a file of a MEGA batch): the parts kept as marked (<paramref name="Parts"/>) and as they will
+/// be written (<paramref name="Kept"/> – exactly, or moved to the key frames the studio read), the picture written anew by
+/// <paramref name="Recipe"/> (also for an exact cut) and the proportions it is shown at (<paramref name="Aspect"/>, as
+/// chosen: "16/9").
+/// </summary>
+public sealed record StudioVideo(IReadOnlyList<CutPart> Parts, IReadOnlyList<CutPart> Kept, bool ExactCut, VideoRecipe Recipe, string? Aspect)
+{
+    /// <summary>The picture is written anew (a change of it, or the exact cut).</summary>
+    [JsonIgnore]
+    public bool WritesPicture => Recipe.NeedsEncoding || (ExactCut && Parts.Count > 0);
+
+    /// <summary>The proportions written: those chosen, turned with a picture turned by 90°.</summary>
+    [JsonIgnore]
+    public string? WrittenAspect => Aspect is null ? null : Recipe.Rotation % 180 == 90 ? VideoAspects.Upright(Aspect) : Aspect;
+
+    /// <summary>Nothing of the picture changes.</summary>
+    [JsonIgnore]
+    public bool IsNone => Parts.Count == 0 && Aspect is null && !WritesPicture;
+
+    /// <summary>The video's own picture (the track written anew is made of it).</summary>
+    public static MediaTrack? OwnPicture(MediaFile file) => file.TracksOf(TrackType.Video).FirstOrDefault(t => t.ExternalFile is null);
+
+    /// <summary>
+    /// The picture of <paramref name="file"/> written anew, a track of its own (<paramref name="id"/>) with key frames where
+    /// each part begins and ends (the cut is then exact); null when the picture is not written anew.
+    /// </summary>
+    public MediaTrack? Picture(MediaFile file, int id)
+    {
+        if (!WritesPicture || OwnPicture(file) is not { } video)
+        {
+            return null;
+        }
+
+        var marks = Cut.Normalized(Parts).SelectMany(p => new[] { p.Start, p.End }).Distinct().Order().ToList();
+        return new VideoEncoding(file.Path, video, Recipe, marks, file.IsMatroska).ToTrack(id);
+    }
+
+    /// <summary>In words, each change apart: "strih 2", "pomer strán 16:9", "otočiť o 90°", "720 riadkov", "obraz znova".</summary>
+    public IEnumerable<string> Describe()
+    {
+        if (Parts.Count > 0)
+        {
+            yield return CoreText.F("strih {0}", Parts.Count);
+        }
+
+        if (Aspect is not null)
+        {
+            yield return CoreText.F("pomer strán {0}", VideoAspects.NameOf(Aspect));
+        }
+
+        if (Recipe.Rotation % 360 != 0)
+        {
+            yield return CoreText.F("otočiť o {0}°", Recipe.Rotation);
+        }
+
+        if (Recipe.Height is { } height)
+        {
+            yield return CoreText.F("{0} riadkov", height);
+        }
+
+        if (WritesPicture)
+        {
+            yield return CoreText.T("obraz znova");
+        }
+    }
 }
 
 /// <summary>
@@ -100,19 +171,29 @@ public sealed record StudioEdits
     /// <summary>Sounds added from other files.</summary>
     public List<StudioSound> AddedSounds { get; init; } = [];
 
-    /// <summary>These edits with the sound part of <paramref name="other"/> (Úprava titulkostopy saves its part only).</summary>
-    public StudioEdits WithSoundsOf(StudioEdits? other) => other is null ? this : this with
+    /// <summary>Úprava videostopy: the parts kept, the proportions, the picture written anew; null = the picture as it is.</summary>
+    public StudioVideo? Video { get; init; }
+
+    // these edits with the sound part of other
+    private StudioEdits WithSoundsOf(StudioEdits? other) => other is null ? this : this with
     {
         SoundStates = other.SoundStates, SoundLanguages = other.SoundLanguages, SoundNames = other.SoundNames, RemovedSounds = other.RemovedSounds,
         SoundRecipes = other.SoundRecipes, AddedSounds = other.AddedSounds,
     };
 
-    /// <summary>The sound part of these edits with the subtitle part of <paramref name="other"/> (Úprava audiostopy saves its part only).</summary>
-    public StudioEdits WithSubtitlesOf(StudioEdits? other) => (other ?? new StudioEdits()).WithSoundsOf(this);
+    /// <summary>The edits as they are now (<paramref name="current"/>) with the subtitle part of these (Úprava titulkostopy saves its part only).</summary>
+    public StudioEdits SubtitlesOver(StudioEdits? current) => WithSoundsOf(current) with { Video = current?.Video };
+
+    /// <summary>The edits as they are now with the sound part of these (Úprava audiostopy saves its part only).</summary>
+    public StudioEdits SoundsOver(StudioEdits? current) => (current ?? new StudioEdits()).WithSoundsOf(this);
+
+    /// <summary>The edits as they are now with the picture part of these (Úprava videostopy saves its part only).</summary>
+    public StudioEdits VideoOver(StudioEdits? current) => (current ?? new StudioEdits()) with { Video = Video is { IsNone: false } video ? video : null };
 
     public bool IsEmpty => Timings.Count == 0 && FileTimings.Count == 0 && Languages.Count == 0 && FileLanguages.Count == 0 && Forced.Count == 0 &&
                            FileForced.Count == 0 && Removed.Count == 0 && RemovedFiles.Count == 0 && Added.Count == 0 && Names.Count == 0 && FileNames.Count == 0 &&
-                           SoundLanguages.Count == 0 && SoundNames.Count == 0 && RemovedSounds.Count == 0 && SoundRecipes.Count == 0 && AddedSounds.Count == 0;
+                           SoundLanguages.Count == 0 && SoundNames.Count == 0 && RemovedSounds.Count == 0 && SoundRecipes.Count == 0 && AddedSounds.Count == 0 &&
+                           Video is null or { IsNone: true };
 
     /// <summary>In words, for the batch: "časy titulkov 2, pridané 1, vynechané 1".</summary>
     public string Describe()
@@ -158,12 +239,17 @@ public sealed record StudioEdits
             parts.Add(CoreText.F("vynechaný zvuk {0}", RemovedSounds.Count));
         }
 
+        if (Video is { } video)
+        {
+            parts.AddRange(video.Describe());
+        }
+
         return parts.Count == 0 ? CoreText.T("bez zmien") : string.Join(", ", parts);
     }
 
     /// <summary>
-    /// The file with the subtitle files and sounds added in the studios (one already among its tracks is not added twice)
-    /// and the sounds of the video written anew (a track each, beside the video's own).
+    /// The file with the subtitle files and sounds added in the studios (one already among its tracks is not added twice),
+    /// the sounds of the video written anew (a track each, beside the video's own) and its picture written anew.
     /// </summary>
     public MediaFile Apply(MediaFile file)
     {
@@ -187,6 +273,12 @@ public sealed record StudioEdits
         foreach (var sound in AddedSounds.Where(s => !tracks.Any(s.Is)))
         {
             tracks.Add(sound.ToTrack(next++));
+        }
+
+        // the picture written anew (Úprava videostopy): a track of its own; the rules leave the video's own out
+        if (!tracks.Any(t => t.VideoEncode is { } written && Paths.Same(written.Path, file.Path)) && Video?.Picture(file, next) is { } picture)
+        {
+            tracks.Add(picture);
         }
 
         return tracks.Count == file.Tracks.Count ? file : file with { Tracks = tracks };
@@ -324,7 +416,21 @@ public sealed record StudioEdits
             }
         }
 
-        return decisions with { Timings = timings, Languages = languages, Forced = forced, Removed = removed, Names = names, Order = order };
+        // the picture: the video's own left out when it is written anew, the parts kept and the proportions
+        var cut = decisions.Cut;
+        var aspect = decisions.VideoAspect;
+        if (Video is { } video)
+        {
+            foreach (var written in file.TracksOf(TrackType.Video).Select(t => t.VideoEncode).OfType<VideoEncoding>().Where(v => Paths.Same(v.Path, file.Path)))
+            {
+                removed.Add(written.Source.Id);
+            }
+
+            cut = video.Kept.Count > 0 ? video.Kept : null;
+            aspect = video.WrittenAspect;
+        }
+
+        return decisions with { Timings = timings, Languages = languages, Forced = forced, Removed = removed, Names = names, Order = order, Cut = cut, VideoAspect = aspect };
     }
 
     // by path, as Windows compares names

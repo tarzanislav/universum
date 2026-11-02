@@ -583,6 +583,61 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task PictureEditsGoIntoTheBatchAndMega()
+    {
+        // owner, 2. 11. 2026: Obraz v štúdiu → Uložiť do úlohy – a cut, the proportions; the picture written anew when turned
+        using var work = new Work();
+        var film = Path.Combine(work.Path, "Vymysleny Obrazovy Film (2026).mkv");
+        File.Copy(TestData.Media("en-only-cz-subs.mkv"), film);
+        var analysis = await AnalyzeAsync(work.Path);
+        var group = analysis.Groups.Single();
+        var parts = new List<Universum.Core.Video.CutPart> { new(TimeSpan.Zero, TimeSpan.FromSeconds(1)) };
+        var subtitles = new StudioEdits { Timings = { [3] = SubtitleTiming.Delay(500) } };
+        var picture = new StudioEdits { Video = new StudioVideo(parts, parts, ExactCut: false, Universum.Core.Video.VideoRecipe.None, "4/3") };
+
+        // each studio saves its part over the others'
+        var both = picture.VideoOver(subtitles);
+        Assert.True(both.Timings.Count == 1 && both.Video is { Aspect: "4/3" } && new StudioEdits().SubtitlesOver(both).Video is not null &&
+                    new StudioEdits().SoundsOver(both) is { Video: not null, Timings.Count: 1 } && new StudioEdits().VideoOver(both) is { Video: null, Timings.Count: 1 } &&
+                    both.Describe().Contains("pomer strán 4:3", StringComparison.Ordinal),
+            "the studios' parts kept apart – " + both.Describe());
+
+        group.Decisions.Studio[film] = both;
+        var library = Library(work.Path, analysis);
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single();
+        var video = item.Target.Tracks.Single(t => t.Type == TrackType.Video);
+        Assert.True(item.Target.Cut is [{ End.TotalSeconds: 1 }] && video.AspectRatio == "4/3" && item.Plan.Method == Universum.Core.Planning.WriteMethod.Remux &&
+                    item.File.Tracks.All(t => t.VideoEncode is null),
+            "the plan: cut at key frames and the proportions, the picture as it is");
+
+        // turned: the picture written anew in a track of its own, the video's own left out, the proportions turned too
+        var turned = new StudioEdits { Video = new StudioVideo(parts, parts, ExactCut: true, new Universum.Core.Video.VideoRecipe(Rotation: 90), "16/9") };
+        group.Decisions.Studio[film] = turned;
+        var anew = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Single();
+        var written = anew.File.Tracks.SingleOrDefault(t => t.VideoEncode is not null);
+        Assert.True(written is { VideoEncode.Recipe.Rotation: 90, VideoEncode.Keyframes.Count: 2 } && anew.Target.Removed.Any(t => t.Id == 0) &&
+                    anew.Target.Tracks.Single(t => t.Type == TrackType.Video) is { AspectRatio: "9/16" } only && only.TrackId == written.Id && anew.Target.Issues.All(i => !i.IsBlocking),
+            "turned: one picture, written anew – " + string.Join(" | ", anew.Target.Tracks.Select(t => $"{t.TrackId}:{t.Type}")));
+
+        // MEGA keeps the cut, the proportions and the picture written anew
+        var store = Path.Combine(work.Path, "mega", "mega.json");
+        new Universum.Core.Mega.MegaStore(store).Add("Obraz", library.Layout.Root, RuleProfile.Default, OriginalsMode.Keep, [anew]);
+        var stored = new Universum.Core.Mega.MegaStore(store).Batches.Single().Files.Single();
+        Assert.True(stored.Cut is [{ End.TotalSeconds: 1 }] && stored.VideoAspect == "9/16" && stored.Studio?.Video is { ExactCut: true, Recipe.Rotation: 90, Parts.Count: 1 } &&
+                    stored.Externals.Any(e => e.ToTrack().VideoEncode is { Recipe.Rotation: 90, Keyframes.Count: 2 }) &&
+                    UniversumRules.Apply(item.File with { Tracks = [.. analysis.Groups.Single().Files.Single().Tracks, .. stored.Externals.Select(e => e.ToTrack())] },
+                        RuleProfile.Default, stored.Decisions()) is { Cut.Count: 1 } again && again.Tracks.Single(t => t.Type == TrackType.Video).AspectRatio == "9/16",
+            "the MEGA batch holds the picture's edits");
+
+        // written: the cut film with the proportions (the first plan – no picture written anew)
+        var result = (await RunAsync(work.Path, [item])).Single();
+        Assert.Equal(ProcessingStatus.Done, result.Status, string.Join("; ", result.Messages));
+        var cut = await (await InspectorAsync()).InspectAsync(result.OutputPath!);
+        Assert.True(cut.TracksOf(TrackType.Video).Single().DisplayAspect is { } shown && Math.Abs(shown - (4.0 / 3)) < 0.05,
+            "the proportions written – " + cut.TracksOf(TrackType.Video).Single().DisplayDimensions);
+    }
+
+    [Test]
     public async Task SoundEditsGoIntoTheBatchAndMega()
     {
         // owner, 30. 10. 2026: Úprava audiostopy → Uložiť do úlohy – a sound of the video written anew, a dub added and moved

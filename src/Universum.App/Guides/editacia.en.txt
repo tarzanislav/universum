@@ -78,12 +78,15 @@ are **white at the bottom** of the picture; those chosen in [Compare with:] are 
 !pozor Subtitle files are saved as **new SRT or WebVTT files next to the original ones**, never over an existing file.
 @otvorit Subtitles Open Subtitle track editing
 
-## Using the studio from Batch processing
-You can edit a file from Batch processing in the studio **before the job starts**:
-1. In Batch processing, choose the file and click [Subtitles in studio] or [Audio in studio]
-   (or right-click: *Edit in studio (subtitles)* / *Edit in studio (audio)*).
-2. The file opens in Subtitle track editing or Audio track editing, with the changes made so far.
-3. Change what you need and click [Save to the job]. The changes are written **only when the job runs**.
+## Using the studio from Single and Batch processing
+You can edit a file from Single or Batch processing (also a file of a MEGA batch opened for editing) in the studio
+**before it is processed**:
+1. Click [Subtitles in studio], [Audio in studio] or [Picture in studio]
+   (in Batch processing also right-click: *Edit in studio (subtitles)* / *(audio)* / *(picture)*).
+2. The file opens in Subtitle, Audio or Video track editing, with the changes made so far.
+3. Change what you need and click [Save to the job] – you go back to where you came from. The changes are written
+   **only when it is processed**. Each studio saves only its own part; the other studios' changes stay.
+- Video track editing saves the cut, aspect ratio, rotation, height and codec of the picture to the job.
 - [Back without saving] goes back without any changes.
 - Outside a job, you can put unfinished work aside with [Save the work] – the next time you open **the same video**
   it comes back. Nothing is written to the files; [Discard the work] forgets it.

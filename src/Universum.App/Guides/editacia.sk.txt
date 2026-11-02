@@ -78,12 +78,15 @@ sú v obraze **dole biele**, titulky vybrané v [Porovnať s:] **hore žlté**.
 !pozor Súbory titulkov sa uložia ako **nové SRT alebo WebVTT vedľa pôvodných**, nikdy cez existujúci súbor.
 @otvorit Subtitles Otvoriť Úpravu titulkostopy
 
-## Práca so štúdiom z Hromadného spracovania
-Súbor z Hromadného spracovania môžete upraviť v štúdiu ešte **pred spustením úlohy**:
-1. V Hromadnom spracovaní vyberte súbor a kliknite na [Titulky v štúdiu] alebo [Zvuk v štúdiu]
-   (rovnako pravé tlačidlo: *Upraviť v štúdiu (titulky)* / *Upraviť v štúdiu (zvuk)*).
-2. Súbor sa otvorí v Úprave titulkostopy alebo audiostopy aj s doterajšími úpravami.
-3. Upravte, čo treba, a kliknite na [Uložiť do úlohy]. Zmeny sa zapíšu **až pri behu úlohy**.
+## Práca so štúdiom zo Single a Hromadného spracovania
+Súbor zo Single alebo Hromadného spracovania (aj súbor dávky MEGA otvorený na úpravu) môžete upraviť v štúdiu
+ešte **pred spracovaním**:
+1. Kliknite na [Titulky v štúdiu], [Zvuk v štúdiu] alebo [Obraz v štúdiu]
+   (v Hromadnom aj pravé tlačidlo: *Upraviť v štúdiu (titulky)* / *(zvuk)* / *(obraz)*).
+2. Súbor sa otvorí v Úprave titulkostopy, audiostopy alebo videostopy aj s doterajšími úpravami.
+3. Upravte, čo treba, a kliknite na [Uložiť do úlohy] – vrátite sa tam, odkiaľ ste prišli. Zmeny sa zapíšu
+   **až pri spracovaní**. Každé štúdio ukladá len svoju časť, úpravy ostatných štúdií ostanú.
+- V Úprave videostopy sa do úlohy uloží strih, pomer strán, otočenie, výška a kodek obrazu.
 - [Späť bez uloženia] sa vráti bez zmien.
 - Mimo úlohy si rozrobenú prácu odložíte tlačidlom [Uložiť prácu] – pri ďalšom otvorení **toho istého videa**
   sa obnoví. Do súborov sa nič nezapíše; [Zahodiť prácu] ju zabudne.

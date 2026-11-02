@@ -47,6 +47,12 @@ public sealed record TrackDecisions
     /// </summary>
     public IReadOnlySet<int> ToSrt { get; init; } = new HashSet<int>();
 
+    /// <summary>The parts of the film kept (Úprava videostopy – owner, 2. 11. 2026: also from Single and Hromadné); null keeps it whole.</summary>
+    public IReadOnlyList<Video.CutPart>? Cut { get; init; }
+
+    /// <summary>The proportions the picture is shown at ("16/9"), without writing it anew; null keeps them.</summary>
+    public string? VideoAspect { get; init; }
+
     /// <summary>Video names to reuse, so a preview does not change on every recalculation.</summary>
     public IReadOnlyDictionary<int, string> VideoNames { get; init; } = new Dictionary<int, string>();
 }

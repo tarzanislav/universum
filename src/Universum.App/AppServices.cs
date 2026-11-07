@@ -226,6 +226,7 @@ public sealed class AppServices
         {
             DeleteOriginalsAllowed = deleteOriginals,
             WaitingPosters = WaitingPosters,
+            Register = TitleRegister,
             ParallelDisks = Math.Clamp(Settings.ParallelDisks, 1, 8),
             // a sound written anew (Úprava audiostopy, also in Hromadné spracovanie and MEGA): FFmpeg of the installation
             FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
@@ -410,6 +411,60 @@ public sealed class AppServices
     /// </summary>
     public SeriesMemory SeriesMemory => _seriesMemory ??= new(AppSettings.SeriesMemoryFile);
 
+    /// <summary>Spracované tituly (owner, 7. 11. 2026): the films and series written into the libraries; the user's own data.</summary>
+    public TitleRegister TitleRegister
+    {
+        get
+        {
+            if (_titleRegister is null)
+            {
+                _titleRegister = new(AppSettings.TitleRegisterFile);
+                _titleRegister.Changed += () => _ = FillTitleNamesAsync();
+            }
+
+            return _titleRegister;
+        }
+    }
+
+    private TitleRegister? _titleRegister;
+    private int _fillingNames;
+
+    /// <summary>
+    /// Owner, 7. 11. 2026: the Czech and English names of the titles in Spracované tituly, from TMDB by their IDs (one
+    /// question per title, kept 30 days in TMDB's cache; only the ID is sent). Without a TMDB key nothing is asked.
+    /// </summary>
+    public async Task FillTitleNamesAsync()
+    {
+        if (Tmdb is not { } tmdb || Interlocked.Exchange(ref _fillingNames, 1) == 1)
+        {
+            return;
+        }
+
+        try
+        {
+            var details = new TmdbTitleDetails(tmdb);
+            foreach (var title in TitleRegister.WithoutNames)
+            {
+                if (await details.GetAsync(title.Kind, title.TmdbId!.Value).ConfigureAwait(false) is { } found)
+                {
+                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, found.CzechTitle, found.EnglishTitle);
+                }
+                else
+                {
+                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, "", "");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or TitleServiceException)
+        {
+            // asked again with the next change or start of Spracované tituly
+        }
+        finally
+        {
+            Volatile.Write(ref _fillingNames, 0);
+        }
+    }
+
     private SeriesMemory? _seriesMemory;
 
     /// <summary>The saved work of Úprava titulkostopy (Uložiť prácu; owner, 30. 10. 2026).</summary>
@@ -422,19 +477,24 @@ public sealed class AppServices
 
     private StudioWorkStore? _studioWork;
 
-    /// <summary>Napovedkyňa for one file (Single spracovanie, the tools): the remembered series its names point to, or null.</summary>
-    public TitleInfo? RememberedSeriesFor(string path)
+    /// <summary>Napovedkyňa for one file (Single spracovanie, the tools): the remembered series or film its names point to, or null.</summary>
+    public TitleInfo? RememberedTitleFor(string path)
     {
         var guess = TitleGuess.ForFile(path);
-        return guess.Kind == MediaKind.Series ? SeriesMemory.Find([guess.Title, LibraryJob.SeriesNameOfFiles([path])]) : null;
+        return guess.Kind == MediaKind.Series ? SeriesMemory.Find([guess.Title, LibraryJob.SeriesNameOfFiles([path])])
+            : SeriesMemory.Find([guess.Title], MediaKind.Movie);
     }
 
-    /// <summary>Remembers the series a file goes into the library as, under the names the file carries (napovedkyňa).</summary>
-    public void RememberSeries(TitleInfo? series, string path)
+    /// <summary>Remembers the series or film a file goes into the library as, under the names the file carries (napovedkyňa).</summary>
+    public void RememberTitle(TitleInfo? title, string path)
     {
-        if (series is { Kind: MediaKind.Series })
+        if (title is { Kind: MediaKind.Series })
         {
-            SeriesMemory.Remember(series, [TitleGuess.ForFile(path).Title?.Name, LibraryJob.SeriesNameOfFiles([path])?.Name], DateTime.UtcNow);
+            SeriesMemory.Remember(title, [TitleGuess.ForFile(path).Title?.Name, LibraryJob.SeriesNameOfFiles([path])?.Name], DateTime.UtcNow);
+        }
+        else if (title is { Kind: MediaKind.Movie })
+        {
+            SeriesMemory.Remember(title, [TitleGuess.ForFile(path).Title?.Name], DateTime.UtcNow);
         }
     }
 
@@ -1007,6 +1067,9 @@ public sealed class AppSettings
 
     public bool BatchRecursive { get; set; } = true;
 
+    /// <summary>Hromadné spracovanie: the language of audio tracks without one is heard right after the analysis (owner, 7. 11. 2026).</summary>
+    public bool BatchDetectAudio { get; set; } = true;
+
     /// <summary>Multiplexer: what to do with several added files without asking (null = ask).</summary>
     public string? MuxAddAction { get; set; }
 
@@ -1200,6 +1263,9 @@ public sealed class AppSettings
     public static string StudioWorkDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "studio");
 
     /// <summary>Napovedkyňa: the series processed before and their titles.</summary>
+    /// <summary>Spracované tituly (the register of titles written into the libraries).</summary>
+    public static string TitleRegisterFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "spracovane-tituly.json");
+
     public static string SeriesMemoryFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "napovedkyna.json");
 
     /// <summary>Posters waiting for their titles to be processed (TMDB poster, Zlúčiť poster s filmom/seriálom).</summary>

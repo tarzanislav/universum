@@ -1272,6 +1272,112 @@ public sealed class BatchTests
         Assert.True(memory.Find([new NameGuess("Vymysleny Serial", null, null)]) is null && new SeriesMemory(memory.File).Series is [{ Title.TmdbId: 777 }], "forgotten, also after a restart (the first series lost its only name)");
     }
 
+    [Test]
+    public void NapovedkynaRemembersFilmsToo()
+    {
+        // owner, 7. 11. 2026: a TMDB ID typed for a film is remembered – the next copy of the film gets it at once (names invented)
+        using var work = new Work();
+        string P(string root, params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([work.Path, root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        var output = Path.Combine(work.Path, "OUTPUT");
+        var memory = new SeriesMemory(Path.Combine(work.Path, "napovedkyna.json"));
+        var film = new TitleInfo(MediaKind.Movie, "The Invented River", 2023, 123456, IncludeId: true);
+        var first = new[] { P("Stiahnute", "Vymyslena.Rieka.2023.1080p.WEB.mkv") };
+        var job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Stiahnute"), first));
+        Assert.True(job.ApplyMemory(memory, first).Count == 0 && !job.Movies.ContainsKey(first[0]), "nothing remembered yet");
+        memory.Remember(film, [job.NameGuesses[first[0]].Name], DateTime.UtcNow);
+
+        memory = new SeriesMemory(memory.File);
+        var again = new[] { P("Znova", "Vymyslena Rieka (2023) 2160p.mkv") };
+        job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Znova"), again));
+        Assert.True(job.ApplyMemory(memory, again) is [{ TmdbId: 123456 }] && job.Movies[again[0]] == film && job.ChosenTitles.Contains(again[0]),
+            "the remembered film with its TMDB ID: " + job.TitleFor(again[0]));
+
+        // a film of the same name and another year (a remake) is not given; a series of that name is not a film
+        var remake = new[] { P("Remake", "Vymyslena Rieka (1990).mkv") };
+        job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Remake"), remake));
+        Assert.True(job.ApplyMemory(memory, remake).Count == 0, "another year: no film");
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Vymyslena Rieka", 2023, null)]), "films are not series");
+
+        // review 7. 11.: a name without a year names no film; a film without its TMDB ID is not remembered
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Vymyslena Rieka", null, null)], MediaKind.Movie), "no year: no film");
+        memory.Remember(new TitleInfo(MediaKind.Movie, "Hadany film", 2020), ["Hadany film"], DateTime.UtcNow);
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Hadany film", 2020, null)], MediaKind.Movie), "a guessed film without an ID is not remembered");
+    }
+
+    [Test]
+    public void ProcessedTitlesAreRegisteredExportedAndImported()
+    {
+        // owner, 7. 11. 2026: Spracované tituly – every film and episode written into a library (names invented)
+        using var work = new Work();
+        var root = Path.Combine(work.Path, "VYSTUP");
+        string Lib(params string[] parts)
+        {
+            var path = Path.Combine([root, .. parts]);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, [1]);
+            return path;
+        }
+
+        var register = new TitleRegister(Path.Combine(work.Path, "spracovane-tituly.json"));
+        Assert.True(register.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 01", "Vymyslený seriál S01E04 - CZ FHD HEVC SMALL.mkv")), "an episode");
+        Assert.True(register.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 02", "Vymyslený seriál S02E01-E02 - CZ FHD HEVC SMALL.mkv")), "a double episode");
+        Assert.True(register.Record(Lib("MOVIES", "The Invented River (2023) [tmdbid-123456]", "The Invented River (2023) [tmdbid-123456] - EN FHD H264 BIG.mkv"),
+            source: Path.Combine(work.Path, "ZDROJ", "Vymyslena.Rieka.2023.1080p.WEB.mkv")), "a film");
+        Assert.True(register.Titles.Single(t => t.Kind == MediaKind.Movie).Names is ["Vymyslena Rieka"], "the other name its original carried");
+        Assert.True(!register.Record(Path.Combine(work.Path, "ZDROJ", "film.mkv")), "a file outside a library is passed by");
+        Assert.True(!register.Record(Path.Combine(root, "TVSHOWS", "Vymyslený seriál (2019)", "Season 01", "Vymyslený seriál S01E04 - CZ FHD HEVC SMALL.mkv"), when: DateTimeOffset.MinValue), "the same file again: no change");
+
+        // the TMDB ID of the title as placed, also when its folder carries none – the entry known without it gets it
+        Assert.True(register.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 02", "Vymyslený seriál S02E03 - CZ FHD HEVC SMALL.mkv"),
+            new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2019, 654321)), "an episode with the series' ID");
+
+        var titles = new TitleRegister(Path.Combine(work.Path, "spracovane-tituly.json")).Titles;
+        Assert.True(titles is [{ Name: "The Invented River", Year: 2023, TmdbId: 123456, Kind: MediaKind.Movie, Files: 1 }, { Name: "Vymyslený seriál", TmdbId: 654321, Kind: MediaKind.Series, Files: 3 } series] &&
+                    series.Episodes.SequenceEqual(["S01E04", "S02E01-E02", "S02E03"]) && series.Seasons == "S01: 1, S02: 2",
+            "kept after a restart: " + string.Join(" | ", titles.Select(t => $"{t.Display} {string.Join(",", t.Episodes)} {t.Files}")));
+
+        // the Czech and English names from TMDB (asked once for each title with an ID)
+        Assert.True(register.WithoutNames.Count == 2, "two titles with IDs wait for their names");
+        register.SetNames(MediaKind.Movie, 123456, "Vymyslená rieka", "The Invented River");
+        Assert.True(register.WithoutNames.Count == 1 && register.Titles.Single(t => t.Kind == MediaKind.Movie) is { CzechName: "Vymyslená rieka", EnglishName: "The Invented River" },
+            "the film's names kept");
+
+        // export (JSON, CSV) and import into another register: joined, never doubled
+        var json = Path.Combine(work.Path, "export.json");
+        var csv = Path.Combine(work.Path, "export.csv");
+        register.Export(json);
+        register.Export(csv);
+        Assert.True(File.ReadAllText(csv).Contains("Vymyslený seriál (2019)", StringComparison.Ordinal) && File.ReadAllBytes(csv)[0] == 0xEF, "CSV for Excel (UTF-8 with its mark)");
+        var other = new TitleRegister(Path.Combine(work.Path, "iny.json"));
+        other.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 03", "Vymyslený seriál S03E01 - CZ FHD HEVC SMALL.mkv"));
+        Assert.Equal(1, other.Import(json), "the film is new; the series (here without its ID, there with it) is joined");
+        Assert.True(other.Titles.Single(t => t.Kind == MediaKind.Series) is { TmdbId: 654321 } joinedSeries &&
+                    joinedSeries.Episodes.SequenceEqual(["S01E04", "S02E01-E02", "S02E03", "S03E01"]), "one series with all its episodes and its ID");
+        Assert.Equal(0, other.Import(json), "imported again: nothing new");
+
+        // review 7. 11.: the same title first without its ID, then with it – one entry with everything of both
+        var joined = new TitleRegister(Path.Combine(work.Path, "joined.json"));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E01 - CZ HD H264 SMALL.mkv"));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E02 - CZ HD H264 SMALL.mkv"), new TitleInfo(MediaKind.Series, "Iný vymyslený seriál", 2020, 777));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E03 - CZ HD H264 SMALL.mkv"));
+        Assert.True(joined.Titles is [{ TmdbId: 777, Files: 3, Episodes.Count: 3 }], "one entry under the ID – " + string.Join(" | ", joined.Titles.Select(t => $"{t.Display} {t.Files}")));
+        joined.Unrecord(Path.Combine(root, "TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E03 - CZ HD H264 SMALL.mkv"));
+        Assert.True(joined.Titles is [{ Files: 2, Episodes.Count: 2 }], "a file put back (Vrátiť originály) leaves the register");
+
+        // read from the output folders: what is there and not yet known
+        var scanned = new TitleRegister(Path.Combine(work.Path, "scan.json"));
+        Assert.Equal(8, scanned.Scan(new LibraryLayout(root).ResultFolders, t => t.Kind == MediaKind.Series && t.Year == 2019 ? t with { TmdbId = 654321 } : null), "eight files in the library");
+        Assert.True(scanned.Titles.Count == 3 && scanned.Titles.Single(t => t.Name == "The Invented River").TmdbId == 123456 &&
+                    scanned.Titles.Single(t => t.Name == "Vymyslený seriál") is { TmdbId: 654321, Episodes.Count: 4 }, "a film and two series, the IDs as known");
+    }
+
     private static BatchAnalysis Synthetic(string folder, params string[] paths)
     {
         var group = new BatchGroup("x", 0);

@@ -36,6 +36,8 @@ internal static class SelfTest
         // the tracks arranged at once after a change (the pause the user gets is tried in Zlučovanie on its own)
         ArrangeLater.Delay = TimeSpan.Zero;
         Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
+        // the language of audio is heard after an analysis only where a test asks for it (it is tried on its own)
+        services.Settings.BatchDetectAudio = false;
 
         MkvToolNixInstallation? installation = null;
         await Step("MKVToolNix", async () => installation = await TestMkvToolNixAsync(services));
@@ -167,7 +169,7 @@ internal static class SelfTest
               "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky | " +
               "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
               "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Spracované tituly, Nastavenia | " +
               "NÁPOVEDA: Novinky a obsah, Poznámky, Multiplexing, Editácia videostôp, Šablóny (template), Štatistika",
             "left rail: Dashboard, the groups, then NÁPOVEDA with the guides in the order of the groups (owner, 1. 11. 2026)");
         model.Open(model.Info);
@@ -1380,8 +1382,8 @@ internal static class SelfTest
         page.Tabs[1].Rows.First(r => r.Caption == "World Invented (2024)").Episodes[0].IsChecked = true;
         await page.SendAsync();
         Check(model.SelectedTool.Page == model.Batch && model.Batch.ChosenFiles?.Count == 3 && model.Batch.SeriesTitle.StartsWith("Domáci seriál (2020)", StringComparison.Ordinal) &&
-              model.Batch.OtherSeries.Contains("World Invented (2024)", StringComparison.Ordinal) && page.Ready.Count == 0,
-            $"novinky: episodes of two series go to one batch – {page.Status} | {model.Batch.SeriesTitle} | {model.Batch.OtherSeries}");
+              model.Batch.OtherSeriesList.Contains("World Invented (2024)", StringComparison.Ordinal) && page.Ready.Count == 0,
+            $"novinky: episodes of two series go to one batch – {page.Status} | {model.Batch.SeriesTitle} | {model.Batch.OtherSeriesList}");
         await Screenshot(window, "novinky-batch-two.png");
 
         // Vymazať frontu (owner, 29. 10. 2026): the analysed files and the opened file are forgotten, nothing on the disk changes
@@ -3328,11 +3330,14 @@ internal static class SelfTest
             Directory.CreateDirectory(speech);
             File.Copy(Path.Combine(media, "speech-und.mkv"), Path.Combine(speech, "Zlatý kapor 2021 WEB-DL CZ 1080p.mkv"), overwrite: true);
             batch.Folder = speech;
-            await batch.AnalyzeAsync();
-            Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
-            Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition offered for audio without a language");
+            // owner, 7. 11. 2026: heard right after Analyzovať – no button needed (Rozpoznať jazyk audiostôp stays)
+            batch.DetectAudioAfterAnalysis = true;
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            await batch.DetectAudioCommand.ExecuteAsync(null);
+            await batch.AnalyzeAsync();
+            batch.DetectAudioAfterAnalysis = false;
+            Check(!batch.IsAutoStep && batch.AutoStep.Length == 0, "batch: the blinking line of the steps after the analysis is gone when they end");
+            Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
+            Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition still offered by hand");
             var audio = batch.SlotRows.Where(s => s.Key.Type == TrackType.Audio).ToList();
             Write($"speech ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState} | " + string.Join(" | ", audio.Select(a => $"{a.Slot}: {a.Suggested} – {a.Evidence}")));
             Check(audio.Count == 3 && audio.All(a => a.HasSuggestion), "batch: the language of the three audio tracks is suggested from the speech – " + batch.RunState);
@@ -3889,6 +3894,9 @@ internal static class SelfTest
             var moved = await Run(single, "Vymyslený samostatný film");
             Check(moved is { Status: Core.Execution.ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(Core.Execution.FileProcessor.MovedIntoLibraryMessage) && !File.Exists(single),
                 $"superfast: moved into the library and edited there in {timed.Elapsed.TotalSeconds:0.00} s – " + string.Join("; ", moved.Messages));
+            // owner, 7. 11. 2026: Spracované tituly – the film written into the library is registered, with its name and year
+            Check(services.TitleRegister.Titles.Any(t => t is { Name: "Vymyslený samostatný film", Year: 2026, Kind: MediaKind.Movie }),
+                "titles: the film written into the library is in Spracované tituly – " + string.Join(" | ", services.TitleRegister.Titles.Select(t => t.Display)));
             var problems = await processor.UndoAsync(moved.UndoRecordPath!);
             Check(problems.Count == 0 && File.Exists(single) && !File.Exists(moved.OutputPath!), "superfast: Vrátiť originály puts it back – " + string.Join("; ", problems));
         }
@@ -4239,13 +4247,13 @@ internal static class SelfTest
     private static void TestSeriesMemory(MainViewModel model, AppServices services, string work)
     {
         var episode = Path.Combine(work, "Stiahnute", "Vymysleny.Napovedany.Serial.S02E07.1080p.WEB.mkv");
-        Check(services.RememberedSeriesFor(episode) is null, "napovedkyňa: an unknown series is not named");
+        Check(services.RememberedTitleFor(episode) is null, "napovedkyňa: an unknown series is not named");
         var series = new TitleInfo(MediaKind.Series, "Vymyslený napovedaný seriál", 2024, 990001);
-        services.RememberSeries(series, Path.Combine(work, "Iny tyzden", "Vymysleny Napovedany Serial S02E01.mkv"));
-        Check(services.RememberedSeriesFor(episode) == series, "napovedkyňa: the next episode gets the remembered series");
+        services.RememberTitle(series, Path.Combine(work, "Iny tyzden", "Vymysleny Napovedany Serial S02E01.mkv"));
+        Check(services.RememberedTitleFor(episode) == series, "napovedkyňa: the next episode gets the remembered series");
         Check(model.Settings.SeriesMemory.Rows.Any(r => r.Series.Title == series), "napovedkyňa: the series is listed in Nastavenia");
         model.Settings.SeriesMemory.ForgetCommand.Execute(model.Settings.SeriesMemory.Rows.First(r => r.Series.Title == series));
-        Check(services.RememberedSeriesFor(episode) is null, "napovedkyňa: a forgotten series is searched again");
+        Check(services.RememberedTitleFor(episode) is null, "napovedkyňa: a forgotten series is searched again");
     }
 
     private static void Check(bool condition, string what)

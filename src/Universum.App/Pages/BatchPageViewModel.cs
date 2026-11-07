@@ -58,6 +58,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private double _progress;
     private bool _busy;
     private bool _running;
+    private bool _stoppedAfterAnalysis;
     private BatchControl? _control;
     private Core.Jobs.BatchJob? _job;
 
@@ -75,7 +76,7 @@ public sealed class BatchPageViewModel : ObservableObject
         DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
         DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
         UndoMovedCommand = new AsyncRelayCommand(UndoMovedAsync, () => !Busy && !_running && MovedOriginals().Count > 0);
-        DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All), () => !Busy && _analysis is { Groups.Count: > 0 });
+        DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All, automatic: false), () => !Busy && _analysis is { Groups.Count: > 0 });
         EditTemplateCommand = new RelayCommand(EditTemplate, () => !Busy);
         TemplateFromGroupCommand = new RelayCommand(TemplateFromGroup, () => !Busy && SelectedGroup is not null);
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
@@ -139,12 +140,17 @@ public sealed class BatchPageViewModel : ObservableObject
         FilmTmdb = new TmdbPicker(services, () => MediaKind.Movie,
             () => FilmTitle.Length > 0 ? FilmTitle : FilmFiles.Select(p => _library?.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) ?? "",
             film => _ = ApplyFilmAsync(FilmFiles, film));
-        FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
+        FindMoviesCommand = new AsyncRelayCommand(() => FindMoviesAsync(automatic: false), () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
         services.TitlesChanged += () =>
         {
             Tmdb.Refresh();
             FilmTmdb.Refresh();
             FindMoviesCommand.NotifyCanExecuteChanged();
+            // a key or token added: the names of the analysed films are looked up now (no need to analyse again)
+            if (FindMoviesCommand.CanExecute(null))
+            {
+                _ = FindMoviesAsync(automatic: true);
+            }
         };
         services.LibraryChanged += () =>
         {
@@ -244,6 +250,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Summary = Loc.T("Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.");
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
+        OnPropertyChanged(nameof(OtherSeriesList));
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(IsMovies));
@@ -703,6 +710,21 @@ public sealed class BatchPageViewModel : ObservableObject
         set
         {
             _services.Settings.BatchRecursive = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Owner, 7. 11. 2026: the audio tracks without a language are heard right after Analyzovať (a series through one
+    /// episode); Rozpoznať jazyk audiostôp stays for any track by hand.
+    /// </summary>
+    public bool DetectAudioAfterAnalysis
+    {
+        get => _services.Settings.BatchDetectAudio;
+        set
+        {
+            _services.Settings.BatchDetectAudio = value;
             _services.Settings.Save();
             OnPropertyChanged();
         }
@@ -1348,10 +1370,10 @@ public sealed class BatchPageViewModel : ObservableObject
     public bool IsListening => _speechCancellation is not null;
 
     /// <summary>The gauge under the summary: while the folder is read or the speech recognised.</summary>
-    public bool ShowsProgress => IsAnalyzing || IsListening;
+    public bool ShowsProgress => IsAnalyzing || IsListening || IsAutoStep;
 
     /// <summary>What the stop button at the top stops.</summary>
-    public string StopText => IsListening ? Loc.T("Zastaviť rozpoznávanie reči") : Loc.T("Zastaviť analýzu");
+    public string StopText => IsListening ? Loc.T("Zastaviť rozpoznávanie reči") : IsAutoStep && !IsAnalyzing ? Loc.T("Zastaviť") : Loc.T("Zastaviť analýzu");
 
     /// <summary>The summary says why nothing can be processed (no MKV, only results…): shown in the warning colour.</summary>
     public bool SummaryIsWarning { get => _summaryIsWarning; private set => SetProperty(ref _summaryIsWarning, value); }
@@ -1380,6 +1402,8 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             return;
         }
+
+        _stoppedAfterAnalysis = false;
 
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
@@ -1572,11 +1596,57 @@ public sealed class BatchPageViewModel : ObservableObject
             Busy = false;
         }
 
-        if (readSubtitles)
+        // owner, 7. 11. 2026: while the steps after the analysis run, a blinking line says so – nothing to do yet
+        try
         {
-            await ReadSubtitlesAsync(again: false);
+            if (readSubtitles)
+            {
+                AutoStep = Loc.T("Čítame jazyk titulkov – počkajte, ešte nič nemeňte…");
+                await ReadSubtitlesAsync(again: false);
+            }
+
+            // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button; Zastaviť
+            // stops the steps that follow too
+            if (_analysis is not null && !_stoppedAfterAnalysis && FindMoviesCommand.CanExecute(null))
+            {
+                AutoStep = Loc.T("Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…");
+                await FindMoviesAsync(automatic: true);
+            }
+
+            // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
+            if (_analysis is { Groups.Count: > 0 } && !_stoppedAfterAnalysis && DetectAudioAfterAnalysis && !Busy)
+            {
+                AutoStep = Loc.T("Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…");
+                await DetectAudioAsync(SpeechScope.All, automatic: true);
+            }
+        }
+        finally
+        {
+            AutoStep = "";
         }
     }
+
+    /// <summary>
+    /// The step running by itself after Analyzovať (subtitles read, names looked up, speech heard) – shown blinking at the
+    /// top so the user waits; empty when none runs.
+    /// </summary>
+    public string AutoStep
+    {
+        get => _autoStep;
+        private set
+        {
+            if (SetProperty(ref _autoStep, value))
+            {
+                OnPropertyChanged(nameof(IsAutoStep));
+                OnPropertyChanged(nameof(ShowsProgress));
+                OnPropertyChanged(nameof(StopText));
+            }
+        }
+    }
+
+    private string _autoStep = "";
+
+    public bool IsAutoStep => _autoStep.Length > 0;
 
     /// <summary>The files sent from Novinky – Seriály (only they are analysed); null for a whole folder.</summary>
     public IReadOnlyList<string>? ChosenFiles => _only;
@@ -1610,9 +1680,16 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>The further series of the batch beside the field Seriál ("Ďalšie seriály: Sľub (2025)"), or empty.</summary>
+    // owner, 7. 11. 2026: only the number beside the field; the names in its tooltip
     public string OtherSeries => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
-        ? (library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1 ? Loc.T("+ ďalší seriál: ") : Loc.F("+ ďalšie seriály ({0}): ", count)) +
-          string.Join(", ", library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
+        ? library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1
+            ? Loc.T("+ 1 ďalší seriál") : count < 5 ? Loc.F("+ {0} ďalšie seriály", count) : Loc.F("+ {0} ďalších seriálov", count)
+        : "";
+
+    /// <summary>The further series of the batch by name (the tooltip of <see cref="OtherSeries"/>).</summary>
+    public string OtherSeriesList => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
+        ? Loc.T("Ďalšie seriály v tejto dávke – každá epizóda ide do priečinka svojho seriálu (stĺpec Cieľ v knižnici):") + Environment.NewLine +
+          string.Join(Environment.NewLine, library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
         : "";
 
     // the further series sent from Novinky, again after each analysis of the same files – keyed by the paths exactly as
@@ -1696,7 +1773,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var given = _library.ApplyMemory(_services.SeriesMemory, _analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).ToList());
         return given.Count == 0 ? ""
-            : Loc.F(" Napovedkyňa: {0} – seriál, ktorý už spracúvate, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
+            : Loc.F(" Napovedkyňa: {0} – titul, ktorý už poznáte, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
     }
 
     // the remembered series a title typed in Novinky names (original title and year), or null
@@ -1711,10 +1788,17 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        foreach (var series in items.Where(i => library.KindFor(i.File.Path) == MediaKind.Series && library.SeriesFor(i.File.Path) is not null)
+        var list = items.ToList();
+        foreach (var series in list.Where(i => library.KindFor(i.File.Path) == MediaKind.Series && library.SeriesFor(i.File.Path) is not null)
                      .GroupBy(i => library.SeriesFor(i.File.Path)!))
         {
             _services.SeriesMemory.Remember(series.Key, series.SelectMany(i => library.SeriesNamesOf(i.File.Path)).Select(n => n.Name), DateTime.UtcNow);
+        }
+
+        // owner, 7. 11. 2026: films too, under the name their file carries – a TMDB ID typed once is not asked again
+        foreach (var film in list.Where(i => library.KindFor(i.File.Path) == MediaKind.Movie && library.Movies.ContainsKey(i.File.Path)))
+        {
+            _services.SeriesMemory.Remember(library.Movies[film.File.Path], [library.NameGuesses.GetValueOrDefault(film.File.Path)?.Name], DateTime.UtcNow);
         }
     }
 
@@ -1792,6 +1876,7 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(DeleteOriginalsText));
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
+        OnPropertyChanged(nameof(OtherSeriesList));
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(SeriesNeedsConfirmation));
         ConfirmSeriesCommand?.NotifyCanExecuteChanged();
@@ -2279,7 +2364,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// one request at a time (TMDB at most 4 per second, HISTRA 2, see RequestPacer); the same name and year is asked
     /// only once (cache). Stop cancels; titles found so far stay.
     /// </summary>
-    private async Task FindMoviesAsync()
+    private async Task FindMoviesAsync(bool automatic)
     {
         if (_library is null || _analysis is null || _services.Titles is not { } titles)
         {
@@ -2296,6 +2381,12 @@ public sealed class BatchPageViewModel : ObservableObject
             .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
+        if (automatic && pending.Count == 0 && !(_library.Units?.Any(u => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } && !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? false))
+        {
+            // after the analysis: nothing to look up, the summary of the analysis stays
+            return;
+        }
+
         Busy = true;
         _tmdbCancellation = new CancellationTokenSource();
         StopCommand.NotifyCanExecuteChanged();
@@ -2643,7 +2734,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     // the speech of the audio tracks without a language: pieces from several places of each film vote; every result is
     // a suggestion with what to check (owner, 28. 10.: the films of a group each on their own, or only chosen films)
-    private async Task DetectAudioAsync(SpeechScope scope)
+    private async Task DetectAudioAsync(SpeechScope scope, bool automatic = false)
     {
         if (_analysis is null)
         {
@@ -2658,6 +2749,11 @@ public sealed class BatchPageViewModel : ObservableObject
             SpeechScope.All => SpeechTargets.ForGroups(_analysis.Groups, series),
             _ => (Array.Empty<SpeechTarget>(), 0),
         };
+        if (automatic && targets.Count == 0)
+        {
+            // after the analysis: every audio track has its language – the summary of the analysis stays
+            return;
+        }
 
         Busy = true;
         var cancellation = _speechCancellation = new CancellationTokenSource();
@@ -3318,6 +3414,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Stop()
     {
+        _stoppedAfterAnalysis = true;
         // an analysis only stops reading (a finished run's control is not touched)
         if (_analysisCancellation is { } analysis)
         {

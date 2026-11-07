@@ -151,7 +151,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         var guess = TitleGuess.ForFile(path);
         _kind = guess.Kind;
         // napovedkyňa (owner, 30. 10. 2026): a series processed before gets its remembered title – no search
-        var remembered = _services.RememberedSeriesFor(path);
+        var remembered = _services.RememberedTitleFor(path);
         _titleText = remembered?.FolderName ?? guess.TitleText;
         // Season 00 or a regular season: asked – the field stays empty until the user answers
         _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
@@ -160,7 +160,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         _titleByUser = false;
         _addition = "";
         OnPropertyChanged(nameof(Addition));
-        TitleNote = remembered is null ? "" : Loc.T("Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).");
+        TitleNote = remembered is null ? "" : Loc.T("Napovedkyňa: titul, ktorý už poznáte – názov bez hľadania (zmeniť ho môžete).");
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));

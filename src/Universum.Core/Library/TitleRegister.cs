@@ -1,0 +1,503 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Universum.Core.Batch;
+using Universum.Core.Text;
+
+namespace Universum.Core.Library;
+
+/// <summary>A title UNIVERSUM wrote into a library: its name as the library has it, the episodes, when.</summary>
+public sealed record RegisteredTitle
+{
+    public MediaKind Kind { get; init; }
+
+    public string Name { get; init; } = "";
+
+    public int? Year { get; init; }
+
+    public int? TmdbId { get; init; }
+
+    /// <summary>
+    /// Other names the title was known by (owner, 7. 11. 2026): the names its original files and folders carried
+    /// ("Vymyslena Rieka", "Iny nazov") – they make it easier to tell which title a new file is.
+    /// </summary>
+    public List<string> Names { get; init; } = [];
+
+    /// <summary>The Czech title from TMDB (owner, 7. 11. 2026); "" when TMDB has none, null when not asked yet.</summary>
+    public string? CzechName { get; init; }
+
+    /// <summary>The English title from TMDB; "" when TMDB has none, null when not asked yet.</summary>
+    public string? EnglishName { get; init; }
+
+    /// <summary>Episodes written ("S01E04", "S01E01-E02"), sorted; empty for a film.</summary>
+    public List<string> Episodes { get; init; } = [];
+
+    /// <summary>Files written (each version and each episode once).</summary>
+    public int Files { get; init; }
+
+    public DateTimeOffset First { get; init; }
+
+    public DateTimeOffset Last { get; init; }
+
+    /// <summary>"Name (Year) [tmdbid-ID]" – as the folder of the library.</summary>
+    [JsonIgnore]
+    public string Display => Name + (Year is { } year ? $" ({year})" : "") + (TmdbId is { } id ? $" [tmdbid-{id}]" : "");
+
+    /// <summary>The seasons and episodes in short: "S01: 10, S02: 3".</summary>
+    [JsonIgnore]
+    public string Seasons => string.Join(", ", Episodes.GroupBy(e => e.Length >= 3 ? e[..3] : e).Select(g => $"{g.Key}: {g.Count()}"));
+
+    // one title: by its TMDB ID, else by its name and year
+    internal string Key => $"{Kind}|" + (TmdbId is { } id ? "id:" + id.ToString(CultureInfo.InvariantCulture) : Name.ToUpperInvariant() + "|" + Year);
+}
+
+/// <summary>
+/// Spracované tituly (owner, 7. 11. 2026): every film and series UNIVERSUM wrote into a library, filled in the background
+/// with each result and from the output folders on request; exported (JSON, CSV for Excel) and imported (JSON, merged).
+/// It is the user's own data – kept in the settings folder, never in the program's sources.
+/// </summary>
+public sealed class TitleRegister
+{
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
+    private readonly string _file;
+    private readonly Lock _gate = new();
+    private Dictionary<string, RegisteredTitle>? _titles;
+    private HashSet<string>? _files;
+
+    public TitleRegister(string file) => _file = file;
+
+    /// <summary>Raised after a change (on the thread that made it).</summary>
+    public event Action? Changed;
+
+    /// <summary>The titles, series and films by name.</summary>
+    public IReadOnlyList<RegisteredTitle> Titles
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. Loaded().Values.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(t => t.Year)];
+            }
+        }
+    }
+
+    /// <summary>
+    /// The title, kind and episode of a file in a library: MOVIES\Name (Year)\… or TVSHOWS\Name (Year)\Season 01\…
+    /// S01E04 …; null for a file elsewhere.
+    /// </summary>
+    public static (TitleInfo Title, EpisodeNumber? Episode)? Read(string path)
+    {
+        var parts = Path.GetFullPath(path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        for (var i = parts.Length - 3; i >= 0; i--)
+        {
+            var kind = parts[i].Equals(LibraryNames.MoviesFolder, StringComparison.OrdinalIgnoreCase) ? MediaKind.Movie
+                : parts[i].Equals(LibraryNames.ShowsFolder, StringComparison.OrdinalIgnoreCase) ? MediaKind.Series
+                : (MediaKind?)null;
+            if (kind is null || TitleGuess.Typed(kind.Value, parts[i + 1]) is not { } title)
+            {
+                continue;
+            }
+
+            if (kind == MediaKind.Movie)
+            {
+                return i + 3 == parts.Length ? (title, null) : null;
+            }
+
+            return EpisodeNumber.TryParse(Path.GetFileNameWithoutExtension(parts[^1])) is { } episode ? (title, episode) : null;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Records a file written into a library (a file elsewhere is passed by); <paramref name="known"/> – the title as it was
+    /// placed – gives its TMDB ID also when the folder's name carries none (owner, 7. 11. 2026: the ID tells a title
+    /// apart for sure). True when the register changed.
+    /// </summary>
+    public bool Record(string path, TitleInfo? known = null, DateTimeOffset? when = null, string? source = null)
+    {
+        if (Read(path) is not var (title, episode))
+        {
+            return false;
+        }
+
+        title = WithId(title, known);
+        var names = source is null ? [] : NamesOf(source, title.Kind);
+
+        bool changed;
+        lock (_gate)
+        {
+            changed = Add(title, episode, Path.GetFullPath(path), when ?? DateTimeOffset.Now, names);
+            if (changed)
+            {
+                Save();
+            }
+        }
+
+        if (changed)
+        {
+            Changed?.Invoke();
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Reads the films and series already in the output folders (MOVIES, TVSHOWS); <paramref name="identify"/> gives a
+    /// title's TMDB ID when its folder carries none (remembered titles). Returns how many files were new.
+    /// </summary>
+    public int Scan(IEnumerable<string> resultFolders, Func<TitleInfo, TitleInfo?>? identify = null, CancellationToken cancellationToken = default)
+    {
+        var found = new List<(string Path, DateTimeOffset Time)>();
+        foreach (var folder in resultFolders.Where(Directory.Exists))
+        {
+            var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System };
+            foreach (var file in Directory.EnumerateFiles(folder, "*", options))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (BatchAnalyzer.VideoExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                {
+                    found.Add((file, new DateTimeOffset(File.GetLastWriteTime(file))));
+                }
+            }
+        }
+
+        var added = 0;
+        lock (_gate)
+        {
+            foreach (var (path, time) in found)
+            {
+                if (Read(path) is var (title, episode) && Add(WithId(title, title.TmdbId is null ? identify?.Invoke(title) : null), episode, Path.GetFullPath(path), time))
+                {
+                    added++;
+                }
+            }
+
+            if (added > 0)
+            {
+                Save();
+            }
+        }
+
+        if (added > 0)
+        {
+            Changed?.Invoke();
+        }
+
+        return added;
+    }
+
+    /// <summary>The titles with a TMDB ID whose Czech and English names were not asked for yet.</summary>
+    public IReadOnlyList<RegisteredTitle> WithoutNames
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. Loaded().Values.Where(t => t.TmdbId is not null && (t.CzechName is null || t.EnglishName is null))];
+            }
+        }
+    }
+
+    /// <summary>Keeps the Czech and English names of a title (from TMDB) – "" for a name TMDB does not have.</summary>
+    public void SetNames(MediaKind kind, int tmdbId, string czech, string english)
+    {
+        lock (_gate)
+        {
+            var key = new RegisteredTitle { Kind = kind, TmdbId = tmdbId }.Key;
+            if (!Loaded().TryGetValue(key, out var title))
+            {
+                return;
+            }
+
+            _titles![key] = title with { CzechName = czech.Trim(), EnglishName = english.Trim() };
+            Save();
+        }
+
+        Changed?.Invoke();
+    }
+
+    /// <summary>Writes the register: JSON (whole, to be imported) or CSV (for Excel) by the file's extension.</summary>
+    public void Export(string path)
+    {
+        var titles = Titles;
+        if (Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            var csv = new StringBuilder();
+            csv.AppendLine(CoreText.T("Druh;Názov;Rok;TMDB ID;Priečinok;Český názov;Anglický názov;Známe aj ako;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"));
+            foreach (var t in titles)
+            {
+                csv.AppendLine(string.Join(";",
+                    t.Kind == MediaKind.Series ? CoreText.T("seriál") : CoreText.T("film"), Cell(t.Name), t.Year?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    t.TmdbId?.ToString(CultureInfo.InvariantCulture) ?? "", Cell(t.Display), Cell(t.CzechName ?? ""), Cell(t.EnglishName ?? ""), Cell(string.Join(" | ", t.Names)), t.Episodes.Count.ToString(CultureInfo.InvariantCulture), Cell(t.Seasons),
+                    Cell(string.Join(" ", t.Episodes)), t.Files.ToString(CultureInfo.InvariantCulture),
+                    t.First.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), t.Last.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
+            }
+
+            Write(path, csv.ToString(), withMark: true);
+            return;
+        }
+
+        Write(path, JsonSerializer.Serialize(new Exported(1, titles.ToList()), Json), withMark: false);
+    }
+
+    /// <summary>Merges an exported register (JSON) into this one: episodes joined, the earliest and latest times kept; returns the titles new here.</summary>
+    public int Import(string path)
+    {
+        var imported = (JsonSerializer.Deserialize<Exported>(File.ReadAllText(path), Json)?.Titles ?? []).Where(t => t is not null).Select(Whole).ToList();
+        var added = 0;
+        lock (_gate)
+        {
+            var titles = Loaded();
+            foreach (var read in imported.Where(t => t.Name.Length > 0))
+            {
+                // the same title with an ID here and without one there (or the reverse): one entry
+                var title = Settle(titles, read);
+                if (titles.TryGetValue(title.Key, out var known))
+                {
+                    titles[title.Key] = known with
+                    {
+                        Episodes = [.. known.Episodes.Union(title.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
+                        Names = Joined(known.Names, title.Names),
+                        CzechName = known.CzechName ?? title.CzechName,
+                        EnglishName = known.EnglishName ?? title.EnglishName,
+                        // the files of two computers are not the same files: the larger count, never doubled by importing twice
+                        Files = Math.Max(known.Files, title.Files),
+                        First = known.First < title.First ? known.First : title.First,
+                        Last = known.Last > title.Last ? known.Last : title.Last,
+                    };
+                }
+                else
+                {
+                    titles[title.Key] = title with { Episodes = [.. title.Episodes.Order(StringComparer.OrdinalIgnoreCase)] };
+                    added++;
+                }
+            }
+
+            Save();
+        }
+
+        Changed?.Invoke();
+        return added;
+    }
+
+    // the title read from the folder with the TMDB ID of the same title as placed (its kind, name and year agree)
+    private static TitleInfo WithId(TitleInfo read, TitleInfo? known) =>
+        read.TmdbId is null && known is { TmdbId: { } id } && known.Kind == read.Kind && known.Year == read.Year &&
+        string.Equals(known.FolderName, read.FolderName, StringComparison.OrdinalIgnoreCase)
+            ? read with { TmdbId = id }
+            : read;
+
+    /// <summary>
+    /// The names an original carried: its file's name and, for an episode, the folder of the series above season
+    /// folders – as read from them ("Vymyslena.Rieka.2023.1080p" → "Vymyslena Rieka").
+    /// </summary>
+    public static IReadOnlyList<string> NamesOf(string source, MediaKind kind)
+    {
+        var names = new List<string>();
+        if (TitleGuess.FromName(Path.GetFileNameWithoutExtension(source), kind) is { } file)
+        {
+            names.Add(file.Name);
+        }
+
+        if (TitleGuess.ForFile(source) is { Kind: var guessed, Title: { } folder } && guessed == kind)
+        {
+            names.Add(folder.Name);
+        }
+
+        return names;
+    }
+
+    // names joined without repeating one (small and capital letters and diacritics alike), at most 20
+    private static List<string> Joined(IEnumerable<string> known, IEnumerable<string> more)
+    {
+        var joined = new List<string>();
+        foreach (var name in known.Concat(more).Select(n => n.Trim()).Where(n => n.Length > 0))
+        {
+            if (joined.Count < 20 && !joined.Any(j => Words.Normalize(j) == Words.Normalize(name)))
+            {
+                joined.Add(name);
+            }
+        }
+
+        return joined;
+    }
+
+    // a file once: the same file written again (a revision) changes only the time
+    private bool Add(TitleInfo title, EpisodeNumber? episode, string path, DateTimeOffset when, IReadOnlyList<string>? names = null)
+    {
+        var titles = Loaded();
+        var entry = new RegisteredTitle { Kind = title.Kind, Name = title.Name, Year = title.Year, TmdbId = title.TmdbId, First = when, Last = when };
+        entry = Settle(titles, entry);
+        var known = titles.GetValueOrDefault(entry.Key);
+        var newFile = _files!.Add(path.ToUpperInvariant());
+        var episodes = known?.Episodes ?? [];
+        var newEpisode = episode is not null && !episodes.Contains(episode.Tag, StringComparer.OrdinalIgnoreCase);
+        // the library's own name is the title itself, not another name
+        var allNames = Joined(known?.Names ?? [], (names ?? []).Where(n => Words.Normalize(n) != Words.Normalize(title.Name)));
+        var newName = allNames.Count != (known?.Names.Count ?? 0);
+        if (known is not null && !newFile && !newEpisode && !newName && when <= known.Last)
+        {
+            return false;
+        }
+
+        titles[entry.Key] = (known ?? entry) with
+        {
+            Episodes = newEpisode ? [.. episodes.Append(episode!.Tag).Order(StringComparer.OrdinalIgnoreCase)] : episodes,
+            Names = allNames,
+            Files = (known?.Files ?? 0) + (newFile ? 1 : 0),
+            First = known is null || when < known.First ? when : known.First,
+            Last = known is null || when > known.Last ? when : known.Last,
+        };
+        return true;
+    }
+
+    /// <summary>
+    /// One title, one entry (review 7. 11. 2026): a title known without its TMDB ID that arrives with one is joined into
+    /// the entry under the ID (episodes, files, times and names of both kept); a title arriving without an ID goes into
+    /// the entry of the same kind, name and year that has one. Returns the entry as it is to be keyed.
+    /// </summary>
+    private static RegisteredTitle Settle(Dictionary<string, RegisteredTitle> titles, RegisteredTitle entry)
+    {
+        if (entry.TmdbId is null)
+        {
+            var withId = titles.Values.FirstOrDefault(t => t.TmdbId is not null && t.Kind == entry.Kind && t.Year == entry.Year &&
+                                                           string.Equals(t.Name, entry.Name, StringComparison.OrdinalIgnoreCase));
+            return withId is null ? entry : entry with { TmdbId = withId.TmdbId };
+        }
+
+        if (titles.Remove((entry with { TmdbId = null }).Key, out var withoutId))
+        {
+            titles[entry.Key] = titles.TryGetValue(entry.Key, out var already)
+                ? Merge(already, withoutId)
+                : withoutId with { TmdbId = entry.TmdbId };
+        }
+
+        return entry;
+    }
+
+    // two entries of one title joined
+    private static RegisteredTitle Merge(RegisteredTitle a, RegisteredTitle b) => a with
+    {
+        Episodes = [.. a.Episodes.Union(b.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
+        Names = Joined(a.Names, b.Names),
+        Files = a.Files + b.Files,
+        First = a.First < b.First ? a.First : b.First,
+        Last = a.Last > b.Last ? a.Last : b.Last,
+        CzechName = a.CzechName ?? b.CzechName,
+        EnglishName = a.EnglishName ?? b.EnglishName,
+    };
+
+    // a title as stored or imported, with nothing missing (null lists or names in a damaged or hand-made file)
+    private static RegisteredTitle Whole(RegisteredTitle title) => title with
+    {
+        Name = title.Name ?? "",
+        Episodes = title.Episodes ?? [],
+        Names = title.Names ?? [],
+    };
+
+    /// <summary>
+    /// A file that left the library again (Vrátiť originály): no longer counted; its episode leaves the title, a title
+    /// without files leaves the register.
+    /// </summary>
+    public void Unrecord(string path)
+    {
+        if (Read(path) is not var (title, episode))
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            var titles = Loaded();
+            if (!_files!.Remove(Path.GetFullPath(path).ToUpperInvariant()))
+            {
+                return;
+            }
+
+            var key = titles.Values.FirstOrDefault(t => t.Kind == title.Kind && t.Year == title.Year && string.Equals(t.Name, title.Name, StringComparison.OrdinalIgnoreCase))?.Key;
+            if (key is not null && titles[key] is var known)
+            {
+                var left = known with
+                {
+                    Files = Math.Max(0, known.Files - 1),
+                    Episodes = episode is null ? known.Episodes : [.. known.Episodes.Where(e => !e.Equals(episode.Tag, StringComparison.OrdinalIgnoreCase))],
+                };
+                if (left.Files == 0)
+                {
+                    titles.Remove(key);
+                }
+                else
+                {
+                    titles[key] = left;
+                }
+            }
+
+            Save();
+        }
+
+        Changed?.Invoke();
+    }
+
+    private Dictionary<string, RegisteredTitle> Loaded()
+    {
+        if (_titles is not null)
+        {
+            return _titles;
+        }
+
+        _titles = [];
+        _files = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            if (File.Exists(_file) && JsonSerializer.Deserialize<Stored>(File.ReadAllText(_file), Json) is { } stored)
+            {
+                foreach (var title in (stored.Titles ?? []).Where(t => t is not null).Select(Whole).Where(t => t.Name.Length > 0))
+                {
+                    _titles[title.Key] = title;
+                }
+
+                _files.UnionWith((stored.Files ?? []).Where(f => f is not null));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // a damaged register starts anew (the films are untouched); it is rebuilt from the output folders on request
+        }
+
+        return _titles;
+    }
+
+    private void Save()
+    {
+        try
+        {
+            Write(_file, JsonSerializer.Serialize(new Stored(_titles!.Values.ToList(), [.. _files!]), Json), withMark: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // kept in memory; written with the next change
+        }
+    }
+
+    private static void Write(string path, string text, bool withMark)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var temporary = path + ".tmp";
+        File.WriteAllText(temporary, text, new UTF8Encoding(withMark));
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    // a cell of the CSV: quoted when it holds a separator, a quote or a line break; a text Excel would take for a formula
+    // starts with an apostrophe
+    private static string Cell(string text)
+    {
+        text = text.Length > 0 && "=+-@".Contains(text[0]) ? "'" + text : text;
+        return text.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
+    }
+
+    private sealed record Stored(List<RegisteredTitle> Titles, List<string> Files);
+
+    private sealed record Exported(int Version, List<RegisteredTitle> Titles);
+}

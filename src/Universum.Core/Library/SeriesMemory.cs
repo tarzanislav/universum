@@ -16,7 +16,7 @@ public sealed record RememberedSeries(TitleInfo Title, IReadOnlyList<string> Nam
 /// </summary>
 public sealed class SeriesMemory(string file)
 {
-    /// <summary>At most this many series are kept (the longest unused ones go first).</summary>
+    /// <summary>At most this many series, and this many films, are kept (the longest unused ones go first).</summary>
     public const int MaximumSeries = 1000;
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = false };
@@ -34,7 +34,7 @@ public sealed class SeriesMemory(string file)
     /// The remembered series for the names read from the files (null names are skipped): only when every name that is
     /// known points to the same series and its year fits (a name without a year fits any; a year one off too).
     /// </summary>
-    public TitleInfo? Find(IEnumerable<NameGuess?> names)
+    public TitleInfo? Find(IEnumerable<NameGuess?> names, MediaKind kind = MediaKind.Series)
     {
         TitleInfo? found = null;
         foreach (var name in names.OfType<NameGuess>())
@@ -45,7 +45,12 @@ public sealed class SeriesMemory(string file)
                 continue;
             }
 
-            var matches = Loaded().Where(s => s.Names.Contains(key, StringComparer.Ordinal) && Fits(s.Title, name)).ToList();
+            var matches = Loaded().Where(s => s.Title.Kind == kind && s.Names.Contains(key, StringComparer.Ordinal) && Fits(s.Title, name)).ToList();
+            if (matches.Count > 1 && name.Year is null && kind == MediaKind.Movie)
+            {
+                // films of one name and other years (a remake): a name without a year names none of them
+                return null;
+            }
             if (matches.Count > 1 || (matches.Count == 1 && found is not null && !Same(found, matches[0].Title)))
             {
                 return null;
@@ -63,7 +68,9 @@ public sealed class SeriesMemory(string file)
     /// </summary>
     public void Remember(TitleInfo series, IEnumerable<string?> names, DateTime nowUtc)
     {
-        if (series.Kind != MediaKind.Series || series.Problem is not null)
+        // owner, 7. 11. 2026: films are remembered too (a TMDB ID typed once is not asked again), each kind apart
+        // a film only with its TMDB ID and year (review 7. 11. 2026: a title merely guessed from a file's name is no answer to remember)
+        if (series.Problem is not null || (series.Kind == MediaKind.Movie && (series.TmdbId is null || series.Year is null)))
         {
             return;
         }
@@ -73,8 +80,9 @@ public sealed class SeriesMemory(string file)
         var known = list.FirstOrDefault(s => Same(s.Title, series));
         for (var i = list.Count - 1; i >= 0; i--)
         {
-            if (ReferenceEquals(list[i], known))
+            if (ReferenceEquals(list[i], known) || list[i].Title.Kind != series.Kind || (series.Kind == MediaKind.Movie && list[i].Title.Year != series.Year))
             {
+                // a film's name stays with films of other years (remakes); the year tells them apart
                 continue;
             }
 
@@ -95,10 +103,14 @@ public sealed class SeriesMemory(string file)
 
         list.Add(entry);
         list.RemoveAll(s => s.Names.Count == 0);
-        if (list.Count > MaximumSeries)
+        // at most MaximumSeries of each kind: many films never push the series out
+        foreach (var kind in new[] { MediaKind.Series, MediaKind.Movie })
         {
-            list.Sort((a, b) => b.LastUsedUtc.CompareTo(a.LastUsedUtc));
-            list.RemoveRange(MaximumSeries, list.Count - MaximumSeries);
+            var ofKind = list.Where(s => s.Title.Kind == kind).OrderByDescending(s => s.LastUsedUtc).ToList();
+            foreach (var old in ofKind.Skip(MaximumSeries))
+            {
+                list.Remove(old);
+            }
         }
 
         Save();
@@ -118,10 +130,12 @@ public sealed class SeriesMemory(string file)
 
     // one series: the same TMDB ID, or without one the same folder in the library
     private static bool Same(TitleInfo a, TitleInfo b) =>
-        a.TmdbId is { } id ? id == b.TmdbId : b.TmdbId is null && string.Equals(a.FolderName, b.FolderName, StringComparison.OrdinalIgnoreCase);
+        a.Kind == b.Kind && (a.TmdbId is { } id ? id == b.TmdbId : b.TmdbId is null && string.Equals(a.FolderName, b.FolderName, StringComparison.OrdinalIgnoreCase));
 
     private static bool Fits(TitleInfo title, NameGuess name) =>
-        name.TmdbId is { } id ? id == title.TmdbId : name.Year is not { } year || title.Year is not { } known || Math.Abs(year - known) <= 1;
+        name.TmdbId is { } id ? id == title.TmdbId
+        : title.Kind == MediaKind.Movie ? name.Year is { } filmYear && filmYear == title.Year // a film's name without its year names no film (remakes)
+        : name.Year is not { } year || title.Year is not { } known || Math.Abs(year - known) <= 1;
 
     private List<RememberedSeries> Loaded()
     {
@@ -135,7 +149,7 @@ public sealed class SeriesMemory(string file)
             _series = System.IO.File.Exists(File)
                 ? (JsonSerializer.Deserialize<List<Stored>>(System.IO.File.ReadAllBytes(File), Options) ?? [])
                 .Where(s => s.Name is { Length: > 0 } && s.Names is { Count: > 0 })
-                .Select(s => new RememberedSeries(new TitleInfo(MediaKind.Series, s.Name!, s.Year, s.TmdbId, s.IncludeId), s.Names!, s.LastUsedUtc, s.Uses))
+                .Select(s => new RememberedSeries(new TitleInfo(s.Kind == nameof(MediaKind.Movie) ? MediaKind.Movie : MediaKind.Series, s.Name!, s.Year, s.TmdbId, s.IncludeId), s.Names!, s.LastUsedUtc, s.Uses))
                 .ToList()
                 : [];
         }
@@ -155,6 +169,7 @@ public sealed class SeriesMemory(string file)
             var temporary = File + ".part";
             var stored = Loaded().Select(s => new Stored
             {
+                Kind = s.Title.Kind == MediaKind.Movie ? nameof(MediaKind.Movie) : null,
                 Name = s.Title.Name,
                 Year = s.Title.Year,
                 TmdbId = s.Title.TmdbId,
@@ -176,6 +191,9 @@ public sealed class SeriesMemory(string file)
 
     private sealed class Stored
     {
+        // null: a series (as every entry before films were remembered)
+        public string? Kind { get; set; }
+
         public string? Name { get; set; }
 
         public int? Year { get; set; }

@@ -88,6 +88,18 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void SubtitlesForTheDeafAreNamedSdh()
+    {
+        // owner, 7. 11. 2026: subtitles marked for the deaf in the file ("English SDH", "CC", the flag) are named "SDH"
+        var hearing = Subs(4, "eng", "English SDH");
+        var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "cze", "Czech"), Subs(3, "slo", "Slovak"), hearing,
+            Subs(5, "eng", "CC"), Subs(6, "pol", null) with { Flags = new TrackFlags(HearingImpaired: true) }));
+        Assert.True(target.For(4) is { Name: "SDH", Flags.HearingImpaired: true } && target.For(5).Name == "SDH" && target.For(6).Name == "SDH",
+            "SDH – " + string.Join(" | ", target.Tracks.Select(t => $"{t.TrackId}:{t.Name}")));
+        Assert.True(target.For(2).Name is null && target.For(3).Name is null, "the others keep no name");
+    }
+
+    [Test]
     public void EnglishAmongPreferredLanguagesIsNoDubbing()
     {
         // owner, 7. 11. 2026 (zásadná chyba): with English among the preferred languages (Nastavenia), an English film got

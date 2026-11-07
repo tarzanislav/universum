@@ -40,11 +40,20 @@ public static class MkvMergeIdentificationParser
         // default; as players do, only the first track of each type is the default one
         if (String(container, "type") is { } type && type != "Matroska")
         {
+            // an MP4 has one flag (owner, 7. 11. 2026): a track is "enabled" – what players take as the default (ffprobe
+            // too); the first enabled track of each type is the default one, subtitles as well
+            var mp4 = type.Contains("MP4", StringComparison.OrdinalIgnoreCase) || type.Contains("QuickTime", StringComparison.OrdinalIgnoreCase);
             var seen = new HashSet<TrackType>();
             tracks = Array(root, "tracks").Zip(tracks, (json, track) =>
                     json.TryGetProperty("properties", out var p) && Bool(p, "default_track") is not null
                         ? track
-                        : track with { Flags = track.Flags with { Default = seen.Add(track.Type) && track.Type != TrackType.Subtitles } })
+                        : track with
+                        {
+                            Flags = track.Flags with
+                            {
+                                Default = mp4 ? track.Flags.Enabled && seen.Add(track.Type) : seen.Add(track.Type) && track.Type != TrackType.Subtitles,
+                            },
+                        })
                 .ToList();
         }
         var duration = Long(containerProperties, "duration");

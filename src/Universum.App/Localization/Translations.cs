@@ -3207,6 +3207,17 @@ internal static class Translations
         ["Odkazy"] = "Odkazy",
         ["Meno namiesto linku"] = "Jméno místo odkazu",
         ["Pri odkaze na TMDB sa ukáže názov filmu alebo seriálu – pôvodný, pri inom písme ako latinka (čínsky, kórejský…) anglický, ako v knižnici. Celý odkaz je v bublinke pri myši."] = "U odkazu na TMDB se ukáže název filmu nebo seriálu – původní, u jiného písma než latinky (čínský, korejský…) anglický, jako v knihovně. Celý odkaz je v bublině u myši.",
+        ["stopa MP4 bez čísla"] = "stopa MP4 bez čísla",
+        ["zlučujú sa viaceré súbory"] = "slučuje se více souborů",
+        ["pripájajú sa ďalšie súbory"] = "připojují se další soubory",
+        ["vlastnosti stopy (oneskorenie, FPS, pomer strán, orez, SRT…)"] = "vlastnosti stopy (zpoždění, FPS, poměr stran, ořez, SRT…)",
+        ["prílohy"] = "přílohy",
+        ["Súbor ostal MP4 – UNIVERSUM upravil len jeho hlavičku, obraz a zvuk sa nezmenili."] = "Soubor zůstal MP4 – UNIVERSUM upravil jen jeho hlavičku, obraz a zvuk se nezměnily.",
+        ["Kópia v knižnici ostane MP4 – UNIVERSUM zmení len jej hlavičku ({0}), obraz a zvuk sa nedotknú. Originál ostane nezmenený."] = "Kopie v knihovně zůstane MP4 – UNIVERSUM změní jen její hlavičku ({0}), obrazu a zvuku se nedotkne. Originál zůstane nezměněn.",
+        ["Zapíše sa nový súbor MKV do knižnice ({0}) – MP4 neudrží: {1}. Originál ostane nezmenený."] = "Zapíše se nový soubor MKV do knihovny ({0}) – MP4 neudrží: {1}. Originál zůstane nezměněn.",
+        ["Výsledok ostane MP4 – UNIVERSUM zmení len hlavičku, obraz a zvuk sa nedotknú."] = "Výsledek zůstane MP4 – UNIVERSUM změní jen hlavičku, obrazu a zvuku se nedotkne.",
+        ["Výsledok bude MKV – MP4 neudrží: {0}."] = "Výsledek bude MKV – MP4 neudrží: {0}.",
+        ["Jedno MP4 so všetkými stopami, ktorému sa mení len hlavička (jazyky, názvy, predvolené stopy, poradie, názov), sa zapíše ako MP4 – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, odstránení stopy, kapitolách alebo vlastnostiach stopy vznikne MKV. Náhľad je vždy MKV."] = "Jedno MP4 se všemi stopami, kterému se mění jen hlavička (jazyky, názvy, výchozí stopy, pořadí, název), se zapíše jako MP4 – hlavičku upraví UNIVERSUM, obrazu a zvuku se nedotkne. Při slučování více souborů, odstranění stopy, kapitolách nebo vlastnostech stopy vznikne MKV. Náhled je vždy MKV.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6410,5 +6421,16 @@ internal static class Translations
         ["Odkazy"] = "Links",
         ["Meno namiesto linku"] = "Name instead of the link",
         ["Pri odkaze na TMDB sa ukáže názov filmu alebo seriálu – pôvodný, pri inom písme ako latinka (čínsky, kórejský…) anglický, ako v knižnici. Celý odkaz je v bublinke pri myši."] = "A TMDB link shows the name of the film or series – the original one, the English one for another script than Latin (Chinese, Korean…), as in the library. The whole link is in the tooltip.",
+        ["stopa MP4 bez čísla"] = "an MP4 track without a number",
+        ["zlučujú sa viaceré súbory"] = "several files are merged",
+        ["pripájajú sa ďalšie súbory"] = "further files are appended",
+        ["vlastnosti stopy (oneskorenie, FPS, pomer strán, orez, SRT…)"] = "track properties (delay, FPS, aspect ratio, cropping, SRT…)",
+        ["prílohy"] = "attachments",
+        ["Súbor ostal MP4 – UNIVERSUM upravil len jeho hlavičku, obraz a zvuk sa nezmenili."] = "The file stayed MP4 – UNIVERSUM edited only its header, picture and sound unchanged.",
+        ["Kópia v knižnici ostane MP4 – UNIVERSUM zmení len jej hlavičku ({0}), obraz a zvuk sa nedotknú. Originál ostane nezmenený."] = "The copy in the library stays MP4 – UNIVERSUM changes only its header ({0}), picture and sound are not touched. The original stays unchanged.",
+        ["Zapíše sa nový súbor MKV do knižnice ({0}) – MP4 neudrží: {1}. Originál ostane nezmenený."] = "A new MKV file is written to the library ({0}) – MP4 cannot hold: {1}. The original stays unchanged.",
+        ["Výsledok ostane MP4 – UNIVERSUM zmení len hlavičku, obraz a zvuk sa nedotknú."] = "The result stays MP4 – UNIVERSUM changes only the header, picture and sound are not touched.",
+        ["Výsledok bude MKV – MP4 neudrží: {0}."] = "The result will be MKV – MP4 cannot hold: {0}.",
+        ["Jedno MP4 so všetkými stopami, ktorému sa mení len hlavička (jazyky, názvy, predvolené stopy, poradie, názov), sa zapíše ako MP4 – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, odstránení stopy, kapitolách alebo vlastnostiach stopy vznikne MKV. Náhľad je vždy MKV."] = "One MP4 with all its tracks whose header only changes (languages, names, default tracks, order, title) is written as MP4 – UNIVERSUM edits the header, picture and sound are not touched. Merging several files, removing a track, chapters or track properties make an MKV. A preview is always MKV.",
     };
 }

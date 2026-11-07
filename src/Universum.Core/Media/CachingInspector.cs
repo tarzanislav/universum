@@ -34,7 +34,8 @@ public sealed class CachingInspector : IMediaInspector
         lock (_lock)
         {
             if (_entries.TryGetValue(key, out var entry) && entry.Size == info.Length &&
-                entry.LastWriteUtcTicks == info.LastWriteTimeUtc.Ticks && entry.Inspector == _inner.Name)
+                entry.LastWriteUtcTicks == info.LastWriteTimeUtc.Ticks && entry.Inspector == _inner.Name &&
+                (entry.Revision >= Mp4Revision || !entry.File.IsMp4))
             {
                 Hits++;
                 return entry.File with { Path = key };
@@ -45,7 +46,7 @@ public sealed class CachingInspector : IMediaInspector
         info.Refresh();
         lock (_lock)
         {
-            _entries[key] = new Entry(info.Length, info.LastWriteTimeUtc.Ticks, _inner.Name, file);
+            _entries[key] = new Entry(info.Length, info.LastWriteTimeUtc.Ticks, _inner.Name, file, Mp4Revision);
             _dirty = true;
         }
 
@@ -98,5 +99,8 @@ public sealed class CachingInspector : IMediaInspector
         }
     }
 
-    private sealed record Entry(long Size, long LastWriteUtcTicks, string Inspector, MediaFile File);
+    // the reading of an MP4's default tracks changed (7. 11. 2026: by its "enabled" flag): an MP4 read before is read again
+    private const int Mp4Revision = 2;
+
+    private sealed record Entry(long Size, long LastWriteUtcTicks, string Inspector, MediaFile File, int Revision = 0);
 }

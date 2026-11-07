@@ -162,6 +162,11 @@ public static partial class ProcessingWords
             return (CoreText.F("Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie).", why), null);
         }
 
+        if (message == Mp4.Mp4Editing.KeptMessage)
+        {
+            return (CoreText.T("Súbor ostal MP4 – UNIVERSUM upravil len jeho hlavičku, obraz a zvuk sa nezmenili."), null);
+        }
+
         if (message == FileProcessor.Mp4ProbedMessage)
         {
             return (CoreText.T("Hlavičku MP4 skontroloval aj ffprobe (nezávislý nástroj) – vidí to isté."), null);

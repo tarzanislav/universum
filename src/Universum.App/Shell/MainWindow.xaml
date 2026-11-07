@@ -1036,6 +1036,12 @@
                         </StackPanel>
                         <StackPanel>
                             <TextBlock Text="{Binding OutputNote}" Style="{StaticResource Hint}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            <!-- owner, 7. 11. 2026: Ponechať MP4 – one MP4 whose header only changes stays MP4 -->
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsMp4, Converter={StaticResource BoolToVisibility}}">
+                                <CheckBox Content="{loc:T 'MP4 ponechať ako MP4'}" IsChecked="{Binding KeepMp4}" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="0"
+                                          ToolTip="{loc:T 'Jedno MP4 so všetkými stopami, ktorému sa mení len hlavička (jazyky, názvy, predvolené stopy, poradie, názov), sa zapíše ako MP4 – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, odstránení stopy, kapitolách alebo vlastnostiach stopy vznikne MKV. Náhľad je vždy MKV.'}" />
+                                <TextBlock Text="{Binding Mp4Note}" Style="{StaticResource Hint}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Mp4Note}" />
+                            </StackPanel>
                             <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" MaxHeight="40" ToolTip="{Binding Problems}" />
                             <TextBlock Text="{Binding Result}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Result}" />
                         </StackPanel>
@@ -2065,6 +2071,10 @@
                              ToolTip="{loc:T 'Názov celého súboru, ktorý ukazujú prehrávače; prázdny ho odstráni'}" />
                     <CheckBox Content="{loc:T 'Odstrániť tagy'}" IsChecked="{Binding RemoveTags}" IsEnabled="{Binding HasTags}" VerticalAlignment="Center" Margin="0,0,20,0"
                               ToolTip="{loc:T 'Globálne tagy aj tagy stôp (názvy, štatistiky, údaje o kódovaní)'}" />
+                    <!-- owner, 7. 11. 2026: Ponechať MP4 – shown for an MP4; the same switch as in Hromadné, Single and Zlučovanie -->
+                    <CheckBox Content="{loc:T 'MP4 ponechať ako MP4 (len hlavička)'}" IsChecked="{Binding KeepMp4}" VerticalAlignment="Center" Margin="0,0,20,0"
+                              Visibility="{Binding IsMp4, Converter={StaticResource BoolToVisibility}}"
+                              ToolTip="{loc:T 'Súbor ostane MP4 – UNIVERSUM upraví len jeho hlavičku (jazyky, názvy, predvolené stopy, poradie, názov), obraz a zvuk sa nedotknú. Ak treba zmenu, ktorú MP4 neudrží (odstrániť stopu, Forced…), zapíše sa ako MKV.'}" />
                     <Button Content="{loc:T 'Pravidlá UNIVERSUM'}" Command="{Binding ApplyRulesCommand}" Padding="12,4" Margin="0,0,8,0"
                             ToolTip="{loc:T 'Vyplní názvy, jazyky, príznaky a poradie podľa pravidiel UNIVERSUM – potom sa dá ďalej upraviť'}" />
                     <Button Content="{loc:T 'Obnoviť zo súboru'}" Command="{Binding ResetCommand}" Padding="12,4" Margin="0,0,8,0" />

@@ -229,7 +229,7 @@ public sealed class MegaPageViewModel : ObservableObject
         var inspector = _services.Inspector(installation);
         // files of Single spracovanie keep their originals; results of Zlučovanie are written by the multiplexer (owner, 1. 11. 2026)
         var job = new MegaJob(batch, _services.Processor(installation, deleteOriginals: batch.Originals.RemovesWhileRunning()), (path, token) => inspector.InspectAsync(path, token),
-            b => JobRow.OnUi(() => Saved(b)), keeping: _services.Processor(installation, deleteOriginals: false), mux: new Core.Muxing.Multiplexer(installation, _services.Runner).MuxAsync);
+            b => JobRow.OnUi(() => Saved(b)), keeping: _services.Processor(installation, deleteOriginals: false), mux: _services.Multiplexer(installation).MuxAsync);
         job.Changed += j =>
         {
             if (j.IsFinished)

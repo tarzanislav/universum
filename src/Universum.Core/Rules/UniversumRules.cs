@@ -13,6 +13,9 @@ public static class UniversumRules
     /// <summary>The track name of forced subtitles (owner, 29. 10. 2026).</summary>
     public const string ForcedName = "Forced";
 
+    /// <summary>The name of subtitles for the deaf and hard of hearing (owner, 7. 11. 2026: "English SDH", "CC" … → "SDH").</summary>
+    public const string HearingImpairedName = "SDH";
+
     private const string NameAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     public static TargetState Apply(MediaFile file, RuleProfile? profile = null, TrackDecisions? decisions = null)
@@ -145,7 +148,7 @@ public static class UniversumRules
 
         var forcedIsDefault = defaultSubtitle is null;
         return subtitles.Select(s => new TrackTarget(
-            s.Track, s.Role == TrackRole.Forced ? ForcedName : null, s.Language,
+            s.Track, s.Role switch { TrackRole.Forced => ForcedName, TrackRole.HearingImpaired => HearingImpairedName, _ => null }, s.Language,
             ReferenceEquals(s, defaultSubtitle) ? new TrackFlags(Default: true, Enabled: true, HearingImpaired: s.Role == TrackRole.HearingImpaired)
             : ReferenceEquals(s, activeForced) ? new TrackFlags(Default: forcedIsDefault, Enabled: true, Forced: true)
             : s.Track.Flags with

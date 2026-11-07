@@ -159,6 +159,11 @@ public static partial class ProcessingWords
             return (CoreText.F("Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie).", why), null);
         }
 
+        if (message.StartsWith(FileProcessor.Mp4RecordPrefix, StringComparison.Ordinal))
+        {
+            return (CoreText.F("Záznam MP4 pre vývojára (bez mien súborov): {0}", Tail(FileProcessor.Mp4RecordPrefix)), null);
+        }
+
         if (message == FileProcessor.RestoredMessage)
         {
             return (CoreText.T("Originál je vrátený do pôvodného stavu."), null);
@@ -214,6 +219,7 @@ public static partial class ProcessingWords
         (Rx("^done, but the library index was not updated: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hotovo, ale register knižnice sa nepodarilo zapísať ({0}).", m.Groups["why"].Value), CoreText.T("Výsledok je v poriadku; pri ďalšom spracovaní toho istého originálu ho UNIVERSUM nemusí spoznať a zapíše novú verziu.")))),
         (Rx("^done, but: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hotovo, ale: {0}.", m.Groups["why"].Value), CoreText.T("Výsledok je v knižnici; skontrolujte uvedenú vec.")))),
         (Rx("^not enough free space on (?<disk>.+?): (?<free>\\d+) MB free, (?<need>\\d+) MB needed"), m => (null, new LoggedProblem(CoreText.F("Na disku {0} je voľných {1} MB, treba {2} MB.", m.Groups["disk"].Value, m.Groups["free"].Value, m.Groups["need"].Value), CoreText.T("Uvoľnite miesto na disku alebo zvoľte knižnicu na inom disku a spustite spracovanie znova.")))),
+        (Rx("^the MP4 header cannot be edited: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hlavičku MP4 sa nepodarilo upraviť: {0}.", m.Groups["why"].Value), CoreText.T("Originál ostal, ako bol. Vypnite Ponechať MP4 (súbor sa zapíše ako MKV) a pošlite záznam MP4 vývojárovi.")))),
         (Rx("^the copy of (?<name>.+) is incomplete"), _ => (null, new LoggedProblem(CoreText.T("Kópia súboru do knižnice je neúplná."), CoreText.T("Skontrolujte disk (miesto, chyby) a spustite spracovanie znova.")))),
         (Rx("^(?<tool>mkvmerge|mkvpropedit) failed \\((?<code>-?\\d+)\\): (?<detail>.*)"), m => (null, new LoggedProblem(
             CoreText.F("Nástroj {0} skončil chybou {1}: {2}", m.Groups["tool"].Value == "mkvmerge" ? CoreText.T("mkvmerge (zápis nového súboru)") : CoreText.T("mkvpropedit (úprava hlavičky)"), m.Groups["code"].Value, m.Groups["detail"].Value),

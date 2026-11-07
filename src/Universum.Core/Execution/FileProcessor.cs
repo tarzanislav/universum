@@ -43,6 +43,15 @@ public sealed class FileProcessor(
     /// <summary>Posters waiting for their titles (TMDB poster, Zlúčiť poster s filmom/seriálom): one goes into the title's folder once a result is written there.</summary>
     public Posters.PendingPosters? WaitingPosters { get; init; }
 
+    /// <summary>Where a záznam MP4 is written when an MP4 cannot be edited or its result does not pass the check (null: none).</summary>
+    public string? Mp4RecordFolder { get; init; }
+
+    /// <summary>The version of UNIVERSUM written into a záznam MP4.</summary>
+    public string Version { get; init; } = typeof(FileProcessor).Assembly.GetName().Version?.ToString(3) ?? "?";
+
+    /// <summary>Start of the message naming the záznam MP4 written.</summary>
+    public const string Mp4RecordPrefix = "the MP4 record: ";
+
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
     /// (MEGA spracovanie keeps it with a batch).
@@ -317,7 +326,18 @@ public sealed class FileProcessor(
         }
 
         var problems = new List<string>();
-        if (record.HeaderChanged)
+        if (record.HeaderChanged && record.Mp4Length is { } mp4Length && record.Mp4MovieStart is { } mp4Movie)
+        {
+            try
+            {
+                Mp4.Mp4HeaderEditor.Undo(path, new Mp4.Mp4Undo(mp4Length, mp4Movie));
+            }
+            catch (Exception ex) when (IsFileError(ex))
+            {
+                problems.Add("the MP4 header could not be restored: " + ex.Message);
+            }
+        }
+        else if (record.HeaderChanged)
         {
             try
             {
@@ -927,6 +947,20 @@ public sealed class FileProcessor(
         else
         {
             await CopyAsync(source, temporary, progress, cancellationToken);
+            if (plan.Method == WriteMethod.HeaderEdit && plan.Target.StaysMp4)
+            {
+                // Ponechať MP4: the header of the copy edited by UNIVERSUM itself, checked against the original
+                var mp4Problems = await EditMp4Async(plan.Target, temporary, source);
+                if (mp4Problems.Count > 0)
+                {
+                    TryDelete(temporary);
+                    return mp4Problems;
+                }
+
+                FlushToDisk(temporary);
+                return [];
+            }
+
             if (plan.Method == WriteMethod.HeaderEdit)
             {
                 using var chapters = ChaptersFile.For(plan.Target);
@@ -991,6 +1025,12 @@ public sealed class FileProcessor(
     /// <summary>Edits a header in place (never interrupted) and verifies it; throws <see cref="EditFailedException"/>.</summary>
     private async Task<IReadOnlyList<string>> EditVerifiedAsync(EditPlan plan, string path)
     {
+        if (plan.Target.StaysMp4)
+        {
+            var mp4Problems = await EditMp4Async(plan.Target, path, null);
+            return mp4Problems.Count > 0 ? throw new EditFailedException(mp4Problems) : [];
+        }
+
         ProcessResult result;
         using (var chapters = ChaptersFile.For(plan.Target))
         {
@@ -1010,6 +1050,68 @@ public sealed class FileProcessor(
         }
 
         return messages;
+    }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): the header of <paramref name="path"/> changed by UNIVERSUM's own code (the media
+    /// untouched), then checked twice – by UNIVERSUM's reader against <paramref name="original"/> (or the file as it was) and by
+    /// ffprobe when FFmpeg is at hand. Problems (and the záznam MP4 written) as messages; empty when all is as planned.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> EditMp4Async(TargetState target, string path, string? original)
+    {
+        try
+        {
+            var before = await Task.Run(() => Mp4.Mp4Reader.Read(original ?? path)).ConfigureAwait(false);
+            await Task.Run(() => Mp4.Mp4HeaderEditor.Apply(path, Mp4.Mp4Targets.ChangeFor(target))).ConfigureAwait(false);
+            var after = await Task.Run(() => Mp4.Mp4Reader.Read(path)).ConfigureAwait(false);
+            var problems = Mp4.Mp4Targets.Verify(target, before, after).ToList();
+            if (problems.Count == 0 && FindFfmpeg is not null)
+            {
+                try
+                {
+                    var ffmpeg = await FindFfmpeg(CancellationToken.None).ConfigureAwait(false);
+                    var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+                    if (File.Exists(ffprobe) && await Mp4.Mp4Targets.ProbeAsync(runner, ffprobe, path, target).ConfigureAwait(false) is { } seen)
+                    {
+                        problems.AddRange(seen);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or Speech.SpeechException or InvalidOperationException)
+                {
+                    // ffprobe is the second opinion; without it UNIVERSUM's own check stands
+                }
+            }
+
+            return problems.Count == 0 ? [] : [.. problems.Select(p => "verification: " + p), .. Mp4Record(path, string.Join("; ", problems))];
+        }
+        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            return [$"the MP4 header cannot be edited: {ex.Message}", .. Mp4Record(path, ex.Message)];
+        }
+    }
+
+    // a záznam MP4 for the developer (no names in it); the message naming it, or none
+    private IEnumerable<string> Mp4Record(string path, string problem)
+    {
+        if (Mp4RecordFolder is null)
+        {
+            yield break;
+        }
+
+        string? saved = null;
+        try
+        {
+            saved = Mp4.Mp4Record.Save(Mp4RecordFolder, Mp4.Mp4Record.Describe(path, problem, Version));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // the record is a help, not a condition
+        }
+
+        if (saved is not null)
+        {
+            yield return Mp4RecordPrefix + saved;
+        }
     }
 
     /// <summary>Records the stream in the library index and sets the modification time; failures here only add messages.</summary>
@@ -1180,8 +1282,16 @@ public sealed class FileProcessor(
     {
         Directory.CreateDirectory(journalDirectory);
         var id = $"{DateTime.UtcNow:yyyyMMdd-HHmmssfff}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4))}";
+        Mp4.Mp4Undo? mp4 = null;
+        if (headerChanged && file.IsMp4)
+        {
+            // Ponechať MP4: what puts the file back byte for byte (its length, where its movie box is)
+            var read = await Task.Run(() => Mp4.Mp4Reader.Read(file.Path), cancellationToken).ConfigureAwait(false);
+            mp4 = new Mp4.Mp4Undo(read.Length, read.Movie.Start);
+        }
+
         string? tagsPath = null;
-        if (file.HasTags && headerChanged)
+        if (file.HasTags && headerChanged && mp4 is null)
         {
             tagsPath = Path.Combine(journalDirectory, id + ".tags.xml");
             var extract = await RunAsync(MkvToolNixTool.MkvExtract, [file.Path, "tags", tagsPath], null, cancellationToken);
@@ -1192,7 +1302,7 @@ public sealed class FileProcessor(
         }
 
         string? chaptersPath = null;
-        if (file.HasChapters && headerChanged && chaptersChanged)
+        if (file.HasChapters && headerChanged && chaptersChanged && mp4 is null)
         {
             chaptersPath = Path.Combine(journalDirectory, id + ".chapters.xml");
             var extract = await RunAsync(MkvToolNixTool.MkvExtract, [file.Path, "chapters", chaptersPath], null, cancellationToken);
@@ -1214,6 +1324,8 @@ public sealed class FileProcessor(
             ModifiedUtc = File.GetLastWriteTimeUtc(file.Path),
             TitleSaved = true,
             Title = file.Title,
+            Mp4Length = mp4?.Length,
+            Mp4MovieStart = mp4?.MovieStart,
             Tracks = file.Tracks.Where(t => t.Number is not null)
                 .Select(t => new UndoTrack(t.Number!.Value, t.Name, t.Language.Legacy, t.Language.Ietf, t.Flags.Default, t.Flags.Enabled, t.Flags.Forced, t.Uid,
                     new UndoFlags(t.Flags.HearingImpaired, t.Flags.VisualImpaired, t.Flags.TextDescriptions, t.Flags.Original, t.Flags.Commentary)))

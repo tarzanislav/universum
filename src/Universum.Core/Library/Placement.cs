@@ -180,9 +180,11 @@ public sealed record LibraryLayout(string Root)
     {
         var stem = StreamLabel.Stem(target, profile);
         var sizes = profile.Library.SizesFor(title.Kind);
+        // an MP4 that stays MP4 (Ponechať MP4) keeps its extension (.mp4, .m4v, .mov)
+        var extension = target.StaysMp4 ? Path.GetExtension(target.Source.Path).ToLowerInvariant() : ".mkv";
         if (title.Kind == MediaKind.Movie)
         {
-            return new Placement(TitleDirectory(title), title.FolderName, stem, sizes) { Title = title };
+            return new Placement(TitleDirectory(title), title.FolderName, stem, sizes, extension) { Title = title };
         }
 
         if (episode is null)
@@ -194,7 +196,8 @@ public sealed record LibraryLayout(string Root)
             Path.Combine(TitleDirectory(title), LibraryNames.SeasonFolder(episode.Season)),
             title.CleanName + " " + episode.Tag,
             stem,
-            sizes) { Title = title };
+            sizes,
+            extension) { Title = title };
     }
 
     /// <summary>

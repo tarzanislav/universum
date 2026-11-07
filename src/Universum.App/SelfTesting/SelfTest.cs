@@ -3845,8 +3845,8 @@ internal static class SelfTest
         batch.SelectSeriesGroups(batch.SeriesGroups.Take(2).ToList());
         Check(batch.SeriesTargetNote.Contains('2', StringComparison.Ordinal), "batch: the row Seriál: names the 2 groups marked – " + batch.SeriesTargetNote);
         batch.SeriesTitle = "Vymyslený spoločný seriál (2025) [tmdbid-424242]";
-        var named = batch.Items.Where(i => i.PlannedPath?.Contains("Vymyslený spoločný seriál (2025) [tmdbid-424242]", StringComparison.Ordinal) == true).ToList();
-        Check(named.Count == 2 && named.All(i => !i.File.Path.Contains("Priecinok C", StringComparison.Ordinal)),
+        var inCommon = batch.Items.Where(i => i.PlannedPath?.Contains("Vymyslený spoločný seriál (2025) [tmdbid-424242]", StringComparison.Ordinal) == true).ToList();
+        Check(inCommon.Count == 2 && inCommon.All(i => !i.File.Path.Contains("Priecinok C", StringComparison.Ordinal)),
             "batch: both groups marked got the series, the third did not – " + string.Join(" | ", batch.Items.Select(i => i.PlannedPath)));
         await Screenshot(window, "batch-series-groups.png");
         batch.SelectSeriesGroups([]);

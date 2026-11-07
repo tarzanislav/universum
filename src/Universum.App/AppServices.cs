@@ -201,6 +201,27 @@ public sealed class AppServices
     /// <summary>Raised when the output folder changes, so the pages can update.</summary>
     public event Action? LibraryChanged;
 
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): one switch for Hromadné, Single spracovanie and Nastavenia –
+    /// an MP4 whose header only changes stays MP4 (UNIVERSUM edits its header itself).
+    /// </summary>
+    public bool KeepMp4
+    {
+        get => Settings.KeepMp4;
+        set
+        {
+            if (Settings.KeepMp4 != value)
+            {
+                Settings.KeepMp4 = value;
+                Settings.Save();
+                KeepMp4Changed?.Invoke();
+            }
+        }
+    }
+
+    /// <summary>Raised when Ponechať MP4 is switched (the pages plan again).</summary>
+    public event Action? KeepMp4Changed;
+
     /// <summary>Sets the output folder and creates MOVIES and TVSHOWS in it (they are never deleted by UNIVERSUM).</summary>
     public void SetOutputDirectory(string folder)
     {
@@ -230,6 +251,8 @@ public sealed class AppServices
             ParallelDisks = Math.Clamp(Settings.ParallelDisks, 1, 8),
             // a sound written anew (Úprava audiostopy, also in Hromadné spracovanie and MEGA): FFmpeg of the installation
             FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
+            // owner, 7. 11. 2026: what went wrong with an MP4, without names, for the developer
+            Mp4RecordFolder = AppSettings.Mp4RecordDirectory,
         };
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
@@ -952,8 +975,18 @@ public sealed class AppServices
     /// <summary>Update check of MKVToolNix and UNIVERSUM (one for the whole program).</summary>
     public Updates.UpdateService Updates => _updates ??= new Updates.UpdateService(this);
 
-    /// <summary>Rules profile chosen in the settings (or the default of the specification).</summary>
-    public RuleProfile Profile => Settings.Profile ?? RuleProfile.Default;
+    /// <summary>
+    /// Rules profile chosen in the settings (or the default of the specification), with Ponechať MP4 of the settings
+    /// (owner, 7. 11. 2026: one switch for Hromadné, Single spracovanie and Nastavenia).
+    /// </summary>
+    public RuleProfile Profile
+    {
+        get
+        {
+            var profile = Settings.Profile ?? RuleProfile.Default;
+            return profile.KeepMp4 == Settings.KeepMp4 ? profile : profile with { KeepMp4 = Settings.KeepMp4 };
+        }
+    }
 
     /// <summary>MKVToolNix found by the last search; null when none is usable.</summary>
     public MkvToolNixInstallation? CurrentMkvToolNix { get; private set; }
@@ -1070,6 +1103,12 @@ public sealed class AppSettings
 
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose header only changes stays MP4 – UNIVERSUM edits its header itself
+    /// (with Superrýchle in seconds); off, every MP4 is written as MKV, as before.
+    /// </summary>
+    public bool KeepMp4 { get; set; }
 
     /// <summary>What Hromadné spracovanie does with the originals (owner, 30. 10. 2026; kept by default).</summary>
     public OriginalsMode BatchOriginals { get; set; } = OriginalsMode.Keep;
@@ -1237,6 +1276,9 @@ public sealed class AppSettings
 
     /// <summary>Saved batch templates (*.json).</summary>
     public static string TemplateDirectory => Path.Combine(Directory, "templates");
+
+    /// <summary>Záznamy MP4 for the developer (owner, 7. 11. 2026): the structure of an MP4 that could not be edited, no names.</summary>
+    public static string Mp4RecordDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "zaznamy-mp4");
 
     /// <summary>Index of library files and the originals they were made from.</summary>
     public static string LibraryIndexFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "library-index.json");

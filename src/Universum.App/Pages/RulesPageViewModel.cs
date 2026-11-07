@@ -74,7 +74,26 @@ public sealed class RulesPageViewModel : ObservableObject
             OnPropertyChanged(nameof(OutputDescription));
             UpdateTarget();
         };
+        // Ponechať MP4 switched here, in Hromadné or in Nastavenia: the plan (and the name in the library) again
+        services.KeepMp4Changed += () =>
+        {
+            OnPropertyChanged(nameof(KeepMp4));
+            if (!Busy && _file is not null)
+            {
+                Recalculate();
+                UpdateTarget();
+            }
+        };
     }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose header only changes stays MP4 – UNIVERSUM edits its header itself;
+    /// the same switch as in Hromadné and Nastavenia.
+    /// </summary>
+    public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
+
+    /// <summary>The opened file is an MP4 (Ponechať MP4 is offered).</summary>
+    public bool IsMp4 => _file?.IsMp4 == true;
 
     public AsyncRelayCommand OpenCommand { get; }
 
@@ -188,10 +207,14 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             if (SetProperty(ref _busy, value))
             {
+                OnPropertyChanged(nameof(IsIdle));
                 RefreshCommands();
             }
         }
     }
+
+    /// <summary>Nothing is being written (Ponechať MP4 can be switched).</summary>
+    public bool IsIdle => !_busy;
 
     public bool KeepOriginal
     {
@@ -426,6 +449,7 @@ public sealed class RulesPageViewModel : ObservableObject
         }
 
         _plan = EditPlan.For(target);
+        OnPropertyChanged(nameof(IsMp4));
 
         // held: the rows in the order they are shown (a new row after them); otherwise the waiting order is not needed
         var shown = Rows.Select(r => r.TrackId).ToList();
@@ -468,7 +492,9 @@ public sealed class RulesPageViewModel : ObservableObject
         Summary = _plan.Method switch
         {
             WriteMethod.None => Loc.T("Súbor už spĺňa pravidlá UNIVERSUM – len sa uloží do knižnice."),
+            WriteMethod.HeaderEdit when target.StaysMp4 => Loc.F("Ostane MP4 – UNIVERSUM zmení len jeho hlavičku ({0}), obraz a zvuk sa nedotknú.", ChangeCount(_plan.Changes.Count)),
             WriteMethod.HeaderEdit => Loc.F("Zmení sa len hlavička ({0}) – trvá to pár sekúnd.", ChangeCount(_plan.Changes.Count)),
+            _ when target.Mp4Obstacle is { } why => Loc.F("Súbor {0} sa prevedie do MKV – MP4 neudrží: {1} ({2}).", _file.ContainerName, why, ChangeCount(_plan.Changes.Count)),
             _ when target.ContainerChanged => Loc.F("Súbor {0} sa prevedie do MKV – vznikne nový súbor ({1}).", _file.ContainerName, ChangeCount(_plan.Changes.Count)),
             _ when target.AddsFiles || target.TimingChanged || target.Tracks.Any(t => t.ToSrt) => Loc.F("Vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),
             _ => Loc.F("Mení sa poradie stôp – vznikne nový súbor ({0}).", ChangeCount(_plan.Changes.Count)),

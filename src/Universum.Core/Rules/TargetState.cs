@@ -9,6 +9,88 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>The file is rewritten to create a missing index (cues) for the video.</summary>
     public bool RepairIndex { get; init; }
 
+    /// <summary>Ponechať MP4 is chosen (the profile): an MP4 stays MP4 when MP4 can hold all its changes.</summary>
+    public bool KeepMp4 { get; init; }
+
+    /// <summary>
+    /// The result stays MP4 – its header edited in place by UNIVERSUM (owner, 7. 11. 2026): Ponechať MP4, an MP4, and
+    /// nothing MP4 cannot hold (see <see cref="Mp4Obstacle"/>). Otherwise the MP4 becomes an MKV as always.
+    /// </summary>
+    public bool StaysMp4 => KeepMp4 && Source.IsMp4 && Mp4Obstacles().FirstOrDefault() is null;
+
+    /// <summary>
+    /// Why an MP4 does not stay MP4 although Ponechať MP4 is chosen – the first thing MP4 cannot hold, in words ("odstraňujú
+    /// sa stopy"); null when it stays, or when it is no MP4 or Ponechať MP4 is off.
+    /// </summary>
+    public string? Mp4Obstacle => KeepMp4 && Source.IsMp4 ? Mp4Obstacles().FirstOrDefault() : null;
+
+    // MP4 holds the order, the title, and per track the language, the name and one flag (enabled = the default); a track
+    // left out or added, new times, a cut, chapters, a new index, proportions, SRT, and the flags of Matroska MP4 has no
+    // place for (forced, hearing impaired, commentary …, a default track switched off) make an MKV
+    private IEnumerable<string> Mp4Obstacles()
+    {
+        if (RemovedFromFile.Any())
+        {
+            yield return Text.CoreText.T("odstraňujú sa stopy");
+        }
+
+        if (AddsFiles)
+        {
+            yield return Text.CoreText.T("pridávajú sa titulky zo súboru");
+        }
+
+        if (TimingChanged)
+        {
+            yield return Text.CoreText.T("menia sa časy titulkov");
+        }
+
+        if (IsCut)
+        {
+            yield return Text.CoreText.T("strih");
+        }
+
+        if (ChaptersChanged)
+        {
+            yield return Text.CoreText.T("kapitoly");
+        }
+
+        if (RepairIndex)
+        {
+            yield return Text.CoreText.T("oprava indexu");
+        }
+
+        if (Tracks.Any(t => t.AspectRatio is not null))
+        {
+            yield return Text.CoreText.T("nový pomer strán obrazu");
+        }
+
+        if (Tracks.Any(t => t.ToSrt))
+        {
+            yield return Text.CoreText.T("titulky do SRT");
+        }
+
+        if (Tracks.Any(t => t.Flags.Forced != t.Source.Flags.Forced))
+        {
+            yield return Text.CoreText.T("príznak vynútené (Forced)");
+        }
+
+        if (Tracks.Any(t => t.OtherFlagsChanged))
+        {
+            yield return Text.CoreText.T("príznak pre nepočujúcich, komentár a podobné");
+        }
+
+        if (Tracks.Any(t => t.Flags.Default && !t.Flags.Enabled))
+        {
+            yield return Text.CoreText.T("predvolená stopa je vypnutá");
+        }
+    }
+
+    /// <summary>
+    /// What changes in an MP4 that stays MP4: the order, the title, and per track the language, the name and the default
+    /// track (MP4's "enabled" flag – MP4 has no other default; mkvmerge reads every MP4 track as default).
+    /// </summary>
+    public bool Mp4Changes => OrderChanged || TitleChanged || Tracks.Any(t => t.NameChanged || t.LanguageChanged || t.Flags.Default != t.Source.Flags.Enabled);
+
     /// <summary>Tracks left out of the result (only audio and subtitles can be removed).</summary>
     public IReadOnlyList<MediaTrack> Removed { get; init; } = [];
 
@@ -45,13 +127,13 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>True when the track order differs from the file (requires writing a new file).</summary>
     public bool OrderChanged => !Tracks.Where(t => !t.IsAdded).Select(t => t.TrackId).SequenceEqual(Source.Tracks.Where(t => t.ExternalFile is null).Select(t => t.Id));
 
-    public bool TagsChanged => RemoveTags && Source.HasTags;
+    public bool TagsChanged => RemoveTags && Source.HasTags && !StaysMp4;
 
     /// <summary>
     /// The file is not Matroska (MP4, AVI, TS…): the result is always a new MKV written by mkvmerge – never a header edit
     /// and never the file copied as it is (owner, 27. 10. 2026: batch processing converts every video format it can).
     /// </summary>
-    public bool ContainerChanged => !Source.IsMatroska;
+    public bool ContainerChanged => !Source.IsMatroska && !StaysMp4;
 
     /// <summary>External files are added to the video (subtitles lying with it).</summary>
     public bool AddsFiles => Tracks.Any(t => t.IsAdded);
@@ -62,14 +144,14 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     /// <summary>Tracks of the file itself left out (an external file not added is no change of the file).</summary>
     public IEnumerable<MediaTrack> RemovedFromFile => Removed.Where(t => t.ExternalFile is null);
 
-    public bool HasChanges => ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || RemovedFromFile.Any() ||
+    public bool HasChanges => StaysMp4 ? Mp4Changes : ContainerChanged || OrderChanged || RepairIndex || TagsChanged || TitleChanged || ChaptersChanged || RemovedFromFile.Any() ||
                               IsCut || Tracks.Any(t => t.HasChanges);
 
     /// <summary>
     /// A new file must be written (another container, order, removed tracks, index repair, added files, new times of
     /// subtitles); otherwise a header edit is enough.
     /// </summary>
-    public bool NeedsRewrite => ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged || IsCut || Tracks.Any(t => t.AspectRatio is not null || t.ToSrt);
+    public bool NeedsRewrite => !StaysMp4 && (ContainerChanged || OrderChanged || RepairIndex || AddsFiles || TimingChanged || IsCut || Tracks.Any(t => t.AspectRatio is not null || t.ToSrt));
 
     public bool IsBlocked => Issues.Any(i => i.IsBlocking);
 

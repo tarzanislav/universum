@@ -245,6 +245,71 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task Mp4StaysMp4WhenChosenHeaderEditedByUniversumAndUndoneExactly()
+    {
+        // owner, 7. 11. 2026: Ponechať MP4 – an MP4 whose changes MP4 can hold stays MP4, its header edited by UNIVERSUM itself
+        // (Superrýchle: moved into the library, edited there, Vrátiť puts it back byte for byte); otherwise it becomes MKV
+        using var work = new WorkFolder();
+        var bin = new FolderRecycleBin(Path.Combine(work.Path, "bin"));
+        var (processor, inspector) = await CreateAsync(work, bin);
+        var keep = RuleProfile.Default with { KeepMp4 = true };
+
+        var file = work.Copy("en-cz.mp4", "vymysleny-film.mp4");
+        var original = System.IO.File.ReadAllBytes(file);
+        var source = Universum.Core.Mp4.Mp4Reader.Read(file);
+        var plan = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file), keep));
+        Assert.True(plan.Target.StaysMp4 && plan.Method == WriteMethod.HeaderEdit, $"stays MP4, a header edit – {plan.Method}");
+        var placement = work.Movie(plan);
+        Assert.Equal(".mp4", placement.Extension, "the library name keeps .mp4");
+
+        var moved = await processor.ProcessAsync(plan, placement, OriginalsMode.MoveIntoLibrary.Output());
+        Assert.True(moved is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
+                    moved.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) && !System.IO.File.Exists(file), "moved into the library and edited there – " + string.Join("; ", moved.Messages));
+        var result = Universum.Core.Mp4.Mp4Reader.Read(moved.OutputPath!);
+        var czech = result.Tracks.First(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio);
+        Assert.True(czech.Language == "ces" && czech.Enabled && result.Tracks.Count(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio && t.Enabled) == 1,
+            "the Czech sound first and the only default one – " + string.Join(", ", result.Tracks.Select(t => $"{t.Id} {t.Language} {t.Enabled}")));
+        foreach (var track in source.Tracks)
+        {
+            Assert.True(result.Tracks.Single(t => t.Id == track.Id).Samples.Offsets.SequenceEqual(track.Samples.Offsets), $"track {track.Id}: the media untouched");
+        }
+
+        Assert.Equal(0, (await processor.UndoAsync(moved.UndoRecordPath!)).Count, "Vrátiť originály");
+        Assert.True(System.IO.File.Exists(file) && System.IO.File.ReadAllBytes(file).SequenceEqual(original), "the original back in its place, byte for byte");
+
+        // the whole file copied (Superrýchle not chosen): the copy edited, the original to the Recycle Bin
+        var copied = await processor.ProcessAsync(EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(file), keep)), placement, OriginalsMode.DeleteAutomatically.Output());
+        Assert.True(copied.Status == ProcessingStatus.Done && copied.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) &&
+                    Universum.Core.Mp4.Mp4Reader.Read(copied.OutputPath).Tracks.First(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio).Language == "ces",
+            "the copy edited – " + string.Join("; ", copied.Messages));
+
+        // without Ponechať MP4 an MP4 becomes MKV as always
+        var other = work.Copy("en-cz.mp4", "iny-vymysleny-film.mp4");
+        var mkv = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(other)));
+        Assert.True(!mkv.Target.StaysMp4 && mkv.Method == WriteMethod.Remux && work.Movie(mkv).Extension == ".mkv", "MKV without the choice");
+
+        // a change MP4 cannot hold (a track left out): MKV even with the choice
+        var inspected = await inspector.InspectAsync(other);
+        var removed = UniversumRules.Apply(inspected, keep) with { Removed = [inspected.Tracks.First(t => t.Type == TrackType.Audio && t.Language.Primary == "en")] };
+        Assert.True(!removed.StaysMp4 && EditPlan.For(removed).Method == WriteMethod.Remux, "a track left out: written as MKV");
+        Assert.True(removed.Mp4Obstacle is { Length: > 0 } && EditPlan.For(removed).Changes.Single(c => c.Kind == ChangeKind.Container).Why == removed.Mp4Obstacle,
+            "and why, in the plan – " + removed.Mp4Obstacle);
+        Assert.True(mkv.Target.Mp4Obstacle is null, "no reason without the choice");
+
+        // the flags of an MP4: one ("enabled", what players take as the default) – the plan lists only that one
+        var mp4Plan = EditPlan.For(UniversumRules.Apply(inspected, keep));
+        Assert.True(!mp4Plan.Changes.Any(c => c.Kind is ChangeKind.Enabled or ChangeKind.Forced or ChangeKind.OtherFlags) &&
+                    mp4Plan.Changes.Where(c => c.Kind == ChangeKind.Default).Select(c => (c.TrackId, c.After)).Order().SequenceEqual([(1, "0"), (2, "1"), (3, "0")]),
+            "the English sound and the subtitles no longer default, the Czech sound default – " + string.Join("; ", mp4Plan.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
+
+        // a flag MP4 has no place for (forced): MKV
+        var forced = UniversumRules.Apply(inspected, keep) is var ruled
+            ? ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true } } : t).ToList() }
+            : null;
+        Assert.True(forced is { StaysMp4: false, Mp4Obstacle: not null }, "forced subtitles: written as MKV – " + forced?.Mp4Obstacle);
+    }
+
+    [Test]
     public async Task SameStreamIsNotWrittenTwiceAnotherGetsANumber()
     {
         using var work = new WorkFolder();

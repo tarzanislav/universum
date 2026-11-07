@@ -36,6 +36,12 @@ public sealed record UndoRecord
     /// <summary>Last-modified time of the file before the edit; restored by undo.</summary>
     public DateTime? ModifiedUtc { get; init; }
 
+    /// <summary>Ponechať MP4: the length of the MP4 before its header was edited (undo cuts it back); null for MKV.</summary>
+    public long? Mp4Length { get; init; }
+
+    /// <summary>Ponechať MP4: where its movie box was (undo makes it count again).</summary>
+    public long? Mp4MovieStart { get; init; }
+
     public static UndoRecord Load(string path) =>
         JsonSerializer.Deserialize<UndoRecord>(File.ReadAllText(path)) ?? throw new InvalidDataException("Empty undo record.");
 

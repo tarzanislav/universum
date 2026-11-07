@@ -37,6 +37,8 @@ public static partial class ProcessingWords
                 done.Add(plan.Method switch
                 {
                     WriteMethod.Remux => CoreText.T("Zapísaný nový súbor (mkvmerge) a skontrolovaný: stopy, jazyky, príznaky, názvy a dĺžka sedia."),
+                    WriteMethod.HeaderEdit when plan.Target.StaysMp4 =>
+                        CoreText.T("Upravená len hlavička MP4 (vlastný kód UNIVERSUM) a skontrolovaná – obraz a zvuk sa nezmenili."),
                     WriteMethod.HeaderEdit => CoreText.T("Upravená len hlavička súboru (mkvpropedit) a skontrolovaná."),
                     _ => CoreText.T("Súbor sa nemusel meniť – len sa uložil do knižnice."),
                 });
@@ -99,6 +101,7 @@ public static partial class ProcessingWords
         var track = change.TrackId is { } id ? CoreText.F("Stopa {0}: ", id) : "";
         return change.Kind switch
         {
+            ChangeKind.Container when change.Why is { } why => CoreText.F("Kontajner {0} sa zmení na MKV – MP4 neudrží: {1}.", change.Before, why),
             ChangeKind.Container => CoreText.F("Kontajner {0} sa zmení na MKV.", change.Before),
             ChangeKind.Added => track + CoreText.F("pridaná zo súboru {0}.", change.After),
             ChangeKind.Position => track + CoreText.F("presunutá z {0}. na {1}. miesto.", change.Before, change.After),
@@ -159,6 +162,16 @@ public static partial class ProcessingWords
             return (CoreText.F("Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie).", why), null);
         }
 
+        if (message == FileProcessor.Mp4ProbedMessage)
+        {
+            return (CoreText.T("Hlavičku MP4 skontroloval aj ffprobe (nezávislý nástroj) – vidí to isté."), null);
+        }
+
+        if (message.StartsWith(FileProcessor.Mp4RecordPrefix, StringComparison.Ordinal))
+        {
+            return (CoreText.F("Záznam MP4 pre vývojára (bez mien súborov): {0}", Tail(FileProcessor.Mp4RecordPrefix)), null);
+        }
+
         if (message == FileProcessor.RestoredMessage)
         {
             return (CoreText.T("Originál je vrátený do pôvodného stavu."), null);
@@ -214,10 +227,13 @@ public static partial class ProcessingWords
         (Rx("^done, but the library index was not updated: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hotovo, ale register knižnice sa nepodarilo zapísať ({0}).", m.Groups["why"].Value), CoreText.T("Výsledok je v poriadku; pri ďalšom spracovaní toho istého originálu ho UNIVERSUM nemusí spoznať a zapíše novú verziu.")))),
         (Rx("^done, but: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hotovo, ale: {0}.", m.Groups["why"].Value), CoreText.T("Výsledok je v knižnici; skontrolujte uvedenú vec.")))),
         (Rx("^not enough free space on (?<disk>.+?): (?<free>\\d+) MB free, (?<need>\\d+) MB needed"), m => (null, new LoggedProblem(CoreText.F("Na disku {0} je voľných {1} MB, treba {2} MB.", m.Groups["disk"].Value, m.Groups["free"].Value, m.Groups["need"].Value), CoreText.T("Uvoľnite miesto na disku alebo zvoľte knižnicu na inom disku a spustite spracovanie znova.")))),
+        (Rx("^the MP4 header cannot be edited: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Hlavičku MP4 sa nepodarilo upraviť: {0}.", m.Groups["why"].Value), CoreText.T("Originál ostal, ako bol. Vypnite Ponechať MP4 (súbor sa zapíše ako MKV) a pošlite záznam MP4 vývojárovi.")))),
         (Rx("^the copy of (?<name>.+) is incomplete"), _ => (null, new LoggedProblem(CoreText.T("Kópia súboru do knižnice je neúplná."), CoreText.T("Skontrolujte disk (miesto, chyby) a spustite spracovanie znova.")))),
         (Rx("^(?<tool>mkvmerge|mkvpropedit) failed \\((?<code>-?\\d+)\\): (?<detail>.*)"), m => (null, new LoggedProblem(
             CoreText.F("Nástroj {0} skončil chybou {1}: {2}", m.Groups["tool"].Value == "mkvmerge" ? CoreText.T("mkvmerge (zápis nového súboru)") : CoreText.T("mkvpropedit (úprava hlavičky)"), m.Groups["code"].Value, m.Groups["detail"].Value),
             CoreText.T("Súbor môže byť poškodený alebo neúplný – otvorte ho v MKVToolNix GUI alebo v Informáciách; skontrolujte aj voľné miesto na disku.")))),
+        (Rx("^verification: (?<what>(MP4 |ffprobe: ).*)"), m => (null, new LoggedProblem(CoreText.T("Kontrola upravenej hlavičky MP4 našla rozdiel, výsledok sa nepoužil: ") + Mp4Verification(m.Groups["what"].Value) + ".",
+            CoreText.T("Originál ostal, ako bol. Vypnite Ponechať MP4 (súbor sa zapíše ako MKV) a pošlite záznam MP4 vývojárovi.")))),
         (Rx("^verification: (?<what>.*)"), m => (null, new LoggedProblem(CoreText.T("Kontrola zapísaného súboru našla rozdiel, výsledok sa nepoužil: ") + Verification(m.Groups["what"].Value) + ".",
             CoreText.T("Originál ostal. Skúste súbor spracovať znova; ak sa to opakuje, otvorte originál v Informáciách – môže byť poškodený alebo mať chybný údaj v hlavičke.")))),
         (Rx("^the library file cannot be replaced: (?<why>.*)"), m => (null, new LoggedProblem(CoreText.F("Súbor v knižnici sa nedá nahradiť: {0}.", m.Groups["why"].Value), CoreText.T("Zatvorte program, ktorý ho má otvorený (prehrávač, Jellyfin), a skúste znova.")))),
@@ -257,6 +273,35 @@ public static partial class ProcessingWords
             _ => where + rest,
         };
     }));
+
+    // the findings of the check of an MP4 ("MP4 track 3: language eng, expected ces; ffprobe: stream 1 …") in words
+    private static string Mp4Verification(string text) => string.Join("; ", text.Split("; ").Select(part =>
+    {
+        if (part.StartsWith("ffprobe: ", StringComparison.Ordinal))
+        {
+            return CoreText.F("ffprobe vidí inak – {0}", part["ffprobe: ".Length..]);
+        }
+
+        var track = Mp4TrackPrefix().Match(part);
+        var where = track.Success ? CoreText.F("stopa MP4 {0}: ", track.Groups["n"].Value) : "";
+        var rest = track.Success ? part[track.Length..] : part;
+        string Expected(string prefix) => rest[prefix.Length..].Replace(", expected ", CoreText.T(" namiesto "), StringComparison.Ordinal);
+        return rest switch
+        {
+            _ when rest.StartsWith("MP4 track order ", StringComparison.Ordinal) => CoreText.F("iné poradie stôp ({0})", Expected("MP4 track order ")),
+            _ when rest.StartsWith("MP4 title ", StringComparison.Ordinal) => CoreText.F("iný názov filmu ({0})", Expected("MP4 title ")),
+            _ when rest.StartsWith("language ", StringComparison.Ordinal) => where + CoreText.F("iný jazyk ({0})", Expected("language ")),
+            _ when rest.StartsWith("name ", StringComparison.Ordinal) => where + CoreText.F("iný názov ({0})", Expected("name ")),
+            "the name changed" => where + CoreText.T("zmenil sa názov, hoci sa nemal"),
+            _ when rest.StartsWith("default (enabled) ", StringComparison.Ordinal) => where + CoreText.T("iný príznak predvolená"),
+            "its kind, codec or length changed" => where + CoreText.T("zmenil sa druh, kodek alebo dĺžka"),
+            "the samples are not the same as before" => where + CoreText.T("obraz alebo zvuk nie je ten istý ako predtým"),
+            _ => where + rest,
+        };
+    }));
+
+    [GeneratedRegex("^MP4 track (?<n>\\d+): ", RegexOptions.CultureInvariant)]
+    private static partial Regex Mp4TrackPrefix();
 
     [GeneratedRegex("^track (?<n>\\d+): ", RegexOptions.CultureInvariant)]
     private static partial Regex TrackPrefix();

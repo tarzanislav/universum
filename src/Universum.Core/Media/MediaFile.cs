@@ -39,6 +39,9 @@ public sealed record MediaFile
     /// </summary>
     public bool IsMatroska => ContainerType == "Matroska";
 
+    /// <summary>MP4 or QuickTime (.mp4, .m4v, .mov) – its header UNIVERSUM can edit itself (Ponechať MP4).</summary>
+    public bool IsMp4 => ContainerType.Contains("MP4", StringComparison.OrdinalIgnoreCase) || ContainerType.Contains("QuickTime", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// "MKV", "MP4", "AVI", "TS", "M2TS" – the container as people call it (for messages). Taken from the extension: the
     /// container type mkvmerge reports changes between versions ("QuickTime/MP4" in 82, "MP4/QuickTime" in 103).

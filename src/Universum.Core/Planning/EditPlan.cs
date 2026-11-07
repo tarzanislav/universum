@@ -22,7 +22,8 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
         var changes = new List<PlannedChange>();
         if (target.ContainerChanged)
         {
-            changes.Add(new PlannedChange(null, ChangeKind.Container, target.Source.ContainerName, "MKV"));
+            // Ponechať MP4 chosen, but MP4 cannot hold a change: why the MP4 becomes an MKV anyway
+            changes.Add(new PlannedChange(null, ChangeKind.Container, target.Source.ContainerName, "MKV") { Why = target.Mp4Obstacle });
         }
 
         var sourcePositions = target.Source.Tracks.Select((t, i) => (t.Id, i)).ToDictionary(x => x.Id, x => x.i);
@@ -57,6 +58,13 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
             if (track.LanguageChanged)
             {
                 changes.Add(new PlannedChange(track.TrackId, ChangeKind.Language, source.Language.ToString(), track.Language.ToString()));
+            }
+
+            if (target.StaysMp4)
+            {
+                // MP4 has one flag for both (the track's "enabled"): what players take as the default
+                AddFlag(changes, track, ChangeKind.Default, source.Flags.Enabled, track.Flags.Default);
+                continue;
             }
 
             AddFlag(changes, track, ChangeKind.Default, source.Flags.Default, track.Flags.Default);

@@ -64,6 +64,12 @@ public sealed record RuleProfile
     /// <summary>Rewrite files whose video track has no index (cues), so seeking works again.</summary>
     public bool RepairIndex { get; init; } = true;
 
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose changes MP4 can hold (languages, names, the default track, the title,
+    /// the order) stays MP4 – its header edited by UNIVERSUM itself in seconds, Superrýchle too. Off: every MP4 becomes MKV.
+    /// </summary>
+    public bool KeepMp4 { get; init; }
+
     /// <summary>Naming of results in the library (size classes, subtitles word).</summary>
     public LibraryProfile Library { get; init; } = new();
 

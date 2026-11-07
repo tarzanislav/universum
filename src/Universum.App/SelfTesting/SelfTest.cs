@@ -3963,6 +3963,37 @@ internal static class SelfTest
                 "titles: the film written into the library is in Spracované tituly – " + string.Join(" | ", services.TitleRegister.Titles.Select(t => t.Display)));
             var problems = await processor.UndoAsync(moved.UndoRecordPath!);
             Check(problems.Count == 0 && File.Exists(single) && !File.Exists(moved.OutputPath!), "superfast: Vrátiť originály puts it back – " + string.Join("; ", problems));
+
+            // owner, 7. 11. 2026: Ponechať MP4 – an MP4 moved into the library, its header edited by UNIVERSUM itself (checked
+            // by its reader and ffprobe), Vrátiť originály puts it back byte for byte
+            var mp4 = Path.Combine(folder, "Vymyslený film v MP4.mp4");
+            File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-cz.mp4"), mp4);
+            var mp4Bytes = File.ReadAllBytes(mp4);
+            var keepMp4 = services.KeepMp4;
+            services.KeepMp4 = true;
+            try
+            {
+                Check(services.Profile.KeepMp4, "MP4: Ponechať MP4 is a part of the profile");
+                var mp4Plan = Core.Planning.EditPlan.For(Core.Rules.UniversumRules.Apply(await inspector.InspectAsync(mp4), services.Profile) with { NewTitle = "Vymyslený film v MP4" });
+                Check(mp4Plan.Target.StaysMp4 && mp4Plan.Method == Core.Planning.WriteMethod.HeaderEdit, $"MP4: stays MP4, a header edit – {mp4Plan.Method} {mp4Plan.Target.Mp4Obstacle}");
+                var mp4Place = library.Place(mp4Plan.Target, new Core.Library.TitleInfo(MediaKind.Movie, "Vymyslený film v MP4", 2026), null, services.Profile);
+                var mp4Timed = System.Diagnostics.Stopwatch.StartNew();
+                var edited = await processor.ProcessAsync(mp4Plan, mp4Place, Core.Execution.OriginalsModes.Output(Core.Execution.OriginalsMode.MoveIntoLibrary));
+                Check(edited is { Status: Core.Execution.ProcessingStatus.Done, UndoRecordPath: not null } && edited.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) &&
+                      edited.Messages.Contains(Core.Execution.FileProcessor.MovedIntoLibraryMessage) && !File.Exists(mp4),
+                    $"MP4: moved into the library and its header edited in {mp4Timed.Elapsed.TotalSeconds:0.00} s (ffprobe: {edited.Messages.Contains(Core.Execution.FileProcessor.Mp4ProbedMessage)}) – " + string.Join("; ", edited.Messages));
+                var read = Core.Mp4.Mp4Reader.Read(edited.OutputPath!);
+                Check(read.Title == "Vymyslený film v MP4" && read.Tracks.Count(t => t.Kind == Core.Mp4.Mp4TrackKind.Audio && t.Enabled) == 1 &&
+                      read.Tracks.First(t => t.Kind == Core.Mp4.Mp4TrackKind.Audio) is { Language: "ces", Enabled: true },
+                    "MP4: the title and the Czech sound first and default – " + string.Join(", ", read.Tracks.Select(t => $"{t.Id} {t.Language} {t.Enabled}")));
+                var undone = await processor.UndoAsync(edited.UndoRecordPath!);
+                Check(undone.Count == 0 && File.Exists(mp4) && File.ReadAllBytes(mp4).AsSpan().SequenceEqual(mp4Bytes) && !File.Exists(edited.OutputPath!),
+                    "MP4: Vrátiť originály puts it back byte for byte – " + string.Join("; ", undone));
+            }
+            finally
+            {
+                services.KeepMp4 = keepMp4;
+            }
         }
         finally
         {

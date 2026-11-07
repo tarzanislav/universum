@@ -105,6 +105,7 @@ public static class UniversumRules
             RemovedByLanguage = file.Tracks.Where(t => outOfList.Contains(t.Id)).ToList(),
             RemovedEmpty = file.Tracks.Where(t => empty.Contains(t.Id)).ToList(),
             RepairIndex = missingIndex && profile.RepairIndex,
+            KeepMp4 = profile.KeepMp4,
             NewTitle = "",
             Cut = decisions.Cut is { Count: > 0 } cut ? cut : null,
         };

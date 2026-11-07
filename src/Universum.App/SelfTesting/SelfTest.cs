@@ -3827,6 +3827,31 @@ internal static class SelfTest
         await Screenshot(window, "batch-new-groups.png");
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 3 && batch.Groups.All(g => !g.IsNew), "batch: analysed again with nothing new – no group marked");
+
+        // owner, 7. 11. 2026: episodes in folders not named after their series – the groups marked together get the series
+        // typed once (or found on TMDB, or by its TMDB ID) – invented names
+        var scattered = Path.Combine(_outputDirectory, "roztrusene", "TVSHOWS");
+        foreach (var name in new[] { "Priecinok A", "Priecinok B", "Priecinok C" })
+        {
+            Directory.CreateDirectory(Path.Combine(scattered, name));
+            File.Copy(Path.Combine(testMedia, "cz-only.mkv"), Path.Combine(scattered, name, name + " 01.mkv"), overwrite: true);
+        }
+
+        batch.Folder = Path.GetDirectoryName(scattered)!;
+        batch.Recursive = true;
+        await batch.AnalyzeAsync();
+        Check(batch.IsMixed && batch.SeriesGroups.Count == 3, $"batch: three series groups – {batch.SeriesGroups.Count}");
+        batch.SelectedSeriesGroup = batch.SeriesGroups[0];
+        batch.SelectSeriesGroups(batch.SeriesGroups.Take(2).ToList());
+        Check(batch.SeriesTargetNote.Contains('2', StringComparison.Ordinal), "batch: the row Seriál: names the 2 groups marked – " + batch.SeriesTargetNote);
+        batch.SeriesTitle = "Vymyslený spoločný seriál (2025) [tmdbid-424242]";
+        // the episodes wait for their numbers – the series of each group is read from the row Seriál: of that group
+        var seriesOfGroups = batch.SeriesGroups.Select(g => { batch.SelectedSeriesGroup = g; return batch.SeriesTitle; }).ToList();
+        Check(seriesOfGroups.Take(2).All(t => t == "Vymyslený spoločný seriál (2025) [tmdbid-424242]") && seriesOfGroups[2] != seriesOfGroups[0],
+            "batch: both groups marked got the series, the third did not – " + string.Join(" | ", seriesOfGroups));
+        batch.SelectedSeriesGroup = batch.SeriesGroups[0];
+        await Screenshot(window, "batch-series-groups.png");
+        batch.SelectSeriesGroups([]);
     }
 
     // owner, 1. 11. 2026: Zlučovanie recognises the language of audio from its speech and of subtitles from their text,

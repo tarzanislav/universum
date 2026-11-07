@@ -2558,8 +2558,11 @@
                             <RowDefinition Height="10" />
                             <RowDefinition Height="*" MinHeight="70" />
                         </Grid.RowDefinitions>
+                        <!-- owner, 7. 11. 2026: several series groups marked with Ctrl / Shift get the series (name, TMDB, TMDB ID) at once -->
                         <DataGrid Grid.Row="0" ItemsSource="{Binding SeriesGroups}" SelectedItem="{Binding SelectedSeriesGroup}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionMode="Extended"
+                                  SelectionChanged="OnBatchSeriesGroupsSelected"
+                                  ToolTip="{loc:T 'Ctrl alebo Shift označí viac skupín – seriál a TMDB ID zo spodného riadka Seriál: dostanú všetky naraz'}">
                             <!-- owner, 31. 10. 2026: groups with files new since the analysis before – a pastel background, dark text to stay readable -->
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
@@ -2633,11 +2636,12 @@
                     <GridSplitter Grid.Column="1" Width="10" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
                                   Background="Transparent" Cursor="SizeWE" ToolTip="{loc:T 'Ťahaním zmeníte šírku zoznamu skupín'}" />
                     <Grid Grid.Column="2">
+                        <!-- owner, 7. 11. 2026: the files and the tracks of the group share the height – the line between them is dragged -->
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="1.2*" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
+                            <RowDefinition Height="1.2*" MinHeight="110" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" MinHeight="140" />
                         </Grid.RowDefinitions>
                         <DockPanel Margin="0,0,0,6">
                             <Button DockPanel.Dock="Right" Content="{loc:T 'Informácie'}" Command="{Binding ShowInfoCommand}" Padding="10,3"
@@ -2754,122 +2758,130 @@
                                 </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
-                        <!-- the buttons wrap under the title when the pane is narrow -->
-                        <DockPanel Grid.Row="2" Margin="0,10,0,0">
-                            <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Stopy skupiny'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
-                                       ToolTip="{loc:T 'Rozhodnutie platí pre všetky súbory skupiny'}" />
-                            <WrapPanel HorizontalAlignment="Right">
-                                <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
-                                <Button Content="{loc:T 'Rozpoznať jazyk audiostôp ▾'}" Click="OnSpeechMenu" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="{loc:T 'Vypočuje si niekoľko úsekov z rôznych miest filmu a navrhne jazyk reči (whisper.cpp, všetko len v počítači; pár sekúnd na stopu). Vyberte, ktoré súbory.'}">
-                                    <Button.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="{loc:T 'Vybrané súbory (v zozname, Ctrl / Shift)'}" Command="{Binding DetectAudioSelectedCommand}" />
-                                            <MenuItem Header="{loc:T 'Celá skupina – filmy každý zvlášť, seriál jedna epizóda'}" Command="{Binding DetectAudioCommand}" />
-                                            <MenuItem Header="{loc:T 'Všetky skupiny'}" Command="{Binding DetectAudioAllCommand}" />
-                                        </ContextMenu>
-                                    </Button.ContextMenu>
-                                </Button>
-                                <Button Content="{loc:T 'Prečítať titulky znova'}" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
-                                        ToolTip="{loc:T 'Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám – niekoľko častí filmu ako pri zvuku (forced titulky tam, kde ich súbor má podľa indexu). Tu ho prečíta znova pre vybranú skupinu.'}" />
-                                <Button Content="{loc:T 'Potvrdiť návrhy'}" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
-                            </WrapPanel>
-                        </DockPanel>
-                        <!-- owner, 29. 10. 2026: the tracks in the order of the result; dragged by the grip (or the arrows) within their type -->
-                        <DataGrid Grid.Row="3" Margin="0,6,0,0" MinHeight="110" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False"
-                                  AllowDrop="True" DragOver="OnSlotDragOver" Drop="OnSlotDrop">
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                    <Setter Property="Background" Value="{Binding Key.Type, Converter={StaticResource TrackTypeBrush}}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsRemovedByLanguage}" Value="True">
-                                            <Setter Property="Opacity" Value="0.55" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGrid.RowStyle>
-                            <DataGrid.Columns>
-                                <DataGridTemplateColumn Header="{loc:T 'Poradie'}" Width="Auto">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="{loc:T 'Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)'}"
-                                                        PreviewMouseLeftButtonDown="OnSlotGripDown" MouseMove="OnSlotGripMove">
-                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
-                                                </Border>
-                                                <Button Command="{Binding MoveUpCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu hore'}">
-                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70E;" FontSize="10" />
-                                                </Button>
-                                                <Button Command="{Binding MoveDownCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu dole'}">
-                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="10" />
-                                                </Button>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="{loc:T 'Stopa'}" Binding="{Binding Slot}" />
-                                <DataGridTextColumn Header="{loc:T 'Kodek'}" Binding="{Binding Codec}" Width="70" />
-                                <DataGridTextColumn Header="{loc:T 'Názov v súbore'}" Binding="{Binding Name}" Width="*" MinWidth="80" />
-                                <!-- owner, 30. 10. 2026: Track name – written for the whole group, it wins over the rules' name -->
-                                <DataGridTemplateColumn Header="{loc:T 'Názov stopy'}" Width="*" MinWidth="110">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBox Text="{Binding TrackName, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding CanName}" VerticalAlignment="Center"
-                                                     ToolTip="{loc:T 'Názov stopy vo výsledku pre celú skupinu – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu'}" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="{loc:T 'Jazyk'}" Width="150">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <!-- owner, 29. 10. 2026: also a language written in the file can be corrected ("EN" that is Czech) -->
-                                            <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Name"
-                                                      SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
-                                                      ToolTip="{loc:T 'Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk'}" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="{loc:T 'Pôvod'}" Width="1.2*" MinWidth="110">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Evidence}" TextWrapping="Wrap" FontSize="11.5" />
-                                                <TextBlock Text="{Binding Suggested}" FontWeight="SemiBold" FontSize="11.5" />
-                                                <CheckBox Visibility="{Binding CanKeep, Converter={StaticResource BoolToVisibility}}" IsChecked="{Binding Kept, UpdateSourceTrigger=PropertyChanged}"
-                                                          FontSize="11.5" Margin="0,2,0,0" ToolTip="{loc:T 'Tieto titulky ponechať, hoci ich jazyk nie je v zozname titulkov (Nastavenia)'}">
-                                                    <TextBlock Text="{Binding ResultNote}" TextWrapping="Wrap" FontWeight="SemiBold" />
-                                                </CheckBox>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="{loc:T 'Forced'}" Width="110">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Visibility="{Binding IsSubtitles, Converter={StaticResource BoolToVisibility}}">
-                                                <CheckBox IsThreeState="True" IsChecked="{Binding Forced, UpdateSourceTrigger=PropertyChanged}"
-                                                          ToolTip="{loc:T 'zaškrtnuté = forced, prázdne = nie, plné pole = podľa súboru'}" />
-                                                <TextBlock Text="{Binding ForcedHint}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                                <!-- owner, 1. 11. 2026: WebVTT, ASS … written as SRT inside the result, only when ticked -->
-                                <DataGridTemplateColumn Header="{loc:T 'Na SRT'}" Width="130">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel>
-                                                <CheckBox IsChecked="{Binding ToSrt, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
-                                                          Visibility="{Binding CanConvertToSrt, Converter={StaticResource BoolToVisibility}}"
-                                                          ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
-                                                <TextBlock Text="{Binding ToSrtHint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <GridSplitter Grid.Row="2" Height="10" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"
+                                      Background="Transparent" Cursor="SizeNS" ToolTip="{loc:T 'Ťahaním zmeníte výšku súborov a stôp skupiny'}" />
+                        <Grid Grid.Row="3">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <!-- the buttons wrap under the title when the pane is narrow -->
+                            <DockPanel Grid.Row="0" Margin="0,4,0,0">
+                                <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Stopy skupiny'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
+                                           ToolTip="{loc:T 'Rozhodnutie platí pre všetky súbory skupiny'}" />
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
+                                    <Button Content="{loc:T 'Rozpoznať jazyk audiostôp ▾'}" Click="OnSpeechMenu" Margin="0,0,8,4" Padding="10,3"
+                                            ToolTip="{loc:T 'Vypočuje si niekoľko úsekov z rôznych miest filmu a navrhne jazyk reči (whisper.cpp, všetko len v počítači; pár sekúnd na stopu). Vyberte, ktoré súbory.'}">
+                                        <Button.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{loc:T 'Vybrané súbory (v zozname, Ctrl / Shift)'}" Command="{Binding DetectAudioSelectedCommand}" />
+                                                <MenuItem Header="{loc:T 'Celá skupina – filmy každý zvlášť, seriál jedna epizóda'}" Command="{Binding DetectAudioCommand}" />
+                                                <MenuItem Header="{loc:T 'Všetky skupiny'}" Command="{Binding DetectAudioAllCommand}" />
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                    </Button>
+                                    <Button Content="{loc:T 'Prečítať titulky znova'}" Command="{Binding DetectSubtitlesCommand}" Margin="0,0,8,4" Padding="10,3"
+                                            ToolTip="{loc:T 'Jazyk každej textovej titulkovej stopy UNIVERSUM číta po analýze sám – niekoľko častí filmu ako pri zvuku (forced titulky tam, kde ich súbor má podľa indexu). Tu ho prečíta znova pre vybranú skupinu.'}" />
+                                    <Button Content="{loc:T 'Potvrdiť návrhy'}" Command="{Binding ConfirmSuggestionsCommand}" Margin="0,0,0,4" Padding="10,3" />
+                                </WrapPanel>
+                            </DockPanel>
+                            <!-- owner, 29. 10. 2026: the tracks in the order of the result; dragged by the grip (or the arrows) within their type -->
+                            <DataGrid Grid.Row="1" Margin="0,6,0,0" MinHeight="90" ItemsSource="{Binding SlotRows}" AutoGenerateColumns="False" IsReadOnly="True"
+                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False"
+                                      AllowDrop="True" DragOver="OnSlotDragOver" Drop="OnSlotDrop">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="Background" Value="{Binding Key.Type, Converter={StaticResource TrackTypeBrush}}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRemovedByLanguage}" Value="True">
+                                                <Setter Property="Opacity" Value="0.55" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="{loc:T 'Poradie'}" Width="Auto">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="{loc:T 'Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)'}"
+                                                            PreviewMouseLeftButtonDown="OnSlotGripDown" MouseMove="OnSlotGripMove">
+                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
+                                                    </Border>
+                                                    <Button Command="{Binding MoveUpCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu hore'}">
+                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE70E;" FontSize="10" />
+                                                    </Button>
+                                                    <Button Command="{Binding MoveDownCommand}" Padding="4,1" Margin="2,0,0,0" MinWidth="0" ToolTip="{loc:T 'Posunúť stopu dole'}">
+                                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="10" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="{loc:T 'Stopa'}" Binding="{Binding Slot}" />
+                                    <DataGridTextColumn Header="{loc:T 'Kodek'}" Binding="{Binding Codec}" Width="70" />
+                                    <DataGridTextColumn Header="{loc:T 'Názov v súbore'}" Binding="{Binding Name}" Width="*" MinWidth="80" />
+                                    <!-- owner, 30. 10. 2026: Track name – written for the whole group, it wins over the rules' name -->
+                                    <DataGridTemplateColumn Header="{loc:T 'Názov stopy'}" Width="*" MinWidth="110">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding TrackName, UpdateSourceTrigger=LostFocus}" IsEnabled="{Binding CanName}" VerticalAlignment="Center"
+                                                         ToolTip="{loc:T 'Názov stopy vo výsledku pre celú skupinu – môžete ho prepísať alebo doň dopísať (potvrdí sa po opustení poľa); prázdny = bez názvu'}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="{loc:T 'Jazyk'}" Width="150">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <!-- owner, 29. 10. 2026: also a language written in the file can be corrected ("EN" that is Czech) -->
+                                                <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Name"
+                                                          SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                          ToolTip="{loc:T 'Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk'}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="{loc:T 'Pôvod'}" Width="1.2*" MinWidth="110">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Evidence}" TextWrapping="Wrap" FontSize="11.5" />
+                                                    <TextBlock Text="{Binding Suggested}" FontWeight="SemiBold" FontSize="11.5" />
+                                                    <CheckBox Visibility="{Binding CanKeep, Converter={StaticResource BoolToVisibility}}" IsChecked="{Binding Kept, UpdateSourceTrigger=PropertyChanged}"
+                                                              FontSize="11.5" Margin="0,2,0,0" ToolTip="{loc:T 'Tieto titulky ponechať, hoci ich jazyk nie je v zozname titulkov (Nastavenia)'}">
+                                                        <TextBlock Text="{Binding ResultNote}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                                                    </CheckBox>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="{loc:T 'Forced'}" Width="110">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Visibility="{Binding IsSubtitles, Converter={StaticResource BoolToVisibility}}">
+                                                    <CheckBox IsThreeState="True" IsChecked="{Binding Forced, UpdateSourceTrigger=PropertyChanged}"
+                                                              ToolTip="{loc:T 'zaškrtnuté = forced, prázdne = nie, plné pole = podľa súboru'}" />
+                                                    <TextBlock Text="{Binding ForcedHint}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <!-- owner, 1. 11. 2026: WebVTT, ASS … written as SRT inside the result, only when ticked -->
+                                    <DataGridTemplateColumn Header="{loc:T 'Na SRT'}" Width="130">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <CheckBox IsChecked="{Binding ToSrt, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                                              Visibility="{Binding CanConvertToSrt, Converter={StaticResource BoolToVisibility}}"
+                                                              ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
+                                                    <TextBlock Text="{Binding ToSrtHint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
                     </Grid>
                 </Grid>
 
@@ -2937,6 +2949,8 @@
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding SeriesTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center"
                                          ToolTip="{loc:T 'Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho'}" />
+                                <TextBlock Text="{Binding SeriesTargetNote}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                           VerticalAlignment="Center" Margin="0,0,10,0" />
                                 <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"
                                            ToolTip="{Binding OtherSeriesList}" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />

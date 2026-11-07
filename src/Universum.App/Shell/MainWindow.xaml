@@ -4085,6 +4085,11 @@
                 <TextBlock Text="{loc:T 'Text'}" Style="{StaticResource Hint}" />
                 <TextBox x:Name="AgendaText" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="220"
                          VerticalScrollBarVisibility="Auto" Margin="0,2,0,6" />
+                <!-- the links of the note, each on a row, to open them (owner, 7. 11. 2026) -->
+                <StackPanel Margin="0,0,0,8" Visibility="{Binding HasLinks, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{loc:T 'Odkazy'}" Style="{StaticResource Hint}" />
+                    <ItemsControl ItemsSource="{Binding Links}" Focusable="False" />
+                </StackPanel>
                 <!-- the voice: Windows' voice typing, or a recording written down in the computer -->
                 <Border Padding="8,6" CornerRadius="6" Margin="0,0,0,6" Background="#10D46A8C" Visibility="{Binding HasVoice, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
@@ -4826,11 +4831,30 @@
             </DockPanel>
         </DataTemplate>
         <!-- POZNÁMKY – Poznámky (owner, 31. 10. 2026, stage P2) -->
+        <!-- a link of a note on a row of its own (owner, 7. 11. 2026): shortened when long, the whole address in the tooltip,
+             a click opens the page -->
+        <DataTemplate DataType="{x:Type pages:NoteLinkView}">
+            <Button Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Cursor="Hand" HorizontalAlignment="Left" Margin="0,1" Focusable="False">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <TextBlock Text="{Binding Shown}" TextTrimming="CharacterEllipsis" TextDecorations="Underline" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </Button>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:TitleNoteEditor}">
             <StackPanel>
                 <TextBlock Text="{loc:T 'Poznámka k titulu'}" Style="{StaticResource Hint}" />
                 <TextBlock Text="{Binding Caption}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="140" VerticalScrollBarVisibility="Auto" Margin="0,0,0,6" />
+                <!-- the links of the note, each on a row, to open them (owner, 7. 11. 2026) -->
+                <StackPanel Margin="0,0,0,8" Visibility="{Binding HasLinks, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="{loc:T 'Odkazy'}" Style="{StaticResource Hint}" />
+                    <ItemsControl ItemsSource="{Binding Links}" Focusable="False" />
+                </StackPanel>
                 <TextBlock Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"
                            Text="{loc:T 'Tá istá poznámka je pri titule v Premiérach a Novinkách – zmena platí všade. Prázdna poznámka sa odstráni.'}" />
                 <WrapPanel>
@@ -4870,6 +4894,8 @@
                             <RadioButton Content="{loc:T 'K titulom'}" IsChecked="{Binding ShowTitles}" GroupName="NotesSource" MinWidth="0" Margin="0,0,12,0" />
                             <RadioButton Content="{Binding BinText}" IsChecked="{Binding ShowBin}" GroupName="NotesSource" MinWidth="0" Margin="0,0,10,0" />
                             <Button Content="{loc:T 'Tlač a export…'}" Command="{Binding PrintCommand}" Padding="10,3" Margin="0,0,8,0" ToolTip="{loc:T 'Tlač s náhľadom, PDF, HTML, Markdown, CSV'}" />
+                            <CheckBox Content="{loc:T 'Meno namiesto linku'}" IsChecked="{Binding LinkNames}" VerticalAlignment="Center" Margin="4,0,12,0"
+                                      ToolTip="{loc:T 'Pri odkaze na TMDB sa ukáže názov filmu alebo seriálu – pôvodný, pri inom písme ako latinka (čínsky, kórejský…) anglický, ako v knižnici. Celý odkaz je v bublinke pri myši.'}" />
                             <Button Content="{loc:T 'Vysypať kôš'}" Command="{Binding EmptyBinCommand}" Padding="10,3"
                                     Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="{loc:T 'Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)'}" />
                         </WrapPanel>
@@ -4934,7 +4960,23 @@
                                                     <Run Text="{Binding When, Mode=OneWay}" />
                                                 </TextBlock>
                                                 <TextBlock DockPanel.Dock="Bottom" Text="{Binding Tags}" FontSize="11.5" Foreground="#D46A8C" TextWrapping="Wrap" Margin="0,4,0,0" />
-                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="128" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                                <!-- owner, 7. 11. 2026: the text, and every link on a row of its own (a click opens it) -->
+                                                <StackPanel Margin="0,4,0,0">
+                                                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid>
+                                                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="96" TextTrimming="CharacterEllipsis" Margin="0,0,0,2"
+                                                                               Visibility="{Binding IsLink, Converter={StaticResource InverseBoolToVisibility}}" />
+                                                                    <ContentControl Content="{Binding Link}" Focusable="False" IsTabStop="False"
+                                                                                    Visibility="{Binding IsLink, Converter={StaticResource BoolToVisibility}}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding More}" Style="{StaticResource Hint}" FontSize="11" Margin="0,2,0,0"
+                                                               Visibility="{Binding HasMore, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
                                             </DockPanel>
                                         </Border>
                                     </Button>

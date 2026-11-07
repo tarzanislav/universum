@@ -315,7 +315,29 @@ public sealed class AgendaEditor : ObservableObject
 
     public string Title { get => _title; set => SetProperty(ref _title, value); }
 
-    public string Text { get => _text; set => SetProperty(ref _text, value); }
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            if (SetProperty(ref _text, value))
+            {
+                OnPropertyChanged(nameof(Links));
+                OnPropertyChanged(nameof(HasLinks));
+            }
+        }
+    }
+
+    /// <summary>Shows a link of the text (Poznámky gives it, with the names of TMDB); null: the links are not shown.</summary>
+    public Func<Core.Text.NoteRow, NoteLinkView>? LinkView { get; init; }
+
+    /// <summary>The links of the text, each on a row, to open them (owner, 7. 11. 2026: the note opened, its video played).</summary>
+    public IReadOnlyList<NoteLinkView> Links => LinkView is null ? [] : [.. Core.Text.NoteRows.Of(Text).Where(r => r.IsLink).Select(LinkView)];
+
+    public bool HasLinks => Links.Count > 0;
+
+    /// <summary>The links shown again (Meno namiesto linku switched).</summary>
+    public void RefreshLinks() => OnPropertyChanged(nameof(Links));
 
     /// <summary>"#kino #seriál".</summary>
     public string TagsText { get => _tags; set => SetProperty(ref _tags, value); }

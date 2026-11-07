@@ -56,6 +56,7 @@ At the top are suggestions that UNIVERSUM works out by itself (a chosen title in
 - **Windows voice typing** (Win + H) types straight where you click – but it goes through Microsoft (internet).
 - [Nahrať hlasom] records from the microphone and **transcribes the recording right on your computer** – nothing leaves it.
   The recording stays with the note and can be played back.
+!tip **Links in a note** each have a row of their own; a long one is shortened and the tooltip shows it whole. **A click** opens the page in the browser (a video too). [Name instead of the link] shows the **name of the film or series** for a TMDB link – the original one, the English one for another script than Latin, as in the library (a TMDB key is needed). An opened note lists its links under the text.
 ![Notes](notes.jpg)
 @otvorit AgendaNotes Open Notes
 

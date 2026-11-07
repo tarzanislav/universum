@@ -424,6 +424,28 @@ public sealed class NewsTests
     }
 
     [Test]
+    public void NoteInRowsEveryLinkOnItsOwnRow()
+    {
+        // owner, 7. 11. 2026: addresses of TMDB one after another ran together in the card – every link gets a row of its own
+        var rows = NoteRows.Of("Pozrieť:\r\nhttps://www.themoviedb.org/tv/111-vymysleny-serial\nhttps://www.themoviedb.org/movie/222-vymysleny-film?language=cs\n" +
+                               "https://www.video.example/watch?v=x1, a [Upútavka](https://www.video.example/u%C3%BAtavka) \n\nkoniec");
+        Assert.Sequence(["text Pozrieť:", "link themoviedb.org/tv/111-vymysleny-serial", "link themoviedb.org/movie/222-vymysleny-film?language=cs",
+                "link video.example/watch?v=x1", "text a", "link video.example/uútavka", "text koniec"],
+            rows.Select(r => r.IsLink ? "link " + r.Address : "text " + r.Text), "the rows in the order of the note");
+        Assert.True(rows[1].Tmdb == new TmdbReference(MediaKind.Series, 111) && rows[2].Tmdb == new TmdbReference(MediaKind.Movie, 222) && rows[3].Tmdb is null,
+            "the films and series of TMDB are known");
+        Assert.True(rows[5] is { Name: "Upútavka" } && rows[1].Name is null, "a named link keeps its name");
+        Assert.True(NoteRows.Of("https://a.example, https://b.example").Count == 2, "only a comma between two links is no row");
+        Assert.True(NoteRows.Of("prvý riadok\n  druhý").Single().Text == "prvý riadok\n  druhý" && NoteRows.Of(null).Count == 0 && NoteRows.Of("  \n ").Count == 0,
+            "text as it is written; nothing for an empty note");
+
+        // the name instead of the link: the original title in Latin script, otherwise the English one, with the year
+        Assert.Equal("Vymyslený film (2026)", NoteRows.TitleName(new TmdbTitle(MediaKind.Movie, 1, "Invented Film", "Vymyslený film", "cs", 2026, [])), "the original title in Latin script");
+        Assert.Equal("Invented Series (2025)", NoteRows.TitleName(new TmdbTitle(MediaKind.Series, 2, "Invented Series", "虚构的系列", "zh", 2025, [])), "Chinese: the English title");
+        Assert.Equal("Invented Drama", NoteRows.TitleName(new TmdbTitle(MediaKind.Series, 3, "Invented Drama", "가상 드라마", "ko", null, [])), "Korean, no year");
+    }
+
+    [Test]
     public void KeptFilmsAreSortedByOrigin()
     {
         FilmPremiere Old(int id, NewsRegion region, string production, string note, int day) => new()

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -27,8 +28,16 @@ public sealed class NoteCard
 {
     public required string Title { get; init; }
 
-    /// <summary>The text (the card shows its beginning).</summary>
+    /// <summary>The text (looked for, printed); the card shows its <see cref="Rows"/>.</summary>
     public string Text { get; init; } = "";
+
+    /// <summary>The note in rows: its text, and every link on a row of its own (owner, 7. 11. 2026).</summary>
+    public IReadOnlyList<NoteRowView> Rows { get; init; } = [];
+
+    /// <summary>"… a ďalšie (3) – otvorte poznámku" when the card does not show all rows.</summary>
+    public string More { get; init; } = "";
+
+    public bool HasMore => More.Length > 0;
 
     public string Tags { get; init; } = "";
 
@@ -83,7 +92,29 @@ public sealed class TitleNoteEditor : ObservableObject
 
     public string Caption { get; }
 
-    public string Text { get => _text; set => SetProperty(ref _text, value); }
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            if (SetProperty(ref _text, value))
+            {
+                OnPropertyChanged(nameof(Links));
+                OnPropertyChanged(nameof(HasLinks));
+            }
+        }
+    }
+
+    /// <summary>Shows a link of the note (Poznámky gives it, with the names of TMDB); null: the links are not shown.</summary>
+    public Func<NoteRow, NoteLinkView>? LinkView { get; init; }
+
+    /// <summary>The links of the note, each on a row, to open them (owner, 7. 11. 2026).</summary>
+    public IReadOnlyList<NoteLinkView> Links => LinkView is null ? [] : [.. NoteRows.Of(Text).Where(r => r.IsLink).Select(LinkView)];
+
+    public bool HasLinks => Links.Count > 0;
+
+    /// <summary>The links shown again (Meno namiesto linku switched).</summary>
+    public void RefreshLinks() => OnPropertyChanged(nameof(Links));
 
     public RelayCommand SaveCommand { get; }
 
@@ -126,6 +157,103 @@ public sealed class NotesPageViewModel : ObservableObject
         };
         services.Marks.Changed += _ => Build();
         Build();
+    }
+
+    /// <summary>
+    /// Meno namiesto linku (owner, 7. 11. 2026): a link of TMDB shown by the name of its film or series – the original
+    /// title in Latin script, otherwise the English one, as the library names it; the address stays in the tooltip.
+    /// </summary>
+    public bool LinkNames
+    {
+        get => _services.Settings.NoteLinkNames;
+        set
+        {
+            if (value != _services.Settings.NoteLinkNames)
+            {
+                _services.Settings.NoteLinkNames = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+                Status = value && _services.Tmdb is null
+                    ? L("Názvy filmov a seriálov sa načítajú z TMDB – zadajte kľúč TMDB v Nastaveniach.", "Názvy filmů a seriálů se načtou z TMDB – zadejte klíč TMDB v Nastavení.",
+                        "The names of films and series come from TMDB – enter a TMDB key in Settings.")
+                    : "";
+                Build();
+                (Editor as AgendaEditor)?.RefreshLinks();
+                (Editor as TitleNoteEditor)?.RefreshLinks();
+            }
+        }
+    }
+
+    // the names of the titles of TMDB found, those asked for, and the links shown that wait for a name
+    private readonly Dictionary<Core.Library.TmdbReference, string> _titleNames = [];
+    private readonly HashSet<Core.Library.TmdbReference> _asking = [];
+    private readonly List<NoteLinkView> _waiting = [];
+
+    /// <summary>A link of a note on its row – by the name of its title of TMDB when Meno namiesto linku is on.</summary>
+    public NoteLinkView LinkView(NoteRow row)
+    {
+        var tmdb = LinkNames ? row.Tmdb : null;
+        var name = tmdb is null ? null : _titleNames.GetValueOrDefault(tmdb);
+        var view = new NoteLinkView(row, name);
+        if (tmdb is not null && name is null && row.Name is null)
+        {
+            _waiting.Add(view);
+            _ = NameAsync(tmdb);
+        }
+
+        return view;
+    }
+
+    /// <summary>The names of the titles of TMDB asked for are known (awaited by the self-test).</summary>
+    public Task Named => _naming;
+
+    private Task _naming = Task.CompletedTask;
+
+    // the title of TMDB read once (TMDB's answers are kept 30 days); its links shown by the name
+    private async Task NameAsync(Core.Library.TmdbReference tmdb)
+    {
+        if (_services.Tmdb is not { } client || tmdb.Kind is not { } kind || !_asking.Add(tmdb))
+        {
+            return;
+        }
+
+        var asked = AskAsync();
+        _naming = Task.WhenAll(_naming, asked);
+        await asked;
+
+        async Task AskAsync()
+        {
+            try
+            {
+                if (await client.GetAsync(kind, tmdb.Id) is { } title)
+                {
+                    var name = NoteRows.TitleName(title);
+                    _titleNames[tmdb] = name;
+                    foreach (var view in _waiting.Where(v => v.Row.Tmdb == tmdb).ToList())
+                    {
+                        view.Named(name);
+                        _waiting.Remove(view);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is Core.Library.TitleServiceException or HttpRequestException or TaskCanceledException or IOException)
+            {
+                // without TMDB the address stays; asked again when the notes are shown again
+                _asking.Remove(tmdb);
+            }
+        }
+    }
+
+    // how many rows a card shows (the note opened shows all its links)
+    private const int CardRows = 8;
+
+    private (IReadOnlyList<NoteRowView> Rows, string More) RowsOf(string text)
+    {
+        var rows = NoteRows.Of(text);
+        var shown = rows.Take(CardRows).Select(r => r.IsLink ? new NoteRowView(null, LinkView(r)) : new NoteRowView(r.Text, null)).ToList();
+        return (shown, rows.Count > CardRows
+            ? L($"… a ďalšie ({rows.Count - CardRows}) – otvorte poznámku", $"… a další ({rows.Count - CardRows}) – otevřete poznámku", $"… and {rows.Count - CardRows} more – open the note")
+            : "");
     }
 
     public static string AllTags => L("všetky", "všechny", "all");
@@ -262,12 +390,16 @@ public sealed class NotesPageViewModel : ObservableObject
     public void Edit(AgendaItem? item) => Editor = new AgendaEditor(_services.Agenda, item, DateOnly.FromDateTime(DateTime.Now), AgendaKind.Note, () => Editor = null)
     {
         Voice = _services.Voice,
+        LinkView = LinkView,
     };
 
     private void EditTitle(string key, string caption)
     {
         var mark = _services.Marks.Get(key);
-        Editor = new TitleNoteEditor(caption, mark.Note, text => _services.Marks.Set(key, _services.Marks.Get(key) with { Note = text }), () => Editor = null);
+        Editor = new TitleNoteEditor(caption, mark.Note, text => _services.Marks.Set(key, _services.Marks.Get(key) with { Note = text }), () => Editor = null)
+        {
+            LinkView = LinkView,
+        };
     }
 
     private void SetSource(bool chosen, NotesSource source)
@@ -339,6 +471,7 @@ public sealed class NotesPageViewModel : ObservableObject
     public void Build()
     {
         _building = true;
+        _waiting.Clear();
         try
         {
             var cards = new List<(NoteCard Card, DateTimeOffset Modified, DateTimeOffset Created)>();
@@ -370,10 +503,13 @@ public sealed class NotesPageViewModel : ObservableObject
                     foreach (var (key, note) in _services.Marks.Notes)
                     {
                         var caption = _captions.GetValueOrDefault(key) ?? Caption(key);
+                        var (rows, more) = RowsOf(note);
                         cards.Add((new NoteCard
                         {
                             Title = caption,
                             Text = note,
+                            Rows = rows,
+                            More = more,
                             Where = L("poznámka k titulu (Premiéry, Novinky)", "poznámka k titulu (Premiéry, Novinky)", "note of a title (Premieres, New episodes)"),
                             Background = Tint(CalendarColors.Of(CalendarLayer.FilmsWorld)),
                             Accent = CalendarColors.Of(CalendarLayer.FilmsWorld),
@@ -418,10 +554,13 @@ public sealed class NotesPageViewModel : ObservableObject
         var accent = CalendarColors.Of(CalendarLayer.Notes, item.Color);
         var day = item.Links.FirstOrDefault(l => l.Kind == LinkKind.Day);
         var kind = item.Time is not null ? L("udalosť", "událost", "event") : item.Task is not null ? L("úloha", "úkol", "task") : null;
+        var (rows, more) = RowsOf(item.Text);
         return new NoteCard
         {
             Title = item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0],
             Text = item.Text,
+            Rows = rows,
+            More = more,
             Tags = string.Join(" ", item.Tags.Select(t => "#" + t)),
             Where = inBin ? L("v koši od ", "v koši od ", "in the bin since ") + item.Deleted?.ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture) + (kind is null ? "" : " · " + kind)
                 : day is not null ? L("k dňu ", "ke dni ", "of the day ") + day.Caption : "",

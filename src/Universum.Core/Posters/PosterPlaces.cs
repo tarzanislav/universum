@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Universum.Core.IO;
 using Universum.Core.Library;
+using Universum.Core.Pictures;
 using Universum.Core.Text;
 
 namespace Universum.Core.Posters;
@@ -99,6 +100,13 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
     /// </summary>
     public static Saved Save(string folder, byte[] jpeg, string name = FileName)
     {
+        // the content must be what the name says (folder.jpg a JPEG, clearlogo.png a PNG) – never a picture only renamed
+        var promised = PictureFormats.Named(name);
+        if (promised != PictureKind.Unknown && PictureFormats.Of(jpeg) != promised)
+        {
+            return new Saved(false, null, CoreText.F("{0} sa nezapísal: obrázok nie je vo formáte, ktorý sľubuje jeho prípona.", name));
+        }
+
         var target = Path.Combine(folder, name);
         var temporary = Path.Combine(folder, name + ".universum-part");
         try
@@ -124,7 +132,11 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
         }
     }
 
-    /// <summary>The picture of a folder (folder.jpg) renamed to the first free "folder-povodny(-N).jpg"; its new name, or null when there was none.</summary>
+    /// <summary>
+    /// The picture of a folder (folder.jpg) renamed to the first free "folder-povodny(-N).jpg"; its new name, or null when
+    /// there was none. The extension of the kept one is that of its content: a WebP once saved as folder.jpg becomes
+    /// "folder-povodny.webp" and opens again (owner, 7. 11. 2026).
+    /// </summary>
     public static string? KeepOld(string folder, string fileName = FileName)
     {
         var current = Path.Combine(folder, fileName);
@@ -135,6 +147,12 @@ public sealed partial class PosterPlaces(LibraryLayout library, string? inputDir
 
         var stem = Path.GetFileNameWithoutExtension(fileName);
         var extension = Path.GetExtension(fileName);
+        var content = PictureFormats.OfFile(current);
+        if (content != PictureKind.Unknown && content != PictureFormats.Named(fileName))
+        {
+            extension = PictureFormats.Extension(content)!;
+        }
+
         for (var number = 1; ; number++)
         {
             var name = number == 1 ? $"{stem}-povodny{extension}" : $"{stem}-povodny-{number}{extension}";

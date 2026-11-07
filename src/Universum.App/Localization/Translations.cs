@@ -3148,6 +3148,10 @@ internal static class Translations
         ["Čítame jazyk titulkov – počkajte, ešte nič nemeňte…"] = "Čteme jazyk titulků – počkejte, ještě nic neměňte…",
         ["Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…"] = "Hledáme názvy filmů na TMDB – počkejte, ještě nic neměňte…",
         ["Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…"] = "Analyzujeme jazykově neoznačené stopy – počkejte, ještě nic neměňte…",
+        ["Obrázok WebP sa nedá prečítať – je poškodený alebo neúplný."] = "Obrázek WebP nelze přečíst – je poškozený nebo neúplný.",
+        ["Obrázok je príliš veľký ({0} × {1} bodov)."] = "Obrázek je příliš velký ({0} × {1} bodů).",
+        ["{0} sa nezapísal: obrázok nie je vo formáte, ktorý sľubuje jeho prípona."] = "{0} se nezapsal: obrázek není ve formátu, který slibuje jeho přípona.",
+        ["Obrázok sa nepodarilo previesť na JPEG."] = "Obrázek se nepodařilo převést na JPEG.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6292,5 +6296,9 @@ internal static class Translations
         ["Čítame jazyk titulkov – počkajte, ešte nič nemeňte…"] = "Reading the subtitles' language – please wait, change nothing yet…",
         ["Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…"] = "Looking up the films' names on TMDB – please wait, change nothing yet…",
         ["Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…"] = "Analysing tracks without a language – please wait, change nothing yet…",
+        ["Obrázok WebP sa nedá prečítať – je poškodený alebo neúplný."] = "The WebP picture cannot be read – it is damaged or incomplete.",
+        ["Obrázok je príliš veľký ({0} × {1} bodov)."] = "The picture is too large ({0} × {1} pixels).",
+        ["{0} sa nezapísal: obrázok nie je vo formáte, ktorý sľubuje jeho prípona."] = "{0} was not written: the picture is not in the format its extension promises.",
+        ["Obrázok sa nepodarilo previesť na JPEG."] = "The picture could not be converted to JPEG.",
     };
 }

@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Localization;
@@ -468,21 +466,11 @@ public sealed class InterestCard : ObservableObject
             return;
         }
 
-        try
+        // a picture that cannot be read stays the coloured placeholder (WebP is read by UNIVERSUM's own decoder)
+        if (PictureTools.Thumbnail(file, 640) is { } image)
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.DecodePixelWidth = 640;
-            bitmap.UriSource = new Uri(file);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            _image = bitmap;
+            _image = image;
             OnPropertyChanged(nameof(Image));
-        }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException)
-        {
-            // a picture WPF cannot read stays the coloured placeholder
         }
     }
 }

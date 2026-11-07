@@ -74,6 +74,8 @@ Po zaškrtnutí [Další TMDB obrázky] vyberete myší **pozadí** (*fanart.jpg
 u seriálu i **plakáty sérií** a **obrázky epizod**. Uloží je tlačítko [Zpracovat další TMDB obrázky];
 [Sloučit další obrázky z TMDB s filmem/seriálem] je dá ke zpracovanému titulu.
 !pozor Existující soubor se nepřepíše – přejmenuje se na *folder-povodny.jpg* (nebo *…-povodny*).
+- Plakát z TMDB ve formátu **WebP** UNIVERSUM převede vlastním kódem na skutečný **JPEG** (logo na **PNG**) – nikdy
+  jen nezmění příponu. Původní soubor, který je ve skutečnosti WebP, dostane příponu podle obsahu (*folder-povodny.webp*).
 ![TMDB plakát](tmdb-poster.jpg)
 @otvorit Posters Otevřít TMDB plakát
 

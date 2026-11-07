@@ -111,6 +111,25 @@ public static partial class WebLinks
             ? ToUri(trimmed)
             : null;
 
+    /// <summary>
+    /// An address as it is read (owner, 7. 11. 2026): without "https://" and "www.", the letters not escaped, whole – the
+    /// row it is shown on shortens it ("themoviedb.org/tv/1-vymysleny-serial").
+    /// </summary>
+    public static string Display(Uri address)
+    {
+        string text;
+        try
+        {
+            text = Uri.UnescapeDataString(address.AbsoluteUri);
+        }
+        catch (UriFormatException)
+        {
+            text = address.AbsoluteUri;
+        }
+
+        return Scheme().Replace(text, "").TrimEnd('/');
+    }
+
     /// <summary>A short name suggested for an address: the site without "www." ("serialzone.cz").</summary>
     public static string SuggestName(Uri address) =>
         address.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? address.Host[4..] : address.Host;

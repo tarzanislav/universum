@@ -1110,6 +1110,9 @@ public sealed class AppSettings
     /// </summary>
     public bool KeepMp4 { get; set; }
 
+    /// <summary>Poznámky: a link of TMDB shown by the name of its film or series (owner, 7. 11. 2026: Meno namiesto linku).</summary>
+    public bool NoteLinkNames { get; set; }
+
     /// <summary>What Hromadné spracovanie does with the originals (owner, 30. 10. 2026; kept by default).</summary>
     public OriginalsMode BatchOriginals { get; set; } = OriginalsMode.Keep;
 

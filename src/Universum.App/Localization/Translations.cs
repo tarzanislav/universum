@@ -3203,6 +3203,10 @@ internal static class Translations
         ["titulky do SRT"] = "titulky do SRT",
         ["zmenil sa druh, kodek alebo dĺžka"] = "změnil se druh, kodek nebo délka",
         ["zmenil sa názov, hoci sa nemal"] = "změnil se název, ačkoli neměl",
+        ["{0}\nKliknutím otvoríte stránku."] = "{0}\nKliknutím otevřete stránku.",
+        ["Odkazy"] = "Odkazy",
+        ["Meno namiesto linku"] = "Jméno místo odkazu",
+        ["Pri odkaze na TMDB sa ukáže názov filmu alebo seriálu – pôvodný, pri inom písme ako latinka (čínsky, kórejský…) anglický, ako v knižnici. Celý odkaz je v bublinke pri myši."] = "U odkazu na TMDB se ukáže název filmu nebo seriálu – původní, u jiného písma než latinky (čínský, korejský…) anglický, jako v knihovně. Celý odkaz je v bublině u myši.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6402,5 +6406,9 @@ internal static class Translations
         ["titulky do SRT"] = "subtitles to SRT",
         ["zmenil sa druh, kodek alebo dĺžka"] = "its kind, codec or length changed",
         ["zmenil sa názov, hoci sa nemal"] = "the name changed though it should not",
+        ["{0}\nKliknutím otvoríte stránku."] = "{0}\nClick to open the page.",
+        ["Odkazy"] = "Links",
+        ["Meno namiesto linku"] = "Name instead of the link",
+        ["Pri odkaze na TMDB sa ukáže názov filmu alebo seriálu – pôvodný, pri inom písme ako latinka (čínsky, kórejský…) anglický, ako v knižnici. Celý odkaz je v bublinke pri myši."] = "A TMDB link shows the name of the film or series – the original one, the English one for another script than Latin (Chinese, Korean…), as in the library. The whole link is in the tooltip.",
     };
 }

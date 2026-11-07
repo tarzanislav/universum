@@ -56,6 +56,7 @@ Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupn
 - **Hlasové psaní Windows** (Win + H) píše hned tam, kam kliknete – jde však přes Microsoft (internet).
 - [Nahrať hlasom] nahraje mikrofon a nahrávku **přepíše přímo ve vašem počítači** – nic neodchází ven.
   Nahrávka zůstane u poznámky a dá se přehrát.
+!tip **Odkazy v poznámce** jsou každý na svém řádku; dlouhý se zkrátí a celý ho ukáže bublina u myši. **Kliknutím** se stránka otevře v prohlížeči (i video). Volba [Jméno místo odkazu] ukáže u odkazu na TMDB **název filmu nebo seriálu** – původní, u jiného písma než latinky anglický, jako v knihovně (je třeba klíč TMDB). Otevřená poznámka má odkazy pod textem.
 ![Poznámky](notes.jpg)
 @otvorit AgendaNotes Otevřít Poznámky
 

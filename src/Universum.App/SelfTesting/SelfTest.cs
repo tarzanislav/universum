@@ -1745,6 +1745,30 @@ internal static class SelfTest
         Check(idea.Text == "Skúsiť tmavšie pozadie" && idea.Tags.SequenceEqual(["nápad"]) && idea.Note is not null && notes.Cards.Any(c => c.Record == idea),
             "notes: a quick note – the first sentence its title, the tag – " + notes.Status);
 
+        // owner, 7. 11. 2026: links one under another, each on a row of its own, shortened by the row, opened by a click;
+        // Meno namiesto linku remembered (invented addresses)
+        services.Agenda.Save(new Core.Agenda.AgendaItem
+        {
+            Title = "Vymyslené odkazy",
+            Text = "https://www.themoviedb.org/tv/111-vymysleny-serial\nhttps://www.themoviedb.org/movie/222-vymysleny-film\nupútavka: https://video.example/vymyslena-upoutavka",
+            Note = new Core.Agenda.AgendaNote(),
+        });
+        var linked = notes.Cards.Single(c => c.Title == "Vymyslené odkazy");
+        Check(linked.Rows.Count(r => r.IsLink) == 3 && linked.Rows[0].Link!.Shown == "themoviedb.org/tv/111-vymysleny-serial" && linked.Rows[2].Text == "upútavka:" &&
+              linked.Rows[0].Link!.Row.Tmdb == new Core.Library.TmdbReference(MediaKind.Series, 111) && linked.Rows[0].Link!.ToolTip.Contains("https://www.themoviedb.org/tv/111-vymysleny-serial", StringComparison.Ordinal),
+            "notes: every link on a row of its own – " + string.Join(" | ", linked.Rows.Select(r => r.Text ?? r.Link!.Shown)));
+        notes.Edit(linked.Record);
+        Check(notes.Editor is AgendaEditor { HasLinks: true, Links.Count: 3 }, "notes: the opened note shows its links to open");
+        var namesBefore = notes.LinkNames;
+        notes.LinkNames = true;
+        Check(services.Settings.NoteLinkNames && notes.Cards.Single(c => c.Title == "Vymyslené odkazy").Rows.Count(r => r.IsLink) == 3,
+            "notes: Meno namiesto linku remembered – " + notes.Status);
+        notes.LinkNames = namesBefore;
+        ((AgendaEditor)notes.Editor!).CancelCommand.Execute(null);
+        // gone for good (the bin is counted below)
+        services.Agenda.Delete(linked.Record!.Id);
+        services.Agenda.EmptyBin();
+
         model.Calendar.Select(today);
         model.Calendar.NewNoteCommand.Execute(null);
         model.Calendar.Editor!.Title = "Vymyslená poznámka k dňu";

@@ -123,17 +123,18 @@ public static class UniversumRules
     private static IEnumerable<TrackTarget> SubtitleTargets(
         List<Classified> audio, Classified? defaultAudio, List<Classified> subtitles, RuleProfile profile, List<RuleIssue> issues)
     {
-        var preferredAudio = audio.Any(a => a.Role != TrackRole.Commentary && profile.IsPreferred(a.Language.Primary));
-        var activeForced = subtitles.Where(s => s.Role == TrackRole.Forced && profile.IsPreferred(s.Language.Primary))
-            .OrderBy(s => profile.Preference(s.Language.Primary)).ThenBy(s => s.Index).FirstOrDefault();
+        // owner, 7. 11. 2026: a dubbing is Czech or Slovak audio only – English among the preferred languages is no dubbing
+        var preferredAudio = audio.Any(a => a.Role != TrackRole.Commentary && profile.IsDubbing(a.Language.Primary));
+        var activeForced = subtitles.Where(s => s.Role == TrackRole.Forced && profile.IsDubbing(s.Language.Primary))
+            .OrderBy(s => profile.DubbingOrder(s.Language.Primary)).ThenBy(s => s.Index).FirstOrDefault();
         Classified? defaultSubtitle = null;
         if (!preferredAudio)
         {
             // foreign audio (owner, 29. 10. and 2. 11. 2026 – ALWAYS): Czech subtitles, without them Slovak, Default and Enabled
             // on – the full ones; subtitles for the hearing impaired when they are the only full ones of the language
             defaultSubtitle = subtitles
-                .Where(s => s.Role is TrackRole.Main or TrackRole.HearingImpaired && profile.IsPreferred(s.Language.Primary))
-                .OrderBy(s => profile.Preference(s.Language.Primary))
+                .Where(s => s.Role is TrackRole.Main or TrackRole.HearingImpaired && profile.IsDubbing(s.Language.Primary))
+                .OrderBy(s => profile.DubbingOrder(s.Language.Primary))
                 .ThenBy(s => s.Role == TrackRole.Main ? 0 : 1)
                 .FirstOrDefault();
             if (defaultSubtitle is null && activeForced is null && subtitles.Count > 0)

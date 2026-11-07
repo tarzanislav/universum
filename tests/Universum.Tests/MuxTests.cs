@@ -68,6 +68,62 @@ public sealed class MuxTests
     }
 
     [Test]
+    public async Task Mp4StaysMp4InZlucovanieHeaderOnlyOtherwiseMkv()
+    {
+        // owner, 7. 11. 2026: Zlučovanie with Ponechať MP4 – one MP4 with all its tracks, only header values changed, is
+        // written as MP4 by UNIVERSUM (its source only read); a track left out makes an MKV, and says why
+        var installation = await TestData.RequireMkvToolNixAsync();
+        var work = Directory.CreateTempSubdirectory("universum-mux-mp4-");
+        try
+        {
+            var inspector = new MkvMergeInspector(installation, new ProcessRunner());
+            var source = Path.Combine(work.FullName, "Vymyslený film.mp4");
+            File.Copy(TestData.Media("en-cz.mp4"), source);
+            var original = File.ReadAllBytes(source);
+            var file = await inspector.InspectAsync(source);
+            Assert.True(file.Tracks.Select(t => t.Flags.Default).SequenceEqual([true, true, false, true]), "an MP4's default tracks are its first enabled ones");
+
+            // the Czech sound first and default, the English one named, a title
+            var czech = file.Tracks.Single(t => t.Type == TrackType.Audio && t.Language.Primary == "cs");
+            var english = file.Tracks.Single(t => t.Type == TrackType.Audio && t.Language.Primary == "en");
+            var video = file.Tracks.Single(t => t.Type == TrackType.Video);
+            var subtitles = file.Tracks.Single(t => t.Type == TrackType.Subtitles);
+            var tracks = new[]
+            {
+                new MuxTrack(0, video.Id, null, video.Language, video.Flags),
+                new MuxTrack(0, czech.Id, "Vymyslený dabing", czech.Language, czech.Flags with { Default = true, Enabled = true }),
+                new MuxTrack(0, english.Id, null, english.Language, english.Flags with { Default = false }),
+                new MuxTrack(0, subtitles.Id, null, LanguageTag.FromCode("sk"), subtitles.Flags with { Default = false }),
+            };
+            var spec = new MuxSpec([new MuxSource(file)], tracks, Path.Combine(work.FullName, "Vymyslený výsledok.mkv")) { Title = "Vymyslený titul", KeepMp4 = true };
+            Assert.True(spec.Mp4Header() is { Order: [1, 3, 2, 4] } && spec.Validate().Count == 0, "stays MP4 – " + string.Join("; ", spec.Validate()));
+            Assert.True(MuxPreview.Of(spec, Path.Combine(work.FullName, "náhľad.mkv"), PreviewRange.Whole).Mp4Header() is null, "a preview is an MKV for the player");
+
+            var result = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(spec);
+            Assert.True(result.Status == MuxStatus.Done && result.OutputPath!.EndsWith("Vymyslený výsledok.mp4", StringComparison.Ordinal) &&
+                        result.Messages.Contains(Universum.Core.Mp4.Mp4Editing.KeptMessage), "written as MP4 – " + string.Join("; ", result.Messages));
+            var mp4 = Universum.Core.Mp4.Mp4Reader.Read(result.OutputPath!);
+            Assert.Sequence(["1 und True", "3 ces True", "2 eng False", "4 slk False"], mp4.Tracks.Select(t => $"{t.Id} {t.Language} {t.Enabled}"), "the order, languages and defaults");
+            Assert.True(mp4.Title == "Vymyslený titul" && mp4.Tracks[1].Name == "Vymyslený dabing", "the title and the name");
+            var read = await inspector.InspectAsync(result.OutputPath!);
+            Assert.True(read.IsMp4 && read.Tracks.Count == 4 && read.Tracks[1].Language.Primary == "cs" && read.Tracks[1].Flags.Default, "mkvmerge reads the result as planned");
+            Assert.True(File.ReadAllBytes(source).SequenceEqual(original), "the source only read");
+
+            // a track left out: MP4 cannot hold it – an MKV, and why
+            var removed = spec with { Tracks = tracks[..3], OutputPath = Path.Combine(work.FullName, "Bez titulkov.mkv") };
+            Assert.True(removed.Mp4Header() is null && Mp4Mux.Plan(removed).Obstacle is { Length: > 0 }, "a track left out – " + Mp4Mux.Plan(removed).Obstacle);
+            var mkv = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(removed);
+            Assert.True(mkv.Status == MuxStatus.Done && mkv.OutputPath!.EndsWith(".mkv", StringComparison.Ordinal) && (await inspector.InspectAsync(mkv.OutputPath)).IsMatroska,
+                "written as MKV – " + string.Join("; ", mkv.Messages));
+            Assert.True(Mp4Mux.Plan(removed with { KeepMp4 = false }).Change is null && (spec with { KeepMp4 = false }).Mp4Header() is null, "without the choice: MKV");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    [Test]
     public async Task AppendedFileContinuesTheTracksAndFlagsAreWritten()
     {
         var installation = await TestData.RequireMkvToolNixAsync();

@@ -255,6 +255,17 @@ public sealed class AppServices
             Mp4RecordFolder = AppSettings.Mp4RecordDirectory,
         };
 
+    /// <summary>
+    /// The multiplexer of Zlučovanie, with FFmpeg (its ffprobe checks an MP4 that stays MP4) and the folder of the záznamy
+    /// MP4 (owner, 7. 11. 2026).
+    /// </summary>
+    public Core.Muxing.Multiplexer Multiplexer(MkvToolNixInstallation installation) =>
+        new(installation, Runner)
+        {
+            FindFfmpeg = async cancellationToken => (await SpeechAsync(cancellationToken)).Ffmpeg,
+            Mp4RecordFolder = AppSettings.Mp4RecordDirectory,
+        };
+
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private TmdbClient? _tmdb;
     private TitleSearch? _titles;

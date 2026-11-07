@@ -25,6 +25,15 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
 {
     private readonly MkvMergeInspector _inspector = new(installation, runner);
 
+    /// <summary>FFmpeg of the installation – its ffprobe checks an MP4 that stays MP4; null: UNIVERSUM's own check only.</summary>
+    public Func<CancellationToken, Task<string>>? FindFfmpeg { get; init; }
+
+    /// <summary>Where a záznam MP4 is written when an MP4 cannot be edited (null: none).</summary>
+    public string? Mp4RecordFolder { get; init; }
+
+    /// <summary>The version of UNIVERSUM written into a záznam MP4.</summary>
+    public string Version { get; init; } = typeof(Multiplexer).Assembly.GetName().Version?.ToString(3) ?? "?";
+
     public async Task<MuxResult> MuxAsync(MuxSpec spec, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         var problems = spec.Validate();
@@ -33,10 +42,13 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
             return new MuxResult(MuxStatus.Failed, null, problems);
         }
 
-        // in the library the folder is created and the name chosen after writing (size class); otherwise the given file
+        // in the library the folder is created and the name chosen after writing (size class); otherwise the given file.
+        // Ponechať MP4: an MP4 that stays MP4 keeps its extension
+        var mp4 = spec.Mp4Header();
+        var mp4Extension = mp4 is null ? null : Mp4Mux.Extension(spec);
         var output = spec.Placement is { } placement
-            ? Path.Combine(placement.Directory, placement.Prefix + placement.Extension)
-            : Path.GetFullPath(spec.OutputPath);
+            ? Path.Combine(placement.Directory, placement.Prefix + (mp4Extension ?? placement.Extension))
+            : mp4Extension is null ? Path.GetFullPath(spec.OutputPath) : Path.ChangeExtension(Path.GetFullPath(spec.OutputPath), mp4Extension);
         string temporary;
         try
         {
@@ -53,6 +65,10 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
         try
         {
             EnsureFreeSpace(spec, output);
+            if (mp4 is not null)
+            {
+                return await KeepMp4Async(spec, mp4, output, temporary, mp4Extension!, progress, cancellationToken);
+            }
 
             // owner, 1. 11. 2026: subtitles the user ticked written as SRT first; the SRT takes the track's place
             var (withSrt, srtProblem) = await ToSrtAsync(spec, converted, cancellationToken);
@@ -128,6 +144,66 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
                 // a temporary folder left behind is harmless
             }
         }
+    }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): the MP4 copied, its header changed by UNIVERSUM's own code and checked (its reader
+    /// and ffprobe), then named – the source only read, the picture and sound as they were.
+    /// </summary>
+    private async Task<MuxResult> KeepMp4Async(
+        MuxSpec spec, Mp4.Mp4Change change, string output, string temporary, string extension, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        var source = spec.Sources[0].File.Path;
+        await CopyAsync(source, temporary, progress, cancellationToken);
+        Func<Task<string?>>? ffprobe = FindFfmpeg is null ? null : async () =>
+        {
+            var ffmpeg = await FindFfmpeg(CancellationToken.None).ConfigureAwait(false);
+            return Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+        };
+        var (problems, probed) = await Mp4.Mp4Editing.ApplyCheckedAsync(temporary, source, change, runner, ffprobe, Mp4RecordFolder, Version);
+        if (problems.Count > 0)
+        {
+            TryDelete(temporary);
+            return new MuxResult(MuxStatus.Failed, null, problems);
+        }
+
+        using (var stream = new FileStream(temporary, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+        {
+            stream.Flush(flushToDisk: true);
+        }
+
+        if (spec.Placement is { } place)
+        {
+            output = MoveToFreeName(temporary, place with { Extension = extension });
+        }
+        else
+        {
+            File.Move(temporary, output, overwrite: false);
+        }
+
+        progress?.Report(1);
+        return new MuxResult(MuxStatus.Done, output, probed ? [Mp4.Mp4Editing.KeptMessage, Mp4.Mp4Editing.ProbedMessage] : [Mp4.Mp4Editing.KeptMessage]);
+    }
+
+    // the source copied whole (the copy is what changes), with progress
+    private static async Task CopyAsync(string source, string target, IProgress<double>? progress, CancellationToken cancellationToken)
+    {
+        const int buffer = 4 << 20;
+        await using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, buffer, FileOptions.SequentialScan | FileOptions.Asynchronous);
+        await using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, buffer, FileOptions.Asynchronous);
+        var length = input.Length;
+        output.SetLength(length);
+        var bytes = new byte[buffer];
+        long copied = 0;
+        int read;
+        while ((read = await input.ReadAsync(bytes, cancellationToken)) > 0)
+        {
+            await output.WriteAsync(bytes.AsMemory(0, read), cancellationToken);
+            copied += read;
+            progress?.Report(length == 0 ? 0.95 : 0.95 * copied / length);
+        }
+
+        output.SetLength(copied);
     }
 
     /// <summary>

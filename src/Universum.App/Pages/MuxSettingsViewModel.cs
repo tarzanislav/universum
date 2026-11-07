@@ -70,6 +70,12 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
                 Recalculate();
             }
         };
+        // Ponechať MP4 switched here or elsewhere: the output (its extension) and the note again – not a change of the settings
+        services.KeepMp4Changed += () =>
+        {
+            OnPropertyChanged(nameof(KeepMp4));
+            Recalculate();
+        };
         RemoveSourceCommand = new RelayCommand(RemoveSource, () => _selectedSource is not null);
         AddSourcesCommand = new AsyncRelayCommand(() => AddRequested?.Invoke(MuxAddAction.AddToCurrent, null) ?? Task.CompletedTask);
         AppendFilesCommand = new AsyncRelayCommand(
@@ -352,17 +358,35 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
     /// <summary>The spec the settings describe now.</summary>
     public MuxSpec Spec()
     {
-        var sources = Inputs.Select(i => i.ToSource()).ToList();
-        var tracks = Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList();
         var (path, placement) = _output;
-        return new MuxSpec(sources, tracks, path)
-        {
-            Placement = placement,
-            Title = Title.Length == 0 ? null : Title,
-            ChaptersFile = ChaptersFile.Length == 0 ? null : ChaptersFile,
-            Attachments = Attachments.Select(a => new MuxAttachment(a)).ToList(),
-        };
+        return Content() with { OutputPath = path, Placement = placement };
     }
+
+    // the sources, tracks, title, chapters and attachments – without the output (Ponechať MP4 decides its extension)
+    private MuxSpec Content() => new(Inputs.Select(i => i.ToSource()).ToList(), Tracks.Where(t => t.Include).Select(t => t.ToTrack(Inputs.IndexOf(t.Input))).ToList(), "")
+    {
+        Title = Title.Length == 0 ? null : Title,
+        ChaptersFile = ChaptersFile.Length == 0 ? null : ChaptersFile,
+        Attachments = Attachments.Select(a => new MuxAttachment(a)).ToList(),
+        KeepMp4 = _services.KeepMp4,
+    };
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): one MP4 whose header only changes stays MP4 – UNIVERSUM edits its header; the
+    /// same switch as in Hromadné, Single spracovanie, Editácia hlavičky and Nastavenia.
+    /// </summary>
+    public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
+
+    /// <summary>The first source is an MP4 (Ponechať MP4 is offered).</summary>
+    public bool IsMp4 => Inputs.Count > 0 && Inputs[0].File.IsMp4;
+
+    /// <summary>"Výsledok ostane MP4 …" or why it will be an MKV; empty without an MP4 or the choice.</summary>
+    public string Mp4Note => !IsMp4 || !KeepMp4 ? ""
+        : Mp4Mux.Plan(Content()) is ({ }, _) ? Loc.T("Výsledok ostane MP4 – UNIVERSUM zmení len hlavičku, obraz a zvuk sa nedotknú.")
+        : Loc.F("Výsledok bude MKV – MP4 neudrží: {0}.", Mp4Mux.Plan(Content()).Obstacle ?? "");
+
+    // the extension of the output when it stays MP4; null: an MKV
+    private string? Mp4Extension() => IsMp4 && KeepMp4 && Content() is var content && content.Mp4Header() is not null ? Mp4Mux.Extension(content) : null;
 
     /// <summary>Adds inspected files as new sources with all their tracks.</summary>
     public void AddFiles(IEnumerable<MediaFile> files)
@@ -526,6 +550,8 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         }
 
         Problems = string.Join("\n", ProblemList(spec));
+        OnPropertyChanged(nameof(IsMp4));
+        OnPropertyChanged(nameof(Mp4Note));
         OnPropertyChanged(nameof(HasFindings));
         OnPropertyChanged(nameof(FindingsText));
         OnPropertyChanged(nameof(Summary));
@@ -567,9 +593,12 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
     /// <summary>The output: library place, typed path, rules name beside the first source, or "name (1).mkv" there.</summary>
     private (string Path, Placement? Placement) Output()
     {
+        // Ponechať MP4: the place keeps the MP4's extension (a typed path is written with it by the multiplexer)
+        var mp4 = Mp4Extension();
+        Placement? Kept(Placement? placement) => placement is null || mp4 is null ? placement : placement with { Extension = mp4 };
         if (_useLibrary)
         {
-            return ("", Library.Placement);
+            return ("", Kept(Library.Placement));
         }
 
         if (_outputEdited)
@@ -577,7 +606,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             return (_typedPath, null);
         }
 
-        return AutoPlacement() is { } placement ? ("", placement) : (DefaultPath(), null);
+        return AutoPlacement() is { } auto ? ("", Kept(auto)) : (DefaultPath(), null);
     }
 
     /// <summary>Beside the first source, named by the rules – when the title (and for a series the episode) is known.</summary>
@@ -604,7 +633,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
         var taken = Files.Concat(ReservedOutputs()).ToList();
         for (var number = 1; ; number++)
         {
-            var candidate = Path.Combine(folder, $"{name} ({number}).mkv");
+            var candidate = Path.Combine(folder, $"{name} ({number}){Mp4Extension() ?? ".mkv"}");
             if (!File.Exists(candidate) && !taken.Any(i => SamePath(i, candidate)))
             {
                 return candidate;
@@ -945,7 +974,7 @@ public sealed partial class MuxSettingsViewModel : ObservableObject
             return;
         }
 
-        var job = new MuxJob(Loc.F("Zlučovanie: {0} ({1} stôp)", DisplayName, spec.Tracks.Count), new Multiplexer(installation, _services.Runner), spec);
+        var job = new MuxJob(Loc.F("Zlučovanie: {0} ({1} stôp)", DisplayName, spec.Tracks.Count), _services.Multiplexer(installation), spec);
         job.Changed += changed => JobRow.OnUi(() =>
         {
             Progress = changed.Progress;

@@ -36,10 +36,12 @@ public static class Mp4Targets
         track.Source.Number ?? throw new InvalidOperationException($"track {track.TrackId} of the MP4 has no number (its ID in the file)");
 
     /// <summary>What the result does not have that the target wanted (empty: all as planned, the media untouched).</summary>
-    public static IReadOnlyList<string> Verify(TargetState target, Mp4File before, Mp4File after)
+    public static IReadOnlyList<string> Verify(TargetState target, Mp4File before, Mp4File after) => Verify(ChangeFor(target), before, after);
+
+    /// <summary>What the result does not have that the change asked for (empty: all as planned, the media untouched).</summary>
+    public static IReadOnlyList<string> Verify(Mp4Change change, Mp4File before, Mp4File after)
     {
         var problems = new List<string>();
-        var change = ChangeFor(target);
         var wanted = change.Tracks.ToDictionary(t => t.TrackId);
         var order = change.Order ?? before.Tracks.Select(t => t.Id).ToList();
         if (!after.Tracks.Select(t => t.Id).SequenceEqual(order))
@@ -87,10 +89,11 @@ public static class Mp4Targets
     }
 
     /// <summary>
-    /// What ffprobe sees in the result compared with the target: the streams in order, their languages, default
-    /// disposition and names (handler), the title. Null when ffprobe could not tell (it is then not counted).
+    /// What ffprobe sees in the result, compared with what UNIVERSUM's reader found in it (<paramref name="after"/>) and
+    /// with the change: the streams in order and their kinds, the languages and names changed, the default disposition
+    /// (MP4's enabled) of every sound and subtitle track, the title. Null when ffprobe could not tell (not counted then).
     /// </summary>
-    public static async Task<IReadOnlyList<string>?> ProbeAsync(IProcessRunner runner, string ffprobe, string path, TargetState target, CancellationToken cancellationToken = default)
+    public static async Task<IReadOnlyList<string>?> ProbeAsync(IProcessRunner runner, string ffprobe, string path, Mp4Change change, Mp4File after, CancellationToken cancellationToken = default)
     {
         var output = new System.Text.StringBuilder();
         var result = await runner.RunAsync(new ProcessRequest(ffprobe, ["-v", "error", "-show_streams", "-show_format", "-of", "json", path])
@@ -108,23 +111,23 @@ public static class Mp4Targets
             using var json = JsonDocument.Parse(output.ToString());
             var streams = json.RootElement.GetProperty("streams").EnumerateArray().ToList();
             var problems = new List<string>();
-            if (streams.Count < target.Tracks.Count)
+            if (streams.Count < after.Tracks.Count)
             {
-                return [$"ffprobe: {streams.Count} streams, expected {target.Tracks.Count}"];
+                return [$"ffprobe: {streams.Count} streams, expected {after.Tracks.Count}"];
             }
 
-            var change = ChangeFor(target).Tracks.ToDictionary(t => t.TrackId);
-            for (var i = 0; i < target.Tracks.Count; i++)
+            var wanted = change.Tracks.ToDictionary(t => t.TrackId);
+            for (var i = 0; i < after.Tracks.Count; i++)
             {
-                var track = target.Tracks[i];
+                var track = after.Tracks[i];
                 var stream = streams[i];
                 var tags = stream.TryGetProperty("tags", out var t) ? t : default;
                 string? Tag(string name) => tags.ValueKind == JsonValueKind.Object && tags.TryGetProperty(name, out var value) ? value.GetString() : null;
-                var expectedType = track.Type switch
+                var expectedType = track.Kind switch
                 {
-                    Media.TrackType.Video => "video",
-                    Media.TrackType.Audio => "audio",
-                    Media.TrackType.Subtitles => "subtitle",
+                    Mp4TrackKind.Video => "video",
+                    Mp4TrackKind.Audio => "audio",
+                    Mp4TrackKind.Subtitles => "subtitle",
                     _ => null,
                 };
                 if (expectedType is not null && stream.GetProperty("codec_type").GetString() != expectedType)
@@ -133,11 +136,11 @@ public static class Mp4Targets
                     continue;
                 }
 
-                if (change.TryGetValue(Id(track), out var to))
+                if (wanted.TryGetValue(track.Id, out var to))
                 {
-                    if (to.Language is { } language && !language.IsUndetermined && Tag("language") != Mp4Languages.Unpack(Mp4Languages.Pack(language)))
+                    if (to.Language is { IsUndetermined: false } && Tag("language") != track.Language)
                     {
-                        problems.Add($"ffprobe: stream {i} language {Tag("language")}, expected {Mp4Languages.Unpack(Mp4Languages.Pack(language))}");
+                        problems.Add($"ffprobe: stream {i} language {Tag("language")}, expected {track.Language}");
                     }
 
                     if (to.Name is { Length: > 0 } name && Tag("handler_name") != name)
@@ -147,19 +150,19 @@ public static class Mp4Targets
                 }
 
                 var isDefault = stream.TryGetProperty("disposition", out var disposition) && disposition.TryGetProperty("default", out var d) && d.GetInt32() == 1;
-                if (track.Flags.Default != isDefault && track.Type != Media.TrackType.Video)
+                if (expectedType is "audio" or "subtitle" && track.Enabled != isDefault)
                 {
-                    problems.Add($"ffprobe: stream {i} default {isDefault}, expected {track.Flags.Default}");
+                    problems.Add($"ffprobe: stream {i} default {isDefault}, expected {track.Enabled}");
                 }
             }
 
-            if (target.TitleChanged)
+            if (change.Title is { } wantedTitle)
             {
                 var format = json.RootElement.GetProperty("format");
                 var title = format.TryGetProperty("tags", out var formatTags) && formatTags.TryGetProperty("title", out var value) ? value.GetString() ?? "" : "";
-                if (title != (target.NewTitle ?? ""))
+                if (title != wantedTitle)
                 {
-                    problems.Add($"ffprobe: title '{title}', expected '{target.NewTitle}'");
+                    problems.Add($"ffprobe: title '{title}', expected '{wantedTitle}'");
                 }
             }
 

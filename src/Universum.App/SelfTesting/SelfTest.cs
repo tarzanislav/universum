@@ -790,6 +790,35 @@ internal static class SelfTest
         await Screenshot(dialog, "mux-add-files.png");
         dialog.Close();
 
+        // owner, 7. 11. 2026: Ponechať MP4 – one MP4 with all its tracks, only header values changed, written as MP4 by
+        // UNIVERSUM (checked by its reader and ffprobe); a track left out makes an MKV, and the note says why
+        var mp4Source = Path.Combine(work, "Vymyslený film na zlúčenie.mp4");
+        File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "en-cz.mp4"), mp4Source, overwrite: true);
+        mux.NewSettingsCommand.Execute(null);
+        var mp4Set = mux.Current;
+        answer = MuxAddAction.AddToCurrent;
+        newForVideo = false;
+        await mux.AddFilesAsync([mp4Source]);
+        var keepMp4 = services.KeepMp4;
+        services.KeepMp4 = true;
+        try
+        {
+            mp4Set.Title = "Vymyslený titul";
+            Check(mp4Set.IsMp4 && mp4Set.Mp4Note.StartsWith("Výsledok ostane MP4", StringComparison.Ordinal) && mp4Set.OutputPath.EndsWith(".mp4", StringComparison.Ordinal),
+                "mux: an MP4 stays MP4 – " + mp4Set.Mp4Note + " | " + mp4Set.OutputPath + " | " + mp4Set.Problems);
+            var kept = await services.Multiplexer(services.CurrentMkvToolNix!).MuxAsync(mp4Set.Spec());
+            Check(kept is { Status: Core.Muxing.MuxStatus.Done } && kept.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) &&
+                  kept.Messages.Contains(Core.Mp4.Mp4Editing.KeptMessage) && Core.Mp4.Mp4Reader.Read(kept.OutputPath).Title == "Vymyslený titul",
+                $"mux: written as MP4 (ffprobe: {kept.Messages.Contains(Core.Mp4.Mp4Editing.ProbedMessage)}) – " + string.Join("; ", kept.Messages));
+            mp4Set.Tracks[^1].Include = false;
+            Check(mp4Set.Mp4Note.StartsWith("Výsledok bude MKV", StringComparison.Ordinal) && mp4Set.OutputPath.EndsWith(".mkv", StringComparison.Ordinal),
+                "mux: a track left out – an MKV, and why: " + mp4Set.Mp4Note + " | " + mp4Set.OutputPath);
+        }
+        finally
+        {
+            services.KeepMp4 = keepMp4;
+        }
+
         // done: the extra tabs are closed ("yes" to the question)
         confirm = true;
         foreach (var extra in mux.Settings.Where(s => s != set).ToList())

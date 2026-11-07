@@ -57,6 +57,7 @@ Výsledek si můžete nejdřív **prohlédnout** a teprve hotový, bezchybný tv
 - Každá záložka má **vlastní náhled** – můžete připravit a porovnat víc výsledků najednou.
 - Když nastavení po náhledu změníte, UNIVERSUM upozorní, že náhled už výsledku neodpovídá.
 !info Náhled se smaže se svou záložkou nebo po týdnu. Složku náhledů změníte v Nastaveních.
+!tip **MP4 ponechat jako MP4:** jedno MP4 se všemi stopami, kterému měníte jen jazyky, názvy, výchozí stopy, pořadí nebo název, se zapíše **jako MP4** – hlavičku upraví UNIVERSUM, obrazu a zvuku se nedotkne. Při slučování více souborů, vynechání stopy, kapitolách či vlastnostech stopy vznikne MKV a řádek u volby řekne proč. Náhled je vždy MKV.
 @otvorit Mux Otevřít Slučování
 
 ## Úprava hlavičky
@@ -73,6 +74,7 @@ v knihovně – trvá to sekundy až minuty.
 - Část **Kontrola** upozorní např. na více stop s Default nebo na forced titulky bez Default.
 !info Změna pořadí nebo vynechání stopy **zapíše nový soubor** – trvá to minuty. Pod tabulkou vždy vidíte,
   jak se výsledek zapíše. [Vrátit zpět] vrátí poslední uloženou změnu, když to jde.
+!tip U MP4 je volba **MP4 ponechat jako MP4** – kopie v knihovně zůstane MP4 a změní se jen její hlavička; co MP4 neudrží (vynechání stopy, Forced…), zapíše se jako MKV.
 ![Úprava hlavičky](header-editor.jpg)
 @otvorit HeaderEditor Otevřít Úpravu hlavičky
 

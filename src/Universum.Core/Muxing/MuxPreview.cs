@@ -26,7 +26,7 @@ public static class MuxPreview
     /// placement in the library); a film shorter than three pieces and their gaps is written whole.
     /// </summary>
     public static MuxSpec Of(MuxSpec spec, string outputPath, PreviewRange range) =>
-        spec with { OutputPath = outputPath, Placement = null, PreviewParts = range == PreviewRange.Samples ? Parts(spec.Sources.FirstOrDefault()?.File.Duration) : null };
+        spec with { OutputPath = outputPath, Placement = null, KeepMp4 = false, PreviewParts = range == PreviewRange.Samples ? Parts(spec.Sources.FirstOrDefault()?.File.Duration) : null };
 
     /// <summary>"parts:00:00:00.000-00:02:00.000,+00:44:00.000-…" (the start, the middle and 90 % of the film); null: whole.</summary>
     public static string? Parts(TimeSpan? duration)

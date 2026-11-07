@@ -50,7 +50,7 @@ public sealed class FileProcessor(
     public string Version { get; init; } = typeof(FileProcessor).Assembly.GetName().Version?.ToString(3) ?? "?";
 
     /// <summary>Start of the message naming the záznam MP4 written.</summary>
-    public const string Mp4RecordPrefix = "the MP4 record: ";
+    public const string Mp4RecordPrefix = Mp4.Mp4Editing.RecordPrefix;
 
     /// <summary>
     /// What <see cref="SameStructure"/> compares, as one text: a file with another text is not the file that was analysed
@@ -623,7 +623,7 @@ public sealed class FileProcessor(
     public const string OriginalRecycledMessage = "the original went to the Recycle Bin";
 
     /// <summary>Ponechať MP4: the edited header of an MP4 checked by ffprobe too, and ffprobe sees what was planned.</summary>
-    public const string Mp4ProbedMessage = "the MP4 checked by ffprobe too";
+    public const string Mp4ProbedMessage = Mp4.Mp4Editing.ProbedMessage;
 
     /// <summary>Superrýchle: the original was moved into the library and edited there (its undo record puts it back).</summary>
     public const string MovedIntoLibraryMessage = "the original was moved into the library and edited there";
@@ -1056,69 +1056,18 @@ public sealed class FileProcessor(
     }
 
     /// <summary>
-    /// Ponechať MP4 (owner, 7. 11. 2026): the header of <paramref name="path"/> changed by UNIVERSUM's own code (the media
-    /// untouched), then checked twice – by UNIVERSUM's reader against <paramref name="original"/> (or the file as it was) and by
-    /// ffprobe when FFmpeg is at hand. Problems (and the záznam MP4 written) as messages, empty when all is as planned; and
-    /// whether ffprobe saw the result as planned.
+    /// Ponechať MP4 (owner, 7. 11. 2026): the header of <paramref name="path"/> changed by UNIVERSUM's own code and checked
+    /// against <paramref name="original"/> (or the file as it was) by its reader and by ffprobe (<see cref="Mp4.Mp4Editing"/>).
     /// </summary>
-    private async Task<(IReadOnlyList<string> Problems, bool Probed)> EditMp4Async(TargetState target, string path, string? original)
+    private Task<(IReadOnlyList<string> Problems, bool Probed)> EditMp4Async(TargetState target, string path, string? original) =>
+        Mp4.Mp4Editing.ApplyCheckedAsync(path, original, Mp4.Mp4Targets.ChangeFor(target), runner, FindFfprobe(), Mp4RecordFolder, Version);
+
+    // ffprobe beside the FFmpeg of the installation; null without FFmpeg
+    private Func<Task<string?>>? FindFfprobe() => FindFfmpeg is null ? null : async () =>
     {
-        try
-        {
-            var before = await Task.Run(() => Mp4.Mp4Reader.Read(original ?? path)).ConfigureAwait(false);
-            await Task.Run(() => Mp4.Mp4HeaderEditor.Apply(path, Mp4.Mp4Targets.ChangeFor(target))).ConfigureAwait(false);
-            var after = await Task.Run(() => Mp4.Mp4Reader.Read(path)).ConfigureAwait(false);
-            var problems = Mp4.Mp4Targets.Verify(target, before, after).ToList();
-            var probed = false;
-            if (problems.Count == 0 && FindFfmpeg is not null)
-            {
-                try
-                {
-                    var ffmpeg = await FindFfmpeg(CancellationToken.None).ConfigureAwait(false);
-                    var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
-                    if (File.Exists(ffprobe) && await Mp4.Mp4Targets.ProbeAsync(runner, ffprobe, path, target).ConfigureAwait(false) is { } seen)
-                    {
-                        problems.AddRange(seen);
-                        probed = seen.Count == 0;
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or Speech.SpeechException or InvalidOperationException)
-                {
-                    // ffprobe is the second opinion; without it UNIVERSUM's own check stands
-                }
-            }
-
-            return (problems.Count > 0 ? [.. problems.Select(p => "verification: " + p), .. Mp4Record(path, string.Join("; ", problems))] : [], probed);
-        }
-        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
-        {
-            return ([$"the MP4 header cannot be edited: {ex.Message}", .. Mp4Record(path, ex.Message)], false);
-        }
-    }
-
-    // a záznam MP4 for the developer (no names in it); the message naming it, or none
-    private IEnumerable<string> Mp4Record(string path, string problem)
-    {
-        if (Mp4RecordFolder is null)
-        {
-            yield break;
-        }
-
-        string? saved = null;
-        try
-        {
-            saved = Mp4.Mp4Record.Save(Mp4RecordFolder, Mp4.Mp4Record.Describe(path, problem, Version));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // the record is a help, not a condition
-        }
-
-        if (saved is not null)
-        {
-            yield return Mp4RecordPrefix + saved;
-        }
-    }
+        var ffmpeg = await FindFfmpeg(CancellationToken.None).ConfigureAwait(false);
+        return Path.Combine(Path.GetDirectoryName(ffmpeg)!, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe");
+    };
 
     /// <summary>Records the stream in the library index and sets the modification time; failures here only add messages.</summary>
     private ProcessingResult Finish(ProcessingResult result, string? fingerprint, string signature, DateTime? originalTime)

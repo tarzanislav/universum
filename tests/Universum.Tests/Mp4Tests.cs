@@ -101,6 +101,36 @@ public sealed class Mp4Tests
     }
 
     [Test]
+    public async Task ChangedAndCheckedByUniversumAndFfprobe()
+    {
+        // the edit used by the processing and Zlučovanie: changed, read back, and seen the same by ffprobe
+        var ffprobe = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(folder => Path.Combine(folder, OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe")).FirstOrDefault(File.Exists);
+        if (ffprobe is null)
+        {
+            Assert.Skip("ffprobe not on PATH");
+        }
+
+        var path = Copy("en-cz.mp4");
+        try
+        {
+            var change = new Mp4Change([new Mp4TrackChange(3) { Language = LanguageTag.FromCode("sk"), Name = "Vymyslený dabing", Enabled = true }, new Mp4TrackChange(2) { Enabled = false }],
+                "Vymyslený titul", [1, 3, 2, 4]);
+            var (problems, probed) = await Mp4Editing.ApplyCheckedAsync(path, null, change, new Universum.Core.Processes.ProcessRunner(), () => Task.FromResult<string?>(ffprobe), null, "0.0.0");
+            Assert.True(problems.Count == 0 && probed, "changed, and ffprobe sees the same – " + string.Join("; ", problems));
+
+            // a check that finds a difference: ffprobe asked about a title that is not there
+            var after = Mp4Reader.Read(path);
+            var seen = await Mp4Targets.ProbeAsync(new Universum.Core.Processes.ProcessRunner(), ffprobe!, path, change with { Title = "Iný vymyslený titul" }, after);
+            Assert.True(seen is [var only] && only.StartsWith("ffprobe: title", StringComparison.Ordinal), "a difference is found – " + string.Join("; ", seen ?? []));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
     public void LanguagesOfMp4()
     {
         Assert.Equal("ces", Mp4Languages.Unpack(Mp4Languages.Pack(LanguageTag.FromCode("cze"))), "Czech as ISO 639-2/T");

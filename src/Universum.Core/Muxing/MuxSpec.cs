@@ -143,6 +143,15 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
     public IReadOnlyList<MuxAttachment> Attachments { get; init; } = [];
 
     /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): one MP4 whose header only changes is written as MP4 – its header edited by
+    /// UNIVERSUM (<see cref="Mp4Mux"/>); otherwise an MKV as always. Never for a preview.
+    /// </summary>
+    public bool KeepMp4 { get; init; }
+
+    /// <summary>The change of the MP4's header when the result stays MP4; null: written by mkvmerge.</summary>
+    public Mp4.Mp4Change? Mp4Header() => KeepMp4 && PreviewParts is null ? Mp4Mux.Plan(this).Change : null;
+
+    /// <summary>
     /// Place of the output named by the rules (in the library or beside the sources); the size class is known only
     /// after writing, so the final name is chosen then. When set, <see cref="OutputPath"/> is not used.
     /// </summary>
@@ -259,7 +268,8 @@ public sealed record MuxSpec(IReadOnlyList<MuxSource> Sources, IReadOnlyList<Mux
         }
 
         var output = Path.GetFullPath(OutputPath);
-        if (!OutputExtensions.Contains(Path.GetExtension(output), StringComparer.OrdinalIgnoreCase))
+        if (!OutputExtensions.Contains(Path.GetExtension(output), StringComparer.OrdinalIgnoreCase) &&
+            !(Mp4Header() is not null && Path.GetExtension(output).Equals(Mp4Mux.Extension(this), StringComparison.OrdinalIgnoreCase)))
         {
             problems.Add(CoreText.F("Výstupný súbor musí mať príponu {0}.", string.Join(", ", OutputExtensions)));
         }

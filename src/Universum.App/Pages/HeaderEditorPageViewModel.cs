@@ -53,7 +53,25 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !Busy && Target() is { HasChanges: true } && Library.Placement is not null);
         UndoCommand = new AsyncRelayCommand(UndoAsync, () => !Busy && _undoRecord is not null);
         QueueCommand = new RelayCommand(Enqueue, () => !Busy && Target() is { HasChanges: true } && Library.Placement is not null);
+        // Ponechať MP4 switched here or elsewhere (Hromadné, Single, Zlučovanie, Nastavenia): the plan and the name again
+        services.KeepMp4Changed += () =>
+        {
+            OnPropertyChanged(nameof(KeepMp4));
+            if (!Busy && _file is not null)
+            {
+                Recalculate();
+            }
+        };
     }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose header only changes stays MP4 – UNIVERSUM edits its header itself;
+    /// the same switch as in Hromadné, Single spracovanie, Zlučovanie and Nastavenia.
+    /// </summary>
+    public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
+
+    /// <summary>The opened file is an MP4 (Ponechať MP4 is offered).</summary>
+    public bool IsMp4 => _file?.IsMp4 == true;
 
     /// <summary>Adds the change to the job queue instead of saving now.</summary>
     public RelayCommand QueueCommand { get; }
@@ -165,7 +183,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
 
         var kept = Rows.Where(r => !r.IsRemoved).Select(r => r.ToEdit()).ToList();
         var removed = Rows.Where(r => r.IsRemoved).Select(r => r.TrackId).ToHashSet();
-        return ManualTarget.Create(_file, kept, removed, RemoveTags && _file.HasTags, Title == (_file.Title ?? "") ? null : Title);
+        return ManualTarget.Create(_file, kept, removed, RemoveTags && _file.HasTags, Title == (_file.Title ?? "") ? null : Title) with { KeepMp4 = _services.KeepMp4 };
     }
 
     // owner, 30. 10. 2026: the language of every text subtitle track read from its text (once for the opened file)
@@ -327,6 +345,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(RemoveTags));
             OnPropertyChanged(nameof(HasTags));
+            OnPropertyChanged(nameof(IsMp4));
             OnPropertyChanged(nameof(FilePath));
             Summary = file is null ? "" : Texts.FileSummary(file);
         }
@@ -363,7 +382,11 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
             Method = plan.Method switch
             {
                 WriteMethod.None => Loc.T("Bez zmien."),
+                WriteMethod.HeaderEdit when target.StaysMp4 =>
+                    Loc.F("Kópia v knižnici ostane MP4 – UNIVERSUM zmení len jej hlavičku ({0}), obraz a zvuk sa nedotknú. Originál ostane nezmenený.", Count(plan.Changes.Count)),
                 WriteMethod.HeaderEdit => Loc.F("Kópia v knižnici so zmenenou hlavičkou ({0}) – trvá to sekundy až minúty (kopírovanie). Originál ostane nezmenený.", Count(plan.Changes.Count)),
+                _ when target.Mp4Obstacle is { } why =>
+                    Loc.F("Zapíše sa nový súbor MKV do knižnice ({0}) – MP4 neudrží: {1}. Originál ostane nezmenený.", Count(plan.Changes.Count), why),
                 _ => Loc.F("Zapíše sa nový súbor do knižnice ({0}; poradie alebo vynechané stopy) – trvá to minúty. Originál ostane nezmenený.", Count(plan.Changes.Count)),
             };
             foreach (var finding in TargetChecks.Review(target, _services.Profile))

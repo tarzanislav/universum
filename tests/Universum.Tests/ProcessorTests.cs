@@ -232,9 +232,10 @@ public sealed class ProcessorTests
         }
         finally
         {
-            if (System.IO.File.Exists(readOnly))
+            // the read-only original went to the (test) Recycle Bin with its attribute – Windows deletes no read-only file
+            foreach (var any in Directory.EnumerateFiles(work.Path, "*", SearchOption.AllDirectories))
             {
-                System.IO.File.SetAttributes(readOnly, FileAttributes.Normal);
+                System.IO.File.SetAttributes(any, FileAttributes.Normal);
             }
         }
 

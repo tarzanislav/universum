@@ -167,23 +167,42 @@ public sealed class FileProcessor(
                 previous = found.Path;
             }
 
+            // Superrýchle: only the header changes – the original is moved into the library and edited there; when that
+            // cannot be done, the whole file is copied and the user is told why (owner, 7. 11. 2026: it was silent)
+            ProcessingResult? moved = null;
+            string? notMoved = null;
+            if (!inLibrary && plan.Method != WriteMethod.Remux && output.Original == OriginalHandling.Delete && output.MoveIntoLibrary)
+            {
+                // a file with another name elsewhere (a hard link – a torrent's seed, another library) is never edited in place
+                notMoved = !Paths.SameVolume(source, placement.Directory) ? NotMovedOtherDisk
+                    : Links(source) != 1 ? NotMovedHardLink
+                    : !CanEditInPlace(source) ? NotMovedInUse
+                    : null;
+                if (notMoved is null)
+                {
+                    moved = await MoveIntoLibraryAsync(plan, placement, cancellationToken);
+                    notMoved = moved is null ? NotMovedRename : null;
+                }
+            }
+
             ProcessingResult result;
             if (inLibrary)
             {
                 temporary = TemporaryPath(placement.Directory, source);
                 result = await ReworkInLibraryAsync(plan, placement, temporary, progress, cancellationToken);
             }
-            else if (plan.Method != WriteMethod.Remux && output.Original == OriginalHandling.Delete && output.MoveIntoLibrary &&
-                     Paths.SameVolume(source, placement.Directory) && Links(source) == 1 && CanEditInPlace(source) &&
-                     await MoveIntoLibraryAsync(plan, placement, cancellationToken) is { } moved)
+            else if (moved is not null)
             {
-                // a file with another name elsewhere (a hard link – a torrent's seed, another library) is never edited in place
                 result = moved;
             }
             else
             {
                 temporary = TemporaryPath(placement.Directory, source);
                 result = await WriteIntoLibraryAsync(plan, placement, output, temporary, progress, cancellationToken);
+                if (notMoved is not null)
+                {
+                    result = result with { Messages = [NotMovedPrefix + notMoved, .. result.Messages] };
+                }
             }
 
             if (result.Status != ProcessingStatus.Done || result.OutputPath is null)
@@ -585,6 +604,17 @@ public sealed class FileProcessor(
 
     /// <summary>Superrýchle: the original was moved into the library and edited there (its undo record puts it back).</summary>
     public const string MovedIntoLibraryMessage = "the original was moved into the library and edited there";
+
+    /// <summary>Superrýchle could not be used for a file whose header only changes: the whole file was copied – why.</summary>
+    public const string NotMovedPrefix = "superfast was not possible, the whole file was copied: ";
+
+    public const string NotMovedOtherDisk = "the output folder is on another disk";
+
+    public const string NotMovedHardLink = "the file has another name too (a hard link)";
+
+    public const string NotMovedInUse = "the file is read-only or open in another program";
+
+    public const string NotMovedRename = "the file cannot be moved (open in another program)";
 
     /// <summary>Start of the message of an original that was to be deleted but stays.</summary>
     public const string OriginalKeptPrefix = "the original stays in place: ";

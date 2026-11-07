@@ -146,6 +146,19 @@ public static partial class ProcessingWords
             return (CoreText.T("Originál je presunutý do knižnice a upravený tam (superrýchle) – Vrátiť originál ho dá späť, ako bol."), null);
         }
 
+        if (message.StartsWith(FileProcessor.NotMovedPrefix, StringComparison.Ordinal))
+        {
+            var why = Tail(FileProcessor.NotMovedPrefix) switch
+            {
+                FileProcessor.NotMovedOtherDisk => CoreText.T("výstupný priečinok je na inom disku ako originál"),
+                FileProcessor.NotMovedHardLink => CoreText.T("súbor má aj iný názov (pevný odkaz – napr. ho ešte zdieľa torrent); úprava na mieste by zmenila aj ten"),
+                FileProcessor.NotMovedInUse => CoreText.T("súbor je len na čítanie alebo ho má otvorený iný program (torrent, prehrávač, mediálny server)"),
+                FileProcessor.NotMovedRename => CoreText.T("súbor sa nedal presunúť – asi ho má otvorený iný program"),
+                var other => other,
+            };
+            return (CoreText.F("Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie).", why), null);
+        }
+
         if (message == FileProcessor.RestoredMessage)
         {
             return (CoreText.T("Originál je vrátený do pôvodného stavu."), null);

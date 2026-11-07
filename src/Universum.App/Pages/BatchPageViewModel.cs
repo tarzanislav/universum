@@ -2962,6 +2962,7 @@ public sealed class BatchPageViewModel : ObservableObject
             var recycled = _results.Count(r => r.Messages.Contains(FileProcessor.OriginalRecycledMessage));
             var stayed = _results.Count(r => r.Messages.Any(m => m.StartsWith(FileProcessor.OriginalKeptPrefix, StringComparison.Ordinal)));
             var movedIn = _results.Count(r => r.Messages.Contains(FileProcessor.MovedIntoLibraryMessage));
+            var copiedWhole = _results.Count(r => r.Messages.Any(m => m.StartsWith(FileProcessor.NotMovedPrefix, StringComparison.Ordinal)));
             var cache = _services.Inspector(installation);
             foreach (var result in _results.Where(r => r.Status == ProcessingStatus.Done))
             {
@@ -3003,6 +3004,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 (recycled > 0 ? Loc.F(" · {0} v Koši", Texts.Count(recycled, Loc.T("originál"), Loc.T("originály"), Loc.T("originálov"))) : "") +
                 (stayed > 0 ? Loc.F(" · {0} originálov ostalo (Kôš nie je k dispozícii – pozri Výstup úloh)", stayed) : "") +
                 (movedIn > 0 ? Loc.F(" · {0} presunutých do knižnice (superrýchle; Vrátiť originály ich dá späť)", movedIn) : "") +
+                (copiedWhole > 0 ? Loc.F(" · {0} superrýchle nešlo – skopírované celé (dôvod vo Výstupe úloh)", copiedWhole) : "") +
                 (originals == OriginalsMode.DeleteManually && PendingOriginals().Count > 0 ? Loc.T(" · originály zmažete tlačidlom Zmazať originály") : "") +
                 Loc.F(" · trvanie {0} · úloha {1} vo Fronte úloh", time, job.Id));
         }

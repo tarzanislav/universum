@@ -14,5 +14,8 @@ subtitles and invented sentences read by a synthetic voice; they are released un
 | `media/und.avi` | AVI without any language tags (MP3 audio) – the language must be chosen, then converted to MKV |
 | `media/speech-und.mkv` | three audio tracks without a language or name with invented sentences read by a synthetic voice (espeak-ng): Czech, English, Slovak – recognition of the spoken language |
 | `identify/*.json` | recorded `mkvmerge -J` output for parser tests |
+| `pictures/*.webp` | invented WebP test patterns (lossy with the normal and the simple loop filter, segments, 8 partitions, alpha; lossless with transforms, palettes and packed pixels; an animation) for UNIVERSUM's own WebP decoder |
+| `pictures/references.txt`, `pictures/lossy-alpha.bgra` | what other decoders give: SHA-256 of the planes from ffmpeg's VP8 decoder and of the pixels from libwebp |
 
-Regenerate the files with `tools/make-testdata.sh` (needs ffmpeg, mkvmerge and espeak-ng).
+Regenerate the files with `tools/make-testdata.sh` (needs ffmpeg, mkvmerge and espeak-ng) and the pictures with
+`python3 tools/make-test-pictures.py` (needs ffmpeg with libwebp and libvpx, and Pillow).

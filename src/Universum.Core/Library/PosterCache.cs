@@ -17,8 +17,8 @@ public enum PosterSize
 /// <summary>
 /// Posters of films and series, downloaded from the poster server in the settings (TMDB's image server by default –
 /// HISTRA gives poster paths in TMDB's form) and kept on the disk, so each poster is downloaded once. Only paths of the
-/// form "/name.jpg" (or .png) are accepted, only from the configured HTTPS server (no redirect elsewhere), at most
-/// <see cref="MaxBytes"/>, and only a real JPEG or PNG picture is stored. A poster that cannot be had is asked for again
+/// form "/name.jpg" (or .png, .webp) are accepted, only from the configured HTTPS server (no redirect elsewhere), at most
+/// <see cref="MaxBytes"/>, and only a real JPEG, PNG or WebP picture is stored (kept as it came; what it is, is told by its content). A poster that cannot be had is asked for again
 /// only in the next run.
 /// </summary>
 public sealed partial class PosterCache
@@ -112,7 +112,12 @@ public sealed partial class PosterCache
         await _parallel.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            using var response = await _http.GetAsync(address, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            // JPEG asked for first: a server that can give the same picture as WebP gives the JPEG (a WebP is read too)
+            using var request = new HttpRequestMessage(HttpMethod.Get, address);
+            request.Headers.Accept.ParseAdd("image/jpeg");
+            request.Headers.Accept.ParseAdd("image/png;q=0.9");
+            request.Headers.Accept.ParseAdd("image/webp;q=0.8");
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode || response.RequestMessage?.RequestUri?.Host != Server.Host ||
                 response.Content.Headers.ContentLength > limit)
             {
@@ -172,10 +177,12 @@ public sealed partial class PosterCache
         }
     }
 
-    /// <summary>The bytes are a JPEG or PNG picture (checked by their signature, not by the name).</summary>
+    /// <summary>
+    /// The bytes are a JPEG, PNG or WebP picture (checked by their signature, not by the name: a WebP can come under a name
+    /// ending .jpg – it is converted, never only renamed, when it is written into a library).
+    /// </summary>
     public static bool IsPicture(ReadOnlySpan<byte> bytes) =>
-        bytes.Length > 8 && ((bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) ||
-                             bytes[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }));
+        bytes.Length > 8 && Pictures.PictureFormats.Of(bytes) is Pictures.PictureKind.Jpeg or Pictures.PictureKind.Png or Pictures.PictureKind.WebP;
 
     private static string SizeFolder(PosterSize size) => size switch
     {
@@ -184,6 +191,6 @@ public sealed partial class PosterCache
         _ => "w154",
     };
 
-    [GeneratedRegex("^/[A-Za-z0-9_-]{1,100}\\.(jpg|jpeg|png)$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^/[A-Za-z0-9_-]{1,100}\\.(jpg|jpeg|png|webp)$", RegexOptions.CultureInvariant)]
     private static partial Regex PosterPath();
 }

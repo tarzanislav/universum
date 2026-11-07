@@ -74,6 +74,8 @@ Po zaškrtnutí [Ďalšie TMDB obrázky] vyberiete myšou **pozadie** (*fanart.j
 pri seriáli aj **plagáty sérií** a **obrázky epizód**. Uloží ich tlačidlo [Spracovať ďalšie TMDB obrázky];
 [Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom] ich dá k spracovanému titulu.
 !pozor Existujúci súbor sa neprepíše – premenuje sa na *folder-povodny.jpg* (alebo *…-povodny*).
+- Plagát z TMDB vo formáte **WebP** UNIVERSUM prevedie vlastným kódom na skutočný **JPEG** (logo na **PNG**) – nikdy
+  len nezmení príponu. Pôvodný súbor, ktorý je v skutočnosti WebP, dostane príponu podľa obsahu (*folder-povodny.webp*).
 ![TMDB poster](tmdb-poster.jpg)
 @otvorit Posters Otvoriť TMDB poster
 

@@ -328,7 +328,7 @@ public sealed class WebImageCache(HttpClient http, string folder)
         }
     }
 
-    /// <summary>JPEG, PNG or GIF by its first bytes.</summary>
+    /// <summary>JPEG, PNG, GIF or WebP by its first bytes.</summary>
     public static bool IsPicture(ReadOnlySpan<byte> bytes) =>
-        bytes is [0xFF, 0xD8, 0xFF, ..] or [0x89, 0x50, 0x4E, 0x47, ..] or [0x47, 0x49, 0x46, 0x38, ..];
+        Pictures.PictureFormats.Of(bytes) is Pictures.PictureKind.Jpeg or Pictures.PictureKind.Png or Pictures.PictureKind.Gif or Pictures.PictureKind.WebP;
 }

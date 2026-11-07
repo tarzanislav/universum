@@ -2333,6 +2333,25 @@ internal static class SelfTest
         await page.ProcessCommand.ExecuteAsync(null);
         Check(File.Exists(Path.Combine(folder, "folder-povodny.jpg")) && page.Result.Contains("folder-povodny.jpg", StringComparison.Ordinal), "posters: the older one renamed – " + page.Result);
 
+        // owner, 7. 11. 2026: the English poster came as WebP – converted by UNIVERSUM's own decoder into a real JPEG, never
+        // only renamed; a WebP saved earlier as folder.jpg is kept as folder-povodny.webp
+        Check(File.ReadAllBytes(jpeg) is [0xFF, 0xD8, 0xFF, ..] && PictureTools.Show(File.ReadAllBytes(jpeg), 40) is not null, "posters: a WebP poster written as a real JPEG – " + page.Result);
+        var converted = PictureTools.ToJpeg(FakePosters.WebP, 30, 90);
+        using (var stream = new MemoryStream(converted))
+        {
+            var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            Check(converted is [0xFF, 0xD8, 0xFF, ..] && frame.PixelHeight == 30 && frame.PixelWidth == 40, $"posters: WebP to JPEG, shrunk ({frame.PixelWidth} × {frame.PixelHeight})");
+        }
+
+        Check(PictureTools.ToPng(FakePosters.WebP) is [0x89, 0x50, 0x4E, 0x47, ..] && PictureTools.Show(FakePosters.WebP, 50) is not null, "posters: WebP to PNG (a logo) and on the screen");
+        var thumbnail = Path.Combine(_outputDirectory, "webp-thumbnail.jpg");
+        File.WriteAllBytes(thumbnail, FakePosters.WebP);
+        Check(PictureTools.Thumbnail(thumbnail, 40) is not null && PictureTools.Look(thumbnail) is not null, "posters: a WebP under a .jpg name shown and measured by its content");
+        File.WriteAllBytes(jpeg, FakePosters.WebP);
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(File.ReadAllBytes(jpeg) is [0xFF, 0xD8, 0xFF, ..] && File.Exists(Path.Combine(folder, "folder-povodny.webp")) && page.Result.Contains("folder-povodny.webp", StringComparison.Ordinal),
+            "posters: an older WebP folder.jpg kept as folder-povodny.webp – " + page.Result);
+
         // Ďalšie TMDB obrázky (owner, 31. 10. 2026): off by default, nothing offered; then a block of their own – the background
         // and the logo chosen with the mouse, written by their own button (Spracovať poster writes only the poster)
         Check(!page.Extras && !File.Exists(Path.Combine(folder, "fanart.jpg")) && page.Backdrops.Count == 0 && !page.ProcessExtrasCommand.CanExecute(null),
@@ -2376,6 +2395,24 @@ internal static class SelfTest
 
     private sealed class FakePosters : System.Net.Http.HttpMessageHandler
     {
+        /// <summary>A small invented WebP (a test pattern, lossy with alpha – testdata/pictures/lossy-alpha.webp), as TMDB may give it.</summary>
+        public static readonly byte[] WebP = Convert.FromBase64String(
+            "UklGRvIEAABXRUJQVlA4WAoAAAAQAAAAXQAARQAAQUxQSCYAAAAJF6AQQAAUNBERLNREkqQck78z+Uo5+yCi/xMAa8fE+tT1RIVXA1ZQOCCmBAAAkBgAnQEq" +
+            "XgBGAD6dQptIpaOioSebbkCwE4lsAM+YAH+Hvvm5VL+rfhj8def6OpXp/2XtE/Mn+S9SXpc+Yv9Uf1x92X/c/sB7rv856gH9P/jvWc/qT7AH7b+lf+4Pwgfu" +
+            "56V0u51S/ABlXugH4BxDWqAfgB/APhP/q/9z5aPoD0Mus2hvCBhr1a/2/MI+aspc/+xHiSHmD0Ipyo2is/qygfhdVp1LZc3XyUftKKeWlikOYD8r3ZKDZFpz" +
+            "t1u1KBi15mXN8MQw3QgEm8HDgAD+8Q0nuH//71X/3qvRNH//40PQr/xDfxDf2VymZYs12MpsEhO9q5Dzf27POLMQ22/yI7aNjj8sHKf3xzQPMRw7S8Z8L5WH" +
+            "b6NYrfOIO9NaCR6tsPNsYmINyxCbA4Sw5XxSbO4rJ1MMYyzpw+5DPXeQeHha7OFGnZUuoeQyMo0aymZPEWge7FmVA22JB6MKOlP7W/D+kxIQ0YoyMW9ur+xS" +
+            "vnQ2gtOQAENIaRpMKSoptRd5kvEYQEPeXs7lcm8UrbUoPeqsJK3aliHUt+mNs9u+Jsif4nJXQ2+qAo6gEdJLnQBp+mns7/aiWmHqDMwllmUvI4iWa/5CPdOy" +
+            "15xLh9+fenaKP78Nxf2Tasv5n72ODq+2KqQmZT358inWzNBx8Rd6HxmDXSzr4GxkaR5dwKjbabWjYV6vGVs5owEDuat4R6mVMnGD3IWVbPlPfo3knUMY+GVF" +
+            "dNBtS1lOm5lY8c/ptviP5weKIVchwNtD2T3/k7sVKytEdMr7fGWrqJet3cI8Rd6HxjoFw2L7TrjO7XRBpf3MLg5A9DO69hlRU9BTb94iFh1SnpE+8MUNA0it" +
+            "uqQgo3NuiUO5U9iA/zp0aKHrBw/PzjNa0owT7fFQ+PlfNQhGY4whfuuDsJeSmC6yL05StroH3oJZldZF6cpWpDVqV0nCLdDtx7Z1QeyTBqi56cMyJ+paTJIb" +
+            "RNyvERKtXlVf/LGZwsOMsTTswDiMyQggsRn2KlFxrOz5lrAsyc/VHYC0clDcoAysSKu5rOMAwPKSKJWOIvOHmvJncDhodkj/rp+qjMgvGmvmaIDAWGTE7UCA" +
+            "sCQkImACvlS80AC4ecIPlOBOzaDW2FgWaj90ZUVys/Qo5dXLCJqTYM1sYAL2WJycv3Mftn2d1ONur0G5X5EKeWsJ9irmnlG1vpny/ZmRZlt3hXqffanTqe4/" +
+            "ej3XHCp2OFbvlPRARDYKauxfwYa3p52CHo/k4Ml8zU9bpNWlxaARPau/XY/eYDnPYaCYvAV127tm0cX70frSIA/98dIFfmVd6CJBmoALb98MbBjR6xXp914Q" +
+            "8wLSEMlIEEhb715tMYz+SIDIx1yiRMk4ksEPy5w/jjcuSX+MHe+NI4Qk60NLQzm4NrBHM28PBc5Xi/ewcgvoRAft6FGcP2yLWxVpeOYAtDi3gBSBRaAD71pd" +
+            "QvPNesa3sz2vE4tSruVN+KXBuh05NqEz5A0uewHwH2K+ityPgigvN4r161KIQ9mw6iITePmEQm8ecT+qXSfYbF+XzTOdPAmfLk7udfAAR/q5mofvEAMzUxri" +
+            "jEAA8Aw9vqKhTfWoAAA=");
+
         private readonly byte[] _poster = FakeHistra.DrawPoster(4);
 
         public List<string> Requests { get; } = [];
@@ -2390,7 +2427,9 @@ internal static class SelfTest
 
             if (uri.Host == "image.tmdb.org")
             {
-                return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.ByteArrayContent(_poster), RequestMessage = request });
+                // the English poster comes as WebP under a name ending .png (owner, 7. 11. 2026)
+                var picture = uri.AbsolutePath.EndsWith("/en-plagat.png", StringComparison.Ordinal) ? WebP : _poster;
+                return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.ByteArrayContent(picture), RequestMessage = request });
             }
 
             var body = uri.Host switch

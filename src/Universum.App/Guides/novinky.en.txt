@@ -74,6 +74,8 @@ After ticking [More TMDB images] you pick with the mouse the **background** (*fa
 and for a series also **season posters** and **episode pictures**. The [Process more TMDB images] button saves them;
 [Merge more TMDB images with the film/series] puts them next to the processed title.
 !pozor An existing file is not overwritten – it is renamed to *folder-povodny.jpg* (or *…-povodny*).
+- A TMDB poster in **WebP** format is converted by UNIVERSUM's own code into a real **JPEG** (a logo into **PNG**) – never
+  just given another extension. An original file that is really WebP gets the extension of its content (*folder-povodny.webp*).
 ![TMDB poster](tmdb-poster.jpg)
 @otvorit Posters Open TMDB poster
 

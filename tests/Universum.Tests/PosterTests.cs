@@ -227,13 +227,15 @@ public sealed class PosterTests
             var film = new TitleInfo(MediaKind.Movie, "Vymyslený film", 2026);
             var series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2025);
 
-            var first = PosterPlaces.Save(places.PosterFolder(film), [1, 2, 3]);
-            Assert.True(first is { Done: true, KeptAs: null } && File.ReadAllBytes(Path.Combine(library.Posters, "Vymyslený film (2026)", "folder.jpg")).Length == 3, "POSTER\\Name (year)\\folder.jpg");
-            var second = PosterPlaces.Save(places.PosterFolder(film), [4, 5]);
-            var third = PosterPlaces.Save(places.PosterFolder(film), [6]);
+            // (folder.jpg must be a JPEG: invented bytes with its signature)
+            byte[] jpeg1 = [0xFF, 0xD8, 0xFF, 1], jpeg2 = [0xFF, 0xD8, 0xFF, 2, 2], jpeg3 = [0xFF, 0xD8, 0xFF, 3, 3, 3];
+            var first = PosterPlaces.Save(places.PosterFolder(film), jpeg1);
+            Assert.True(first is { Done: true, KeptAs: null } && File.ReadAllBytes(Path.Combine(library.Posters, "Vymyslený film (2026)", "folder.jpg")).Length == 4, "POSTER\\Name (year)\\folder.jpg");
+            var second = PosterPlaces.Save(places.PosterFolder(film), jpeg2);
+            var third = PosterPlaces.Save(places.PosterFolder(film), jpeg3);
             var folder = places.PosterFolder(film);
-            Assert.True(second.KeptAs == "folder-povodny.jpg" && third.KeptAs == "folder-povodny-2.jpg" && File.ReadAllBytes(Path.Combine(folder, "folder.jpg")).SequenceEqual(new byte[] { 6 }) &&
-                        File.ReadAllBytes(Path.Combine(folder, "folder-povodny.jpg")).Length == 3, "an older folder.jpg renamed, never lost");
+            Assert.True(second.KeptAs == "folder-povodny.jpg" && third.KeptAs == "folder-povodny-2.jpg" && File.ReadAllBytes(Path.Combine(folder, "folder.jpg")).SequenceEqual(jpeg3) &&
+                        File.ReadAllBytes(Path.Combine(folder, "folder-povodny.jpg")).SequenceEqual(jpeg1), "an older folder.jpg renamed, never lost");
 
             Assert.True(places.LibraryFolder(film, 1) is null, "the film is not processed");
             Directory.CreateDirectory(Path.Combine(library.Shows, "Vymyslený seriál (2025) [tmdbid-55]", "Season 01"));

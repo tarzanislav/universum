@@ -6,4 +6,6 @@
 *.mkv binary
 *.ico binary
 *.png binary
+*.webp binary
+*.bgra binary
 src/Universum.App/Assets/tmdb-logo.svg binary

@@ -681,7 +681,7 @@ public sealed class PosterPageViewModel : ObservableObject
             Result = Loc.F("{0} sa nenašiel ani vo výstupe ({1}, {2}), ani na vstupe. Nič sa nezapísalo – vypnite Zlúčiť poster s filmom/seriálom a plagát sa uloží do POSTER.",
                      details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"), LibraryNames.MoviesFolder, LibraryNames.ShowsFolder);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException or InvalidDataException)
         {
             Result = Loc.T("Plagát sa nedá spracovať: ") + ex.Message;
         }
@@ -753,7 +753,7 @@ public sealed class PosterPageViewModel : ObservableObject
             ExtrasResult = Loc.F("{0} sa nenašiel ani vo výstupe ({1}, {2}), ani na vstupe. Nič sa nezapísalo – vypnite Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom a obrázky sa uložia do POSTER.",
                            kind, LibraryNames.MoviesFolder, LibraryNames.ShowsFolder);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException or TitleServiceException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException or InvalidDataException or TitleServiceException)
         {
             ExtrasResult = Loc.T("Obrázky sa nedajú spracovať: ") + ex.Message;
         }
@@ -871,9 +871,10 @@ public sealed class PosterPageViewModel : ObservableObject
         if (ExtraLogo && (SelectedLogo?.Picture ?? PosterChoice.BestLogo(pictures.Logos, details.OriginalLanguage)) is { } logo)
         {
             progress(Loc.T("Sťahujem logo…"));
-            if (await Original(logo.Path) is { Length: > 8 } png && png[0] == 0x89 && png[1] == 0x50)
+            if (await Original(logo.Path) is { Length: > 8 } picture)
             {
-                extras["clearlogo.png"] = png;
+                // a PNG as it is (transparent), a WebP converted to a real PNG
+                extras["clearlogo.png"] = PictureTools.ToPng(picture);
             }
         }
 

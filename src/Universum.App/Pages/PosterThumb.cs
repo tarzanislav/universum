@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.IO;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.Core.Library;
 
@@ -62,21 +60,11 @@ public sealed class PosterThumb : ObservableObject
             return;
         }
 
-        try
+        // a picture that cannot be read stays a placeholder (WebP is read by UNIVERSUM's own decoder)
+        if (PictureTools.Thumbnail(file, _size == PosterSize.Large ? 342 : 154) is { } image)
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.DecodePixelWidth = _size == PosterSize.Large ? 342 : 154;
-            bitmap.UriSource = new Uri(file);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            _image = bitmap;
+            _image = image;
             OnPropertyChanged(nameof(Image));
-        }
-        catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidOperationException or ArgumentException or FileFormatException)
-        {
-            // a picture WPF cannot read stays a placeholder
         }
     }
 }

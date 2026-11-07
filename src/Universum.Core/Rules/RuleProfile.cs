@@ -19,6 +19,20 @@ public sealed record RuleProfile
     public IReadOnlyList<string> PreferredLanguages { get; init; } = ["cs", "sk"];
 
     /// <summary>
+    /// The dubbing languages (owner, 2. and 7. 11. 2026 – napevno: Czech, then Slovak). Audio in one of them is a dubbing:
+    /// full subtitles are not default then. Without it the full subtitles in the first of them (Czech, else Slovak) are
+    /// Default and Enabled, and only their forced subtitles are active – whatever else <see cref="PreferredLanguages"/>
+    /// lists (English among them orders the tracks, it is no dubbing).
+    /// </summary>
+    public IReadOnlyList<string> DubbingLanguages { get; init; } = ["cs", "sk"];
+
+    /// <summary>Order among <see cref="DubbingLanguages"/> (lower is better); int.MaxValue for other languages.</summary>
+    public int DubbingOrder(string primaryLanguage) => IndexOf(DubbingLanguages, primaryLanguage);
+
+    /// <summary>The language is one of <see cref="DubbingLanguages"/> (Czech or Slovak).</summary>
+    public bool IsDubbing(string primaryLanguage) => DubbingOrder(primaryLanguage) != int.MaxValue;
+
+    /// <summary>
     /// Track order by language (primary subtags), e.g. ["cs", "en", "sk"] from a batch template. Empty means the
     /// order of <see cref="PreferredLanguages"/>. Languages not listed follow in their original order.
     /// </summary>

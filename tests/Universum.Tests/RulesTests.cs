@@ -88,6 +88,28 @@ public sealed class RulesTests
     }
 
     [Test]
+    public void EnglishAmongPreferredLanguagesIsNoDubbing()
+    {
+        // owner, 7. 11. 2026 (zásadná chyba): with English among the preferred languages (Nastavenia), an English film got
+        // no default subtitles – a dubbing is Czech or Slovak audio only
+        var profile = RuleProfile.Default with { PreferredLanguages = ["cs", "sk", "en"] };
+        var tracks = new[] { Video(0), Audio(1, "eng", null), Subs(2, "cze", null, isDefault: false) with { Flags = new TrackFlags(Default: false, Enabled: false) },
+            Subs(3, "slo", null, isDefault: false), Subs(4, "eng", null), Subs(5, "pol", null) };
+        var english = UniversumRules.Apply(File(tracks), profile);
+        Assert.True(english.For(2).Flags is { Default: true, Enabled: true, Forced: false }, "English audio: Czech subtitles Default and Enabled – " + english.For(2).Flags);
+        Assert.True(english.Tracks.Where(t => t.Type == TrackType.Subtitles && t.TrackId != 2).All(t => t.Flags is { Default: false, Enabled: true }), "the others: Enabled only");
+        Assert.True(TargetChecks.ForeignAudioSubtitles(english, profile)?.TrackId == 2, "the check knows it too");
+
+        // Czech or Slovak dubbing: full Czech subtitles Default No, Enabled Yes
+        foreach (var dub in new[] { "cze", "slo" })
+        {
+            var dubbed = UniversumRules.Apply(File(Video(0), Audio(1, dub, null), Subs(2, "cze", null), Subs(3, "eng", null)), profile);
+            Assert.True(dubbed.For(2).Flags is { Default: false, Enabled: true }, $"{dub} dubbing: Czech subtitles Default No, Enabled Yes – " + dubbed.For(2).Flags);
+            Assert.Equal(null, TargetChecks.ForeignAudioSubtitles(dubbed, profile), "no foreign audio");
+        }
+    }
+
+    [Test]
     public void SlovakSubtitlesWhenThereAreNoCzech()
     {
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Subs(2, "eng", null), Subs(3, "slo", null)));
@@ -292,7 +314,7 @@ public sealed class RulesTests
     [Test]
     public void ProfileWithOtherLanguages()
     {
-        var profile = RuleProfile.Default with { PreferredLanguages = ["hu"] };
+        var profile = RuleProfile.Default with { PreferredLanguages = ["hu"], DubbingLanguages = ["hu"] };
         var target = UniversumRules.Apply(File(Video(0), Audio(1, "eng", null), Audio(2, "hun", null), Subs(3, "cze", null)), profile);
         Assert.Sequence([0, 2, 1, 3], target.Tracks.Select(t => t.TrackId), "Hungarian first");
         AssertFlags(target.For(3), false, false, "Czech subtitles are not preferred in this profile");

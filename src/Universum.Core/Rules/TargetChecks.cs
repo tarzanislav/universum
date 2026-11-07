@@ -97,14 +97,14 @@ public static class TargetChecks
     {
         profile ??= RuleProfile.Default;
         var audio = target.Tracks.Where(t => t.Type == TrackType.Audio && !IsCommentary(t, profile)).ToList();
-        if (audio.Count == 0 || audio.Any(a => profile.IsPreferred(a.Language.Primary)))
+        if (audio.Count == 0 || audio.Any(a => profile.IsDubbing(a.Language.Primary)))
         {
             return null;
         }
 
         return target.Tracks
-            .Where(t => t.Type == TrackType.Subtitles && profile.IsPreferred(t.Language.Primary) && !t.Flags.Forced && !IsCommentary(t, profile))
-            .OrderBy(t => profile.Preference(t.Language.Primary))
+            .Where(t => t.Type == TrackType.Subtitles && profile.IsDubbing(t.Language.Primary) && !t.Flags.Forced && !IsCommentary(t, profile))
+            .OrderBy(t => profile.DubbingOrder(t.Language.Primary))
             .ThenBy(t => t.Flags.HearingImpaired ? 1 : 0)
             .FirstOrDefault();
     }

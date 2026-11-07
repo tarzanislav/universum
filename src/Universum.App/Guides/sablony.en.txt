@@ -67,7 +67,7 @@ If an audio track has no language, click [Recognize the audio languages ▾] and
 ![Episodes sorted into series and seasons](batch-sorted-series.jpg)
 
 !pozor With *delete automatically*, each original goes to the Recycle Bin as soon as the new file has been written and verified. With *delete manually*, nothing is deleted during the run; send the originals to the Recycle Bin afterwards with [Delete the originals].
-!pozor With *super fast*, a file whose header only changes and that lies on the disk of its output folder is **moved into the library and edited there** in a few seconds – the original becomes the result and does not go to the Recycle Bin. Other files are written anew and their original goes to the Recycle Bin. A file with another name (hard link), open in another program or on another disk is not moved. Leave files you are still sharing (torrent) on *keep*. [Return the originals] (in MEGA [Return the original]) puts them back in their place with their original header.
+!pozor With *super fast*, a file whose header only changes and that lies on the disk of its output folder is **moved into the library and edited there** in a few seconds – the original becomes the result and does not go to the Recycle Bin. Other files are written anew and their original goes to the Recycle Bin. A file with another name (hard link), open in another program or on another disk is not moved – it is copied whole (slower), and Job output and the summary say why. Leave files you are still sharing (torrent) on *keep*. [Return the originals] (in MEGA [Return the original]) puts them back in their place with their original header.
 
 @otvorit Batch Open Batch processing
 

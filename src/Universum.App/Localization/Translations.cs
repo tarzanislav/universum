@@ -3152,6 +3152,12 @@ internal static class Translations
         ["Obrázok je príliš veľký ({0} × {1} bodov)."] = "Obrázek je příliš velký ({0} × {1} bodů).",
         ["{0} sa nezapísal: obrázok nie je vo formáte, ktorý sľubuje jeho prípona."] = "{0} se nezapsal: obrázek není ve formátu, který slibuje jeho přípona.",
         ["Obrázok sa nepodarilo previesť na JPEG."] = "Obrázek se nepodařilo převést na JPEG.",
+        ["výstupný priečinok je na inom disku ako originál"] = "výstupní složka je na jiném disku než originál",
+        ["súbor má aj iný názov (pevný odkaz – napr. ho ešte zdieľa torrent); úprava na mieste by zmenila aj ten"] = "soubor má i jiný název (pevný odkaz – např. ho ještě sdílí torrent); úprava na místě by změnila i ten",
+        ["súbor je len na čítanie alebo ho má otvorený iný program (torrent, prehrávač, mediálny server)"] = "soubor je jen pro čtení nebo ho má otevřený jiný program (torrent, přehrávač, mediální server)",
+        ["súbor sa nedal presunúť – asi ho má otvorený iný program"] = "soubor nešlo přesunout – asi ho má otevřený jiný program",
+        ["Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie)."] = "Superrychle nešlo: {0}. Soubor se proto zkopíroval celý (pomaleji).",
+        [" · {0} superrýchle nešlo – skopírované celé (dôvod vo Výstupe úloh)"] = " · {0} superrychle nešlo – zkopírováno celé (důvod ve Výstupu úloh)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6300,5 +6306,11 @@ internal static class Translations
         ["Obrázok je príliš veľký ({0} × {1} bodov)."] = "The picture is too large ({0} × {1} pixels).",
         ["{0} sa nezapísal: obrázok nie je vo formáte, ktorý sľubuje jeho prípona."] = "{0} was not written: the picture is not in the format its extension promises.",
         ["Obrázok sa nepodarilo previesť na JPEG."] = "The picture could not be converted to JPEG.",
+        ["výstupný priečinok je na inom disku ako originál"] = "the output folder is on another disk than the original",
+        ["súbor má aj iný názov (pevný odkaz – napr. ho ešte zdieľa torrent); úprava na mieste by zmenila aj ten"] = "the file has another name too (a hard link – e.g. a torrent still shares it); editing it in place would change that one too",
+        ["súbor je len na čítanie alebo ho má otvorený iný program (torrent, prehrávač, mediálny server)"] = "the file is read-only or open in another program (a torrent client, a player, a media server)",
+        ["súbor sa nedal presunúť – asi ho má otvorený iný program"] = "the file could not be moved – another program probably has it open",
+        ["Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie)."] = "Super fast was not possible: {0}. So the whole file was copied (slower).",
+        [" · {0} superrýchle nešlo – skopírované celé (dôvod vo Výstupe úloh)"] = " · {0} not super fast – copied whole (the reason is in Job output)",
     };
 }

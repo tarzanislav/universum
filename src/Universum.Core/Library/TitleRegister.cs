@@ -201,21 +201,35 @@ public sealed class TitleRegister
     }
 
     /// <summary>Keeps the Czech and English names of a title (from TMDB) – "" for a name TMDB does not have.</summary>
-    public void SetNames(MediaKind kind, int tmdbId, string czech, string english)
+    public void SetNames(MediaKind kind, int tmdbId, string czech, string english) => SetNames([(kind, tmdbId, czech, english)]);
+
+    /// <summary>The names of several titles at once – written once (a register of thousands is not rewritten per title).</summary>
+    public void SetNames(IReadOnlyCollection<(MediaKind Kind, int TmdbId, string Czech, string English)> names)
     {
+        var changed = false;
         lock (_gate)
         {
-            var key = new RegisteredTitle { Kind = kind, TmdbId = tmdbId }.Key;
-            if (!Loaded().TryGetValue(key, out var title))
+            var titles = Loaded();
+            foreach (var (kind, tmdbId, czech, english) in names)
             {
-                return;
+                var key = new RegisteredTitle { Kind = kind, TmdbId = tmdbId }.Key;
+                if (titles.TryGetValue(key, out var title))
+                {
+                    titles[key] = title with { CzechName = czech.Trim(), EnglishName = english.Trim() };
+                    changed = true;
+                }
             }
 
-            _titles![key] = title with { CzechName = czech.Trim(), EnglishName = english.Trim() };
-            Save();
+            if (changed)
+            {
+                Save();
+            }
         }
 
-        Changed?.Invoke();
+        if (changed)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>Writes the register: JSON (whole, to be imported) or CSV (for Excel) by the file's extension.</summary>

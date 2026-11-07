@@ -419,7 +419,8 @@ public sealed class AppServices
             if (_titleRegister is null)
             {
                 _titleRegister = new(AppSettings.TitleRegisterFile);
-                _titleRegister.Changed += () => _ = FillTitleNamesAsync();
+                // never on the thread that processes files (owner, 7. 11. 2026: Superrýchle must stay fast)
+                _titleRegister.Changed += () => _ = Task.Run(FillTitleNamesAsync);
             }
 
             return _titleRegister;
@@ -442,16 +443,27 @@ public sealed class AppServices
 
         try
         {
+            // the answers are written 25 titles at a time (not the whole register for each title)
             var details = new TmdbTitleDetails(tmdb);
-            foreach (var title in TitleRegister.WithoutNames)
+            var names = new List<(MediaKind, int, string, string)>();
+            try
             {
-                if (await details.GetAsync(title.Kind, title.TmdbId!.Value).ConfigureAwait(false) is { } found)
+                foreach (var title in TitleRegister.WithoutNames)
                 {
-                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, found.CzechTitle, found.EnglishTitle);
+                    var found = await details.GetAsync(title.Kind, title.TmdbId!.Value).ConfigureAwait(false);
+                    names.Add((title.Kind, title.TmdbId!.Value, found?.CzechTitle ?? "", found?.EnglishTitle ?? ""));
+                    if (names.Count == 25)
+                    {
+                        TitleRegister.SetNames(names);
+                        names.Clear();
+                    }
                 }
-                else
+            }
+            finally
+            {
+                if (names.Count > 0)
                 {
-                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, "", "");
+                    TitleRegister.SetNames(names);
                 }
             }
         }

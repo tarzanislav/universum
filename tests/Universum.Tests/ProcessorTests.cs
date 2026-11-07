@@ -215,6 +215,33 @@ public sealed class ProcessorTests
         Assert.True(copied.Status == ProcessingStatus.Done && !copied.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
                     copied.Messages.Contains(FileProcessor.OriginalRecycledMessage) && bin.Recycled.Count == 1,
             "a file with another name: written anew, the original to the Recycle Bin – " + string.Join("; ", copied.Messages));
+
+        // owner, 7. 11. 2026: the whole file copied is never silent – the user is told why Superrýchle could not be used
+        Assert.True(copied.Messages.Contains(FileProcessor.NotMovedPrefix + FileProcessor.NotMovedHardLink), "why: a hard link – " + string.Join("; ", copied.Messages));
+        Assert.True(ProcessingWords.Explain(FileProcessor.NotMovedPrefix + FileProcessor.NotMovedHardLink) is ({ } words, null) &&
+                    words.StartsWith("Superrýchle sa nedalo: súbor má aj iný názov", StringComparison.Ordinal), "in words");
+
+        var readOnly = work.Copy("cz-only.mkv", "vymysleny-len-na-citanie.mkv");
+        System.IO.File.SetAttributes(readOnly, FileAttributes.ReadOnly);
+        try
+        {
+            var plan2 = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(readOnly)) with { NewTitle = "Ešte iný vymyslený názov" });
+            var whole = await processor.ProcessAsync(plan2, work.Movie(plan2), output);
+            Assert.True(whole.Messages.Contains(FileProcessor.NotMovedPrefix + FileProcessor.NotMovedInUse) && !whole.Messages.Contains(FileProcessor.MovedIntoLibraryMessage),
+                "a read-only original: copied whole, and said why – " + string.Join("; ", whole.Messages));
+        }
+        finally
+        {
+            // the read-only original went to the (test) Recycle Bin with its attribute – Windows deletes no read-only file
+            foreach (var any in Directory.EnumerateFiles(work.Path, "*", SearchOption.AllDirectories))
+            {
+                System.IO.File.SetAttributes(any, FileAttributes.Normal);
+            }
+        }
+
+        var normal = await processor.ProcessAsync(EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(work.Copy("cz-only.mkv", "vymysleny-iny.mkv"))) with { NewTitle = "Tretí vymyslený názov" }),
+            work.Movie(plan), OriginalsMode.DeleteAutomatically.Output());
+        Assert.True(!normal.Messages.Any(m => m.StartsWith(FileProcessor.NotMovedPrefix, StringComparison.Ordinal)), "nothing said when Superrýchle was not chosen");
     }
 
     [Test]

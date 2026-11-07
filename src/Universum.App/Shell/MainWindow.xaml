@@ -2350,7 +2350,9 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="{loc:T 'Titul'}" Binding="{Binding Display, Mode=OneWay}" Width="*" />
                         <DataGridTextColumn Header="{loc:T 'Druh'}" Binding="{Binding Kind, Mode=OneWay}" Width="80" />
-                        <DataGridTextColumn Header="{loc:T 'Známe aj ako'}" Binding="{Binding Names, Mode=OneWay}" Width="220" />
+                        <DataGridTextColumn Header="{loc:T 'Český názov'}" Binding="{Binding CzechName, Mode=OneWay}" Width="180" />
+                        <DataGridTextColumn Header="{loc:T 'Anglický názov'}" Binding="{Binding EnglishName, Mode=OneWay}" Width="180" />
+                        <DataGridTextColumn Header="{loc:T 'Známe aj ako'}" Binding="{Binding Names, Mode=OneWay}" Width="200" />
                         <DataGridTextColumn Header="{loc:T 'Epizódy'}" Binding="{Binding Episodes, Mode=OneWay}" Width="260" />
                         <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Files, Mode=OneWay}" Width="70" />
                         <DataGridTextColumn Header="{loc:T 'Naposledy'}" Binding="{Binding Last, Mode=OneWay}" Width="110" />

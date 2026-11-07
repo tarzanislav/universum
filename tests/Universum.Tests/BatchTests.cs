@@ -1338,6 +1338,12 @@ public sealed class BatchTests
                     series.Episodes.SequenceEqual(["S01E04", "S02E01-E02", "S02E03"]) && series.Seasons == "S01: 1, S02: 2",
             "kept after a restart: " + string.Join(" | ", titles.Select(t => $"{t.Display} {string.Join(",", t.Episodes)} {t.Files}")));
 
+        // the Czech and English names from TMDB (asked once for each title with an ID)
+        Assert.True(register.WithoutNames.Count == 2, "two titles with IDs wait for their names");
+        register.SetNames(MediaKind.Movie, 123456, "Vymyslená rieka", "The Invented River");
+        Assert.True(register.WithoutNames.Count == 1 && register.Titles.Single(t => t.Kind == MediaKind.Movie) is { CzechName: "Vymyslená rieka", EnglishName: "The Invented River" },
+            "the film's names kept");
+
         // export (JSON, CSV) and import into another register: joined, never doubled
         var json = Path.Combine(work.Path, "export.json");
         var csv = Path.Combine(work.Path, "export.csv");

@@ -412,9 +412,58 @@ public sealed class AppServices
     public SeriesMemory SeriesMemory => _seriesMemory ??= new(AppSettings.SeriesMemoryFile);
 
     /// <summary>Spracované tituly (owner, 7. 11. 2026): the films and series written into the libraries; the user's own data.</summary>
-    public TitleRegister TitleRegister => _titleRegister ??= new(AppSettings.TitleRegisterFile);
+    public TitleRegister TitleRegister
+    {
+        get
+        {
+            if (_titleRegister is null)
+            {
+                _titleRegister = new(AppSettings.TitleRegisterFile);
+                _titleRegister.Changed += () => _ = FillTitleNamesAsync();
+            }
+
+            return _titleRegister;
+        }
+    }
 
     private TitleRegister? _titleRegister;
+    private int _fillingNames;
+
+    /// <summary>
+    /// Owner, 7. 11. 2026: the Czech and English names of the titles in Spracované tituly, from TMDB by their IDs (one
+    /// question per title, kept 30 days in TMDB's cache; only the ID is sent). Without a TMDB key nothing is asked.
+    /// </summary>
+    public async Task FillTitleNamesAsync()
+    {
+        if (Tmdb is not { } tmdb || Interlocked.Exchange(ref _fillingNames, 1) == 1)
+        {
+            return;
+        }
+
+        try
+        {
+            var details = new TmdbTitleDetails(tmdb);
+            foreach (var title in TitleRegister.WithoutNames)
+            {
+                if (await details.GetAsync(title.Kind, title.TmdbId!.Value).ConfigureAwait(false) is { } found)
+                {
+                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, found.CzechTitle, found.EnglishTitle);
+                }
+                else
+                {
+                    TitleRegister.SetNames(title.Kind, title.TmdbId!.Value, "", "");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or TitleServiceException)
+        {
+            // asked again with the next change or start of Spracované tituly
+        }
+        finally
+        {
+            Volatile.Write(ref _fillingNames, 0);
+        }
+    }
 
     private SeriesMemory? _seriesMemory;
 

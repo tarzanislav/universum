@@ -23,6 +23,12 @@ public sealed class ProcessedTitleRow(RegisteredTitle title)
     /// <summary>The other names the title was known by (its originals' file and folder names).</summary>
     public string Names => string.Join(", ", Title.Names);
 
+    /// <summary>The Czech title from TMDB (empty until asked, or when it has none).</summary>
+    public string CzechName => Title.CzechName ?? "";
+
+    /// <summary>The English title from TMDB.</summary>
+    public string EnglishName => Title.EnglishName ?? "";
+
     public string Episodes => Title.Kind == MediaKind.Series ? Loc.F("{0} ({1})", Title.Episodes.Count, Title.Seasons) : "";
 
     public int Files => Title.Files;
@@ -51,6 +57,7 @@ public sealed class ProcessedTitlesPageViewModel : ObservableObject
         ImportCommand = new RelayCommand(Import, () => !_busy);
         services.TitleRegister.Changed += () => Application.Current?.Dispatcher.BeginInvoke(Refresh);
         Refresh();
+        _ = services.FillTitleNamesAsync();
     }
 
     public ObservableCollection<ProcessedTitleRow> Titles { get; } = [];
@@ -100,7 +107,8 @@ public sealed class ProcessedTitlesPageViewModel : ObservableObject
         var words = _filter.Trim();
         var shown = all.Where(t => _kind == 0 || (_kind == 1) == (t.Kind == MediaKind.Series))
             .Where(t => words.Length == 0 || t.Display.Contains(words, StringComparison.CurrentCultureIgnoreCase) ||
-                        t.Names.Any(n => n.Contains(words, StringComparison.CurrentCultureIgnoreCase)))
+                        t.Names.Any(n => n.Contains(words, StringComparison.CurrentCultureIgnoreCase)) ||
+                        (t.CzechName ?? "").Contains(words, StringComparison.CurrentCultureIgnoreCase) || (t.EnglishName ?? "").Contains(words, StringComparison.CurrentCultureIgnoreCase))
             .ToList();
         Titles.Clear();
         foreach (var title in shown)

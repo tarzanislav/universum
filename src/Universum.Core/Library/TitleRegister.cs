@@ -24,6 +24,12 @@ public sealed record RegisteredTitle
     /// </summary>
     public List<string> Names { get; init; } = [];
 
+    /// <summary>The Czech title from TMDB (owner, 7. 11. 2026); "" when TMDB has none, null when not asked yet.</summary>
+    public string? CzechName { get; init; }
+
+    /// <summary>The English title from TMDB; "" when TMDB has none, null when not asked yet.</summary>
+    public string? EnglishName { get; init; }
+
     /// <summary>Episodes written ("S01E04", "S01E01-E02"), sorted; empty for a film.</summary>
     public List<string> Episodes { get; init; } = [];
 
@@ -182,6 +188,36 @@ public sealed class TitleRegister
         return added;
     }
 
+    /// <summary>The titles with a TMDB ID whose Czech and English names were not asked for yet.</summary>
+    public IReadOnlyList<RegisteredTitle> WithoutNames
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. Loaded().Values.Where(t => t.TmdbId is not null && (t.CzechName is null || t.EnglishName is null))];
+            }
+        }
+    }
+
+    /// <summary>Keeps the Czech and English names of a title (from TMDB) – "" for a name TMDB does not have.</summary>
+    public void SetNames(MediaKind kind, int tmdbId, string czech, string english)
+    {
+        lock (_gate)
+        {
+            var key = new RegisteredTitle { Kind = kind, TmdbId = tmdbId }.Key;
+            if (!Loaded().TryGetValue(key, out var title))
+            {
+                return;
+            }
+
+            _titles![key] = title with { CzechName = czech.Trim(), EnglishName = english.Trim() };
+            Save();
+        }
+
+        Changed?.Invoke();
+    }
+
     /// <summary>Writes the register: JSON (whole, to be imported) or CSV (for Excel) by the file's extension.</summary>
     public void Export(string path)
     {
@@ -189,12 +225,12 @@ public sealed class TitleRegister
         if (Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase))
         {
             var csv = new StringBuilder();
-            csv.AppendLine(CoreText.T("Druh;Názov;Rok;TMDB ID;Priečinok;Známe aj ako;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"));
+            csv.AppendLine(CoreText.T("Druh;Názov;Rok;TMDB ID;Priečinok;Český názov;Anglický názov;Známe aj ako;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"));
             foreach (var t in titles)
             {
                 csv.AppendLine(string.Join(";",
                     t.Kind == MediaKind.Series ? CoreText.T("seriál") : CoreText.T("film"), Cell(t.Name), t.Year?.ToString(CultureInfo.InvariantCulture) ?? "",
-                    t.TmdbId?.ToString(CultureInfo.InvariantCulture) ?? "", Cell(t.Display), Cell(string.Join(" | ", t.Names)), t.Episodes.Count.ToString(CultureInfo.InvariantCulture), Cell(t.Seasons),
+                    t.TmdbId?.ToString(CultureInfo.InvariantCulture) ?? "", Cell(t.Display), Cell(t.CzechName ?? ""), Cell(t.EnglishName ?? ""), Cell(string.Join(" | ", t.Names)), t.Episodes.Count.ToString(CultureInfo.InvariantCulture), Cell(t.Seasons),
                     Cell(string.Join(" ", t.Episodes)), t.Files.ToString(CultureInfo.InvariantCulture),
                     t.First.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), t.Last.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
             }
@@ -222,6 +258,8 @@ public sealed class TitleRegister
                     {
                         Episodes = [.. known.Episodes.Union(title.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
                         Names = Joined(known.Names, title.Names ?? []),
+                        CzechName = known.CzechName ?? title.CzechName,
+                        EnglishName = known.EnglishName ?? title.EnglishName,
                         Files = Math.Max(known.Files, title.Files),
                         First = known.First < title.First ? known.First : title.First,
                         Last = known.Last > title.Last ? known.Last : title.Last,

@@ -2319,6 +2319,45 @@
         </DataTemplate>
 
         <!-- Záznamy spracovania (owner, 31. 10. 2026): every run in words; ticked ones or all can be deleted -->
+        <!-- owner, 7. 11. 2026: Spracované tituly – the films and series written into the libraries, export and import -->
+        <DataTemplate DataType="{x:Type pages:ProcessedTitlesPageViewModel}">
+            <Grid Margin="32,24,32,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Top">
+                        <Button Content="{loc:T 'Načítať z knižnice'}" Command="{Binding ScanCommand}" Padding="12,4" Margin="0,0,8,0"
+                                ToolTip="{loc:T 'Doplní filmy a seriály, ktoré už sú vo výstupných priečinkoch (MOVIES, TVSHOWS) – aj tie spracované skôr'}" />
+                        <Button Content="{loc:T 'Exportovať…'}" Command="{Binding ExportCommand}" Padding="12,4" Margin="0,0,8,0"
+                                ToolTip="{loc:T 'JSON na neskorší import alebo CSV pre Excel'}" />
+                        <Button Content="{loc:T 'Importovať…'}" Command="{Binding ImportCommand}" Padding="12,4"
+                                ToolTip="{loc:T 'Spojí exportovaný zoznam s týmto – nič sa neprepíše, epizódy sa doplnia'}" />
+                    </WrapPanel>
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Spracované tituly'}" />
+                </DockPanel>
+                <TextBlock Grid.Row="1" Style="{StaticResource Hint}" Text="{Binding Status}" TextWrapping="Wrap" Margin="0,4,0,10" />
+                <WrapPanel Grid.Row="2" Margin="0,0,0,8">
+                    <TextBlock Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" Width="280" Margin="0,0,16,0" VerticalContentAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding KindChoices}" SelectedIndex="{Binding KindFilter}" Width="130" />
+                </WrapPanel>
+                <DataGrid Grid.Row="3" ItemsSource="{Binding Titles}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal" CanUserAddRows="False" EnableRowVirtualization="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="{loc:T 'Titul'}" Binding="{Binding Display, Mode=OneWay}" Width="*" />
+                        <DataGridTextColumn Header="{loc:T 'Druh'}" Binding="{Binding Kind, Mode=OneWay}" Width="80" />
+                        <DataGridTextColumn Header="{loc:T 'Epizódy'}" Binding="{Binding Episodes, Mode=OneWay}" Width="260" />
+                        <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Files, Mode=OneWay}" Width="70" />
+                        <DataGridTextColumn Header="{loc:T 'Naposledy'}" Binding="{Binding Last, Mode=OneWay}" Width="110" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type jobs:ProcessingLogsPageViewModel}">
             <Grid Margin="32,24,32,16">
                 <Grid.RowDefinitions>
@@ -2871,8 +2910,8 @@
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding SeriesTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center"
                                          ToolTip="{loc:T 'Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho'}" />
-                                <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" TextWrapping="Wrap" MaxWidth="360"
-                                           ToolTip="{loc:T 'Epizódy ďalších seriálov poslané z Noviniek spolu s prvým – každá ide do priečinka svojho seriálu (vidno v stĺpci Cieľ v knižnici)'}" />
+                                <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"
+                                           ToolTip="{Binding OtherSeriesList}" />
                                 <TextBlock Text="{Binding SeriesSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <Button Content="{loc:T 'Potvrdiť seriál'}" Command="{Binding ConfirmSeriesCommand}" Padding="10,3" Margin="0,0,12,0"
                                         Visibility="{Binding SeriesNeedsConfirmation, Converter={StaticResource BoolToVisibility}}"
@@ -2893,9 +2932,6 @@
                                 <TextBlock Text="{Binding FilmSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <TextBlock Text="{Binding FilmHint}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="360" />
                             </StackPanel>
-                            <Button Content="{loc:T 'Spresniť názvy'}" Command="{Binding FindMoviesCommand}" Padding="10,3" Margin="0,0,6,0"
-                                    Visibility="{Binding CanFindTitles, Converter={StaticResource BoolToVisibility}}"
-                                    ToolTip="{loc:T 'Spresní navrhnuté názvy filmov podľa TMDB a overí ich v katalógu HISTRA; bez kľúča TMDB hľadá v HISTRA (len presná zhoda názvu a roku)'}" />
                             <Button Content="{loc:T 'Prijať návrhy názvov'}" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
                                     ToolTip="{loc:T 'Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)'}" />
                             <Button Content="{loc:T 'Prijať všetko v skupine'}" Command="{Binding AcceptGroupCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"

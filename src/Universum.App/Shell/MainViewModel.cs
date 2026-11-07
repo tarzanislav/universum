@@ -38,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
         Queue = new Jobs.JobQueuePageViewModel(services);
         Output = new Jobs.JobOutputPageViewModel(Queue);
         Logs = new Jobs.ProcessingLogsPageViewModel(_services.ProcessingLogs);
+        ProcessedTitles = new ProcessedTitlesPageViewModel(_services);
         Dashboard = new DashboardPageViewModel(services, this);
         Posters = new PosterPageViewModel(services);
         HistraLists = new HistraListsPageViewModel(services)
@@ -170,6 +171,7 @@ public sealed class MainViewModel : ObservableObject
                 new(Loc.T("Fronta úloh"), "\uE823", Queue, statistics),
                 new(Loc.T("Výstup úloh"), "\uE7C3", Output, statistics),
                 new(Loc.T("Záznamy spracovania"), "\uE81C", Logs, statistics),
+                new(Loc.T("Spracované tituly"), "\uE8FD", ProcessedTitles, statistics),
                 new(Loc.T("Nastavenia"), "\uE713", Settings, statistics),
             ], Loc.T("Štatistika"), StatisticsGuide),
         };
@@ -692,6 +694,9 @@ public sealed class MainViewModel : ObservableObject
 
     /// <summary>Záznamy spracovania (owner, 31. 10. 2026).</summary>
     public Jobs.ProcessingLogsPageViewModel Logs { get; }
+
+    /// <summary>Spracované tituly (Štatistika): the films and series written into the libraries.</summary>
+    public ProcessedTitlesPageViewModel ProcessedTitles { get; }
 
     public ToolItem SelectedTool
     {

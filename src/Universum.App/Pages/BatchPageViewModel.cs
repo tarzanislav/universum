@@ -139,7 +139,7 @@ public sealed class BatchPageViewModel : ObservableObject
         FilmTmdb = new TmdbPicker(services, () => MediaKind.Movie,
             () => FilmTitle.Length > 0 ? FilmTitle : FilmFiles.Select(p => _library?.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) ?? "",
             film => _ = ApplyFilmAsync(FilmFiles, film));
-        FindMoviesCommand = new AsyncRelayCommand(FindMoviesAsync, () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
+        FindMoviesCommand = new AsyncRelayCommand(() => FindMoviesAsync(automatic: false), () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
         services.TitlesChanged += () =>
         {
             Tmdb.Refresh();
@@ -244,6 +244,7 @@ public sealed class BatchPageViewModel : ObservableObject
         Summary = Loc.T("Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.");
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
+        OnPropertyChanged(nameof(OtherSeriesList));
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(IsMovies));
@@ -1576,6 +1577,12 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             await ReadSubtitlesAsync(again: false);
         }
+
+        // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button
+        if (_analysis is not null && FindMoviesCommand.CanExecute(null))
+        {
+            await FindMoviesAsync(automatic: true);
+        }
     }
 
     /// <summary>The files sent from Novinky – Seriály (only they are analysed); null for a whole folder.</summary>
@@ -1610,9 +1617,16 @@ public sealed class BatchPageViewModel : ObservableObject
     }
 
     /// <summary>The further series of the batch beside the field Seriál ("Ďalšie seriály: Sľub (2025)"), or empty.</summary>
+    // owner, 7. 11. 2026: only the number beside the field; the names in its tooltip
     public string OtherSeries => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
-        ? (library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1 ? Loc.T("+ ďalší seriál: ") : Loc.F("+ ďalšie seriály ({0}): ", count)) +
-          string.Join(", ", library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
+        ? library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal).Count() is var count && count == 1
+            ? Loc.T("+ 1 ďalší seriál") : count < 5 ? Loc.F("+ {0} ďalšie seriály", count) : Loc.F("+ {0} ďalších seriálov", count)
+        : "";
+
+    /// <summary>The further series of the batch by name (the tooltip of <see cref="OtherSeries"/>).</summary>
+    public string OtherSeriesList => _library is { Kind: MediaKind.Series, SeriesOfFile.Count: > 0 } library
+        ? Loc.T("Ďalšie seriály v tejto dávke – každá epizóda ide do priečinka svojho seriálu (stĺpec Cieľ v knižnici):") + Environment.NewLine +
+          string.Join(Environment.NewLine, library.SeriesOfFile.Values.Select(t => t.FolderName).Distinct(StringComparer.Ordinal))
         : "";
 
     // the further series sent from Novinky, again after each analysis of the same files – keyed by the paths exactly as
@@ -1696,7 +1710,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         var given = _library.ApplyMemory(_services.SeriesMemory, _analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).ToList());
         return given.Count == 0 ? ""
-            : Loc.F(" Napovedkyňa: {0} – seriál, ktorý už spracúvate, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
+            : Loc.F(" Napovedkyňa: {0} – titul, ktorý už poznáte, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
     }
 
     // the remembered series a title typed in Novinky names (original title and year), or null
@@ -1711,10 +1725,17 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
-        foreach (var series in items.Where(i => library.KindFor(i.File.Path) == MediaKind.Series && library.SeriesFor(i.File.Path) is not null)
+        var list = items.ToList();
+        foreach (var series in list.Where(i => library.KindFor(i.File.Path) == MediaKind.Series && library.SeriesFor(i.File.Path) is not null)
                      .GroupBy(i => library.SeriesFor(i.File.Path)!))
         {
             _services.SeriesMemory.Remember(series.Key, series.SelectMany(i => library.SeriesNamesOf(i.File.Path)).Select(n => n.Name), DateTime.UtcNow);
+        }
+
+        // owner, 7. 11. 2026: films too, under the name their file carries – a TMDB ID typed once is not asked again
+        foreach (var film in list.Where(i => library.KindFor(i.File.Path) == MediaKind.Movie && library.Movies.ContainsKey(i.File.Path)))
+        {
+            _services.SeriesMemory.Remember(library.Movies[film.File.Path], [library.NameGuesses.GetValueOrDefault(film.File.Path)?.Name], DateTime.UtcNow);
         }
     }
 
@@ -1792,6 +1813,7 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(DeleteOriginalsText));
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(OtherSeries));
+        OnPropertyChanged(nameof(OtherSeriesList));
         OnPropertyChanged(nameof(SeriesSuggestion));
         OnPropertyChanged(nameof(SeriesNeedsConfirmation));
         ConfirmSeriesCommand?.NotifyCanExecuteChanged();
@@ -2279,7 +2301,7 @@ public sealed class BatchPageViewModel : ObservableObject
     /// one request at a time (TMDB at most 4 per second, HISTRA 2, see RequestPacer); the same name and year is asked
     /// only once (cache). Stop cancels; titles found so far stay.
     /// </summary>
-    private async Task FindMoviesAsync()
+    private async Task FindMoviesAsync(bool automatic)
     {
         if (_library is null || _analysis is null || _services.Titles is not { } titles)
         {
@@ -2296,6 +2318,12 @@ public sealed class BatchPageViewModel : ObservableObject
             .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
+        if (automatic && pending.Count == 0 && !(_library.Units?.Any(u => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } && !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? false))
+        {
+            // after the analysis: nothing to look up, the summary of the analysis stays
+            return;
+        }
+
         Busy = true;
         _tmdbCancellation = new CancellationTokenSource();
         StopCommand.NotifyCanExecuteChanged();

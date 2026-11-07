@@ -20,6 +20,9 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     /// </summary>
     public string? FixedName { get; init; }
 
+    /// <summary>The title placed here (with its TMDB ID even when the folder's name carries none); null for a fixed place.</summary>
+    public TitleInfo? Title { get; init; }
+
     /// <summary>
     /// The file at <paramref name="path"/> is edited where it is and keeps its name. Internal: originals are never
     /// edited (owner's decision); kept for tests and a possible later, explicitly agreed use.
@@ -179,7 +182,7 @@ public sealed record LibraryLayout(string Root)
         var sizes = profile.Library.SizesFor(title.Kind);
         if (title.Kind == MediaKind.Movie)
         {
-            return new Placement(TitleDirectory(title), title.FolderName, stem, sizes);
+            return new Placement(TitleDirectory(title), title.FolderName, stem, sizes) { Title = title };
         }
 
         if (episode is null)
@@ -191,7 +194,7 @@ public sealed record LibraryLayout(string Root)
             Path.Combine(TitleDirectory(title), LibraryNames.SeasonFolder(episode.Season)),
             title.CleanName + " " + episode.Tag,
             stem,
-            sizes);
+            sizes) { Title = title };
     }
 
     /// <summary>

@@ -461,6 +461,20 @@ public sealed class LibraryJob(LibraryLayout layout)
             given.Add(title);
         }
 
+        // owner, 7. 11. 2026: a film whose TMDB ID was given before gets its title at once (decided, never searched again)
+        foreach (var file in files.Where(f => KindFor(f) == MediaKind.Movie && !Movies.ContainsKey(f) && !Unsorted.Contains(f)))
+        {
+            var guess = NameGuesses.GetValueOrDefault(file) ?? MovieSuggestions.GetValueOrDefault(file);
+            if (guess is not null && memory.Find([new NameGuess(guess.Name, guess.Year, null)], MediaKind.Movie) is { } film)
+            {
+                Movies[file] = film;
+                MovieSuggestions.Remove(file);
+                UnverifiedTitles.Remove(file);
+                ChosenTitles.Add(file);
+                given.Add(film);
+            }
+        }
+
         return given;
     }
 

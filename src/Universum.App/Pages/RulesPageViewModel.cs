@@ -664,7 +664,7 @@ public sealed class RulesPageViewModel : ObservableObject
         var guess = TitleGuess.ForFile(path);
         _kind = guess.Kind;
         // napovedkyňa (owner, 30. 10. 2026): a series processed before gets its remembered title – no search
-        _rememberedSeries = _services.RememberedSeriesFor(path);
+        _rememberedSeries = _services.RememberedTitleFor(path);
         _titleText = _rememberedSeries?.FolderName ?? guess.TitleText;
         // Season 00 or a regular season: asked – the field stays empty until the user answers
         _episodeText = guess.Episode is { IsSeasonQuestion: true } ? "" : guess.Episode?.Number.Tag ?? "";
@@ -672,7 +672,7 @@ public sealed class RulesPageViewModel : ObservableObject
         _tmdbTitle = null;
         _addition = "";
         OnPropertyChanged(nameof(Addition));
-        TitleNote = _rememberedSeries is null ? "" : Loc.T("Napovedkyňa: seriál, ktorý už spracúvate – názov bez hľadania (zmeniť ho môžete).");
+        TitleNote = _rememberedSeries is null ? "" : Loc.T("Napovedkyňa: titul, ktorý už poznáte – názov bez hľadania (zmeniť ho môžete).");
         Tmdb.ClearConfirmation();
         Tmdb.Refresh();
         OnPropertyChanged(nameof(IsMovie));
@@ -685,13 +685,14 @@ public sealed class RulesPageViewModel : ObservableObject
     // (it keeps its TMDB ID), otherwise the typed one with the ID of the TMDB title chosen for it
     private TitleInfo? SeriesToRemember()
     {
-        if (_kind != MediaKind.Series || TitleGuess.Typed(_kind, TitleText) is not { } title)
+        // owner, 7. 11. 2026: films too – a TMDB ID typed once is remembered
+        if (TitleGuess.Typed(_kind, TitleText) is not { } title)
         {
             return null;
         }
 
         return _rememberedSeries is { } remembered && remembered.FolderName == title.FolderName ? remembered
-            : _tmdbTitle is { Kind: MediaKind.Series } chosen && title.TmdbId is null ? title with { TmdbId = chosen.Id }
+            : _tmdbTitle is { } chosen && chosen.Kind == _kind && title.TmdbId is null ? title with { TmdbId = chosen.Id }
             : title;
     }
 
@@ -834,14 +835,14 @@ public sealed class RulesPageViewModel : ObservableObject
             }
 
             Result = Loc.F("Zmeny sú uložené v {0} MEGA spracovania.", batch.Label);
-            _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
+            _services.RememberTitle(SeriesToRemember(), _plan!.Target.Source.Path);
             SetMegaBatch(null);
             BackToMega?.Invoke();
             return;
         }
 
         Result = Mega.Send([file], Loc.T("Single spracovanie: ") + title.Name + (EpisodeText.Length > 0 ? " " + EpisodeText : ""), main.Root, _services.Profile);
-        _services.RememberSeries(SeriesToRemember(), _plan!.Target.Source.Path);
+        _services.RememberTitle(SeriesToRemember(), _plan!.Target.Source.Path);
     }
 
     // ---------------------------------------------------------------- the studios (owner, 2. 11. 2026)
@@ -1021,7 +1022,7 @@ public sealed class RulesPageViewModel : ObservableObject
             _undoRecord = result.UndoRecordPath;
             if (result.Status is ProcessingStatus.Done or ProcessingStatus.Unchanged or ProcessingStatus.AlreadyInLibrary)
             {
-                _services.RememberSeries(series, result.SourcePath);
+                _services.RememberTitle(series, result.SourcePath);
             }
 
             var cache = _services.Inspector(_services.CurrentMkvToolNix);
@@ -1072,7 +1073,7 @@ public sealed class RulesPageViewModel : ObservableObject
             }
         });
         _services.Enqueue(job);
-        _services.RememberSeries(SeriesToRemember(), _plan.Target.Source.Path);
+        _services.RememberTitle(SeriesToRemember(), _plan.Target.Source.Path);
         Result = _services.Settings.AutoStartQueue
             ? Loc.F("Pridané do fronty ako úloha {0}.", job.Id)
             : Loc.F("Pridané do fronty ako úloha {0} – frontu spustíte na stránke Fronta úloh.", job.Id);

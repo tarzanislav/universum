@@ -72,6 +72,9 @@ public sealed class FileProcessor(
     /// </summary>
     public bool DeleteOriginalsAllowed { get; init; }
 
+    /// <summary>Spracované tituly: the register of titles written into a library (null: none kept).</summary>
+    public TitleRegister? Register { get; init; }
+
     /// <summary>The names (hard links) a file has – a file with more is never moved into the library and edited (Superrýchle).</summary>
     public Func<string, int> Links { get; init; } = Paths.Links;
 
@@ -207,7 +210,14 @@ public sealed class FileProcessor(
                 }
             }
 
-            return previous is null ? result : ReplacePrevious(result, previous, placement, fingerprint!, signature);
+            result = previous is null ? result : ReplacePrevious(result, previous, placement, fingerprint!, signature);
+            if (result is { Status: ProcessingStatus.Done, OutputPath: { } written } && placement.FixedName is null)
+            {
+                // Spracované tituly (owner, 7. 11. 2026): every film and episode written into a library
+                Register?.Record(written, placement.Title);
+            }
+
+            return result;
         }
         catch (OperationCanceledException)
         {

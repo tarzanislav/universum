@@ -1370,10 +1370,10 @@ public sealed class BatchPageViewModel : ObservableObject
     public bool IsListening => _speechCancellation is not null;
 
     /// <summary>The gauge under the summary: while the folder is read or the speech recognised.</summary>
-    public bool ShowsProgress => IsAnalyzing || IsListening;
+    public bool ShowsProgress => IsAnalyzing || IsListening || IsAutoStep;
 
     /// <summary>What the stop button at the top stops.</summary>
-    public string StopText => IsListening ? Loc.T("Zastaviť rozpoznávanie reči") : Loc.T("Zastaviť analýzu");
+    public string StopText => IsListening ? Loc.T("Zastaviť rozpoznávanie reči") : IsAutoStep && !IsAnalyzing ? Loc.T("Zastaviť") : Loc.T("Zastaviť analýzu");
 
     /// <summary>The summary says why nothing can be processed (no MKV, only results…): shown in the warning colour.</summary>
     public bool SummaryIsWarning { get => _summaryIsWarning; private set => SetProperty(ref _summaryIsWarning, value); }
@@ -1596,24 +1596,57 @@ public sealed class BatchPageViewModel : ObservableObject
             Busy = false;
         }
 
-        if (readSubtitles)
+        // owner, 7. 11. 2026: while the steps after the analysis run, a blinking line says so – nothing to do yet
+        try
         {
-            await ReadSubtitlesAsync(again: false);
-        }
+            if (readSubtitles)
+            {
+                AutoStep = Loc.T("Čítame jazyk titulkov – počkajte, ešte nič nemeňte…");
+                await ReadSubtitlesAsync(again: false);
+            }
 
-        // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button; Zastaviť
-        // stops the steps that follow too
-        if (_analysis is not null && !_stoppedAfterAnalysis && FindMoviesCommand.CanExecute(null))
-        {
-            await FindMoviesAsync(automatic: true);
-        }
+            // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button; Zastaviť
+            // stops the steps that follow too
+            if (_analysis is not null && !_stoppedAfterAnalysis && FindMoviesCommand.CanExecute(null))
+            {
+                AutoStep = Loc.T("Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…");
+                await FindMoviesAsync(automatic: true);
+            }
 
-        // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
-        if (_analysis is { Groups.Count: > 0 } && !_stoppedAfterAnalysis && DetectAudioAfterAnalysis && !Busy)
+            // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
+            if (_analysis is { Groups.Count: > 0 } && !_stoppedAfterAnalysis && DetectAudioAfterAnalysis && !Busy)
+            {
+                AutoStep = Loc.T("Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…");
+                await DetectAudioAsync(SpeechScope.All, automatic: true);
+            }
+        }
+        finally
         {
-            await DetectAudioAsync(SpeechScope.All, automatic: true);
+            AutoStep = "";
         }
     }
+
+    /// <summary>
+    /// The step running by itself after Analyzovať (subtitles read, names looked up, speech heard) – shown blinking at the
+    /// top so the user waits; empty when none runs.
+    /// </summary>
+    public string AutoStep
+    {
+        get => _autoStep;
+        private set
+        {
+            if (SetProperty(ref _autoStep, value))
+            {
+                OnPropertyChanged(nameof(IsAutoStep));
+                OnPropertyChanged(nameof(ShowsProgress));
+                OnPropertyChanged(nameof(StopText));
+            }
+        }
+    }
+
+    private string _autoStep = "";
+
+    public bool IsAutoStep => _autoStep.Length > 0;
 
     /// <summary>The files sent from Novinky – Seriály (only they are analysed); null for a whole folder.</summary>
     public IReadOnlyList<string>? ChosenFiles => _only;

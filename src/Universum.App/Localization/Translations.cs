@@ -3145,6 +3145,9 @@ internal static class Translations
         ["Známe aj ako"] = "Známé také jako",
         ["Český názov"] = "Český název",
         ["Anglický názov"] = "Anglický název",
+        ["Čítame jazyk titulkov – počkajte, ešte nič nemeňte…"] = "Čteme jazyk titulků – počkejte, ještě nic neměňte…",
+        ["Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…"] = "Hledáme názvy filmů na TMDB – počkejte, ještě nic neměňte…",
+        ["Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…"] = "Analyzujeme jazykově neoznačené stopy – počkejte, ještě nic neměňte…",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6286,5 +6289,8 @@ internal static class Translations
         ["Známe aj ako"] = "Also known as",
         ["Český názov"] = "Czech title",
         ["Anglický názov"] = "English title",
+        ["Čítame jazyk titulkov – počkajte, ešte nič nemeňte…"] = "Reading the subtitles' language – please wait, change nothing yet…",
+        ["Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…"] = "Looking up the films' names on TMDB – please wait, change nothing yet…",
+        ["Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…"] = "Analysing tracks without a language – please wait, change nothing yet…",
     };
 }

@@ -2502,6 +2502,28 @@
                     <Button DockPanel.Dock="Right" Content="{Binding StopText}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
                             Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <!-- owner, 7. 11. 2026: the steps after Analyzovať (subtitles, names, speech) blink so the user waits -->
+                        <TextBlock Text="{Binding AutoStep}" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,0,2"
+                                   Visibility="{Binding IsAutoStep, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsAutoStep}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="autoStepBlink">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.25" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="autoStepBlink" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <!-- why nothing can be processed is said plainly, in the warning colour -->
                         <TextBlock Text="{Binding Summary}" TextWrapping="Wrap">
                             <TextBlock.Style>

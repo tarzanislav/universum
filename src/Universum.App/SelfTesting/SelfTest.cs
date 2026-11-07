@@ -169,7 +169,7 @@ internal static class SelfTest
               "-: Dashboard | NOVINKY A OBSAH: Premiéry, Novinky – Seriály, Listy z HISTRA, TMDB poster, Zaujímavosti | POZNÁMKY: Kalendár, Plánované úlohy, Poznámky | " +
               "MULTIPLEXING: Zlučovanie, Úprava hlavičky, Kapitoly, Informácie | " +
               "EDITÁCIA VIDEOSTÔP (video, audio, titulky): Úprava videostopy, Úprava audiostopy, Úprava titulkostopy | " +
-              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Nastavenia | " +
+              "ŠABLÓNY (TEMPLATE): Single spracovanie, Hromadné spracovanie, MEGA spracovanie | ŠTATISTIKA: Fronta úloh, Výstup úloh, Záznamy spracovania, Spracované tituly, Nastavenia | " +
               "NÁPOVEDA: Novinky a obsah, Poznámky, Multiplexing, Editácia videostôp, Šablóny (template), Štatistika",
             "left rail: Dashboard, the groups, then NÁPOVEDA with the guides in the order of the groups (owner, 1. 11. 2026)");
         model.Open(model.Info);
@@ -3335,6 +3335,7 @@ internal static class SelfTest
             var watch = System.Diagnostics.Stopwatch.StartNew();
             await batch.AnalyzeAsync();
             batch.DetectAudioAfterAnalysis = false;
+            Check(!batch.IsAutoStep && batch.AutoStep.Length == 0, "batch: the blinking line of the steps after the analysis is gone when they end");
             Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
             Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition still offered by hand");
             var audio = batch.SlotRows.Where(s => s.Key.Type == TrackType.Audio).ToList();

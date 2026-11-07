@@ -633,6 +633,7 @@ public sealed class MainViewModel : ObservableObject
             "Queue" => Queue,
             "Output" => Output,
             "Logs" => Logs,
+            "ProcessedTitles" => ProcessedTitles,
             "Settings" => Settings,
             _ => null,
         };

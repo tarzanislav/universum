@@ -43,6 +43,15 @@ Logs stay until you delete them. [Delete the ticked] deletes the ticked logs (or
 !info Deleting a log **does not change any films** – only the description of the run disappears.
 @otvorit Logs Open Processing logs
 
+## Processed titles
+A list of the **films and series UNIVERSUM wrote into the library** – it fills itself with every processing.
+- each title has its **TMDB ID** (also when its folder has none), the **Czech** and **English title** from TMDB and the names your files came under (**Also known as**);
+- series show their **episodes by season**, the number of files and when the title was last processed;
+- [Read from the library] adds the titles already in the output folders (processed before);
+- [Export…] saves the list as JSON (to import later) or CSV for Excel, [Import…] joins one with this list – nothing is overwritten.
+!info The list stays **on your computer only** (in UNIVERSUM's settings folder) and is sent nowhere.
+@otvorit ProcessedTitles Open Processed titles
+
 ## Settings
 Settings is one long page of blocks – scroll down.
 ![Settings](settings.jpg)

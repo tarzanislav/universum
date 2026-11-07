@@ -43,6 +43,15 @@ Záznamy zůstávají, dokud je nesmažete. [Smazat označené] smaže zaškrtnu
 !info Smazáním záznamu se **filmy nemění** – zmizí jen popis běhu.
 @otvorit Logs Otevřít Záznamy zpracování
 
+## Zpracované tituly
+Seznam **filmů a seriálů, které UNIVERSUM zapsal do knihovny** – doplňuje se sám při každém zpracování.
+- u titulu je **TMDB ID** (i když ho adresář nemá), **český** a **anglický název** z TMDB a jména, pod kterými přišly vaše soubory (**Známé také jako**);
+- u seriálů **epizody po sériích**, počet souborů a kdy byl titul naposledy zpracován;
+- [Načíst z knihovny] doplní i tituly, které už jsou ve výstupních adresářích (zpracované dříve);
+- [Exportovat…] uloží seznam jako JSON (k pozdějšímu importu) nebo CSV pro Excel, [Importovat…] ho spojí s tímto – nic se nepřepíše.
+!info Seznam je **jen ve vašem počítači** (v adresáři nastavení UNIVERSUM), nikam se neposílá.
+@otvorit ProcessedTitles Otevřít Zpracované tituly
+
 ## Nastavení
 Nastavení je jedna dlouhá stránka s bloky – posouvejte ji dolů.
 ![Nastavení](settings.jpg)

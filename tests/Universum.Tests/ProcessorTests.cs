@@ -292,6 +292,21 @@ public sealed class ProcessorTests
         var inspected = await inspector.InspectAsync(other);
         var removed = UniversumRules.Apply(inspected, keep) with { Removed = [inspected.Tracks.First(t => t.Type == TrackType.Audio && t.Language.Primary == "en")] };
         Assert.True(!removed.StaysMp4 && EditPlan.For(removed).Method == WriteMethod.Remux, "a track left out: written as MKV");
+        Assert.True(removed.Mp4Obstacle is { Length: > 0 } && EditPlan.For(removed).Changes.Single(c => c.Kind == ChangeKind.Container).Why == removed.Mp4Obstacle,
+            "and why, in the plan – " + removed.Mp4Obstacle);
+        Assert.True(mkv.Target.Mp4Obstacle is null, "no reason without the choice");
+
+        // the flags of an MP4: one ("enabled", what players take as the default) – the plan lists only that one
+        var mp4Plan = EditPlan.For(UniversumRules.Apply(inspected, keep));
+        Assert.True(!mp4Plan.Changes.Any(c => c.Kind is ChangeKind.Enabled or ChangeKind.Forced or ChangeKind.OtherFlags) &&
+                    mp4Plan.Changes.Where(c => c.Kind == ChangeKind.Default).Select(c => (c.TrackId, c.After)).Order().SequenceEqual([(1, "0"), (2, "1"), (3, "0")]),
+            "the English sound and the subtitles no longer default, the Czech sound default – " + string.Join("; ", mp4Plan.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
+
+        // a flag MP4 has no place for (forced): MKV
+        var forced = UniversumRules.Apply(inspected, keep) is var ruled
+            ? ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true } } : t).ToList() }
+            : null;
+        Assert.True(forced is { StaysMp4: false, Mp4Obstacle: not null }, "forced subtitles: written as MKV – " + forced?.Mp4Obstacle);
     }
 
     [Test]

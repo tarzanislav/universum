@@ -14,15 +14,80 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
 
     /// <summary>
     /// The result stays MP4 – its header edited in place by UNIVERSUM (owner, 7. 11. 2026): Ponechať MP4, an MP4, and
-    /// nothing MP4 cannot hold – no track left out or added, no new times, no cut, no chapters, no new proportions or SRT,
-    /// no forced flag changed. Otherwise the MP4 becomes an MKV as always.
+    /// nothing MP4 cannot hold (see <see cref="Mp4Obstacle"/>). Otherwise the MP4 becomes an MKV as always.
     /// </summary>
-    public bool StaysMp4 => KeepMp4 && Source.IsMp4 && !RemovedFromFile.Any() && !AddsFiles && !TimingChanged && !IsCut && !ChaptersChanged &&
-                            !RepairIndex && Tracks.All(t => t.AspectRatio is null && !t.ToSrt && t.Flags.Forced == t.Source.Flags.Forced);
+    public bool StaysMp4 => KeepMp4 && Source.IsMp4 && Mp4Obstacles().FirstOrDefault() is null;
+
+    /// <summary>
+    /// Why an MP4 does not stay MP4 although Ponechať MP4 is chosen – the first thing MP4 cannot hold, in words ("odstraňujú
+    /// sa stopy"); null when it stays, or when it is no MP4 or Ponechať MP4 is off.
+    /// </summary>
+    public string? Mp4Obstacle => KeepMp4 && Source.IsMp4 ? Mp4Obstacles().FirstOrDefault() : null;
+
+    // MP4 holds the order, the title, and per track the language, the name and one flag (enabled = the default); a track
+    // left out or added, new times, a cut, chapters, a new index, proportions, SRT, and the flags of Matroska MP4 has no
+    // place for (forced, hearing impaired, commentary …, a default track switched off) make an MKV
+    private IEnumerable<string> Mp4Obstacles()
+    {
+        if (RemovedFromFile.Any())
+        {
+            yield return Text.CoreText.T("odstraňujú sa stopy");
+        }
+
+        if (AddsFiles)
+        {
+            yield return Text.CoreText.T("pridávajú sa titulky zo súboru");
+        }
+
+        if (TimingChanged)
+        {
+            yield return Text.CoreText.T("menia sa časy titulkov");
+        }
+
+        if (IsCut)
+        {
+            yield return Text.CoreText.T("strih");
+        }
+
+        if (ChaptersChanged)
+        {
+            yield return Text.CoreText.T("kapitoly");
+        }
+
+        if (RepairIndex)
+        {
+            yield return Text.CoreText.T("oprava indexu");
+        }
+
+        if (Tracks.Any(t => t.AspectRatio is not null))
+        {
+            yield return Text.CoreText.T("nový pomer strán obrazu");
+        }
+
+        if (Tracks.Any(t => t.ToSrt))
+        {
+            yield return Text.CoreText.T("titulky do SRT");
+        }
+
+        if (Tracks.Any(t => t.Flags.Forced != t.Source.Flags.Forced))
+        {
+            yield return Text.CoreText.T("príznak vynútené (Forced)");
+        }
+
+        if (Tracks.Any(t => t.OtherFlagsChanged))
+        {
+            yield return Text.CoreText.T("príznak pre nepočujúcich, komentár a podobné");
+        }
+
+        if (Tracks.Any(t => t.Flags.Default && !t.Flags.Enabled))
+        {
+            yield return Text.CoreText.T("predvolená stopa je vypnutá");
+        }
+    }
 
     /// <summary>
     /// What changes in an MP4 that stays MP4: the order, the title, and per track the language, the name and the default
-    /// track (MP4's "enabled" flag – MP4 has no other default; the other flags MP4 cannot hold stay as they are).
+    /// track (MP4's "enabled" flag – MP4 has no other default; mkvmerge reads every MP4 track as default).
     /// </summary>
     public bool Mp4Changes => OrderChanged || TitleChanged || Tracks.Any(t => t.NameChanged || t.LanguageChanged || t.Flags.Default != t.Source.Flags.Enabled);
 

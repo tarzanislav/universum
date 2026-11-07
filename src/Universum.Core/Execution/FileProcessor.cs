@@ -622,6 +622,9 @@ public sealed class FileProcessor(
     /// <summary>The original went to the Recycle Bin after its result was verified in the library.</summary>
     public const string OriginalRecycledMessage = "the original went to the Recycle Bin";
 
+    /// <summary>Ponechať MP4: the edited header of an MP4 checked by ffprobe too, and ffprobe sees what was planned.</summary>
+    public const string Mp4ProbedMessage = "the MP4 checked by ffprobe too";
+
     /// <summary>Superrýchle: the original was moved into the library and edited there (its undo record puts it back).</summary>
     public const string MovedIntoLibraryMessage = "the original was moved into the library and edited there";
 
@@ -950,7 +953,7 @@ public sealed class FileProcessor(
             if (plan.Method == WriteMethod.HeaderEdit && plan.Target.StaysMp4)
             {
                 // Ponechať MP4: the header of the copy edited by UNIVERSUM itself, checked against the original
-                var mp4Problems = await EditMp4Async(plan.Target, temporary, source);
+                var (mp4Problems, _) = await EditMp4Async(plan.Target, temporary, source);
                 if (mp4Problems.Count > 0)
                 {
                     TryDelete(temporary);
@@ -1027,8 +1030,8 @@ public sealed class FileProcessor(
     {
         if (plan.Target.StaysMp4)
         {
-            var mp4Problems = await EditMp4Async(plan.Target, path, null);
-            return mp4Problems.Count > 0 ? throw new EditFailedException(mp4Problems) : [];
+            var (mp4Problems, probed) = await EditMp4Async(plan.Target, path, null);
+            return mp4Problems.Count > 0 ? throw new EditFailedException(mp4Problems) : probed ? [Mp4ProbedMessage] : [];
         }
 
         ProcessResult result;
@@ -1055,9 +1058,10 @@ public sealed class FileProcessor(
     /// <summary>
     /// Ponechať MP4 (owner, 7. 11. 2026): the header of <paramref name="path"/> changed by UNIVERSUM's own code (the media
     /// untouched), then checked twice – by UNIVERSUM's reader against <paramref name="original"/> (or the file as it was) and by
-    /// ffprobe when FFmpeg is at hand. Problems (and the záznam MP4 written) as messages; empty when all is as planned.
+    /// ffprobe when FFmpeg is at hand. Problems (and the záznam MP4 written) as messages, empty when all is as planned; and
+    /// whether ffprobe saw the result as planned.
     /// </summary>
-    private async Task<IReadOnlyList<string>> EditMp4Async(TargetState target, string path, string? original)
+    private async Task<(IReadOnlyList<string> Problems, bool Probed)> EditMp4Async(TargetState target, string path, string? original)
     {
         try
         {
@@ -1065,6 +1069,7 @@ public sealed class FileProcessor(
             await Task.Run(() => Mp4.Mp4HeaderEditor.Apply(path, Mp4.Mp4Targets.ChangeFor(target))).ConfigureAwait(false);
             var after = await Task.Run(() => Mp4.Mp4Reader.Read(path)).ConfigureAwait(false);
             var problems = Mp4.Mp4Targets.Verify(target, before, after).ToList();
+            var probed = false;
             if (problems.Count == 0 && FindFfmpeg is not null)
             {
                 try
@@ -1074,6 +1079,7 @@ public sealed class FileProcessor(
                     if (File.Exists(ffprobe) && await Mp4.Mp4Targets.ProbeAsync(runner, ffprobe, path, target).ConfigureAwait(false) is { } seen)
                     {
                         problems.AddRange(seen);
+                        probed = seen.Count == 0;
                     }
                 }
                 catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or Speech.SpeechException or InvalidOperationException)
@@ -1082,11 +1088,11 @@ public sealed class FileProcessor(
                 }
             }
 
-            return problems.Count == 0 ? [] : [.. problems.Select(p => "verification: " + p), .. Mp4Record(path, string.Join("; ", problems))];
+            return (problems.Count > 0 ? [.. problems.Select(p => "verification: " + p), .. Mp4Record(path, string.Join("; ", problems))] : [], probed);
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
-            return [$"the MP4 header cannot be edited: {ex.Message}", .. Mp4Record(path, ex.Message)];
+            return ([$"the MP4 header cannot be edited: {ex.Message}", .. Mp4Record(path, ex.Message)], false);
         }
     }
 

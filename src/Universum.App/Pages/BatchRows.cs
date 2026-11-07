@@ -633,11 +633,15 @@ public sealed class FileRow : ObservableObject
         set => page.SetRevision(Item.File.Path, value);
     }
 
-    /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container.</summary>
+    /// <summary>"nový súbor", or "nový MKV z MP4" for a file of another container ("len hlavička – ostane MP4" with Ponechať MP4).</summary>
     public string Status => Item.Plan.Revision && Item.Reasons.Count == 0 ? Loc.T("revízia – nová verzia nahradí výsledok v knižnici")
         : Item.AlreadyInLibraryAt is not null && Item.Reasons.Count == 0 ? Loc.T("už v knižnici")
+        : Item.Status == BatchStatus.Remux && Item.Plan.Target.Mp4Obstacle is { } why
+        ? Loc.F("nový MKV z {0} – MP4 neudrží: {1}", Item.File.ContainerName, why)
         : Item.Status == BatchStatus.Remux && !Item.File.IsMatroska
         ? Loc.F("nový MKV z {0}", Item.File.ContainerName)
+        : Item.Status == BatchStatus.HeaderEdit && Item.Plan.Target.StaysMp4
+        ? Loc.T("len hlavička – ostane MP4")
         : Texts.Status(Item.Status);
 
     public string Reasons => string.Join("; ", Item.Reasons.Select(Texts.Reason));

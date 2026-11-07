@@ -58,6 +58,12 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveHistraTokenCommand = new RelayCommand(RemoveHistraToken, () => _services.Settings.HistraTokenProtected is not null);
         OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraApi.TokenPage));
         services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
+        services.KeepMp4Changed += () => OnPropertyChanged(nameof(KeepMp4));
+        OpenMp4RecordsCommand = new RelayCommand(() =>
+        {
+            Directory.CreateDirectory(AppSettings.Mp4RecordDirectory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppSettings.Mp4RecordDirectory) { UseShellExecute = true })?.Dispose();
+        });
         services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
         FindWeatherTownCommand = new AsyncRelayCommand(FindWeatherTownAsync, () => WeatherTownInput.Trim().Length > 0);
@@ -533,6 +539,15 @@ public sealed class SettingsPageViewModel : ObservableObject
     public bool RemoveTags { get => _removeTags; set => SetProperty(ref _removeTags, value); }
 
     public bool RepairIndex { get => _repairIndex; set => SetProperty(ref _repairIndex, value); }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): saved at once – the same switch as in Hromadné and Single spracovanie (not a part
+    /// of the profile saved by Uložiť).
+    /// </summary>
+    public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
+
+    /// <summary>Opens the folder of the záznamy MP4 (what went wrong with an MP4, without names – for the developer).</summary>
+    public RelayCommand OpenMp4RecordsCommand { get; }
 
     public int VideoNameLength { get => _videoNameLength; set => SetProperty(ref _videoNameLength, value); }
 

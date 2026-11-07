@@ -100,6 +100,18 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         };
         RefreshMegaTargets();
+        // Ponechať MP4 switched here, in Single spracovanie or in Nastavenia: the plan again (an MP4 stays MP4 or becomes MKV)
+        services.KeepMp4Changed += () =>
+        {
+            OnPropertyChanged(nameof(KeepMp4));
+            OnPropertyChanged(nameof(HiddenPanelsNote));
+            if (!Busy && !_running && _analysis is not null)
+            {
+                Replan();
+                RefreshCommands();
+            }
+        };
+        ShowPanelsCommand = new RelayCommand(() => ShowPanels = true);
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
                                                              _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
@@ -684,6 +696,37 @@ public sealed class BatchPageViewModel : ObservableObject
     /// <summary>"Skryť nastavenia ▴" / "Zobraziť nastavenia ▾".</summary>
     public string PanelsText => ShowPanels ? Loc.T("Skryť nastavenia ▴") : Loc.T("Zobraziť nastavenia ▾");
 
+    /// <summary>
+    /// The settings hidden: a line in their place says so and what is chosen (owner, 7. 11. 2026: the hidden panels looked
+    /// like a part of the window gone missing).
+    /// </summary>
+    public string HiddenPanelsNote => Loc.F("Nastavenia pod tabuľkami sú skryté – originál: {0}{1}.", Originals switch
+    {
+        OriginalsMode.DeleteAutomatically => Loc.T("zmazať automaticky"),
+        OriginalsMode.DeleteManually => Loc.T("zmazať ručne"),
+        OriginalsMode.MoveIntoLibrary => Loc.T("superrýchle"),
+        _ => Loc.T("zachovať"),
+    }, KeepMp4 ? Loc.T("; MP4 ostáva MP4") : "");
+
+    /// <summary>Shows the hidden settings again (the line in their place).</summary>
+    public RelayCommand ShowPanelsCommand { get; }
+
+    /// <summary>
+    /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose header only changes stays MP4 – UNIVERSUM edits its header itself
+    /// (with Superrýchle in seconds); off, every MP4 becomes MKV. The same switch as in Single spracovanie and Nastavenia.
+    /// </summary>
+    public bool KeepMp4
+    {
+        get => _services.KeepMp4;
+        set
+        {
+            if (!_running)
+            {
+                _services.KeepMp4 = value;
+            }
+        }
+    }
+
     private BatchFinish? _finish;
 
     public BatchAnalysis? Analysis => _analysis;
@@ -954,7 +997,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         _services.Settings.BatchOriginals = mode;
         _services.Settings.Save();
-        foreach (var name in new[] { nameof(Originals), nameof(KeepOriginal), nameof(DeleteAutomatically), nameof(DeleteManually), nameof(MoveIntoLibrary), nameof(CanDeleteOriginals), nameof(DeleteOriginalsText) })
+        foreach (var name in new[] { nameof(Originals), nameof(KeepOriginal), nameof(DeleteAutomatically), nameof(DeleteManually), nameof(MoveIntoLibrary), nameof(CanDeleteOriginals), nameof(DeleteOriginalsText), nameof(HiddenPanelsNote) })
         {
             OnPropertyChanged(name);
         }

@@ -3158,6 +3158,10 @@ internal static class Translations
         ["súbor sa nedal presunúť – asi ho má otvorený iný program"] = "soubor nešlo přesunout – asi ho má otevřený jiný program",
         ["Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie)."] = "Superrychle nešlo: {0}. Soubor se proto zkopíroval celý (pomaleji).",
         [" · {0} superrýchle nešlo – skopírované celé (dôvod vo Výstupe úloh)"] = " · {0} superrychle nešlo – zkopírováno celé (důvod ve Výstupu úloh)",
+        ["→ pre {0} označených skupín"] = "→ pro {0} označených skupin",
+        ["{0} označených skupín: {1}"] = "{0} označených skupin: {1}",
+        ["Ctrl alebo Shift označí viac skupín – seriál a TMDB ID zo spodného riadka Seriál: dostanú všetky naraz"] = "Ctrl nebo Shift označí více skupin – seriál a TMDB ID ze spodního řádku Seriál: dostanou všechny najednou",
+        ["Ťahaním zmeníte výšku súborov a stôp skupiny"] = "Tažením změníte výšku souborů a stop skupiny",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6312,5 +6316,9 @@ internal static class Translations
         ["súbor sa nedal presunúť – asi ho má otvorený iný program"] = "the file could not be moved – another program probably has it open",
         ["Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie)."] = "Super fast was not possible: {0}. So the whole file was copied (slower).",
         [" · {0} superrýchle nešlo – skopírované celé (dôvod vo Výstupe úloh)"] = " · {0} not super fast – copied whole (the reason is in Job output)",
+        ["→ pre {0} označených skupín"] = "→ for {0} marked groups",
+        ["{0} označených skupín: {1}"] = "{0} marked groups: {1}",
+        ["Ctrl alebo Shift označí viac skupín – seriál a TMDB ID zo spodného riadka Seriál: dostanú všetky naraz"] = "Ctrl or Shift marks several groups – they all get the series and TMDB ID of the Series: row below at once",
+        ["Ťahaním zmeníte výšku súborov a stôp skupiny"] = "Drag to change the height of the group's files and tracks",
     };
 }

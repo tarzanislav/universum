@@ -87,6 +87,15 @@ public partial class MainWindow : Window
     }
 
     // several files can be selected in batch processing (Ctrl, Shift) – for listening to their audio
+    // Hromadné spracovanie: several series groups marked (Ctrl / Shift) get the series of the row Seriál: at once
+    private void OnBatchSeriesGroupsSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+        {
+            Model.Batch.SelectSeriesGroups(grid.SelectedItems.OfType<Pages.GroupRow>());
+        }
+    }
+
     private void OnBatchFilesSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (sender is System.Windows.Controls.DataGrid grid)

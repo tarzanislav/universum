@@ -741,7 +741,7 @@ public sealed class BatchPageViewModel : ObservableObject
                 OnFilmChanged();
                 if (IsMixed)
                 {
-                    foreach (var name in new[] { nameof(IsMovies), nameof(IsSeries), nameof(SeriesTitle), nameof(SeriesSuggestion), nameof(SeriesNeedsConfirmation), nameof(KindNote), nameof(CanFindTitles) })
+                    foreach (var name in new[] { nameof(IsMovies), nameof(IsSeries), nameof(SeriesTitle), nameof(SeriesTargetNote), nameof(SeriesSuggestion), nameof(SeriesNeedsConfirmation), nameof(KindNote), nameof(CanFindTitles) })
                     {
                         OnPropertyChanged(name);
                     }
@@ -1035,7 +1035,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
                 _typedTmdb = null;
                 var typed = TitleGuess.Typed(MediaKind.Series, value);
-                foreach (var path in SelectedFiles)
+                foreach (var path in SeriesFiles)
                 {
                     if (typed is null)
                     {
@@ -2282,12 +2282,15 @@ public sealed class BatchPageViewModel : ObservableObject
             var (groupSeries, seriesNote) = title.Kind == MediaKind.Series ? LibraryTitle(title, SelectedFirst) : (null, "");
             if (groupSeries is not null)
             {
-                foreach (var path in SelectedFiles)
+                var groups = SeriesGroupsNamed;
+                foreach (var path in SeriesFiles)
                 {
                     _library.SeriesOfFile[path] = groupSeries;
                 }
 
-                RunState = seriesNote.Length > 0 ? seriesNote : Loc.F("Skupina {0}: {1}", SelectedGroup?.Label, title.Display);
+                RunState = seriesNote.Length > 0 ? seriesNote
+                    : groups > 1 ? Loc.F("{0} označených skupín: {1}", groups, title.Display)
+                    : Loc.F("Skupina {0}: {1}", SelectedGroup?.Label, title.Display);
             }
             else
             {
@@ -2861,6 +2864,32 @@ public sealed class BatchPageViewModel : ObservableObject
         SpeechStage.CzechOrSlovak => Loc.T("rozlišujem češtinu a slovenčinu (presný model)"),
         _ => Loc.T("hotovo"),
     };
+
+    private IReadOnlyList<GroupRow> _selectedSeriesGroups = [];
+
+    /// <summary>
+    /// The series groups marked in the list (several with Ctrl or Shift; owner, 7. 11. 2026): episodes in folders not named
+    /// after their series get the series – its name, TMDB or TMDB ID – all at once.
+    /// </summary>
+    public void SelectSeriesGroups(IEnumerable<GroupRow> groups)
+    {
+        _selectedSeriesGroups = groups.Where(SeriesGroups.Contains).ToList();
+        OnPropertyChanged(nameof(SeriesTargetNote));
+    }
+
+    // the files the row Seriál: names in a sorted folder: of all the series groups marked (when the group shown is one of
+    // them), otherwise of the group shown
+    private IReadOnlyList<string> SeriesFiles =>
+        _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(shown)
+            ? _selectedSeriesGroups.SelectMany(g => g.Group.Files).Select(f => f.Path).ToList()
+            : SelectedFiles;
+
+    private int SeriesGroupsNamed => _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(shown) ? _selectedSeriesGroups.Count : 1;
+
+    /// <summary>"pre 5 označených skupín" when the row Seriál: names several groups at once.</summary>
+    public string SeriesTargetNote => _library is { Mixed: true } && SeriesGroupsNamed > 1
+        ? Loc.F("→ pre {0} označených skupín", SeriesGroupsNamed)
+        : "";
 
     private IReadOnlyList<FileRow> _selectedFiles = [];
 

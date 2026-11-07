@@ -32,9 +32,11 @@ Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu
 Celá složka najednou. UNIVERSUM soubory analyzuje, seřadí je do **skupin** (jeden film nebo jeden seriál) a ukáže *výsledek simulace* – ještě před zápisem vidíte, co ze kterého souboru vznikne.
 
 1. Klikněte na [Složka…], podle potřeby zaškrtněte **i podsložky** a klikněte na [Analyzovat].
-2. Vlevo vyberte skupinu – seriály jsou nahoře v seznamu **Skupina Seriál**, filmy dole v seznamu **Skupina Film**. Vpravo uvidíte její soubory a pod nimi **Stopy skupiny**.
+2. Vlevo vyberte skupinu – seriály jsou nahoře v seznamu **Skupina Seriál**, filmy dole v seznamu **Skupina Film**. Vpravo uvidíte její soubory a pod nimi **Stopy skupiny** – čarou mezi nimi změníte, kolik místa má která část.
+   Epizody ve složkách, které nejsou pojmenované podle seriálu: označte jejich skupiny s **Ctrl** nebo **Shift** a do řádku
+   **Seriál:** zadejte název, [TMDB] nebo **TMDB ID** – dostanou ho všechny označené skupiny najednou.
 3. Zvolte druh *filmy* nebo *seriál*. U seriálu vyplňte **Seriál:** a klikněte na [TMDB], u filmu vyplňte **Film:**. Přesný titul zadáte i přes **TMDB ID**.
-4. Návrhy názvů zkontrolujte a přijměte: [Upřesnit názvy], [Přijmout návrhy názvů] nebo pro celou skupinu najednou [Přijmout vše ve skupině].
+4. Názvy se po analýze vyhledají na TMDB samy; zkontrolujte je a přijměte: [Přijmout návrhy názvů] nebo pro celou skupinu najednou [Přijmout vše ve skupině].
 5. V části **Stopy skupiny** nastavte **Jazyk**, **Název stopy**, **Forced** a pořadí. Rozhodnutí platí pro všechny soubory skupiny.
 6. U **Originál:** zvolte *zachovat*, *smazat automaticky*, *smazat ručně* nebo *superrychle*.
 7. Klikněte na [Spustit]. Průběh uvidíte i ve Frontě úloh, konec se ukáže výrazným pruhem.

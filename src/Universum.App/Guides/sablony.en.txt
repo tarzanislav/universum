@@ -33,9 +33,11 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows the *simulation result* – before anything is written, you can see what each file will become.
 
 1. Click [Folder…], tick **subfolders too** if needed, and click [Analyze].
-2. On the left, choose a group – series are at the top in the **Series groups** list, films below in the **Film groups** list. On the right you will see its files and, below them, **Group tracks**.
+2. On the left, choose a group – series are at the top in the **Series groups** list, films below in the **Film groups** list. On the right you will see its files and, below them, **Group tracks** – drag the line between them to share the height.
+   Episodes in folders not named after their series: mark their groups with **Ctrl** or **Shift** and in the **Series:** row
+   enter the name, [TMDB] or the **TMDB ID** – all the marked groups get it at once.
 3. Choose the kind, *films* or *series*. For a series, fill in **Series:** and click [TMDB]; for a film, fill in **Film:**. You can also enter the exact title via **TMDB ID**.
-4. Check and accept the suggested names: [Refine the titles], [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
+4. Names are looked up on TMDB by themselves after the analysis; check and accept them: [Accept the suggested titles] or, for the whole group at once, [Accept everything in the group].
 5. In **Group tracks**, set **Language**, **Track name**, **Forced** and the order. The decision applies to all files in the group.
 6. At **Original:**, choose *keep*, *delete automatically*, *delete manually* or *super fast*.
 7. Click [Start]. You can follow the progress in the Job queue too; a prominent bar shows when it has finished.

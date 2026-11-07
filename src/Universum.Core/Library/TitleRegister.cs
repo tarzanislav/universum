@@ -18,6 +18,12 @@ public sealed record RegisteredTitle
 
     public int? TmdbId { get; init; }
 
+    /// <summary>
+    /// Other names the title was known by (owner, 7. 11. 2026): the names its original files and folders carried
+    /// ("Vymyslena Rieka", "Iny nazov") – they make it easier to tell which title a new file is.
+    /// </summary>
+    public List<string> Names { get; init; } = [];
+
     /// <summary>Episodes written ("S01E04", "S01E01-E02"), sorted; empty for a film.</summary>
     public List<string> Episodes { get; init; } = [];
 
@@ -103,7 +109,7 @@ public sealed class TitleRegister
     /// placed – gives its TMDB ID also when the folder's name carries none (owner, 7. 11. 2026: the ID tells a title
     /// apart for sure). True when the register changed.
     /// </summary>
-    public bool Record(string path, TitleInfo? known = null, DateTimeOffset? when = null)
+    public bool Record(string path, TitleInfo? known = null, DateTimeOffset? when = null, string? source = null)
     {
         if (Read(path) is not var (title, episode))
         {
@@ -111,11 +117,12 @@ public sealed class TitleRegister
         }
 
         title = WithId(title, known);
+        var names = source is null ? [] : NamesOf(source, title.Kind);
 
         bool changed;
         lock (_gate)
         {
-            changed = Add(title, episode, Path.GetFullPath(path), when ?? DateTimeOffset.Now);
+            changed = Add(title, episode, Path.GetFullPath(path), when ?? DateTimeOffset.Now, names);
             if (changed)
             {
                 Save();
@@ -182,12 +189,12 @@ public sealed class TitleRegister
         if (Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase))
         {
             var csv = new StringBuilder();
-            csv.AppendLine(CoreText.T("Druh;Názov;Rok;TMDB ID;Priečinok;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"));
+            csv.AppendLine(CoreText.T("Druh;Názov;Rok;TMDB ID;Priečinok;Známe aj ako;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"));
             foreach (var t in titles)
             {
                 csv.AppendLine(string.Join(";",
                     t.Kind == MediaKind.Series ? CoreText.T("seriál") : CoreText.T("film"), Cell(t.Name), t.Year?.ToString(CultureInfo.InvariantCulture) ?? "",
-                    t.TmdbId?.ToString(CultureInfo.InvariantCulture) ?? "", Cell(t.Display), t.Episodes.Count.ToString(CultureInfo.InvariantCulture), Cell(t.Seasons),
+                    t.TmdbId?.ToString(CultureInfo.InvariantCulture) ?? "", Cell(t.Display), Cell(string.Join(" | ", t.Names)), t.Episodes.Count.ToString(CultureInfo.InvariantCulture), Cell(t.Seasons),
                     Cell(string.Join(" ", t.Episodes)), t.Files.ToString(CultureInfo.InvariantCulture),
                     t.First.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), t.Last.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
             }
@@ -214,6 +221,7 @@ public sealed class TitleRegister
                     titles[title.Key] = known with
                     {
                         Episodes = [.. known.Episodes.Union(title.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
+                        Names = Joined(known.Names, title.Names ?? []),
                         Files = Math.Max(known.Files, title.Files),
                         First = known.First < title.First ? known.First : title.First,
                         Last = known.Last > title.Last ? known.Last : title.Last,
@@ -221,7 +229,7 @@ public sealed class TitleRegister
                 }
                 else
                 {
-                    titles[title.Key] = title with { Episodes = [.. title.Episodes.Order(StringComparer.OrdinalIgnoreCase)] };
+                    titles[title.Key] = title with { Episodes = [.. title.Episodes.Order(StringComparer.OrdinalIgnoreCase)], Names = title.Names ?? [] };
                     added++;
                 }
             }
@@ -240,8 +248,43 @@ public sealed class TitleRegister
             ? read with { TmdbId = id }
             : read;
 
+    /// <summary>
+    /// The names an original carried: its file's name and, for an episode, the folder of the series above season
+    /// folders – as read from them ("Vymyslena.Rieka.2023.1080p" → "Vymyslena Rieka").
+    /// </summary>
+    public static IReadOnlyList<string> NamesOf(string source, MediaKind kind)
+    {
+        var names = new List<string>();
+        if (TitleGuess.FromName(Path.GetFileNameWithoutExtension(source), kind) is { } file)
+        {
+            names.Add(file.Name);
+        }
+
+        if (TitleGuess.ForFile(source) is { Kind: var guessed, Title: { } folder } && guessed == kind)
+        {
+            names.Add(folder.Name);
+        }
+
+        return names;
+    }
+
+    // names joined without repeating one (small and capital letters and diacritics alike), at most 20
+    private static List<string> Joined(IEnumerable<string> known, IEnumerable<string> more)
+    {
+        var joined = new List<string>();
+        foreach (var name in known.Concat(more).Select(n => n.Trim()).Where(n => n.Length > 0))
+        {
+            if (joined.Count < 20 && !joined.Any(j => Words.Normalize(j) == Words.Normalize(name)))
+            {
+                joined.Add(name);
+            }
+        }
+
+        return joined;
+    }
+
     // a file once: the same file written again (a revision) changes only the time
-    private bool Add(TitleInfo title, EpisodeNumber? episode, string path, DateTimeOffset when)
+    private bool Add(TitleInfo title, EpisodeNumber? episode, string path, DateTimeOffset when, IReadOnlyList<string>? names = null)
     {
         var titles = Loaded();
         var entry = new RegisteredTitle { Kind = title.Kind, Name = title.Name, Year = title.Year, TmdbId = title.TmdbId, First = when, Last = when };
@@ -255,7 +298,10 @@ public sealed class TitleRegister
         var newFile = _files!.Add(path.ToUpperInvariant());
         var episodes = known?.Episodes ?? [];
         var newEpisode = episode is not null && !episodes.Contains(episode.Tag, StringComparer.OrdinalIgnoreCase);
-        if (known is not null && !newFile && !newEpisode && when <= known.Last)
+        // the library's own name is the title itself, not another name
+        var allNames = Joined(known?.Names ?? [], (names ?? []).Where(n => Words.Normalize(n) != Words.Normalize(title.Name)));
+        var newName = allNames.Count != (known?.Names.Count ?? 0);
+        if (known is not null && !newFile && !newEpisode && !newName && when <= known.Last)
         {
             return false;
         }
@@ -263,6 +309,7 @@ public sealed class TitleRegister
         titles[entry.Key] = (known ?? entry) with
         {
             Episodes = newEpisode ? [.. episodes.Append(episode!.Tag).Order(StringComparer.OrdinalIgnoreCase)] : episodes,
+            Names = allNames,
             Files = (known?.Files ?? 0) + (newFile ? 1 : 0),
             First = known is null || when < known.First ? when : known.First,
             Last = known is null || when > known.Last ? when : known.Last,

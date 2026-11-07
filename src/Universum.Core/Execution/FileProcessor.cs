@@ -214,7 +214,7 @@ public sealed class FileProcessor(
             if (result is { Status: ProcessingStatus.Done, OutputPath: { } written } && placement.FixedName is null)
             {
                 // Spracované tituly (owner, 7. 11. 2026): every film and episode written into a library
-                Register?.Record(written, placement.Title);
+                Register?.Record(written, placement.Title, source: source);
             }
 
             return result;

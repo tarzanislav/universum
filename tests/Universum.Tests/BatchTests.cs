@@ -1323,7 +1323,9 @@ public sealed class BatchTests
         var register = new TitleRegister(Path.Combine(work.Path, "spracovane-tituly.json"));
         Assert.True(register.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 01", "Vymyslený seriál S01E04 - CZ FHD HEVC SMALL.mkv")), "an episode");
         Assert.True(register.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 02", "Vymyslený seriál S02E01-E02 - CZ FHD HEVC SMALL.mkv")), "a double episode");
-        Assert.True(register.Record(Lib("MOVIES", "The Invented River (2023) [tmdbid-123456]", "The Invented River (2023) [tmdbid-123456] - EN FHD H264 BIG.mkv")), "a film");
+        Assert.True(register.Record(Lib("MOVIES", "The Invented River (2023) [tmdbid-123456]", "The Invented River (2023) [tmdbid-123456] - EN FHD H264 BIG.mkv"),
+            source: Path.Combine(work.Path, "ZDROJ", "Vymyslena.Rieka.2023.1080p.WEB.mkv")), "a film");
+        Assert.True(register.Titles.Single(t => t.Kind == MediaKind.Movie).Names is ["Vymyslena Rieka"], "the other name its original carried");
         Assert.True(!register.Record(Path.Combine(work.Path, "ZDROJ", "film.mkv")), "a file outside a library is passed by");
         Assert.True(!register.Record(Path.Combine(root, "TVSHOWS", "Vymyslený seriál (2019)", "Season 01", "Vymyslený seriál S01E04 - CZ FHD HEVC SMALL.mkv"), when: DateTimeOffset.MinValue), "the same file again: no change");
 

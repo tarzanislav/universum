@@ -20,6 +20,9 @@ public sealed class ProcessedTitleRow(RegisteredTitle title)
 
     public string Kind => Title.Kind == MediaKind.Series ? Loc.T("seriál") : Loc.T("film");
 
+    /// <summary>The other names the title was known by (its originals' file and folder names).</summary>
+    public string Names => string.Join(", ", Title.Names);
+
     public string Episodes => Title.Kind == MediaKind.Series ? Loc.F("{0} ({1})", Title.Episodes.Count, Title.Seasons) : "";
 
     public int Files => Title.Files;
@@ -96,7 +99,8 @@ public sealed class ProcessedTitlesPageViewModel : ObservableObject
         var all = _services.TitleRegister.Titles;
         var words = _filter.Trim();
         var shown = all.Where(t => _kind == 0 || (_kind == 1) == (t.Kind == MediaKind.Series))
-            .Where(t => words.Length == 0 || t.Display.Contains(words, StringComparison.CurrentCultureIgnoreCase))
+            .Where(t => words.Length == 0 || t.Display.Contains(words, StringComparison.CurrentCultureIgnoreCase) ||
+                        t.Names.Any(n => n.Contains(words, StringComparison.CurrentCultureIgnoreCase)))
             .ToList();
         Titles.Clear();
         foreach (var title in shown)

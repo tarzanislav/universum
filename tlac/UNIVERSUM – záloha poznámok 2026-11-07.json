@@ -1,0 +1,81 @@
+[
+  {
+    "Id": "70f0751e-22fb-4a27-9a35-36ec9f37e122",
+    "Title": "Kino \u2013 vymyslen\u00FD \u010F\u00E1belsk\u00FD film",
+    "Text": "",
+    "Color": null,
+    "Tags": [
+      "kino"
+    ],
+    "Links": [],
+    "Created": "2026-11-07T09:57:40.5117938+00:00",
+    "Modified": "2026-11-07T09:57:40.5118472+00:00",
+    "Deleted": null,
+    "Time": {
+      "Start": "2026-11-07",
+      "StartTime": "20:00:00",
+      "End": null,
+      "EndTime": null,
+      "Repeat": {
+        "Every": "Week",
+        "Interval": 1,
+        "Days": [],
+        "Until": null,
+        "Count": 3
+      },
+      "ReminderMinutes": 60,
+      "Skipped": []
+    },
+    "Task": null,
+    "Note": null,
+    "Action": null,
+    "Uid": null
+  },
+  {
+    "Id": "5ed1265b-a69d-405b-a704-06dcc56220c1",
+    "Title": "Spracova\u0165 vymyslen\u00FD seri\u00E1l",
+    "Text": "",
+    "Color": null,
+    "Tags": [],
+    "Links": [],
+    "Created": "2026-11-07T09:57:40.5126599+00:00",
+    "Modified": "2026-11-07T09:57:40.512663+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": {
+      "Due": "2026-11-07",
+      "DueTime": null,
+      "State": "Open",
+      "Finished": null,
+      "Priority": 1,
+      "Checklist": [
+        {
+          "Text": "\u0165a\u017Ek\u00FD krok",
+          "Done": true
+        }
+      ]
+    },
+    "Note": null,
+    "Action": null,
+    "Uid": null
+  },
+  {
+    "Id": "7565f54e-23e2-4441-9537-182426888b6d",
+    "Title": "Vymyslen\u00E1 pozn\u00E1mka",
+    "Text": "\u017Dlt\u00FD k\u00F4\u0148 \u00FApel \u010F\u00E1belsk\u00E9 \u00F3dy.",
+    "Color": null,
+    "Tags": [],
+    "Links": [],
+    "Created": "2026-11-07T09:57:40.5135143+00:00",
+    "Modified": "2026-11-07T09:57:40.5135151+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": null,
+    "Note": {
+      "Pinned": false,
+      "Recording": null
+    },
+    "Action": null,
+    "Uid": null
+  }
+]

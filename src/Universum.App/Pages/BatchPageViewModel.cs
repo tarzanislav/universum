@@ -58,6 +58,7 @@ public sealed class BatchPageViewModel : ObservableObject
     private double _progress;
     private bool _busy;
     private bool _running;
+    private bool _stoppedAfterAnalysis;
     private BatchControl? _control;
     private Core.Jobs.BatchJob? _job;
 
@@ -145,6 +146,11 @@ public sealed class BatchPageViewModel : ObservableObject
             Tmdb.Refresh();
             FilmTmdb.Refresh();
             FindMoviesCommand.NotifyCanExecuteChanged();
+            // a key or token added: the names of the analysed films are looked up now (no need to analyse again)
+            if (FindMoviesCommand.CanExecute(null))
+            {
+                _ = FindMoviesAsync(automatic: true);
+            }
         };
         services.LibraryChanged += () =>
         {
@@ -1397,6 +1403,8 @@ public sealed class BatchPageViewModel : ObservableObject
             return;
         }
 
+        _stoppedAfterAnalysis = false;
+
         var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
         if (installation is null)
         {
@@ -1593,14 +1601,15 @@ public sealed class BatchPageViewModel : ObservableObject
             await ReadSubtitlesAsync(again: false);
         }
 
-        // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button
-        if (_analysis is not null && FindMoviesCommand.CanExecute(null))
+        // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button; Zastaviť
+        // stops the steps that follow too
+        if (_analysis is not null && !_stoppedAfterAnalysis && FindMoviesCommand.CanExecute(null))
         {
             await FindMoviesAsync(automatic: true);
         }
 
         // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
-        if (_analysis is { Groups.Count: > 0 } && DetectAudioAfterAnalysis && !Busy)
+        if (_analysis is { Groups.Count: > 0 } && !_stoppedAfterAnalysis && DetectAudioAfterAnalysis && !Busy)
         {
             await DetectAudioAsync(SpeechScope.All, automatic: true);
         }
@@ -3372,6 +3381,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     private void Stop()
     {
+        _stoppedAfterAnalysis = true;
         // an analysis only stops reading (a finished run's control is not touched)
         if (_analysisCancellation is { } analysis)
         {

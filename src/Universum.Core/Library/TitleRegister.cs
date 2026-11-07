@@ -245,21 +245,24 @@ public sealed class TitleRegister
     /// <summary>Merges an exported register (JSON) into this one: episodes joined, the earliest and latest times kept; returns the titles new here.</summary>
     public int Import(string path)
     {
-        var imported = JsonSerializer.Deserialize<Exported>(File.ReadAllText(path), Json)?.Titles ?? [];
+        var imported = (JsonSerializer.Deserialize<Exported>(File.ReadAllText(path), Json)?.Titles ?? []).Where(t => t is not null).Select(Whole).ToList();
         var added = 0;
         lock (_gate)
         {
             var titles = Loaded();
-            foreach (var title in imported.Where(t => t.Name.Length > 0))
+            foreach (var read in imported.Where(t => t.Name.Length > 0))
             {
+                // the same title with an ID here and without one there (or the reverse): one entry
+                var title = Settle(titles, read);
                 if (titles.TryGetValue(title.Key, out var known))
                 {
                     titles[title.Key] = known with
                     {
                         Episodes = [.. known.Episodes.Union(title.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
-                        Names = Joined(known.Names, title.Names ?? []),
+                        Names = Joined(known.Names, title.Names),
                         CzechName = known.CzechName ?? title.CzechName,
                         EnglishName = known.EnglishName ?? title.EnglishName,
+                        // the files of two computers are not the same files: the larger count, never doubled by importing twice
                         Files = Math.Max(known.Files, title.Files),
                         First = known.First < title.First ? known.First : title.First,
                         Last = known.Last > title.Last ? known.Last : title.Last,
@@ -267,7 +270,7 @@ public sealed class TitleRegister
                 }
                 else
                 {
-                    titles[title.Key] = title with { Episodes = [.. title.Episodes.Order(StringComparer.OrdinalIgnoreCase)], Names = title.Names ?? [] };
+                    titles[title.Key] = title with { Episodes = [.. title.Episodes.Order(StringComparer.OrdinalIgnoreCase)] };
                     added++;
                 }
             }
@@ -326,12 +329,7 @@ public sealed class TitleRegister
     {
         var titles = Loaded();
         var entry = new RegisteredTitle { Kind = title.Kind, Name = title.Name, Year = title.Year, TmdbId = title.TmdbId, First = when, Last = when };
-        if (entry.TmdbId is not null && titles.Remove((entry with { TmdbId = null }).Key, out var withoutId))
-        {
-            // the title known so far without its ID now has it: one entry, under the ID
-            titles[entry.Key] = withoutId with { TmdbId = entry.TmdbId };
-        }
-
+        entry = Settle(titles, entry);
         var known = titles.GetValueOrDefault(entry.Key);
         var newFile = _files!.Add(path.ToUpperInvariant());
         var episodes = known?.Episodes ?? [];
@@ -355,6 +353,93 @@ public sealed class TitleRegister
         return true;
     }
 
+    /// <summary>
+    /// One title, one entry (review 7. 11. 2026): a title known without its TMDB ID that arrives with one is joined into
+    /// the entry under the ID (episodes, files, times and names of both kept); a title arriving without an ID goes into
+    /// the entry of the same kind, name and year that has one. Returns the entry as it is to be keyed.
+    /// </summary>
+    private static RegisteredTitle Settle(Dictionary<string, RegisteredTitle> titles, RegisteredTitle entry)
+    {
+        if (entry.TmdbId is null)
+        {
+            var withId = titles.Values.FirstOrDefault(t => t.TmdbId is not null && t.Kind == entry.Kind && t.Year == entry.Year &&
+                                                           string.Equals(t.Name, entry.Name, StringComparison.OrdinalIgnoreCase));
+            return withId is null ? entry : entry with { TmdbId = withId.TmdbId };
+        }
+
+        if (titles.Remove((entry with { TmdbId = null }).Key, out var withoutId))
+        {
+            titles[entry.Key] = titles.TryGetValue(entry.Key, out var already)
+                ? Merge(already, withoutId)
+                : withoutId with { TmdbId = entry.TmdbId };
+        }
+
+        return entry;
+    }
+
+    // two entries of one title joined
+    private static RegisteredTitle Merge(RegisteredTitle a, RegisteredTitle b) => a with
+    {
+        Episodes = [.. a.Episodes.Union(b.Episodes, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
+        Names = Joined(a.Names, b.Names),
+        Files = a.Files + b.Files,
+        First = a.First < b.First ? a.First : b.First,
+        Last = a.Last > b.Last ? a.Last : b.Last,
+        CzechName = a.CzechName ?? b.CzechName,
+        EnglishName = a.EnglishName ?? b.EnglishName,
+    };
+
+    // a title as stored or imported, with nothing missing (null lists or names in a damaged or hand-made file)
+    private static RegisteredTitle Whole(RegisteredTitle title) => title with
+    {
+        Name = title.Name ?? "",
+        Episodes = title.Episodes ?? [],
+        Names = title.Names ?? [],
+    };
+
+    /// <summary>
+    /// A file that left the library again (Vrátiť originály): no longer counted; its episode leaves the title, a title
+    /// without files leaves the register.
+    /// </summary>
+    public void Unrecord(string path)
+    {
+        if (Read(path) is not var (title, episode))
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            var titles = Loaded();
+            if (!_files!.Remove(Path.GetFullPath(path).ToUpperInvariant()))
+            {
+                return;
+            }
+
+            var key = titles.Values.FirstOrDefault(t => t.Kind == title.Kind && t.Year == title.Year && string.Equals(t.Name, title.Name, StringComparison.OrdinalIgnoreCase))?.Key;
+            if (key is not null && titles[key] is var known)
+            {
+                var left = known with
+                {
+                    Files = Math.Max(0, known.Files - 1),
+                    Episodes = episode is null ? known.Episodes : [.. known.Episodes.Where(e => !e.Equals(episode.Tag, StringComparison.OrdinalIgnoreCase))],
+                };
+                if (left.Files == 0)
+                {
+                    titles.Remove(key);
+                }
+                else
+                {
+                    titles[key] = left;
+                }
+            }
+
+            Save();
+        }
+
+        Changed?.Invoke();
+    }
+
     private Dictionary<string, RegisteredTitle> Loaded()
     {
         if (_titles is not null)
@@ -368,12 +453,12 @@ public sealed class TitleRegister
         {
             if (File.Exists(_file) && JsonSerializer.Deserialize<Stored>(File.ReadAllText(_file), Json) is { } stored)
             {
-                foreach (var title in stored.Titles.Where(t => t.Name.Length > 0))
+                foreach (var title in (stored.Titles ?? []).Where(t => t is not null).Select(Whole).Where(t => t.Name.Length > 0))
                 {
                     _titles[title.Key] = title;
                 }
 
-                _files.UnionWith(stored.Files);
+                _files.UnionWith((stored.Files ?? []).Where(f => f is not null));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -404,7 +489,13 @@ public sealed class TitleRegister
         File.Move(temporary, path, overwrite: true);
     }
 
-    private static string Cell(string text) => text.Contains(';') || text.Contains('"') ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
+    // a cell of the CSV: quoted when it holds a separator, a quote or a line break; a text Excel would take for a formula
+    // starts with an apostrophe
+    private static string Cell(string text)
+    {
+        text = text.Length > 0 && "=+-@".Contains(text[0]) ? "'" + text : text;
+        return text.IndexOfAny([';', '"', '\n', '\r']) >= 0 ? "\"" + text.Replace("\"", "\"\"") + "\"" : text;
+    }
 
     private sealed record Stored(List<RegisteredTitle> Titles, List<string> Files);
 

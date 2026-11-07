@@ -16,7 +16,7 @@ public sealed record RememberedSeries(TitleInfo Title, IReadOnlyList<string> Nam
 /// </summary>
 public sealed class SeriesMemory(string file)
 {
-    /// <summary>At most this many series are kept (the longest unused ones go first).</summary>
+    /// <summary>At most this many series, and this many films, are kept (the longest unused ones go first).</summary>
     public const int MaximumSeries = 1000;
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = false };
@@ -69,7 +69,8 @@ public sealed class SeriesMemory(string file)
     public void Remember(TitleInfo series, IEnumerable<string?> names, DateTime nowUtc)
     {
         // owner, 7. 11. 2026: films are remembered too (a TMDB ID typed once is not asked again), each kind apart
-        if (series.Problem is not null)
+        // a film only with its TMDB ID and year (review 7. 11. 2026: a title merely guessed from a file's name is no answer to remember)
+        if (series.Problem is not null || (series.Kind == MediaKind.Movie && (series.TmdbId is null || series.Year is null)))
         {
             return;
         }
@@ -102,10 +103,14 @@ public sealed class SeriesMemory(string file)
 
         list.Add(entry);
         list.RemoveAll(s => s.Names.Count == 0);
-        if (list.Count > MaximumSeries)
+        // at most MaximumSeries of each kind: many films never push the series out
+        foreach (var kind in new[] { MediaKind.Series, MediaKind.Movie })
         {
-            list.Sort((a, b) => b.LastUsedUtc.CompareTo(a.LastUsedUtc));
-            list.RemoveRange(MaximumSeries, list.Count - MaximumSeries);
+            var ofKind = list.Where(s => s.Title.Kind == kind).OrderByDescending(s => s.LastUsedUtc).ToList();
+            foreach (var old in ofKind.Skip(MaximumSeries))
+            {
+                list.Remove(old);
+            }
         }
 
         Save();
@@ -129,7 +134,8 @@ public sealed class SeriesMemory(string file)
 
     private static bool Fits(TitleInfo title, NameGuess name) =>
         name.TmdbId is { } id ? id == title.TmdbId
-        : name.Year is not { } year || title.Year is not { } known || (title.Kind == MediaKind.Movie ? year == known : Math.Abs(year - known) <= 1);
+        : title.Kind == MediaKind.Movie ? name.Year is { } filmYear && filmYear == title.Year // a film's name without its year names no film (remakes)
+        : name.Year is not { } year || title.Year is not { } known || Math.Abs(year - known) <= 1;
 
     private List<RememberedSeries> Loaded()
     {

@@ -1304,6 +1304,11 @@ public sealed class BatchTests
         job = LibraryJob.Guess(new LibraryLayout(output), Synthetic(Path.Combine(work.Path, "Remake"), remake));
         Assert.True(job.ApplyMemory(memory, remake).Count == 0, "another year: no film");
         Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Vymyslena Rieka", 2023, null)]), "films are not series");
+
+        // review 7. 11.: a name without a year names no film; a film without its TMDB ID is not remembered
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Vymyslena Rieka", null, null)], MediaKind.Movie), "no year: no film");
+        memory.Remember(new TitleInfo(MediaKind.Movie, "Hadany film", 2020), ["Hadany film"], DateTime.UtcNow);
+        Assert.Equal<TitleInfo?>(null, memory.Find([new NameGuess("Hadany film", 2020, null)], MediaKind.Movie), "a guessed film without an ID is not remembered");
     }
 
     [Test]
@@ -1352,14 +1357,25 @@ public sealed class BatchTests
         Assert.True(File.ReadAllText(csv).Contains("Vymyslený seriál (2019)", StringComparison.Ordinal) && File.ReadAllBytes(csv)[0] == 0xEF, "CSV for Excel (UTF-8 with its mark)");
         var other = new TitleRegister(Path.Combine(work.Path, "iny.json"));
         other.Record(Lib("TVSHOWS", "Vymyslený seriál (2019)", "Season 03", "Vymyslený seriál S03E01 - CZ FHD HEVC SMALL.mkv"));
-        Assert.Equal(2, other.Import(json), "the film and the series by its ID are new");
-        Assert.True(other.Titles.Count(t => t.Kind == MediaKind.Series) == 2, "the series without the ID stays apart until a file of it is written with the ID");
+        Assert.Equal(1, other.Import(json), "the film is new; the series (here without its ID, there with it) is joined");
+        Assert.True(other.Titles.Single(t => t.Kind == MediaKind.Series) is { TmdbId: 654321 } joinedSeries &&
+                    joinedSeries.Episodes.SequenceEqual(["S01E04", "S02E01-E02", "S02E03", "S03E01"]), "one series with all its episodes and its ID");
         Assert.Equal(0, other.Import(json), "imported again: nothing new");
+
+        // review 7. 11.: the same title first without its ID, then with it – one entry with everything of both
+        var joined = new TitleRegister(Path.Combine(work.Path, "joined.json"));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E01 - CZ HD H264 SMALL.mkv"));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E02 - CZ HD H264 SMALL.mkv"), new TitleInfo(MediaKind.Series, "Iný vymyslený seriál", 2020, 777));
+        joined.Record(Lib("TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E03 - CZ HD H264 SMALL.mkv"));
+        Assert.True(joined.Titles is [{ TmdbId: 777, Files: 3, Episodes.Count: 3 }], "one entry under the ID – " + string.Join(" | ", joined.Titles.Select(t => $"{t.Display} {t.Files}")));
+        joined.Unrecord(Path.Combine(root, "TVSHOWS", "Iný vymyslený seriál (2020)", "Season 01", "Iný vymyslený seriál S01E03 - CZ HD H264 SMALL.mkv"));
+        Assert.True(joined.Titles is [{ Files: 2, Episodes.Count: 2 }], "a file put back (Vrátiť originály) leaves the register");
 
         // read from the output folders: what is there and not yet known
         var scanned = new TitleRegister(Path.Combine(work.Path, "scan.json"));
-        Assert.Equal(5, scanned.Scan(new LibraryLayout(root).ResultFolders, t => t.Kind == MediaKind.Series ? t with { TmdbId = 654321 } : null), "five files in the library");
-        Assert.True(scanned.Titles is [{ TmdbId: 123456 }, { TmdbId: 654321, Episodes.Count: 4 }], "one film and one series (four episodes), both with their IDs");
+        Assert.Equal(8, scanned.Scan(new LibraryLayout(root).ResultFolders, t => t.Kind == MediaKind.Series && t.Year == 2019 ? t with { TmdbId = 654321 } : null), "eight files in the library");
+        Assert.True(scanned.Titles.Count == 3 && scanned.Titles.Single(t => t.Name == "The Invented River").TmdbId == 123456 &&
+                    scanned.Titles.Single(t => t.Name == "Vymyslený seriál") is { TmdbId: 654321, Episodes.Count: 4 }, "a film and two series, the IDs as known");
     }
 
     private static BatchAnalysis Synthetic(string folder, params string[] paths)

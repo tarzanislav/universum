@@ -353,6 +353,12 @@ public sealed class FileProcessor(
 
         if (problems.Count == 0)
         {
+            // the file left the library (Vrátiť originály): it is no title written there any more
+            if (back is not null && !Paths.Same(finalPath, path))
+            {
+                Register?.Unrecord(path);
+            }
+
             TryDelete(undoRecordPath);
             TryDelete(record.TagsXmlPath);
             TryDelete(record.ChaptersXmlPath);

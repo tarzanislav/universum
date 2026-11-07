@@ -36,6 +36,8 @@ internal static class SelfTest
         // the tracks arranged at once after a change (the pause the user gets is tried in Zlučovanie on its own)
         ArrangeLater.Delay = TimeSpan.Zero;
         Environment.SetEnvironmentVariable("UNIVERSUM_SETTINGS_DIR", Path.Combine(_outputDirectory, "settings"));
+        // the language of audio is heard after an analysis only where a test asks for it (it is tried on its own)
+        services.Settings.BatchDetectAudio = false;
 
         MkvToolNixInstallation? installation = null;
         await Step("MKVToolNix", async () => installation = await TestMkvToolNixAsync(services));
@@ -3328,11 +3330,13 @@ internal static class SelfTest
             Directory.CreateDirectory(speech);
             File.Copy(Path.Combine(media, "speech-und.mkv"), Path.Combine(speech, "Zlatý kapor 2021 WEB-DL CZ 1080p.mkv"), overwrite: true);
             batch.Folder = speech;
-            await batch.AnalyzeAsync();
-            Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
-            Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition offered for audio without a language");
+            // owner, 7. 11. 2026: heard right after Analyzovať – no button needed (Rozpoznať jazyk audiostôp stays)
+            batch.DetectAudioAfterAnalysis = true;
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            await batch.DetectAudioCommand.ExecuteAsync(null);
+            await batch.AnalyzeAsync();
+            batch.DetectAudioAfterAnalysis = false;
+            Check(batch.Groups.Count == 1 && batch.Groups[0].Title == "Zlatý kapor", "batch: the group is named by its film – " + batch.Groups.FirstOrDefault()?.Title);
+            Check(batch.DetectAudioCommand.CanExecute(null), "batch: speech recognition still offered by hand");
             var audio = batch.SlotRows.Where(s => s.Key.Type == TrackType.Audio).ToList();
             Write($"speech ({watch.Elapsed.TotalSeconds:0.0} s): {batch.RunState} | " + string.Join(" | ", audio.Select(a => $"{a.Slot}: {a.Suggested} – {a.Evidence}")));
             Check(audio.Count == 3 && audio.All(a => a.HasSuggestion), "batch: the language of the three audio tracks is suggested from the speech – " + batch.RunState);

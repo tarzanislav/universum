@@ -1018,6 +1018,9 @@ public sealed class AppSettings
 
     public bool BatchRecursive { get; set; } = true;
 
+    /// <summary>Hromadné spracovanie: the language of audio tracks without one is heard right after the analysis (owner, 7. 11. 2026).</summary>
+    public bool BatchDetectAudio { get; set; } = true;
+
     /// <summary>Multiplexer: what to do with several added files without asking (null = ask).</summary>
     public string? MuxAddAction { get; set; }
 

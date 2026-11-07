@@ -3140,6 +3140,8 @@ internal static class Translations
         ["+ {0} ďalších seriálov"] = "+ {0} dalších seriálů",
         ["Ďalšie seriály v tejto dávke – každá epizóda ide do priečinka svojho seriálu (stĺpec Cieľ v knižnici):"] = "Další seriály v této dávce – každá epizoda jde do adresáře svého seriálu (sloupec Cíl v knihovně):",
         ["Druh;Názov;Rok;TMDB ID;Priečinok;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"] = "Druh;Název;Rok;TMDB ID;Adresář;Epizody (počet);Série;Epizody;Soubory;První zpracování;Poslední zpracování",
+        ["rozpoznať jazyk zvuku"] = "rozpoznat jazyk zvuku",
+        ["Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva"] = "Hned po analýze poslechne audiostopy bez jazyka (seriál přes jednu epizodu); ruční Rozpoznat jazyk audiostop zůstává",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6276,5 +6278,7 @@ internal static class Translations
         ["+ {0} ďalších seriálov"] = "+ {0} more series",
         ["Ďalšie seriály v tejto dávke – každá epizóda ide do priečinka svojho seriálu (stĺpec Cieľ v knižnici):"] = "Further series in this batch – each episode goes into its own series' folder (column Target in library):",
         ["Druh;Názov;Rok;TMDB ID;Priečinok;Epizódy (počet);Série;Epizódy;Súbory;Prvé spracovanie;Posledné spracovanie"] = "Kind;Name;Year;TMDB ID;Folder;Episodes (count);Seasons;Episodes;Files;First processed;Last processed",
+        ["rozpoznať jazyk zvuku"] = "detect audio language",
+        ["Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva"] = "Right after the analysis, listens to audio tracks without a language (a series through one episode); the manual Detect audio language stays",
     };
 }

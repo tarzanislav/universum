@@ -75,7 +75,7 @@ public sealed class BatchPageViewModel : ObservableObject
         DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
         DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
         UndoMovedCommand = new AsyncRelayCommand(UndoMovedAsync, () => !Busy && !_running && MovedOriginals().Count > 0);
-        DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All), () => !Busy && _analysis is { Groups.Count: > 0 });
+        DetectAudioAllCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.All, automatic: false), () => !Busy && _analysis is { Groups.Count: > 0 });
         EditTemplateCommand = new RelayCommand(EditTemplate, () => !Busy);
         TemplateFromGroupCommand = new RelayCommand(TemplateFromGroup, () => !Busy && SelectedGroup is not null);
         LoadTemplateCommand = new RelayCommand(LoadTemplate, () => !Busy);
@@ -704,6 +704,21 @@ public sealed class BatchPageViewModel : ObservableObject
         set
         {
             _services.Settings.BatchRecursive = value;
+            _services.Settings.Save();
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Owner, 7. 11. 2026: the audio tracks without a language are heard right after Analyzovať (a series through one
+    /// episode); Rozpoznať jazyk audiostôp stays for any track by hand.
+    /// </summary>
+    public bool DetectAudioAfterAnalysis
+    {
+        get => _services.Settings.BatchDetectAudio;
+        set
+        {
+            _services.Settings.BatchDetectAudio = value;
             _services.Settings.Save();
             OnPropertyChanged();
         }
@@ -1582,6 +1597,12 @@ public sealed class BatchPageViewModel : ObservableObject
         if (_analysis is not null && FindMoviesCommand.CanExecute(null))
         {
             await FindMoviesAsync(automatic: true);
+        }
+
+        // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
+        if (_analysis is { Groups.Count: > 0 } && DetectAudioAfterAnalysis && !Busy)
+        {
+            await DetectAudioAsync(SpeechScope.All, automatic: true);
         }
     }
 
@@ -2671,7 +2692,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
     // the speech of the audio tracks without a language: pieces from several places of each film vote; every result is
     // a suggestion with what to check (owner, 28. 10.: the films of a group each on their own, or only chosen films)
-    private async Task DetectAudioAsync(SpeechScope scope)
+    private async Task DetectAudioAsync(SpeechScope scope, bool automatic = false)
     {
         if (_analysis is null)
         {
@@ -2686,6 +2707,11 @@ public sealed class BatchPageViewModel : ObservableObject
             SpeechScope.All => SpeechTargets.ForGroups(_analysis.Groups, series),
             _ => (Array.Empty<SpeechTarget>(), 0),
         };
+        if (automatic && targets.Count == 0)
+        {
+            // after the analysis: every audio track has its language – the summary of the analysis stays
+            return;
+        }
 
         Busy = true;
         var cancellation = _speechCancellation = new CancellationTokenSource();

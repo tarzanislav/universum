@@ -2479,6 +2479,8 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                         <CheckBox Content="{loc:T 'aj podpriečinky'}" IsChecked="{Binding Recursive}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <CheckBox Content="{loc:T 'rozpoznať jazyk zvuku'}" IsChecked="{Binding DetectAudioAfterAnalysis}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                  ToolTip="{loc:T 'Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva'}" />
                         <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseFolderCommand}" Margin="0,0,8,0" Padding="12,5" />
                         <Button Content="{loc:T 'Analyzovať'}" Command="{Binding AnalyzeCommand}" Padding="16,5" />
                         <Button Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0"

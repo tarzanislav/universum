@@ -1863,7 +1863,7 @@ internal static class SelfTest
         Check(notes.EditorWidth > widthBefore || widthBefore >= 820, $"notes: the note opened wider – {widthBefore} → {notes.EditorWidth}");
         services.Settings.NotesEditorWidth = widthBefore;
         ((AgendaEditor)notes.Editor!).CancelCommand.Execute(null);
-        services.Agenda.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená široká poznámka", Text = string.Join('\n', Enumerable.Range(1, 20).Select(n => $"riadok {n}")), Note = new Core.Agenda.AgendaNote() });
+        services.Agenda.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená široká poznámka", Text = string.Join('\n', Enumerable.Range(1, 20).Select(n => $"https://video.example/vymyslene-video-{n}")), Note = new Core.Agenda.AgendaNote() });
         var plain = notes.Cards.Single(c => c.Title == "Vymyslená široká poznámka");
         plain.WidenCommand!.Execute(null);
         var wide = notes.Cards.Single(c => c.Title == "Vymyslená široká poznámka");

@@ -97,6 +97,15 @@ public sealed class Mp4Tests
             Assert.True(File.ReadAllBytes(path).SequenceEqual(rewritten), "and the file is not touched");
             File.WriteAllBytes(path, [.. edited2, 0, 0, 0, 8, (byte)'f', (byte)'r', (byte)'e', (byte)'e']);
             Assert.Throws<Mp4UndoRefusedException>(() => Mp4HeaderEditor.Undo(path, undoAgain), "something written after UNIVERSUM's movie box");
+
+            // the edit stopped while the new movie box was being written (a full disk, a crash): the unfinished tail is cut
+            var newMovie = Mp4HeaderEditor.NewMovie(Mp4Reader.Read(new MemoryStream(before)), change);
+            foreach (var written in new[] { newMovie.Length / 2, 5 })
+            {
+                File.WriteAllBytes(path, [.. before, .. newMovie.AsSpan(0, written).ToArray()]);
+                Mp4HeaderEditor.Undo(path, undoAgain);
+                Assert.True(File.ReadAllBytes(path).SequenceEqual(before), $"{written} bytes of the new movie box: cut away, the file as it was");
+            }
         }
         finally
         {
@@ -267,6 +276,22 @@ public sealed class Mp4Tests
             var odd = "(" + new string('x', 39);
             (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null, new Mp4Change([new Mp4TrackChange(3) { Name = odd }]), runner, probe, null, "0.0.0");
             Assert.True(problems.Count == 0 && Mp4Reader.Read(path).Tracks[2].HandlerName == odd, "the name as it is – " + string.Join("; ", problems));
+
+            // an iTunes title in a 'meta' right in 'moov' (no 'udta'): removed, and a new one kept in 'udta'
+            var withTitle = File.ReadAllBytes(path);
+            File.WriteAllBytes(path, withTitle);
+            Mp4HeaderEditor.Apply(path, new Mp4Change([], "Vymyslený starý titul"));
+            var titledFile = Mp4Reader.Read(path);
+            var metaBox = titledFile.Movie.Find("udta")!.Children.First(c => c.Type == "meta");
+            var metaBytes = File.ReadAllBytes(path).AsSpan((int)metaBox.Start, (int)metaBox.Size).ToArray();
+            var fresh = File.ReadAllBytes(Copy("en-cz.mp4"));
+            File.WriteAllBytes(path, WithMovieUserData(fresh, metaBytes));
+            Assert.True(Mp4Reader.Read(path) is { Title: "Vymyslený starý titul" } read && read.Movie.Find("udta") is null, "the title in 'moov/meta'");
+            (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null, new Mp4Change([], ""), runner, probe, null, "0.0.0");
+            Assert.True(problems.Count == 0 && Mp4Reader.Read(path).Title is null, "removed – " + string.Join("; ", problems));
+            File.WriteAllBytes(path, WithMovieUserData(fresh, metaBytes));
+            (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null, new Mp4Change([], "Vymyslený nový titul"), runner, probe, null, "0.0.0");
+            Assert.True(problems.Count == 0 && Mp4Reader.Read(path).Title == "Vymyslený nový titul", "replaced – " + string.Join("; ", problems));
 
             // an iTunes 'meta' without a list: the title goes into it, not into a second 'meta'
             var mdir = Box("meta", [0, 0, 0, 0, .. Box("hdlr", [.. new byte[8], .. "mdirappl"u8.ToArray(), .. new byte[9]])]);

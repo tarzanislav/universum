@@ -341,6 +341,22 @@ public sealed class ProcessorTests
     }
 
     [Test]
+    public async Task RolesOfAnMp4KeptInTheMkv()
+    {
+        // owner, 8. 11. 2026 (review): the roles of an MP4's tracks (mkvmerge does not read them) written into the MKV
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var file = work.Copy("en-cz.mp4", "vymysleny-film-s-titulkami-pre-nepocujucich.mp4");
+        Universum.Core.Mp4.Mp4HeaderEditor.Apply(file, new Universum.Core.Mp4.Mp4Change([new Universum.Core.Mp4.Mp4TrackChange(4) { Roles = [Universum.Core.Mp4.Mp4Roles.Caption] }]));
+        var source = await inspector.InspectAsync(file);
+        Assert.True(source.Tracks.Single(t => t.Type == TrackType.Subtitles).Flags.HearingImpaired, "read from the MP4");
+        var plan = EditPlan.For(UniversumRules.Apply(source));
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.True(result.Status == ProcessingStatus.Done && result.OutputPath!.EndsWith(".mkv", StringComparison.Ordinal), "an MKV – " + string.Join("; ", result.Messages));
+        Assert.True((await inspector.InspectAsync(result.OutputPath!)).Tracks.Single(t => t.Type == TrackType.Subtitles).Flags.HearingImpaired, "for the hearing impaired in the MKV too");
+    }
+
+    [Test]
     public async Task Mp4UniversumCannotEditBecomesMkv()
     {
         // owner, 8. 11. 2026 (review): an MP4 UNIVERSUM would refuse to edit (fragmented, not ending with a whole box) is

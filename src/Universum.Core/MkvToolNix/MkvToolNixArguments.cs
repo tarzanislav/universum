@@ -99,7 +99,9 @@ public static class MkvToolNixArguments
 
         foreach (var track in target.Tracks.Where(t => !t.IsAdded))
         {
-            AddTrackOptions(arguments, track, track.TrackId.ToString(CultureInfo.InvariantCulture), track.LanguageChanged, track.OtherFlagsChanged);
+            // the roles of an MP4's tracks (hearing impaired, commentary …) come from UNIVERSUM's reading, not from mkvmerge:
+            // written always, or they would be lost (8. 11. 2026)
+            AddTrackOptions(arguments, track, track.TrackId.ToString(CultureInfo.InvariantCulture), track.LanguageChanged, track.OtherFlagsChanged || target.Source.IsMp4);
         }
 
         if (target.ChaptersChanged)

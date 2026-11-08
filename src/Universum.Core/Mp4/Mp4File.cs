@@ -171,10 +171,16 @@ public sealed class Mp4Track
     /// The name players show: 'udta/name', else the handler's name unless it is only the program's usual one
     /// ("SoundHandler", "Core Media Audio", "GPAC ISO Audio Handler" …); null when there is none.
     /// </summary>
-    public string? DisplayName => Name is { Length: > 0 } name ? name
-        : HandlerName.Length == 0 || HandlerName.Contains("Handler", StringComparison.OrdinalIgnoreCase) || HandlerName.StartsWith("Core Media", StringComparison.Ordinal) ||
-          HandlerName.Contains("Media Handler", StringComparison.OrdinalIgnoreCase) || HandlerName.StartsWith("ISO Media", StringComparison.OrdinalIgnoreCase) ? null
-        : HandlerName;
+    public string? DisplayName => Name is { Length: > 0 } name ? name : IsUsualHandlerName(HandlerName.TrimStart(Controls)) ? null : HandlerName.TrimStart(Controls);
+
+    // the names programs give every handler ("SoundHandler", Android's "SoundHandle", "Core Media Audio", "GPAC ISO Audio
+    // Handler", "ISO Media file produced by …"); a name written as a length and the text in an ISO file keeps its length
+    // byte when read as FFmpeg reads it – it is not part of the name
+    private static readonly char[] Controls = [.. Enumerable.Range(0, 32).Select(c => (char)c)];
+
+    private static bool IsUsualHandlerName(string name) =>
+        name.Length == 0 || name.Contains("Handle", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Core Media", StringComparison.Ordinal) ||
+        name.StartsWith("ISO Media", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The track's references to other tracks ('tref'): the type ("chap", "forc" …) and the IDs.</summary>
     public IReadOnlyList<(string Type, IReadOnlyList<int> Ids)> References { get; private init; } = [];

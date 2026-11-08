@@ -137,6 +137,7 @@ public static class Mp4HeaderEditor
 
         var movie = NewMovie(file, change);
         var undo = new Mp4Undo(file.Length, file.Movie.Start, file.Movie.Size);
+        EnsureSpace(path, movie.Length);
 
         // 1. the new movie after everything (the old one still counts – the file is whole all the time)
         stream.Position = file.Length;
@@ -175,6 +176,16 @@ public static class Mp4HeaderEditor
             throw new Mp4UndoRefusedException($"the file is {length} bytes, not longer than the {undo.Length} it had before the edit");
         }
 
+        // the edit stopped while the new movie box was being written (a full disk, a crash): the old one still counts – the
+        // unfinished tail is cut away
+        if (BoxAt(stream, undo.MovieStart) is ("moov", var stillThere) && (undo.MovieSize is null || stillThere == undo.MovieSize) &&
+            (length - undo.Length < 8 || BoxAt(stream, undo.Length) is ("moov", var claimed) && claimed > length - undo.Length))
+        {
+            stream.SetLength(undo.Length);
+            stream.Flush(flushToDisk: true);
+            return;
+        }
+
         if (BoxAt(stream, undo.Length) is not ("moov", var newSize) || newSize != length - undo.Length)
         {
             throw new Mp4UndoRefusedException("the movie box UNIVERSUM wrote is not at the end of the file any more");
@@ -191,6 +202,22 @@ public static class Mp4HeaderEditor
         stream.Flush(flushToDisk: true);
         stream.SetLength(undo.Length);
         stream.Flush(flushToDisk: true);
+    }
+
+    // room on the disk for the new movie box (and a little more): not started without it
+    private static void EnsureSpace(string path, long bytes)
+    {
+        try
+        {
+            if (Path.GetPathRoot(Path.GetFullPath(path)) is { Length: > 0 } root && new DriveInfo(root).AvailableFreeSpace < bytes + (16L << 20))
+            {
+                throw new IOException($"not enough free space on {root} for the new movie box ({bytes} bytes)");
+            }
+        }
+        catch (ArgumentException)
+        {
+            // no drive information (some network paths): the write itself reports a full disk
+        }
     }
 
     // the type and size of the box that begins at a place (a 64-bit size read on); null when there is none
@@ -239,7 +266,7 @@ public static class Mp4HeaderEditor
             {
                 if (child.Type != "trak")
                 {
-                    yield return Part.Of(child, change.Title is null ? NoChange : child.Type == "udta" ? TitleChildren : child.Type == "meta" ? KeyedTitle : NoChange);
+                    yield return Part.Of(child, change.Title is null ? NoChange : child.Type == "udta" ? TitleChildren : child.Type == "meta" ? MovieMeta : NoChange);
                 }
                 else if (!removed.Contains(child))
                 {
@@ -494,6 +521,13 @@ public static class Mp4HeaderEditor
                 yield return Part.New(Title(title));
             }
         }
+
+        // a 'meta' right in 'moov': keyed metadata get the title (or lose it); an iTunes list there loses its title – the
+        // title is kept in 'udta' (where UNIVERSUM reads it first)
+        private IEnumerable<Part> MovieMeta(Mp4Box meta) =>
+            file.MetaHandler(meta) == "mdta"
+                ? KeyedTitle(meta)
+                : meta.Children.Select(c => c.Type == "ilst" ? Part.Of(c, ilst => ListChildren(ilst, "")) : Part.Of(c, null));
 
         // QuickTime's keyed metadata ('mdta'): the item of the title key replaced by the new title, or removed for ""; a
         // title is not added where there was none (the key list stays as it is)

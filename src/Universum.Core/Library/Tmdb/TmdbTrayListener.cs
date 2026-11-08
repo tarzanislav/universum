@@ -128,7 +128,16 @@ public sealed class TmdbTrayListener : IDisposable
             return (422, "text/plain", "");
         }
 
-        await _received(entry).ConfigureAwait(false);
+        try
+        {
+            await _received(entry).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // the tray could not be stored (the disk is full …): the script shows the refusal on its button
+            return (500, "text/plain", "");
+        }
+
         return (204, "text/plain", "");
     }
 
@@ -217,6 +226,7 @@ public sealed class TmdbTrayListener : IDisposable
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
+        500 => "Internal Server Error",
         _ => "Unprocessable Content",
     };
 

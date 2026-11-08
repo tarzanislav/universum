@@ -57,9 +57,9 @@ Settings is one long page of blocks – scroll down.
 ![Settings](settings.jpg)
 - **Folders on the disks** – one table, a row for every disk: **Input (source)** – new films and episodes come here,
   UNIVERSUM **only reads** them – and **Output (library)** with MOVIES, TVSHOWS and POSTER (another library for Jellyfin each).
-  [+ Input folder…] and [+ Output folder…] add a folder, the [**…**] button in a row changes it, [Create an output]
-  makes the output beside the input (e.g. *D:\\UNIVERSUM\\VYSTUP*), [★ Main] sets the output for files from disks without one,
-  [Remove the disk] stops using it. A disk has one input and one output; an input is never an output – an output holding
+  Every disk has **a block of its own** (DISK E:, DISK D: …) with its input and output one under the other and a sentence where
+  its films go. [Change…] by the input or output changes it, [★ Make it the main one] sets the output for films from disks
+  without one, [Remove the disk] stops using it; [+ Add a disk…] adds the input of another disk. [Create an output] makes the output beside the input (e.g. *D:\\UNIVERSUM\\VYSTUP*). A disk has one input and one output; an input is never an output – an output holding
   films shows [It is a source – move it to Input]. Nothing in the folders is **ever deleted**.
   A file is written **on the disk it lies on** – no copying; a file with no change of content is only **moved** with “delete originals”.
   **On how many disks at once** – the disks work at the same time, one file on each (two on SSD/NVMe); re-encoding runs one

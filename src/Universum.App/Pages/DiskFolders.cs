@@ -30,6 +30,25 @@ public sealed class DiskFolderView(DiskFolderRow row, DiskFolders owner)
 
     public bool IsMain => Row.IsMain;
 
+    /// <summary>"DISK E:" – the title of the block of the disk.</summary>
+    public string DiskTitle => Loc.F("DISK {0}", Disk);
+
+    /// <summary>"★ hlavný" for the disk of the default output.</summary>
+    public string MainCaption => Row.IsMain ? "  ★ " + Loc.T("hlavný disk") : "";
+
+    /// <summary>
+    /// Where the films of this disk go, in one sentence (owner, 8. 11. 2026: "nikto nedokáže určiť, ktorý vstupný patrí
+    /// kam"): "Filmy z D:\UNIVERSUM\ZDROJ sa zapíšu do D:\UNIVERSUM\VYSTUP."
+    /// </summary>
+    public string Flow => (Row.Input, Row.Output) switch
+    {
+        ({ } input, { } output) => Loc.F("Filmy z {0} sa zapíšu do {1}.", input, output),
+        ({ } input, null) => Loc.F("Disk nemá vlastný výstup – filmy z {0} sa skopírujú do hlavného výstupu {1} na inom disku.", input, owner.MainOutput ?? "?"),
+        (null, { }) when Row.IsMain => "",
+        (null, { } output) => Loc.F("Disk nemá vstup – do {0} sa zapíšu filmy, ktoré ležia na tomto disku.", output),
+        _ => "",
+    } + (Row.IsMain && Row.Output is not null ? (Row.Input is null ? "" : " ") + Loc.T("Sem idú aj filmy z diskov bez vlastného výstupu.") : "");
+
     public bool CanMakeMain => !Row.IsMain && Row.Output is not null;
 
     /// <summary>A disk with films but no output: they would be copied to another disk.</summary>
@@ -106,8 +125,30 @@ public sealed class DiskFolders : CommunityToolkit.Mvvm.ComponentModel.Observabl
 
     public bool IsEmpty => Rows.Count == 0;
 
-    /// <summary>What happened (shown under the table).</summary>
-    public string Message { get => _message; private set => SetProperty(ref _message, value); }
+    /// <summary>The default output folder (★).</summary>
+    public string? MainOutput => _services.Settings.OutputDirectory;
+
+    /// <summary>What happened (shown under the table; it goes after a few seconds – owner, 8. 11. 2026).</summary>
+    public string Message
+    {
+        get => _message;
+        private set
+        {
+            if (SetProperty(ref _message, value) && value.Length > 0 && System.Windows.Application.Current?.Dispatcher is { } dispatcher)
+            {
+                var shown = value;
+                var timer = new System.Windows.Threading.DispatcherTimer(TimeSpan.FromSeconds(12), System.Windows.Threading.DispatcherPriority.Background, (sender, _) =>
+                {
+                    ((System.Windows.Threading.DispatcherTimer)sender!).Stop();
+                    if (_message == shown)
+                    {
+                        Message = "";
+                    }
+                }, dispatcher);
+                timer.Start();
+            }
+        }
+    }
 
     public RelayCommand AddInputCommand { get; }
 
@@ -142,11 +183,6 @@ public sealed class DiskFolders : CommunityToolkit.Mvvm.ComponentModel.Observabl
         if (row.ExtraInputs.Count > 0)
         {
             parts.Add(Loc.F("Na disku je viac vstupných priečinkov – ukazuje sa {0}; navyše: {1}.", row.Input ?? "", string.Join(", ", row.ExtraInputs)));
-        }
-
-        if (row.Input is not null && row.Output is null)
-        {
-            parts.Add(Loc.F("Disk nemá výstup – súbory z neho sa skopírujú na disk {0}.", _services.Library is { } main ? Path.GetPathRoot(main.Root)?.TrimEnd('\\') ?? "" : "?"));
         }
 
         return string.Join(" ", parts);

@@ -57,6 +57,7 @@ Nastavenia sú jedna dlhá stránka s blokmi – posúvajte ju nadol.
 ![Nastavenia](settings.jpg)
 - **Výstupný priečinok (knižnica)** – [Priečinok…] vyberie knižnicu. Filmy idú do *MOVIES\\Názov (rok)*, seriály do
   *TVSHOWS\\Názov (rok)\\Season 01*. Priečinky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
+  Priečinok na inom disku UNIVERSUM ponúkne **pridať ako ďalší výstup**; predvolený nahradí len po otázke. Vstupný priečinok ani priečinok s filmami (zdroj) výstupom nebude.
 - **Výstupné priečinky na ďalších diskoch** – [Pridať…] pridá výstupný priečinok na inom disku alebo diskovom poli (vlastné
   MOVIES a TVSHOWS, pre Jellyfin ďalšia knižnica). Súbor sa zapíše **na disk, kde leží** – bez kopírovania medzi diskami;
   súbor bez zmeny obsahu sa pri „zmazať originály“ len **presunie** (hneď). **Na koľkých diskoch naraz** – disky pracujú

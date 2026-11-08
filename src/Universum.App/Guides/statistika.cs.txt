@@ -57,6 +57,7 @@ Nastavení je jedna dlouhá stránka s bloky – posouvejte ji dolů.
 ![Nastavení](settings.jpg)
 - **Výstupní složka (knihovna)** – [Složka…] vybere knihovnu. Filmy jdou do *MOVIES\\Název (rok)*, seriály do
   *TVSHOWS\\Název (rok)\\Season 01*. Složky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
+  Složku na jiném disku UNIVERSUM nabídne **přidat jako další výstup**; výchozí nahradí jen po dotazu. Vstupní složka ani složka s filmy (zdroj) výstupem nebude.
 - **Výstupní složky na dalších discích** – [Přidat…] přidá výstupní složku na jiném disku nebo diskovém poli (vlastní
   MOVIES a TVSHOWS, pro Jellyfin další knihovna). Soubor se zapíše **na disk, kde leží** – bez kopírování mezi disky;
   soubor beze změny obsahu se při „smazat originály“ jen **přesune** (hned). **Na kolika discích najednou** – disky pracují

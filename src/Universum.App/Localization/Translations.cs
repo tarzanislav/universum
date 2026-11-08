@@ -3279,6 +3279,16 @@ internal static class Translations
         ["＋ plagát do UNIVERSUM"] = "＋ plakát do UNIVERSUM",
         ["✓ plagát poslaný"] = "✓ plakát poslán",
         ["posielam…"] = "posílám…",
+        ["Disk {0} nemá vlastný výstupný priečinok – súbory sa skopírujú do {1} na inom disku. Výstup na tomto disku pridáte v Nastaveniach (Výstupné priečinky na ďalších diskoch → Pridať…)."] = "Disk {0} nemá vlastní výstupní složku – soubory se zkopírují do {1} na jiném disku. Výstup na tomto disku přidáte v Nastavení (Výstupní složky na dalších discích → Přidat…).",
+        ["V priečinku {0} sú filmy alebo seriály mimo MOVIES a TVSHOWS – vyzerá ako zdrojový priečinok, nie ako výstup.\n\nNaozaj ho použiť ako výstupný priečinok?"] = "Ve složce {0} jsou filmy nebo seriály mimo MOVIES a TVSHOWS – vypadá jako zdrojová složka, ne jako výstup.\n\nOpravdu ji použít jako výstupní složku?",
+        ["Výstupný priečinok sa nezmenil."] = "Výstupní složka se nezměnila.",
+        ["{0} je na inom disku ako predvolený výstupný priečinok {1}.\n\nÁno – pridať ho ako výstup na ďalšom disku (odporúčané; {1} ostane predvolený).\nNie – nahradiť ním predvolený výstupný priečinok.\nZrušiť – nič nemeniť."] = "{0} je na jiném disku než výchozí výstupní složka {1}.\n\nAno – přidat ji jako výstup na dalším disku (doporučeno; {1} zůstane výchozí).\nNe – nahradit jí výchozí výstupní složku.\nZrušit – nic neměnit.",
+        ["Nahradiť predvolený výstupný priečinok {0} priečinkom {1}?\n\nV {0} sa nič nezmení ani nezmaže – UNIVERSUM ho len prestane používať."] = "Nahradit výchozí výstupní složku {0} složkou {1}?\n\nV {0} se nic nezmění ani nesmaže – UNIVERSUM ji jen přestane používat.",
+        ["Výstupný priečinok: {0}"] = "Výstupní složka: {0}",
+        ["Predvolený výstupný priečinok je teraz {0} (predtým {1} – v ňom sa nič nezmenilo)."] = "Výchozí výstupní složka je teď {0} (předtím {1} – v ní se nic nezměnilo).",
+        ["Výstup na tom istom disku sa už nepoužíva: {0}."] = "Výstup na stejném disku se už nepoužívá: {0}.",
+        ["Na jednom disku je viac výstupných priečinkov ({0}) – súbory z neho pôjdu len do jedného. Odoberte ten, ktorý je navyše."] = "Na jednom disku je více výstupních složek ({0}) – soubory z něj půjdou jen do jedné. Odeberte tu, která je navíc.",
+        ["{0} nemôže byť výstupný priečinok – je to vstupný priečinok, leží v ňom alebo ho obsahuje ({1}). Výstup musí byť samostatný priečinok."] = "{0} nemůže být výstupní složka – je to vstupní složka, leží v ní nebo ji obsahuje ({1}). Výstup musí být samostatná složka.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6554,5 +6564,15 @@ internal static class Translations
         ["＋ plagát do UNIVERSUM"] = "＋ poster to UNIVERSUM",
         ["✓ plagát poslaný"] = "✓ poster sent",
         ["posielam…"] = "sending…",
+        ["Disk {0} nemá vlastný výstupný priečinok – súbory sa skopírujú do {1} na inom disku. Výstup na tomto disku pridáte v Nastaveniach (Výstupné priečinky na ďalších diskoch → Pridať…)."] = "Disk {0} has no output folder of its own – the files will be copied to {1} on another disk. Add an output on this disk in Settings (Output folders on other disks → Add…).",
+        ["V priečinku {0} sú filmy alebo seriály mimo MOVIES a TVSHOWS – vyzerá ako zdrojový priečinok, nie ako výstup.\n\nNaozaj ho použiť ako výstupný priečinok?"] = "The folder {0} holds films or series outside MOVIES and TVSHOWS – it looks like a source folder, not an output.\n\nUse it as an output folder anyway?",
+        ["Výstupný priečinok sa nezmenil."] = "The output folder did not change.",
+        ["{0} je na inom disku ako predvolený výstupný priečinok {1}.\n\nÁno – pridať ho ako výstup na ďalšom disku (odporúčané; {1} ostane predvolený).\nNie – nahradiť ním predvolený výstupný priečinok.\nZrušiť – nič nemeniť."] = "{0} is on another disk than the default output folder {1}.\n\nYes – add it as the output of another disk (recommended; {1} stays the default).\nNo – replace the default output folder with it.\nCancel – change nothing.",
+        ["Nahradiť predvolený výstupný priečinok {0} priečinkom {1}?\n\nV {0} sa nič nezmení ani nezmaže – UNIVERSUM ho len prestane používať."] = "Replace the default output folder {0} with {1}?\n\nNothing in {0} changes or is deleted – UNIVERSUM only stops using it.",
+        ["Výstupný priečinok: {0}"] = "Output folder: {0}",
+        ["Predvolený výstupný priečinok je teraz {0} (predtým {1} – v ňom sa nič nezmenilo)."] = "The default output folder is now {0} (before {1} – nothing in it changed).",
+        ["Výstup na tom istom disku sa už nepoužíva: {0}."] = "The output on the same disk is no longer used: {0}.",
+        ["Na jednom disku je viac výstupných priečinkov ({0}) – súbory z neho pôjdu len do jedného. Odoberte ten, ktorý je navyše."] = "Several output folders are on one disk ({0}) – its files go into one only. Remove the extra one.",
+        ["{0} nemôže byť výstupný priečinok – je to vstupný priečinok, leží v ňom alebo ho obsahuje ({1}). Výstup musí byť samostatný priečinok."] = "{0} cannot be an output folder – it is the input folder, lies in it or holds it ({1}). The output must be a folder of its own.",
     };
 }

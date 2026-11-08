@@ -57,6 +57,7 @@ Settings is one long page of blocks – scroll down.
 ![Settings](settings.jpg)
 - **Output folder (library)** – [Folder…] chooses the library. Films go to *MOVIES\\Title (year)*, series to
   *TVSHOWS\\Title (year)\\Season 01*. UNIVERSUM **never deletes** the MOVIES and TVSHOWS folders.
+  A folder on another disk is offered **as a further output**; the default one is replaced only after a question. The input folder or a folder of films (a source) is no output.
 - **Output folders on other disks** – [Add…] adds an output folder on another disk or disk array (its own MOVIES and
   TVSHOWS, another library for Jellyfin). A file is written **on the disk it lies on** – no copying between disks; a file
   whose content does not change is only **moved** (at once) with "delete originals". **On how many disks at once** – the

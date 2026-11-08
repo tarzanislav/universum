@@ -93,7 +93,12 @@ public sealed class SettingsPageViewModel : ObservableObject
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppSettings.Mp4RecordDirectory) { UseShellExecute = true })?.Dispose();
         });
         services.HistraChanged += () => OnPropertyChanged(nameof(SyncStatus));
-        services.LibraryChanged += () => OnPropertyChanged(nameof(OutputDescription));
+        services.LibraryChanged += () =>
+        {
+            OnPropertyChanged(nameof(OutputDescription));
+            OnPropertyChanged(nameof(OutputWarning));
+            OnPropertyChanged(nameof(HasOutputWarning));
+        };
         FindWeatherTownCommand = new AsyncRelayCommand(FindWeatherTownAsync, () => WeatherTownInput.Trim().Length > 0);
         UseWeatherChoiceCommand = new RelayCommand(UseWeatherChoice, () => SelectedWeatherChoice is not null);
         RemoveWeatherTownCommand = new RelayCommand(RemoveWeatherTown, () => _services.Settings.WeatherPlace is not null);
@@ -756,37 +761,153 @@ public sealed class SettingsPageViewModel : ObservableObject
 
     private RelayCommand? _addOtherOutput;
 
+    private string _outputMessage = "";
+
+    /// <summary>What happened to the output folders (shown in their card).</summary>
+    public string OutputMessage { get => _outputMessage; private set => SetProperty(ref _outputMessage, value); }
+
     private void AddOtherOutput()
     {
         var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok na inom disku (vlastné MOVIES a TVSHOWS)") };
-        if (dialog.ShowDialog() != true)
+        if (dialog.ShowDialog() == true)
         {
-            return;
+            AddOtherOutput(dialog.FolderName);
+        }
+    }
+
+    /// <summary>
+    /// Asks the owner (Áno / Nie / Zrušiť – true / false / null); the self-test answers by itself. Owner, 8. 11. 2026: the
+    /// default output was replaced without a question.
+    /// </summary>
+    public Func<string, bool, bool?> Ask { get; set; } = (question, three) =>
+        System.Windows.MessageBox.Show(System.Windows.Application.Current.MainWindow!, question, "UNIVERSUM",
+            three ? System.Windows.MessageBoxButton.YesNoCancel : System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question) switch
+        {
+            System.Windows.MessageBoxResult.Yes => true,
+            System.Windows.MessageBoxResult.No => false,
+            _ => null,
+        };
+
+    // the checks every output folder passes: not the input folder, not a folder of films (asked)
+    private bool Acceptable(string chosen)
+    {
+        if (Universum.Core.Library.OutputFolders.Problem(chosen, _services.InputDirectory) is { } problem)
+        {
+            OutputMessage = problem;
+            return false;
         }
 
-        var chosen = Path.GetFullPath(dialog.FolderName);
+        if (Universum.Core.Library.OutputFolders.LooksLikeSource(chosen) &&
+            Ask(Loc.F("V priečinku {0} sú filmy alebo seriály mimo MOVIES a TVSHOWS – vyzerá ako zdrojový priečinok, nie ako výstup.\n\nNaozaj ho použiť ako výstupný priečinok?", chosen), false) != true)
+        {
+            OutputMessage = Loc.T("Výstupný priečinok sa nezmenil.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>An output folder on another disk added (also the self-test).</summary>
+    public void AddOtherOutput(string folder)
+    {
+        var chosen = Path.GetFullPath(folder);
         if (_services.Library is { } main && Universum.Core.IO.Paths.SameVolume(chosen, main.Root))
         {
-            Message = Loc.T("Tento priečinok je na tom istom disku ako predvolený výstupný priečinok – na jeden disk stačí jeden. Zvoľte priečinok na inom disku.");
+            OutputMessage = Loc.T("Tento priečinok je na tom istom disku ako predvolený výstupný priečinok – na jeden disk stačí jeden. Zvoľte priečinok na inom disku.");
             return;
         }
 
         if (_services.Settings.OtherOutputDirectories.FirstOrDefault(f => Universum.Core.IO.Paths.SameVolume(f, chosen)) is { } taken)
         {
-            Message = Loc.F("Na tomto disku už výstupný priečinok je: {0}", taken);
+            OutputMessage = Loc.F("Na tomto disku už výstupný priečinok je: {0}", taken);
+            return;
+        }
+
+        if (!Acceptable(chosen))
+        {
             return;
         }
 
         _services.AddOutputDirectory(chosen);
-        Message = Loc.F("Pridaný výstupný priečinok: {0} – súbory z tohto disku pôjdu sem.", chosen);
+        OutputMessage = Loc.F("Pridaný výstupný priečinok: {0} – súbory z tohto disku pôjdu sem.", chosen);
         OnPropertyChanged(nameof(OtherOutputs));
+        OnPropertyChanged(nameof(OutputWarning));
+        OnPropertyChanged(nameof(HasOutputWarning));
     }
+
+    /// <summary>
+    /// The default output folder chosen (also the self-test; owner, 8. 11. 2026): a folder on another disk than the default
+    /// one is offered as a further output (the default one stays); replacing the default one is asked first. Nothing in the
+    /// old folder changes.
+    /// </summary>
+    public void ChooseOutput(string folder)
+    {
+        var chosen = Path.GetFullPath(folder);
+        if (_services.Library is { } current && Universum.Core.IO.Paths.Same(current.Root, chosen))
+        {
+            return;
+        }
+
+        if (!Acceptable(chosen))
+        {
+            return;
+        }
+
+        if (_services.Library is { } main)
+        {
+            if (!Universum.Core.IO.Paths.SameVolume(main.Root, chosen))
+            {
+                var answer = Ask(Loc.F("{0} je na inom disku ako predvolený výstupný priečinok {1}.\n\nÁno – pridať ho ako výstup na ďalšom disku (odporúčané; {1} ostane predvolený).\nNie – nahradiť ním predvolený výstupný priečinok.\nZrušiť – nič nemeniť.", chosen, main.Root), true);
+                if (answer is null)
+                {
+                    OutputMessage = Loc.T("Výstupný priečinok sa nezmenil.");
+                    return;
+                }
+
+                if (answer == true)
+                {
+                    AddOtherOutput(chosen);
+                    return;
+                }
+            }
+            else if (Ask(Loc.F("Nahradiť predvolený výstupný priečinok {0} priečinkom {1}?\n\nV {0} sa nič nezmení ani nezmaže – UNIVERSUM ho len prestane používať.", main.Root, chosen), false) != true)
+            {
+                OutputMessage = Loc.T("Výstupný priečinok sa nezmenil.");
+                return;
+            }
+        }
+
+        var before = _services.Library?.Root;
+
+        // a further output on the disk of the new default one would share its disk: it is no longer used
+        var dropped = _services.Settings.OtherOutputDirectories.Where(f => Universum.Core.IO.Paths.SameVolume(f, chosen)).ToList();
+        foreach (var other in dropped)
+        {
+            _services.RemoveOutputDirectory(other);
+        }
+
+        _services.SetOutputDirectory(chosen);
+        OutputMessage = (before is null ? Loc.F("Výstupný priečinok: {0}", chosen) : Loc.F("Predvolený výstupný priečinok je teraz {0} (predtým {1} – v ňom sa nič nezmenilo).", chosen, before)) +
+                  (dropped.Count > 0 ? " " + Loc.F("Výstup na tom istom disku sa už nepoužíva: {0}.", string.Join(", ", dropped)) : "");
+        OnPropertyChanged(nameof(OtherOutputs));
+        OnPropertyChanged(nameof(OutputWarning));
+        OnPropertyChanged(nameof(HasOutputWarning));
+    }
+
+    /// <summary>Output folders sharing a disk (saved before the checks existed): only one per disk is used.</summary>
+    public string OutputWarning => Universum.Core.Library.OutputFolders.SharingADisk(_services.Settings.OutputDirectory, _services.Settings.OtherOutputDirectories) is { Count: > 0 } sharing
+        ? Loc.F("Na jednom disku je viac výstupných priečinkov ({0}) – súbory z neho pôjdu len do jedného. Odoberte ten, ktorý je navyše.", string.Join(", ", sharing))
+        : "";
+
+    public bool HasOutputWarning => OutputWarning.Length > 0;
 
     internal void RemoveOtherOutput(string folder)
     {
         _services.RemoveOutputDirectory(folder);
-        Message = Loc.F("Výstupný priečinok {0} sa už nepoužíva (nič v ňom sa nezmenilo).", folder);
+        OutputMessage = Loc.F("Výstupný priečinok {0} sa už nepoužíva (nič v ňom sa nezmenilo).", folder);
         OnPropertyChanged(nameof(OtherOutputs));
+        OnPropertyChanged(nameof(OutputWarning));
+        OnPropertyChanged(nameof(HasOutputWarning));
     }
 
     private void ChooseOutputDirectory()
@@ -794,7 +915,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         var dialog = new OpenFolderDialog { Title = Loc.T("Výstupný priečinok (knižnica s MOVIES a TVSHOWS)") };
         if (dialog.ShowDialog() == true)
         {
-            _services.SetOutputDirectory(dialog.FolderName);
+            ChooseOutput(dialog.FolderName);
         }
     }
 

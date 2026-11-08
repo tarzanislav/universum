@@ -2538,6 +2538,8 @@
                             <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock Text="{Binding Folder}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding DiskHint}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left"
+                                   Visibility="{Binding HasDiskHint, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </DockPanel>
                 <DockPanel Grid.Row="1" Margin="0,6,0,8">
@@ -6022,6 +6024,9 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Text="{Binding OutputMessage}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="{Binding OutputWarning}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       Visibility="{Binding HasOutputWarning, Converter={StaticResource BoolToVisibility}}" />
                             <CheckBox Content="{loc:T 'Súbor zapísať do výstupného priečinka na jeho disku'}" IsChecked="{Binding OutputBySourceDisk}" Margin="0,8,0,0"
                                       ToolTip="{loc:T 'Vypnuté: všetko do predvoleného výstupného priečinka ako doteraz'}" />
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

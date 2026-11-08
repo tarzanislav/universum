@@ -4165,9 +4165,61 @@ internal static class SelfTest
             Check(model.Rules.Result.StartsWith("Hotovo", StringComparison.Ordinal) && written.Count == 1 && File.Exists(source),
                 $"disks: written on the same disk in {timed.Elapsed.TotalSeconds:0.0} s, original kept – {model.Rules.Result}");
             await Screenshot(window, "disks-single.png");
+
+            // owner, 8. 11. 2026: the default output is never replaced without a question; a folder on another disk is offered
+            // as a further output; the input folder or a folder of films is no output; Hromadné says when a disk has none
+            var settings = model.Settings;
+            var batch = model.Batch;
+            var batchFolder = batch.Folder;
+            batch.Folder = Path.GetDirectoryName(source);
+            Check(!batch.HasDiskHint, "disks: Hromadné – the disk has its output folder, nothing said");
+            services.RemoveOutputDirectory(output);
+            Check(batch.HasDiskHint && batch.DiskHint.Contains(main, StringComparison.OrdinalIgnoreCase), "disks: Hromadné – a disk without an output folder said – " + batch.DiskHint);
+            var asked = new List<string>();
+            var askBefore = settings.Ask;
+            settings.Ask = (question, three) =>
+            {
+                asked.Add(question);
+                return null;
+            };
+            settings.ChooseOutput(output);
+            Check(services.Library!.Root == main && services.Settings.OtherOutputDirectories.Count == 0 && asked.Count == 1 && settings.OutputMessage.Length > 0,
+                "disks: Priečinok… on another disk asks first – cancelled, nothing changed – " + settings.OutputMessage);
+            settings.Ask = (question, three) => true;
+            settings.ChooseOutput(output);
+            Check(services.Library!.Root == main && services.Settings.OtherOutputDirectories.Any(f => Core.IO.Paths.Same(f, output)) && !batch.HasDiskHint,
+                "disks: … Áno – added as the output of the other disk, the default one kept – " + settings.OutputMessage);
+            services.RemoveOutputDirectory(output);
+            settings.Ask = (question, three) => false;
+            settings.AddOtherOutput(Path.GetDirectoryName(source)!);
+            Check(services.Settings.OtherOutputDirectories.Count == 0 && settings.OutputMessage.Length > 0,
+                "disks: a folder with films is no output unless confirmed – " + settings.OutputMessage);
+            if (services.InputDirectory is { Length: > 0 } input)
+            {
+                settings.AddOtherOutput(input);
+                Check(services.Settings.OtherOutputDirectories.Count == 0 && settings.OutputMessage.Contains(input, StringComparison.OrdinalIgnoreCase),
+                    "disks: the input folder is no output – " + settings.OutputMessage);
+            }
+
+            settings.Ask = (question, three) => false;
+            settings.ChooseOutput(output);
+            Check(Core.IO.Paths.Same(services.Library!.Root, output) && settings.OutputMessage.Contains(main, StringComparison.OrdinalIgnoreCase),
+                "disks: … Nie – the default output replaced, the old one named – " + settings.OutputMessage);
+            services.SetOutputDirectory(main);
+            Check(Core.IO.Paths.Same(services.Library!.Root, main), "disks: the default output back");
+            services.Settings.OtherOutputDirectories.Add(Path.Combine(main, "druhy-na-tom-istom-disku"));
+            Check(settings.HasOutputWarning, "disks: two outputs on one disk said – " + settings.OutputWarning);
+            services.Settings.OtherOutputDirectories.Clear();
+            batch.Folder = batchFolder;
+            settings.Ask = askBefore;
         }
         finally
         {
+            if (!Core.IO.Paths.Same(services.Library!.Root, main))
+            {
+                services.SetOutputDirectory(main);
+            }
+
             services.RemoveOutputDirectory(output);
             try
             {

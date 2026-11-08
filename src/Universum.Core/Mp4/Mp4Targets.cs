@@ -62,6 +62,12 @@ public static class Mp4Targets
             var where = $"MP4 track {now.Id}";
             var language = to?.Language is { } newLanguage ? Mp4Languages.Unpack(Mp4Languages.Pack(newLanguage)) : was.Language;
             Check(now.Language == language, $"{where}: language {now.Language}, expected {language}");
+            if (to?.Language is { } changedTo)
+            {
+                var extended = Mp4Languages.Extended(changedTo);
+                Check(now.ExtendedLanguage == extended, $"{where}: extended language {now.ExtendedLanguage}, expected {extended}");
+            }
+
             if (to?.Name is { } name)
             {
                 Check((now.Name ?? "") == name && (name.Length == 0 || now.HandlerName == name), $"{where}: name '{now.Name}' / '{now.HandlerName}', expected '{name}'");
@@ -102,8 +108,12 @@ public static class Mp4Targets
     /// with the change: the streams in order and their kinds, the languages and names changed, the default disposition
     /// (MP4's enabled) of every sound and subtitle track, the title. Null when ffprobe could not tell (not counted then).
     /// </summary>
-    public static async Task<IReadOnlyList<string>?> ProbeAsync(IProcessRunner runner, string ffprobe, string path, Mp4Change change, Mp4File after, CancellationToken cancellationToken = default)
+    /// <param name="readBefore">ffprobe could read the file before the change: then a result it cannot read is a problem.</param>
+    public static async Task<IReadOnlyList<string>?> ProbeAsync(
+        IProcessRunner runner, string ffprobe, string path, Mp4Change change, Mp4File after, bool readBefore = false, CancellationToken cancellationToken = default)
     {
+        IReadOnlyList<string>? Unread(string why) => readBefore ? [$"ffprobe: the result cannot be read ({why}), the file before could"] : null;
+
         var output = new System.Text.StringBuilder();
         var result = await runner.RunAsync(new ProcessRequest(ffprobe, ["-v", "error", "-show_streams", "-show_format", "-of", "json", path])
         {
@@ -112,7 +122,7 @@ public static class Mp4Targets
         }, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
-            return null;
+            return Unread($"exit code {result.ExitCode}");
         }
 
         try
@@ -199,7 +209,17 @@ public static class Mp4Targets
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            return null;
+            return Unread("no answer it could give");
         }
+    }
+
+    /// <summary>ffprobe can read the file (its format and streams).</summary>
+    public static async Task<bool> ReadableAsync(IProcessRunner runner, string ffprobe, string path, CancellationToken cancellationToken = default)
+    {
+        var result = await runner.RunAsync(new ProcessRequest(ffprobe, ["-v", "error", "-show_format", "-show_streams", "-of", "json", path])
+        {
+            Timeout = TimeSpan.FromMinutes(2),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.ExitCode == 0;
     }
 }

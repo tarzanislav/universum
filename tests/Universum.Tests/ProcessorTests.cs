@@ -268,6 +268,10 @@ public sealed class ProcessorTests
         var moved = await processor.ProcessAsync(plan, placement, OriginalsMode.MoveIntoLibrary.Output());
         Assert.True(moved is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
                     moved.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) && !System.IO.File.Exists(file), "moved into the library and edited there – " + string.Join("; ", moved.Messages));
+        // processed once, the MP4 is as the rules want it (owner, 8. 11. 2026, review: the names of its tracks, which
+        // MKVToolNix does not read, made a new video name and an edit on every run)
+        var again = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(moved.OutputPath!), keep));
+        Assert.True(again.Method == WriteMethod.None, "nothing more to change – " + string.Join("; ", again.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
         var result = Universum.Core.Mp4.Mp4Reader.Read(moved.OutputPath!);
         var czech = result.Tracks.First(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio);
         Assert.True(czech.Language == "ces" && czech.Enabled && result.Tracks.Count(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio && t.Enabled) == 1,
@@ -334,6 +338,36 @@ public sealed class ProcessorTests
         // a flag MP4 has no place for (original language): MKV
         var originalFlag = ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Audio ? t with { Flags = t.Flags with { Original = !t.Source.Flags.Original } } : t).ToList() };
         Assert.True(originalFlag is { StaysMp4: false, Mp4Obstacle: not null }, "the original language flag: written as MKV – " + originalFlag.Mp4Obstacle);
+    }
+
+    [Test]
+    public async Task Mp4UniversumCannotEditBecomesMkv()
+    {
+        // owner, 8. 11. 2026 (review): an MP4 UNIVERSUM would refuse to edit (fragmented, not ending with a whole box) is
+        // planned as an MKV at once, not as a header edit that fails
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(folder => Path.Combine(folder, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(System.IO.File.Exists);
+        using var work = new WorkFolder();
+        var (_, inspector) = await CreateAsync(work);
+        var keep = RuleProfile.Default with { KeepMp4 = true };
+
+        var junk = work.Copy("en-cz.mp4", "vymysleny-film-so-zvyskom.mp4");
+        await using (var stream = new FileStream(junk, FileMode.Append))
+        {
+            stream.Write(new byte[24]);
+        }
+
+        var ended = UniversumRules.Apply(await inspector.InspectAsync(junk), keep);
+        Assert.True(ended is { StaysMp4: false, Mp4Obstacle: not null } && EditPlan.For(ended).Method == WriteMethod.Remux, "loose bytes at the end: an MKV – " + ended.Mp4Obstacle);
+
+        if (ffmpeg is not null)
+        {
+            var fragmented = Path.Combine(work.Path, "vymysleny-fragmentovany-film.mp4");
+            await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg, ["-v", "error", "-y", "-i", TestData.Media("en-cz.mp4"), "-map", "0", "-c", "copy", "-movflags", "+frag_keyframe", fragmented]));
+            var target = UniversumRules.Apply(await inspector.InspectAsync(fragmented), keep);
+            Assert.True(target.Source.Mp4Problem == Universum.Core.Mp4.Mp4Reading.Fragmented && !target.StaysMp4 && target.Mp4Obstacle is not null,
+                "a fragmented MP4: an MKV – " + target.Mp4Obstacle);
+        }
     }
 
     [Test]

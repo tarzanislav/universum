@@ -33,6 +33,6 @@ public sealed class MkvMergeInspector(MkvToolNixInstallation installation, IProc
         }
 
         var file = MkvMergeIdentificationParser.Parse(result.StandardOutput, fullPath);
-        return file.IsMp4 ? Mp4.Mp4Roles.Read(file) : file;
+        return file.IsMp4 ? Mp4.Mp4Reading.Complete(file) : file;
     }
 }

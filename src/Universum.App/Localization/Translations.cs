@@ -3220,6 +3220,9 @@ internal static class Translations
         ["Jedno MP4 so všetkými zvukmi, ktorému sa mení len hlavička (jazyky, názvy, predvolené stopy, Forced, titulky pre nepočujúcich, komentár, poradie, názov; vynechané titulky), sa zapíše ako MP4 – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, vynechaní zvuku, kapitolách alebo vlastnostiach stopy vznikne MKV. Náhľad je vždy MKV."] = "Jedno MP4 se všemi zvuky, kterému se mění jen hlavička (jazyky, názvy, výchozí stopy, Forced, titulky pro neslyšící, komentář, pořadí, název; vynechané titulky), se zapíše jako MP4 – hlavičku upraví UNIVERSUM, obrazu a zvuku se nedotkne. Při slučování více souborů, vynechání zvuku, kapitolách nebo vlastnostech stopy vznikne MKV. Náhled je vždy MKV.",
         ["príznak pôvodný jazyk alebo textový popis"] = "příznak původní jazyk nebo textový popis",
         ["odstraňuje sa obraz alebo zvuk (súbor sa zmenší)"] = "odstraňuje se obraz nebo zvuk (soubor se zmenší)",
+        ["fragmentované MP4 – UNIVERSUM ho na mieste neupraví"] = "fragmentované MP4 – UNIVERSUM ho na místě neupraví",
+        ["MP4 nekončí celým boxom – UNIVERSUM ho na mieste neupraví"] = "MP4 nekončí celým boxem – UNIVERSUM ho na místě neupraví",
+        ["UNIVERSUM toto MP4 nevie prečítať"] = "UNIVERSUM toto MP4 neumí přečíst",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6436,5 +6439,8 @@ internal static class Translations
         ["Jedno MP4 so všetkými zvukmi, ktorému sa mení len hlavička (jazyky, názvy, predvolené stopy, Forced, titulky pre nepočujúcich, komentár, poradie, názov; vynechané titulky), sa zapíše ako MP4 – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, vynechaní zvuku, kapitolách alebo vlastnostiach stopy vznikne MKV. Náhľad je vždy MKV."] = "One MP4 with all its sounds whose header only changes (languages, names, default tracks, Forced, hearing impaired subtitles, commentary, order, title; subtitles left out) is written as MP4 – UNIVERSUM edits the header, picture and sound are not touched. Merging several files, leaving out a sound, chapters or track properties make an MKV. A preview is always MKV.",
         ["príznak pôvodný jazyk alebo textový popis"] = "the original language or text descriptions flag",
         ["odstraňuje sa obraz alebo zvuk (súbor sa zmenší)"] = "a picture or sound is removed (the file gets smaller)",
+        ["fragmentované MP4 – UNIVERSUM ho na mieste neupraví"] = "a fragmented MP4 – UNIVERSUM does not edit it in place",
+        ["MP4 nekončí celým boxom – UNIVERSUM ho na mieste neupraví"] = "the MP4 does not end with a whole box – UNIVERSUM does not edit it in place",
+        ["UNIVERSUM toto MP4 nevie prečítať"] = "UNIVERSUM cannot read this MP4",
     };
 }

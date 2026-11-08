@@ -6,7 +6,7 @@ namespace Universum.Core.Mp4;
 /// What a track is for, in an MP4 (owner, 8. 11. 2026: forced subtitles, subtitles for the hearing impaired and
 /// commentary kept in an MP4 that stays MP4): 'kind' boxes in the track's 'udta' with the roles of MPEG-DASH
 /// (urn:mpeg:dash:role:2011) – the way FFmpeg writes and reads them, so ffprobe and the media servers built on it (Jellyfin)
-/// see them. MKVToolNix does not read them; UNIVERSUM adds them to what it reads of an MP4.
+/// see them. MKVToolNix does not read them; UNIVERSUM adds them to what it reads of an MP4 (<see cref="Mp4Reading"/>).
 /// </summary>
 public static class Mp4Roles
 {
@@ -49,27 +49,6 @@ public static class Mp4Roles
         Commentary = roles.Contains(Commentary),
         VisualImpaired = roles.Contains(Description),
     };
-
-    /// <summary>
-    /// The file as MKVToolNix read it, with the roles of its MP4 tracks as flags (MKVToolNix does not read them): forced,
-    /// hearing impaired, commentary, visual impaired. As it was when the MP4 cannot be read.
-    /// </summary>
-    public static MediaFile Read(MediaFile file)
-    {
-        try
-        {
-            var mp4 = Mp4Reader.Read(file.Path);
-            var roles = mp4.Tracks.ToDictionary(t => t.Id, t => (IReadOnlyCollection<string>)t.Roles);
-            return file with
-            {
-                Tracks = [.. file.Tracks.Select(t => t.Number is { } id && roles.TryGetValue(id, out var these) ? t with { Flags = Apply(t.Flags, these) } : t)],
-            };
-        }
-        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
-        {
-            return file;
-        }
-    }
 
     /// <summary>
     /// The flags an MP4 can hold besides the default one: forced, hearing impaired, commentary, visual impaired. The text

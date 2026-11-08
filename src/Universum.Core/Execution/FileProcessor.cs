@@ -334,7 +334,12 @@ public sealed class FileProcessor(
         {
             try
             {
-                Mp4.Mp4HeaderEditor.Undo(path, new Mp4.Mp4Undo(mp4Length, mp4Movie));
+                Mp4.Mp4HeaderEditor.Undo(path, new Mp4.Mp4Undo(mp4Length, mp4Movie, record.Mp4MovieSize));
+            }
+            catch (Mp4.Mp4UndoRefusedException ex)
+            {
+                // another program wrote the file since: it is left as it is, where it is (owner, 8. 11. 2026)
+                return [$"{path} has changed since UNIVERSUM edited it ({ex.Message}); nothing was restored"];
             }
             catch (Exception ex) when (IsFileError(ex))
             {
@@ -1063,8 +1068,20 @@ public sealed class FileProcessor(
     /// Ponechať MP4 (owner, 7. 11. 2026): the header of <paramref name="path"/> changed by UNIVERSUM's own code and checked
     /// against <paramref name="original"/> (or the file as it was) by its reader and by ffprobe (<see cref="Mp4.Mp4Editing"/>).
     /// </summary>
-    private Task<(IReadOnlyList<string> Problems, bool Probed)> EditMp4Async(TargetState target, string path, string? original) =>
-        Mp4.Mp4Editing.ApplyCheckedAsync(path, original, Mp4.Mp4Targets.ChangeFor(target), runner, FindFfprobe(), Mp4RecordFolder, Version);
+    private async Task<(IReadOnlyList<string> Problems, bool Probed)> EditMp4Async(TargetState target, string path, string? original)
+    {
+        Mp4.Mp4Change change;
+        try
+        {
+            change = Mp4.Mp4Targets.ChangeFor(target);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ([Mp4.Mp4Editing.CannotEditPrefix + ex.Message], false);
+        }
+
+        return await Mp4.Mp4Editing.ApplyCheckedAsync(path, original, change, runner, FindFfprobe(), Mp4RecordFolder, Version);
+    }
 
     // ffprobe beside the FFmpeg of the installation; null without FFmpeg
     private Func<Task<string?>>? FindFfprobe() => FindFfmpeg is null ? null : async () =>
@@ -1244,9 +1261,17 @@ public sealed class FileProcessor(
         Mp4.Mp4Undo? mp4 = null;
         if (headerChanged && file.IsMp4)
         {
-            // Ponechať MP4: what puts the file back byte for byte (its length, where its movie box is)
-            var read = await Task.Run(() => Mp4.Mp4Reader.Read(file.Path), cancellationToken).ConfigureAwait(false);
-            mp4 = new Mp4.Mp4Undo(read.Length, read.Movie.Start);
+            // Ponechať MP4: what puts the file back byte for byte (its length, where its movie box is and how large); a file
+            // UNIVERSUM cannot read is not edited (a file error: the route that copies it is taken, or the step fails)
+            try
+            {
+                var read = await Task.Run(() => Mp4.Mp4Reader.Read(file.Path), cancellationToken).ConfigureAwait(false);
+                mp4 = new Mp4.Mp4Undo(read.Length, read.Movie.Start, read.Movie.Size);
+            }
+            catch (FormatException ex)
+            {
+                throw new IOException("the MP4 cannot be read for its undo record: " + ex.Message, ex);
+            }
         }
 
         string? tagsPath = null;
@@ -1285,6 +1310,7 @@ public sealed class FileProcessor(
             Title = file.Title,
             Mp4Length = mp4?.Length,
             Mp4MovieStart = mp4?.MovieStart,
+            Mp4MovieSize = mp4?.MovieSize,
             Tracks = file.Tracks.Where(t => t.Number is not null)
                 .Select(t => new UndoTrack(t.Number!.Value, t.Name, t.Language.Legacy, t.Language.Ietf, t.Flags.Default, t.Flags.Enabled, t.Flags.Forced, t.Uid,
                     new UndoFlags(t.Flags.HearingImpaired, t.Flags.VisualImpaired, t.Flags.TextDescriptions, t.Flags.Original, t.Flags.Commentary)))

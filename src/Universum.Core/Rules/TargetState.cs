@@ -29,6 +29,11 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     // place for (forced, hearing impaired, commentary …, a default track switched off) make an MKV
     private IEnumerable<string> Mp4Obstacles()
     {
+        if (Mp4.Mp4Reading.Problem(Source.Mp4Problem) is { } problem)
+        {
+            yield return problem;
+        }
+
         // subtitles left out go only from the header (their few bytes stay, 8. 11. 2026); a picture or sound left out makes
         // an MKV – the file is to be smaller
         if (RemovedFromFile.Any(t => t.Type != TrackType.Subtitles))

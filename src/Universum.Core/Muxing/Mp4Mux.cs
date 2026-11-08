@@ -62,7 +62,8 @@ public static class Mp4Mux
     {
         var file = source.File;
         var tracks = spec.Tracks.Select(t => (Track: t, Was: t.Source == 0 ? file.Tracks.FirstOrDefault(s => s.Id == t.TrackId) : null)).ToList();
-        return spec.Sources.Count > 1 || tracks.Any(t => t.Track.Source != 0) ? CoreText.T("zlučujú sa viaceré súbory")
+        return Mp4Reading.Problem(file.Mp4Problem) is { } problem ? problem
+            : spec.Sources.Count > 1 || tracks.Any(t => t.Track.Source != 0) ? CoreText.T("zlučujú sa viaceré súbory")
             : source.AdditionalParts.Count > 0 || source.Appended.Count > 0 ? CoreText.T("pripájajú sa ďalšie súbory")
             : tracks.Any(t => t.Was is null) || tracks.Select(t => t.Track.TrackId).Distinct().Count() != tracks.Count || file.Tracks.Any(t => t.Number is null)
                 ? CoreText.T("stopa MP4 bez čísla")

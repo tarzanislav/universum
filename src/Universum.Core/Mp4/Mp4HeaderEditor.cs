@@ -32,8 +32,14 @@ public sealed record Mp4Change(IReadOnlyList<Mp4TrackChange> Tracks, string? Tit
     public IReadOnlyList<int> Removed { get; init; } = [];
 }
 
-/// <summary>What is needed to put an edited MP4 back exactly as it was: its length and where its movie box was.</summary>
-public sealed record Mp4Undo(long Length, long MovieStart);
+/// <summary>
+/// What is needed to put an edited MP4 back exactly as it was: its length, where its movie box was and how large it was
+/// (null in records of 0.3.23, which did not keep it).
+/// </summary>
+public sealed record Mp4Undo(long Length, long MovieStart, long? MovieSize = null);
+
+/// <summary>The MP4 is not as UNIVERSUM left it (another program wrote it since): nothing is undone.</summary>
+public sealed class Mp4UndoRefusedException(string message) : IOException(message);
 
 /// <summary>
 /// Changes the header of an MP4 without writing its media anew (owner, 7. 11. 2026: Superrýchle also for MP4): the movie
@@ -51,9 +57,9 @@ public static class Mp4HeaderEditor
             return "fragmented MP4 (the tables are in 'moof' fragments)";
         }
 
-        if (file.Boxes.Count == 0 || file.Boxes[^1].End != file.Length)
+        if (file.Boxes.Count == 0 || file.Boxes[^1].End != file.Length || file.Boxes[^1].HeaderSize == 0 || file.LastBoxOpenEnded)
         {
-            return "the last box does not end with the file";
+            return "the file does not end with a whole box (a box without a size, or loose bytes)";
         }
 
         return null;
@@ -130,7 +136,7 @@ public static class Mp4HeaderEditor
         }
 
         var movie = NewMovie(file, change);
-        var undo = new Mp4Undo(file.Length, file.Movie.Start);
+        var undo = new Mp4Undo(file.Length, file.Movie.Start, file.Movie.Size);
 
         // 1. the new movie after everything (the old one still counts – the file is whole all the time)
         stream.Position = file.Length;
@@ -144,21 +150,40 @@ public static class Mp4HeaderEditor
         return undo;
     }
 
-    /// <summary>The file exactly as before <see cref="Apply"/>: the old movie box back, the new one cut away.</summary>
+    /// <summary>
+    /// The file exactly as before <see cref="Apply"/>: the old movie box back, the new one cut away. Done only when the
+    /// file is just as the edit left it – the new movie box from the old end of the file to its end, the old one (free
+    /// space now) where it was and as large as it was; otherwise <see cref="Mp4UndoRefusedException"/> and nothing changes
+    /// (owner, 8. 11. 2026: a file another program wrote since must never be cut). A file the edit never reached is left
+    /// as it is.
+    /// </summary>
     public static void Undo(string path, Mp4Undo undo)
     {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 1 << 16);
-        if (stream.Length < undo.Length || undo.MovieStart + 8 > undo.Length)
+        // looked at first without writing (a file the edit never reached may be open elsewhere)
+        using (var look = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
-            throw new IOException("the file is shorter than before the change – it was changed elsewhere");
+            if (look.Length == undo.Length && BoxAt(look, undo.MovieStart) is ("moov", var size) && (undo.MovieSize is null || size == undo.MovieSize))
+            {
+                return;
+            }
         }
 
-        Span<byte> type = stackalloc byte[4];
-        stream.Position = undo.MovieStart + 4;
-        stream.ReadExactly(type);
-        if (!type.SequenceEqual("free"u8) && !type.SequenceEqual("moov"u8))
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 1 << 16);
+        var length = stream.Length;
+        if (length <= undo.Length || undo.MovieStart + 8 > undo.Length)
         {
-            throw new IOException("the old movie box is not where it was – the file was changed elsewhere");
+            throw new Mp4UndoRefusedException($"the file is {length} bytes, not longer than the {undo.Length} it had before the edit");
+        }
+
+        if (BoxAt(stream, undo.Length) is not ("moov", var newSize) || newSize != length - undo.Length)
+        {
+            throw new Mp4UndoRefusedException("the movie box UNIVERSUM wrote is not at the end of the file any more");
+        }
+
+        if (BoxAt(stream, undo.MovieStart) is not ("free" or "moov", var oldSize) || (undo.MovieSize is { } recorded && oldSize != recorded) ||
+            undo.MovieStart + oldSize > undo.Length)
+        {
+            throw new Mp4UndoRefusedException("the old movie box is not where it was, or not as large");
         }
 
         stream.Position = undo.MovieStart + 4;
@@ -166,6 +191,27 @@ public static class Mp4HeaderEditor
         stream.Flush(flushToDisk: true);
         stream.SetLength(undo.Length);
         stream.Flush(flushToDisk: true);
+    }
+
+    // the type and size of the box that begins at a place (a 64-bit size read on); null when there is none
+    private static (string Type, long Size)? BoxAt(Stream stream, long at)
+    {
+        if (at < 0 || at + 8 > stream.Length)
+        {
+            return null;
+        }
+
+        Span<byte> header = stackalloc byte[16];
+        stream.Position = at;
+        stream.ReadExactly(header[..8]);
+        long size = BinaryPrimitives.ReadUInt32BigEndian(header);
+        if (size == 1 && at + 16 <= stream.Length)
+        {
+            stream.ReadExactly(header.Slice(8, 8));
+            size = (long)Math.Min(BinaryPrimitives.ReadUInt64BigEndian(header.Slice(8, 8)), long.MaxValue);
+        }
+
+        return (Mp4Reader.TypeName(header.Slice(4, 4)), size);
     }
 
     // builds the movie box again: changed boxes replaced, all others (and the bytes between boxes) copied as they are
@@ -193,7 +239,7 @@ public static class Mp4HeaderEditor
             {
                 if (child.Type != "trak")
                 {
-                    yield return Part.Of(child, child.Type == "udta" && change.Title is not null ? TitleChildren : NoChange);
+                    yield return Part.Of(child, change.Title is null ? NoChange : child.Type == "udta" ? TitleChildren : child.Type == "meta" ? KeyedTitle : NoChange);
                 }
                 else if (!removed.Contains(child))
                 {
@@ -279,10 +325,15 @@ public static class Mp4HeaderEditor
                         var at = child.HeaderSize + 4 + (version == 1 ? 28 : 16);
                         BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(at), Mp4Languages.Pack(language));
                         yield return Part.New(bytes);
+                        if (Mp4Languages.Extended(language) is { } extended)
+                        {
+                            // a region or script ("pt-BR") 'mdhd' cannot say: the extended language ('elng', BCP 47)
+                            yield return Part.New(Box("elng", Join([0, 0, 0, 0], Encoding.UTF8.GetBytes(extended), [0])));
+                        }
                     }
                     else if (child.Type == "elng" && wanted!.Language is not null)
                     {
-                        // the extended language would say the old one: it goes, the language of 'mdhd' counts
+                        // the extended language would say the old one: it goes (a new one is written after 'mdhd' when needed)
                         continue;
                     }
                     else if (child.Type == "hdlr" && wanted!.Name is { } name && child.ContentSize >= 24)
@@ -298,13 +349,12 @@ public static class Mp4HeaderEditor
             }
         }
 
-        // the handler with another name: its first 24 bytes as they are, the name as the original wrote it (QuickTime:
-        // its length first; ISO: ended by zero); no name gives the usual one of the kind
+        // the handler with another name: its first 24 bytes as they are, the name as FFmpeg reads it (a QuickTime file: its
+        // length first; an ISO file: ended by zero); no name gives the usual one of the kind
         private byte[] Handler(Mp4Box hdlr, string name)
         {
             var content = _bytes.AsSpan((int)(hdlr.ContentStart - _start), (int)hdlr.ContentSize);
             var fixedPart = content[..24];
-            var oldName = content[24..];
             var handler = Mp4Reader.TypeName(fixedPart.Slice(8, 4));
             var text = name.Length > 0 ? name : handler switch
             {
@@ -314,7 +364,8 @@ public static class Mp4HeaderEditor
                 _ => "Handler",
             };
             var utf8 = Encoding.UTF8.GetBytes(text);
-            var pascal = oldName.Length > 0 && oldName[0] == oldName.Length - 1 && oldName[0] > 0;
+            // QuickTime's way (its length first) where FFmpeg reads it so: in a file that is no ISO file
+            var pascal = file.Brand is null or "qt  ";
             byte[] written = pascal
                 ? [(byte)Math.Min(utf8.Length, 255), .. utf8.AsSpan(0, Math.Min(utf8.Length, 255))]
                 : [.. utf8, 0];
@@ -400,7 +451,9 @@ public static class Mp4HeaderEditor
         private static byte[] Kind(string role) =>
             Box("kind", Join([0, 0, 0, 0], Encoding.UTF8.GetBytes(Mp4Roles.Scheme), [0], Encoding.UTF8.GetBytes(role), [0]));
 
-        // the movie's 'udta': the title in 'meta/ilst/©nam' (and QuickTime's '©nam'), or both removed for ""
+        // the movie's 'udta': the title in iTunes 'meta/ilst/©nam' (the first such list; a 'meta' of iTunes without a list gets
+        // one, none at all a new 'meta'), in QuickTime's keyed metadata where it has one, QuickTime's '©nam' removed; for ""
+        // the title is removed everywhere
         private IEnumerable<Part> TitleChildren(Mp4Box udta)
         {
             var title = change.Title!;
@@ -412,10 +465,24 @@ public static class Mp4HeaderEditor
                     continue;
                 }
 
+                if (child.Type == "meta" && file.MetaHandler(child) == "mdta")
+                {
+                    yield return Part.Of(child, KeyedTitle);
+                    continue;
+                }
+
                 if (child.Type == "meta" && child.Find("ilst") is not null)
                 {
+                    var first = !placed;
                     placed = true;
-                    yield return Part.Of(child, meta => meta.Children.Select(c => c.Type == "ilst" ? Part.Of(c, ilst => ListChildren(ilst, title)) : Part.Of(c, null)));
+                    yield return Part.Of(child, meta => meta.Children.Select(c => c.Type == "ilst" ? Part.Of(c, ilst => ListChildren(ilst, first ? title : "")) : Part.Of(c, null)));
+                    continue;
+                }
+
+                if (child.Type == "meta" && file.MetaHandler(child) == "mdir" && !placed && title.Length > 0)
+                {
+                    placed = true;
+                    yield return Part.Of(child, meta => [.. meta.Children.Select(c => Part.Of(c, null)), Part.New(Box("ilst", Item(title)))]);
                     continue;
                 }
 
@@ -425,6 +492,46 @@ public static class Mp4HeaderEditor
             if (!placed && title.Length > 0)
             {
                 yield return Part.New(Title(title));
+            }
+        }
+
+        // QuickTime's keyed metadata ('mdta'): the item of the title key replaced by the new title, or removed for ""; a
+        // title is not added where there was none (the key list stays as it is)
+        private IEnumerable<Part> KeyedTitle(Mp4Box meta)
+        {
+            if (file.MetaHandler(meta) != "mdta")
+            {
+                foreach (var child in meta.Children)
+                {
+                    yield return Part.Of(child, null);
+                }
+
+                yield break;
+            }
+
+            var keys = file.TitleKeys(meta);
+            var title = change.Title!;
+            foreach (var child in meta.Children)
+            {
+                yield return child.Type != "ilst" || keys.Count == 0 ? Part.Of(child, null) : Part.Of(child, ilst => KeyedItems(ilst, keys, title));
+            }
+        }
+
+        private IEnumerable<Part> KeyedItems(Mp4Box ilst, IReadOnlySet<uint> keys, string title)
+        {
+            foreach (var item in ilst.Children)
+            {
+                var index = file.ItemIndex(item);
+                if (!keys.Contains(index))
+                {
+                    yield return Part.Of(item, null);
+                }
+                else if (title.Length > 0)
+                {
+                    var type = new byte[4];
+                    BinaryPrimitives.WriteUInt32BigEndian(type, index);
+                    yield return Part.New(Box(type, Box("data", Join([0, 0, 0, 1, 0, 0, 0, 0], Encoding.UTF8.GetBytes(title)))));
+                }
             }
         }
 
@@ -466,9 +573,16 @@ public static class Mp4HeaderEditor
             var wide = box.HeaderSize >= 16 && box.Type != "uuid" || box.HeaderSize == 32;
             output.Write(_bytes, (int)(box.Start - _start), box.HeaderSize);
 
-            // the bytes before the first child (the 4 of 'meta') and after the last one (QuickTime's zeros) stay as they are
+            // the bytes before the first child (the 4 of 'meta') and after the last one (QuickTime's zeros) stay as they are;
+            // a box with no child but zeros (QuickTime's end of a list) gets its new children before them
             var original = box.Children;
             var firstChild = original.Count > 0 ? original[0].Start : box.End;
+            var onlyZeros = original.Count == 0 && box.Type != "meta" && _bytes.AsSpan((int)(box.ContentStart - _start), (int)box.ContentSize).IndexOfAnyExcept((byte)0) < 0;
+            if (onlyZeros)
+            {
+                firstChild = box.ContentStart;
+            }
+
             output.Write(_bytes, (int)(box.ContentStart - _start), (int)(firstChild - box.ContentStart));
             foreach (var part in children(box))
             {
@@ -485,6 +599,10 @@ public static class Mp4HeaderEditor
             if (original.Count > 0)
             {
                 output.Write(_bytes, (int)(original[^1].End - _start), (int)(box.End - original[^1].End));
+            }
+            else if (onlyZeros)
+            {
+                output.Write(_bytes, (int)(box.ContentStart - _start), (int)box.ContentSize);
             }
 
             // the size of the box as it is now
@@ -514,11 +632,13 @@ public static class Mp4HeaderEditor
 
         private byte[] Raw(Mp4Box box) => _bytes.AsSpan((int)(box.Start - _start), (int)box.Size).ToArray();
 
-        private static byte[] Box(string type, ReadOnlySpan<byte> content)
+        private static byte[] Box(string type, ReadOnlySpan<byte> content) => Box(Mp4Reader.TypeBytes(type), content);
+
+        private static byte[] Box(byte[] type, ReadOnlySpan<byte> content)
         {
             var box = new byte[8 + content.Length];
             BinaryPrimitives.WriteUInt32BigEndian(box, (uint)box.Length);
-            Mp4Reader.TypeBytes(type).CopyTo(box, 4);
+            type.CopyTo(box, 4);
             content.CopyTo(box.AsSpan(8));
             return box;
         }

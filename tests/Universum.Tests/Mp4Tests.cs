@@ -83,6 +83,20 @@ public sealed class Mp4Tests
 
             Mp4HeaderEditor.Undo(path, undo);
             Assert.True(File.ReadAllBytes(path).SequenceEqual(before), "undone byte for byte");
+            Mp4HeaderEditor.Undo(path, undo);
+            Assert.True(File.ReadAllBytes(path).SequenceEqual(before), "undone again: a file as it was is left alone");
+
+            // owner, 8. 11. 2026 (review): a file another program wrote since is never cut – here the edited file written
+            // again with its movie box moved to the front and padding after it, as long as before (a rewrite by another tool)
+            var undoAgain = Mp4HeaderEditor.Apply(path, change);
+            var edited2 = File.ReadAllBytes(path);
+            var movie = Mp4Reader.Read(path).Movie;
+            var rewritten = edited2.AsSpan((int)movie.Start, (int)movie.Size).ToArray().Concat(edited2.AsSpan(0, (int)movie.Start).ToArray()).ToArray();
+            File.WriteAllBytes(path, rewritten);
+            Assert.Throws<Mp4UndoRefusedException>(() => Mp4HeaderEditor.Undo(path, undoAgain), "the movie box is not where UNIVERSUM wrote it");
+            Assert.True(File.ReadAllBytes(path).SequenceEqual(rewritten), "and the file is not touched");
+            File.WriteAllBytes(path, [.. edited2, 0, 0, 0, 8, (byte)'f', (byte)'r', (byte)'e', (byte)'e']);
+            Assert.Throws<Mp4UndoRefusedException>(() => Mp4HeaderEditor.Undo(path, undoAgain), "something written after UNIVERSUM's movie box");
         }
         finally
         {
@@ -228,6 +242,102 @@ public sealed class Mp4Tests
             work.Delete(recursive: true);
         }
     }
+
+    [Test]
+    public async Task UnusualHeadersOfReviewEditedRight()
+    {
+        // owner, 8. 11. 2026 – the review's cases: a 'udta' that is only QuickTime's end of a list, an iTunes 'meta' without
+        // a list, QuickTime's keyed title, a handler's name that looks like a length, a language with a region
+        var ffprobe = Tool("ffprobe");
+        var runner = new Universum.Core.Processes.ProcessRunner();
+        Func<Task<string?>>? probe = ffprobe is null ? null : () => Task.FromResult<string?>(ffprobe);
+        var path = Copy("en-cz.mp4");
+        try
+        {
+            // a track whose 'udta' holds only four zero bytes gets its name and roles before them
+            File.WriteAllBytes(path, WithTrackBox(File.ReadAllBytes(path), 1, Box("udta", new byte[4])));
+            Assert.True(Mp4Reader.Read(path).Tracks[1].Name is null, "the padding is no box");
+            var (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null,
+                new Mp4Change([new Mp4TrackChange(2) { Name = "Vymyslený zvuk", Roles = [Mp4Roles.Commentary], Language = LanguageTag.FromCode("pt-BR") }]), runner, probe, null, "0.0.0");
+            var track = Mp4Reader.Read(path).Tracks[1];
+            Assert.True(problems.Count == 0 && track is { Name: "Vymyslený zvuk", Roles: ["commentary"], Language: "por", ExtendedLanguage: "pt-BR" },
+                $"named, a commentary, Portuguese of Brazil – {string.Join("; ", problems)} {track.Name} {track.ExtendedLanguage}");
+
+            // a handler's name whose first letter looks like its length (an ISO file: a name ended by zero, as FFmpeg reads it)
+            var odd = "(" + new string('x', 39);
+            (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null, new Mp4Change([new Mp4TrackChange(3) { Name = odd }]), runner, probe, null, "0.0.0");
+            Assert.True(problems.Count == 0 && Mp4Reader.Read(path).Tracks[2].HandlerName == odd, "the name as it is – " + string.Join("; ", problems));
+
+            // an iTunes 'meta' without a list: the title goes into it, not into a second 'meta'
+            var mdir = Box("meta", [0, 0, 0, 0, .. Box("hdlr", [.. new byte[8], .. "mdirappl"u8.ToArray(), .. new byte[9]])]);
+            File.WriteAllBytes(path, WithMovieUserData(File.ReadAllBytes(path), Box("udta", mdir)));
+            (problems, _) = await Mp4Editing.ApplyCheckedAsync(path, null, new Mp4Change([], "Vymyslený titul"), runner, probe, null, "0.0.0");
+            var titled = Mp4Reader.Read(path);
+            Assert.True(problems.Count == 0 && titled.Title == "Vymyslený titul" && titled.Movie.Find("udta")!.Children.Count(c => c.Type == "meta") == 1,
+                "the title in the one 'meta' – " + string.Join("; ", problems));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        // QuickTime's keyed title (FFmpeg with use_metadata_tags): replaced, then removed
+        if (Tool("ffmpeg") is { } ffmpeg)
+        {
+            var keyed = Path.Combine(Path.GetTempPath(), $"universum-mp4-keyed-{Guid.NewGuid():N}.mp4");
+            try
+            {
+                await Run(ffmpeg, "-v", "error", "-y", "-i", TestData.Media("en-cz.mp4"), "-map", "0", "-c", "copy", "-movflags", "use_metadata_tags", "-metadata", "title=Starý vymyslený titul", keyed);
+                Assert.Equal("Starý vymyslený titul", Mp4Reader.Read(keyed).Title, "the keyed title read");
+                var (problems, _) = await Mp4Editing.ApplyCheckedAsync(keyed, null, new Mp4Change([], "Nový vymyslený titul"), runner, probe, null, "0.0.0");
+                Assert.True(problems.Count == 0 && Mp4Reader.Read(keyed).Title == "Nový vymyslený titul", "replaced – " + string.Join("; ", problems));
+                (problems, _) = await Mp4Editing.ApplyCheckedAsync(keyed, null, new Mp4Change([], ""), runner, probe, null, "0.0.0");
+                Assert.True(problems.Count == 0 && Mp4Reader.Read(keyed).Title is null, "removed – " + string.Join("; ", problems));
+            }
+            finally
+            {
+                File.Delete(keyed);
+            }
+        }
+    }
+
+    // a box of a type and content
+    private static byte[] Box(string type, byte[] content)
+    {
+        var box = new byte[8 + content.Length];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(box, (uint)box.Length);
+        System.Text.Encoding.ASCII.GetBytes(type).CopyTo(box, 4);
+        content.CopyTo(box, 8);
+        return box;
+    }
+
+    // the file with a box added at the end of a track (its movie box last in the file: the media data do not move)
+    private static byte[] WithTrackBox(byte[] file, int track, byte[] box)
+    {
+        var read = Mp4Reader.Read(new MemoryStream(file));
+        var trak = read.Tracks[track].Box;
+        Assert.True(read.Movie.End == file.Length && trak.HeaderSize == 8 && read.Movie.HeaderSize == 8, "the movie box last, small sizes");
+        var result = file.AsSpan(0, (int)trak.End).ToArray().Concat(box).Concat(file.AsSpan((int)trak.End).ToArray()).ToArray();
+        Grow(result, trak.Start, box.Length);
+        Grow(result, read.Movie.Start, box.Length);
+        return result;
+    }
+
+    // the file with the movie's 'udta' replaced
+    private static byte[] WithMovieUserData(byte[] file, byte[] udta)
+    {
+        var read = Mp4Reader.Read(new MemoryStream(file));
+        Assert.True(read.Movie.End == file.Length, "the movie box last");
+        var old = read.Movie.Children.FirstOrDefault(c => c.Type == "udta");
+        var cutAt = old?.Start ?? read.Movie.End;
+        var cutLength = old?.Size ?? 0;
+        var result = file.AsSpan(0, (int)cutAt).ToArray().Concat(udta).Concat(file.AsSpan((int)(cutAt + cutLength)).ToArray()).ToArray();
+        Grow(result, read.Movie.Start, (int)(udta.Length - cutLength));
+        return result;
+    }
+
+    private static void Grow(byte[] file, long at, int by) =>
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(file.AsSpan((int)at), System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(file.AsSpan((int)at)) + (uint)by);
 
     private static string? Tool(string name) => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
         .Select(folder => Path.Combine(folder, OperatingSystem.IsWindows() ? name + ".exe" : name)).FirstOrDefault(File.Exists);

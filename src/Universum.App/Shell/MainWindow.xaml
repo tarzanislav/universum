@@ -3651,6 +3651,12 @@
                             </TextBox.InputBindings>
                         </TextBox>
                     </DockPanel>
+                    <!-- owner, 8. 11. 2026: a title of the Zásobník TMDB with one click – its posters picked on ČSFD or TMDB first -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                        <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}"
+                                        Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </StackPanel>
                     <TextBlock Text="{Binding SearchStatus}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,8" />
                 </StackPanel>
                 <!-- the card of the title -->

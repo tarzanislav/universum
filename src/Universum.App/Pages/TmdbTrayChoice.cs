@@ -7,9 +7,10 @@ using Universum.Core.Library.Tmdb;
 namespace Universum.App.Pages;
 
 /// <summary>A title of the Zásobník TMDB as a list shows it: "Vymyslený film (2026) · film".</summary>
-public sealed record TmdbTrayRow(TmdbTrayEntry Entry)
+public sealed record TmdbTrayRow(TmdbTrayEntry Entry, int Posters = 0)
 {
-    public string Label => Entry.Display + " · " + (Entry.Kind == MediaKind.Series ? Loc.T("seriál") : Loc.T("film"));
+    public string Label => Entry.Display + " · " + (Entry.Kind == MediaKind.Series ? Loc.T("seriál") : Loc.T("film")) +
+                           (Posters > 0 ? " · " + Loc.F("plagáty: {0}", Posters) : "");
 
     public string ToolTip => Entry.Address.AbsoluteUri;
 }
@@ -37,7 +38,7 @@ public sealed class TmdbTrayChoice : ObservableObject
         ReadBrowserCommand = new AsyncRelayCommand(ReadBrowserAsync);
     }
 
-    public IReadOnlyList<TmdbTrayRow> Rows => [.. _services.TmdbTray.Entries.Select(e => new TmdbTrayRow(e))];
+    public IReadOnlyList<TmdbTrayRow> Rows => [.. _services.TmdbTray.Entries.Select(e => new TmdbTrayRow(e, _services.TmdbTray.PostersOf(e.Kind, e.Id).Count))];
 
     public bool HasRows => _services.TmdbTray.Entries.Count > 0;
 

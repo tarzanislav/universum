@@ -272,6 +272,9 @@ public sealed class AppServices
         };
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+
+    /// <summary>The web client of UNIVERSUM (the posters of the Zásobník TMDB are downloaded with it).</summary>
+    public static HttpClient WebClient => Http;
     private TmdbClient? _tmdb;
     private TitleSearch? _titles;
 
@@ -1328,6 +1331,9 @@ public sealed class AppSettings
 
     /// <summary>Downloaded posters (each one once).</summary>
     public static string PosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "posters");
+
+    /// <summary>The posters picked into the Zásobník TMDB (owner, 8. 11. 2026 – ČSFD and TMDB).</summary>
+    public static string TrayPosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "zasobnik-plagaty");
 
     /// <summary>The days read from the sources of news.</summary>
     public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");

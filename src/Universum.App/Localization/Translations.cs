@@ -3341,6 +3341,18 @@ internal static class Translations
         ["Priečinok sa nedá použiť: "] = "Složku nelze použít: ",
         ["Epizódy do zásobníka (S01E03)"] = "Epizody do zásobníku (S01E03)",
         ["Zapnuté: tlačidlo Do UNIVERSUM na stránke epizódy pridá epizódu – výber vyplní seriál aj epizódu. Vypnuté: pridá sa len seriál."] = "Zapnuto: tlačítko Do UNIVERSUM na stránce epizody přidá epizodu – výběr vyplní seriál i epizodu. Vypnuto: přidá se jen seriál.",
+        ["Upraviť ▾"] = "Upravit ▾",
+        ["Zmeniť vstup (zdroj)…"] = "Změnit vstup (zdroj)…",
+        ["Zmeniť výstup (knižnicu)…"] = "Změnit výstup (knihovnu)…",
+        ["Nastaviť ako hlavný (★)"] = "Nastavit jako hlavní (★)",
+        ["Odobrať disk (nič sa nezmaže)"] = "Odebrat disk (nic se nesmaže)",
+        ["VSTUP (zdroj)"] = "VSTUP (zdroj)",
+        ["VÝSTUP (knižnica)"] = "VÝSTUP (knihovna)",
+        ["Disk {0}"] = "Disk {0}",
+        ["Filmy z {0} sa zapíšu do {1}."] = "Filmy z {0} se zapíšou do {1}.",
+        ["Disk nemá vlastný výstup – filmy z {0} sa skopírujú do hlavného výstupu {1} na inom disku."] = "Disk nemá vlastní výstup – filmy z {0} se zkopírují do hlavního výstupu {1} na jiném disku.",
+        ["Disk nemá vstup – do {0} sa zapíšu filmy, ktoré ležia na tomto disku."] = "Disk nemá vstup – do {0} se zapíšou filmy, které leží na tomto disku.",
+        ["Sem idú aj filmy z diskov bez vlastného výstupu."] = "Sem jdou i filmy z disků bez vlastního výstupu.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6678,5 +6690,17 @@ internal static class Translations
         ["Priečinok sa nedá použiť: "] = "The folder cannot be used: ",
         ["Epizódy do zásobníka (S01E03)"] = "Episodes into the tray (S01E03)",
         ["Zapnuté: tlačidlo Do UNIVERSUM na stránke epizódy pridá epizódu – výber vyplní seriál aj epizódu. Vypnuté: pridá sa len seriál."] = "On: the Do UNIVERSUM button on an episode page adds the episode – choosing it fills the series and the episode. Off: only the series is added.",
+        ["Upraviť ▾"] = "Edit ▾",
+        ["Zmeniť vstup (zdroj)…"] = "Change the input (source)…",
+        ["Zmeniť výstup (knižnicu)…"] = "Change the output (library)…",
+        ["Nastaviť ako hlavný (★)"] = "Make it the main one (★)",
+        ["Odobrať disk (nič sa nezmaže)"] = "Remove the disk (nothing is deleted)",
+        ["VSTUP (zdroj)"] = "INPUT (source)",
+        ["VÝSTUP (knižnica)"] = "OUTPUT (library)",
+        ["Disk {0}"] = "Disk {0}",
+        ["Filmy z {0} sa zapíšu do {1}."] = "Films from {0} are written into {1}.",
+        ["Disk nemá vlastný výstup – filmy z {0} sa skopírujú do hlavného výstupu {1} na inom disku."] = "The disk has no output of its own – films from {0} are copied into the main output {1} on another disk.",
+        ["Disk nemá vstup – do {0} sa zapíšu filmy, ktoré ležia na tomto disku."] = "The disk has no input – films lying on this disk are written into {0}.",
+        ["Sem idú aj filmy z diskov bez vlastného výstupu."] = "Films from disks without an output of their own come here too.",
     };
 }

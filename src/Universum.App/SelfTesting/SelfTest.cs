@@ -4252,12 +4252,14 @@ internal static class SelfTest
                 $"disks: a source folder among the outputs is told – {wrong.Disk} {wrong.OutputText}");
             disks.OutputToInput(wrong.Row);
             var row = disks.Rows.Single(r => !r.IsMain);
-            Check(row.HasInput && Core.IO.Paths.Same(row.Input!, stiahnute) && !row.HasOutput && row.NeedsOutput && row.HasWarning &&
+            Check(row.HasInput && Core.IO.Paths.Same(row.Input!, stiahnute) && !row.HasOutput && row.NeedsOutput && row.Flow.Contains(main, StringComparison.OrdinalIgnoreCase) &&
                   services.InputDirectories.Any(i => Core.IO.Paths.Same(i, stiahnute)) && services.Settings.OtherOutputDirectories.Count == 0,
-                "disks: … it is the input of its disk now, the disk asks for an output – " + disks.Message + " | " + row.Warning);
+                "disks: … it is the input of its disk now, the disk says its films go to the main output – " + disks.Message + " | " + row.Flow);
             disks.CreateOutput(row.Row);
             row = disks.Rows.Single(r => !r.IsMain);
-            Check(row.HasOutput && Core.IO.Paths.Same(row.Output!, output) && services.LibraryFor(source)?.Root == Path.GetFullPath(output) && !row.NeedsOutput,
+            Check(row.HasOutput && Core.IO.Paths.Same(row.Output!, output) && services.LibraryFor(source)?.Root == Path.GetFullPath(output) && !row.NeedsOutput &&
+                  row.Flow.Contains(stiahnute, StringComparison.OrdinalIgnoreCase) && row.Flow.Contains(Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase) &&
+                  disks.Rows.Single(r => r.IsMain).MainCaption.Contains('★'),
                 $"disks: Vytvoriť výstup – {row.OutputText} beside the input, the film of that disk goes there – " + disks.Message);
             disks.SetInput(row.Row, output);
             Check(disks.Rows.Single(r => !r.IsMain).Input is { } stays && Core.IO.Paths.Same(stays, stiahnute) && disks.Message.Contains(output, StringComparison.OrdinalIgnoreCase),

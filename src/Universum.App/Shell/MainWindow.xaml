@@ -6184,6 +6184,8 @@
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
                                        Text="{loc:T 'Filmy a seriály, ktoré otvoríte na TMDB, sa zbierajú v pripnutej poznámke Zásobník TMDB (Poznámky); pri poliach titulu a TMDB ID ich vyberiete jedným klikom. 1. Do prehliadača si nainštalujte rozšírenie Tampermonkey alebo Violentmonkey (z obchodu s rozšíreniami). 2. Kliknite na Nainštalovať skript – rozšírenie ponúkne skript UNIVERSUM, potvrďte ho. Potom každá otvorená stránka filmu alebo seriálu na TMDB pribudne do zásobníka sama, a na stránke je aj tlačidlo Do UNIVERSUM. Skript posiela len na tento počítač (127.0.0.1) s tajným kľúčom; UNIVERSUM prijme len adresy filmov a seriálov TMDB.'}" />
                             <CheckBox Content="{loc:T 'Prijímať zo skriptu v prehliadači'}" IsChecked="{Binding TmdbTrayReceive}" />
+                            <CheckBox Content="{loc:T 'Epizódy do zásobníka (S01E03)'}" IsChecked="{Binding TmdbTrayEpisodes}" Margin="0,4,0,0"
+                                      ToolTip="{loc:T 'Zapnuté: tlačidlo Do UNIVERSUM na stránke epizódy pridá epizódu – výber vyplní seriál aj epizódu. Vypnuté: pridá sa len seriál.'}" />
                             <TextBlock Text="{Binding TmdbTrayStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6" />
                             <WrapPanel>
                                 <Button Content="{loc:T 'Nainštalovať skript'}" Command="{Binding InstallTrayScriptCommand}" Padding="12,5" Margin="0,0,8,4"

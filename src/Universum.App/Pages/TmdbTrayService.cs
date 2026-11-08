@@ -96,8 +96,9 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Adds a title (at the top; one already there moves up) and asks TMDB for its name as the library names it.</summary>
     public void Add(TmdbTrayEntry entry, bool fromBrowser = false, bool byItself = false)
     {
-        // pages sent by themselves add the film or series (an episode only by the button of its page)
-        entry = byItself ? entry.WithoutEpisode() : entry;
+        // pages sent by themselves add the film or series; an episode only by the button of its page and only when episodes
+        // are switched on (owner, 8. 11. 2026: off for now)
+        entry = byItself || !_services.Settings.TmdbTrayEpisodes ? entry.WithoutEpisode() : entry;
 
         // a title already in the tray sent by itself again (a season or an episode of it opened): nothing to do
         // (owner, 8. 11. 2026: one film or series – one send); the button of the page still moves it up

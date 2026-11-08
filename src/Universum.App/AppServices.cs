@@ -1245,6 +1245,9 @@ public sealed class AppSettings
     /// </summary>
     public bool TmdbTrayAuto { get; set; }
 
+    /// <summary>Episodes into the tray with their season and number (owner, 8. 11. 2026: there, but off for now – off, an episode page adds its series).</summary>
+    public bool TmdbTrayEpisodes { get; set; }
+
     /// <summary>The width of the note opened in Poznámky (owner, 8. 11. 2026: notes can be made larger).</summary>
     public double NotesEditorWidth { get; set; } = 340;
 

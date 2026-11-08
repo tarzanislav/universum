@@ -1887,6 +1887,17 @@ internal static class SelfTest
 
         // owner, 8. 11. 2026: the button on an episode page adds the episode – chosen, it fills the series and S01E03; an
         // episode page sent by itself adds only its series
+        var episodesBefore = services.Settings.TmdbTrayEpisodes;
+        services.Settings.TmdbTrayEpisodes = false;
+        await Send(tray.Key, "https://www.themoviedb.org/tv/444-vymysleny-serial-bez-epizod/season/1/episode/1", byItself: false);
+        for (var i = 0; i < 50 && !tray.Entries.Any(e => e.Id == 444); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(tray.Entries.Any(e => e is { Id: 444, IsEpisode: false }) && !tray.Entries.Any(e => e is { Id: 444, IsEpisode: true }),
+            "tray: episodes off (as by default) – the button on an episode page adds its series");
+        services.Settings.TmdbTrayEpisodes = true;
         var episodeSent = await Send(tray.Key, "https://www.themoviedb.org/tv/222-vymysleny-serial/season/1/episode/3", byItself: false);
         var seriesSent = await Send(tray.Key, "https://www.themoviedb.org/tv/333-iny-vymysleny-serial/season/2/episode/5");
         for (var i = 0; i < 50 && !(tray.Entries.Any(e => e is { Id: 222, IsEpisode: true }) && tray.Entries.Any(e => e.Id == 333)); i++)
@@ -1901,6 +1912,7 @@ internal static class SelfTest
         await Task.Delay(300);
         Check(library.TitleText == "https://www.themoviedb.org/tv/222" && library.EpisodeText == "S01E03",
             $"tray: an episode chosen fills the series and the episode – {library.TitleText} {library.EpisodeText}");
+        services.Settings.TmdbTrayEpisodes = episodesBefore;
 
         // the browser windows: a stand-in with a TMDB film in front, then the real windows (there may be none)
         var found = await tray.ReadBrowserAsync(() => [new BrowserWindow("themoviedb.org/movie/444-iny-vymysleny-film", ["Nejaká iná stránka – Vymyslený portál"])]);

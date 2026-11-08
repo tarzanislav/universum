@@ -585,6 +585,21 @@ public sealed class SettingsPageViewModel : ObservableObject
     public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
 
     /// <summary>Zásobník TMDB: UNIVERSUM's script in the browser may send films and series (saved at once, the receiver follows).</summary>
+    /// <summary>Episodes into the Zásobník TMDB with S01E03 (owner, 8. 11. 2026: off for now).</summary>
+    public bool TmdbTrayEpisodes
+    {
+        get => _services.Settings.TmdbTrayEpisodes;
+        set
+        {
+            if (value != _services.Settings.TmdbTrayEpisodes)
+            {
+                _services.Settings.TmdbTrayEpisodes = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool TmdbTrayReceive
     {
         get => _services.Settings.TmdbTrayReceive;

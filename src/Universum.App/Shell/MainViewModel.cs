@@ -23,6 +23,9 @@ public sealed class MainViewModel : ObservableObject
     private string _mkvToolNixStatus = Loc.T("Hľadám MKVToolNix…");
     private string _updateBadge = "";
 
+    /// <summary>The Zásobník TMDB – its switch at the top of the pages binds to it.</summary>
+    public TmdbTrayService TmdbTray => _services.TmdbTray;
+
     public MainViewModel(AppServices services)
     {
         _services = services;

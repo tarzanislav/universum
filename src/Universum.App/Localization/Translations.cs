@@ -3260,6 +3260,13 @@ internal static class Translations
         ["over"] = "ověřit",
         ["✓ V zásobníku UNIVERSUM"] = "✓ V zásobníku UNIVERSUM",
         ["＋ Do UNIVERSUM"] = "＋ Do UNIVERSUM",
+        ["Rozšíriť"] = "Rozšířit",
+        ["Vráti filmy a seriály do zásobníka, ako boli pred vyprázdnením"] = "Vrátí filmy a seriály do zásobníku, jak byly před vyprázdněním",
+        ["Vyprázdniť zásobník"] = "Vyprázdnit zásobník",
+        ["Vyprázdniť zásobník – nezostane v ňom žiaden film ani seriál z TMDB (dá sa vrátiť)"] = "Vyprázdnit zásobník – nezůstane v něm žádný film ani seriál z TMDB (lze vrátit)",
+        ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "Zapnuto: každý film a seriál, který otevřete na TMDB, se sám uloží do Zásobníku TMDB (potřebuje skript UNIVERSUM v prohlížeči – Nastavení). Vypnuto: jen tlačítkem Do UNIVERSUM na stránce.",
+        ["Zásobník TMDB zbiera"] = "Zásobník TMDB sbírá",
+        ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "Širší poznámka (další klik ještě širší, pak zase užší)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6516,5 +6523,12 @@ internal static class Translations
         ["over"] = "check",
         ["✓ V zásobníku UNIVERSUM"] = "✓ In UNIVERSUM's tray",
         ["＋ Do UNIVERSUM"] = "＋ To UNIVERSUM",
+        ["Rozšíriť"] = "Wider",
+        ["Vráti filmy a seriály do zásobníka, ako boli pred vyprázdnením"] = "Puts the films and series back into the tray as they were before it was emptied",
+        ["Vyprázdniť zásobník"] = "Empty the tray",
+        ["Vyprázdniť zásobník – nezostane v ňom žiaden film ani seriál z TMDB (dá sa vrátiť)"] = "Empty the tray – no TMDB film or series stays in it (it can be taken back)",
+        ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "On: every film and series you open on TMDB goes into the TMDB tray by itself (needs the UNIVERSUM script in the browser – Settings). Off: only by the Do UNIVERSUM button on the page.",
+        ["Zásobník TMDB zbiera"] = "TMDB tray collecting",
+        ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "A wider note (the next click wider still, then narrow again)",
     };
 }

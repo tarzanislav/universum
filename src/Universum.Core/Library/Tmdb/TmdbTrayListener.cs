@@ -20,10 +20,12 @@ public sealed class TmdbTrayListener : IDisposable
     private readonly string _key;
     private readonly Func<TmdbTrayEntry, Task> _received;
     private readonly Func<string> _script;
+    private readonly Func<bool> _automatic;
     private readonly CancellationTokenSource _stop = new();
 
-    private TmdbTrayListener(TcpListener listener, string key, Func<TmdbTrayEntry, Task> received, Func<string> script)
+    private TmdbTrayListener(TcpListener listener, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool> automatic)
     {
+        _automatic = automatic;
         _listener = listener;
         _key = key;
         _received = received;
@@ -35,8 +37,12 @@ public sealed class TmdbTrayListener : IDisposable
     /// <summary>A new secret key (32 hexadecimal characters).</summary>
     public static string NewKey() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
 
-    /// <summary>Listens on 127.0.0.1 (port 0: any free one); throws a <see cref="SocketException"/> when the port is taken.</summary>
-    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, Task> received, Func<string> script)
+    /// <summary>
+    /// Listens on 127.0.0.1 (port 0: any free one); throws a <see cref="SocketException"/> when the port is taken.
+    /// <paramref name="automatic"/>: whether pages the script sends by itself are taken now (owner, 8. 11. 2026: the
+    /// automatic gathering is switched on and off in UNIVERSUM; the button of the page is always taken).
+    /// </summary>
+    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool>? automatic = null)
     {
         if (key.Length < 16)
         {
@@ -45,7 +51,7 @@ public sealed class TmdbTrayListener : IDisposable
 
         var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
-        var door = new TmdbTrayListener(listener, key, received, script);
+        var door = new TmdbTrayListener(listener, key, received, script, automatic ?? (() => true));
         _ = Task.Run(door.AcceptAsync);
         return door;
     }
@@ -112,11 +118,15 @@ public sealed class TmdbTrayListener : IDisposable
 
         string? page;
         string? title;
+        bool sentByItself;
         try
         {
             using var json = JsonDocument.Parse(request.Body);
             page = json.RootElement.TryGetProperty("u", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : null;
             title = json.RootElement.TryGetProperty("t", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+
+            // "a": sent by itself (true) or by the button (false); a script of 1.0 does not say – it sent by itself
+            sentByItself = !json.RootElement.TryGetProperty("a", out var a) || a.ValueKind != JsonValueKind.False;
         }
         catch (JsonException)
         {
@@ -126,6 +136,12 @@ public sealed class TmdbTrayListener : IDisposable
         if (TmdbTray.FromPage(page, title) is not { } entry)
         {
             return (422, "text/plain", "");
+        }
+
+        if (sentByItself && !_automatic())
+        {
+            // the automatic gathering is switched off: the page is not taken (the button of the page still adds it)
+            return (202, "text/plain", "");
         }
 
         try
@@ -222,6 +238,7 @@ public sealed class TmdbTrayListener : IDisposable
     private static string Reason(int status) => status switch
     {
         200 => "OK",
+        202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
         403 => "Forbidden",

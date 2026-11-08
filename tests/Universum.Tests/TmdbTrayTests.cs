@@ -25,6 +25,7 @@ public sealed class TmdbTrayTests
             "added again: moved up, its name kept; text of the user is no title");
         Assert.Equal("https://www.themoviedb.org/movie/111", entries[0].FieldText, "a title field takes the address");
         Assert.Equal(1, TmdbTray.Read(TmdbTray.Remove(note, MediaKind.Movie, 111)).Count, "removed");
+        Assert.Equal("moja poznámka", TmdbTray.Clear("moja poznámka\n" + note), "emptied: the own line stays, no TMDB title");
     }
 
     [Test]
@@ -67,6 +68,7 @@ public sealed class TmdbTrayTests
     {
         var key = TmdbTrayListener.NewKey();
         var received = new List<TmdbTrayEntry>();
+        var automatic = true;
         using var door = TmdbTrayListener.Start(0, key, entry =>
         {
             lock (received)
@@ -75,7 +77,7 @@ public sealed class TmdbTrayTests
             }
 
             return Task.CompletedTask;
-        }, () => TmdbUserScript.Text(4711, key));
+        }, () => TmdbUserScript.Text(4711, key), () => automatic);
 
         async Task<string> Send(string request)
         {
@@ -106,6 +108,18 @@ public sealed class TmdbTrayTests
             Assert.True(received is [{ Kind: MediaKind.Movie, Id: 111, Name: "Vymyslený film (2026)" }], "one title received");
         }
 
+        // the automatic gathering switched off: pages sent by themselves are not taken, the button's still are
+        automatic = false;
+        Assert.True((await Send(Post(key, """{"u":"https://www.themoviedb.org/movie/112","a":true}"""))).StartsWith("HTTP/1.1 202", StringComparison.Ordinal), "by itself: not taken");
+        Assert.True((await Send(Post(key, """{"u":"https://www.themoviedb.org/movie/113"}"""))).StartsWith("HTTP/1.1 202", StringComparison.Ordinal), "the script 1.0 (by itself): not taken");
+        Assert.True((await Send(Post(key, """{"u":"https://www.themoviedb.org/tv/114","a":false}"""))).StartsWith("HTTP/1.1 204", StringComparison.Ordinal), "the button: taken");
+        automatic = true;
+        Assert.True((await Send(Post(key, """{"u":"https://www.themoviedb.org/movie/115","a":true}"""))).StartsWith("HTTP/1.1 204", StringComparison.Ordinal), "switched on again: taken");
+        lock (received)
+        {
+            Assert.Equal("111 114 115", string.Join(' ', received.Select(e => e.Id)), "what was taken");
+        }
+
         Assert.Throws<ArgumentException>(() => TmdbTrayListener.Start(0, "kratky", _ => Task.CompletedTask, () => ""), "a short key is no key");
     }
 
@@ -117,6 +131,7 @@ public sealed class TmdbTrayTests
         Assert.Sequence(["https://www.themoviedb.org/movie/*", "https://www.themoviedb.org/tv/*"], matches, "only TMDB's film and series pages");
         Assert.True(script.Contains("@connect      127.0.0.1", StringComparison.Ordinal) && !script.Contains("@connect      *", StringComparison.Ordinal) &&
                     script.Contains("'http://127.0.0.1:' + PORT", StringComparison.Ordinal), "only 127.0.0.1");
+        Assert.True(script.Contains("a: !button", StringComparison.Ordinal), "it says whether it sent by itself (UNIVERSUM takes those only while gathering)");
         Assert.True(TmdbUserScript.Bookmarklet.StartsWith("javascript:location.href='universum://tmdb?u='", StringComparison.Ordinal), "the bookmark");
     }
 }

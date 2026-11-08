@@ -81,6 +81,12 @@ public static partial class TmdbTray
     public static string Remove(string? note, MediaKind kind, int id) =>
         string.Join('\n', Lines(note).Where(line => !Matches(line, new TmdbTrayEntry(kind, id))));
 
+    /// <summary>
+    /// The tray emptied (owner, 8. 11. 2026: "reštart – nebude tam žiaden údaj z TMDB"): every film and series line out,
+    /// the owner's own lines stay.
+    /// </summary>
+    public static string Clear(string? note) => string.Join('\n', Lines(note).Where(line => Read(line).Count == 0));
+
     private static List<string> Lines(string? note) =>
         [.. (note ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Where(l => l.Trim().Length > 0)];
 

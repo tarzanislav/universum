@@ -32,6 +32,7 @@ public sealed class MkvMergeInspector(MkvToolNixInstallation installation, IProc
             throw new MkvToolNixException($"mkvmerge could not identify '{fullPath}' (exit code {result.ExitCode}): {detail.Trim()}");
         }
 
-        return MkvMergeIdentificationParser.Parse(result.StandardOutput, fullPath);
+        var file = MkvMergeIdentificationParser.Parse(result.StandardOutput, fullPath);
+        return file.IsMp4 ? Mp4.Mp4Roles.Read(file) : file;
     }
 }

@@ -305,11 +305,35 @@ public sealed class ProcessorTests
                     mp4Plan.Changes.Where(c => c.Kind == ChangeKind.Default).Select(c => (c.TrackId, c.After)).Order().SequenceEqual([(1, "0"), (2, "1"), (3, "0")]),
             "the English sound and the subtitles no longer default, the Czech sound default – " + string.Join("; ", mp4Plan.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
 
-        // a flag MP4 has no place for (forced): MKV
-        var forced = UniversumRules.Apply(inspected, keep) is var ruled
-            ? ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true } } : t).ToList() }
-            : null;
-        Assert.True(forced is { StaysMp4: false, Mp4Obstacle: not null }, "forced subtitles: written as MKV – " + forced?.Mp4Obstacle);
+        // subtitles left out (owner, 8. 11. 2026): gone from the header only – the file stays MP4, Vrátiť puts them back
+        var noSubtitles = UniversumRules.Apply(inspected, keep) with { Removed = [inspected.Tracks.Single(t => t.Type == TrackType.Subtitles)] };
+        noSubtitles = noSubtitles with { Tracks = noSubtitles.Tracks.Where(t => t.Type != TrackType.Subtitles).ToList() };
+        Assert.True(noSubtitles is { StaysMp4: true, HasChanges: true } && EditPlan.For(noSubtitles).Method == WriteMethod.HeaderEdit, "subtitles left out: still MP4 – " + noSubtitles.Mp4Obstacle);
+        var otherBytes = System.IO.File.ReadAllBytes(other);
+        var lighter = await processor.ProcessAsync(EditPlan.For(noSubtitles), work.Movie(EditPlan.For(noSubtitles)), OriginalsMode.MoveIntoLibrary.Output());
+        Assert.True(lighter is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && Universum.Core.Mp4.Mp4Reader.Read(lighter.OutputPath!).Tracks.All(t => t.Kind != Universum.Core.Mp4.Mp4TrackKind.Subtitles),
+            "moved, the subtitles gone – " + string.Join("; ", lighter.Messages));
+        var undoProblems = await processor.UndoAsync(lighter.UndoRecordPath!);
+        Assert.True(undoProblems.Count == 0 && System.IO.File.ReadAllBytes(other).SequenceEqual(otherBytes),
+            $"Vrátiť: the original with its subtitles, byte for byte – {string.Join("; ", undoProblems)} {System.IO.File.Exists(other)} {(System.IO.File.Exists(other) ? new FileInfo(other).Length : -1)} vs {otherBytes.Length}");
+
+        // forced subtitles for the hearing impaired (owner, 8. 11. 2026): roles of the track an MP4 holds – it stays MP4, and
+        // the roles are read back as flags (MKVToolNix does not read them)
+        var ruled = UniversumRules.Apply(inspected, keep);
+        var forced = ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true, HearingImpaired = true } } : t).ToList() };
+        Assert.True(forced is { StaysMp4: true, Mp4Changes: true } && EditPlan.For(forced).Changes.Any(c => c.Kind == ChangeKind.Forced) && EditPlan.For(forced).Changes.Any(c => c.Kind == ChangeKind.OtherFlags),
+            "forced subtitles for the hearing impaired stay MP4 – " + forced.Mp4Obstacle);
+        var withRoles = await processor.ProcessAsync(EditPlan.For(forced), work.Movie(EditPlan.For(forced)), Keep);
+        Assert.True(withRoles.Status == ProcessingStatus.Done && withRoles.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal), "written – " + string.Join("; ", withRoles.Messages));
+        var reread = await inspector.InspectAsync(withRoles.OutputPath!);
+        Assert.True(reread.Tracks.Single(t => t.Type == TrackType.Subtitles).Flags is { Forced: true, HearingImpaired: true } &&
+                    EditPlan.For(UniversumRules.Apply(reread, keep) with { Tracks = forced.Tracks.Select(t => t with { Source = reread.Tracks.Single(r => r.Number == t.Source.Number) }).ToList() }).Changes
+                        .All(c => c.Kind is not (ChangeKind.Forced or ChangeKind.OtherFlags)),
+            "read back: forced, for the hearing impaired – nothing to set again");
+
+        // a flag MP4 has no place for (original language): MKV
+        var originalFlag = ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Audio ? t with { Flags = t.Flags with { Original = !t.Source.Flags.Original } } : t).ToList() };
+        Assert.True(originalFlag is { StaysMp4: false, Mp4Obstacle: not null }, "the original language flag: written as MKV – " + originalFlag.Mp4Obstacle);
     }
 
     [Test]

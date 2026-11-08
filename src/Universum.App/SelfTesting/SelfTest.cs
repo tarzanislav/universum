@@ -810,9 +810,13 @@ internal static class SelfTest
             Check(kept is { Status: Core.Muxing.MuxStatus.Done } && kept.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) &&
                   kept.Messages.Contains(Core.Mp4.Mp4Editing.KeptMessage) && Core.Mp4.Mp4Reader.Read(kept.OutputPath).Title == "Vymyslený titul",
                 $"mux: written as MP4 (ffprobe: {kept.Messages.Contains(Core.Mp4.Mp4Editing.ProbedMessage)}) – " + string.Join("; ", kept.Messages));
+            // subtitles left out stay MP4 (8. 11. 2026); a sound left out makes an MKV, and the note says why
             mp4Set.Tracks[^1].Include = false;
+            Check(mp4Set.Mp4Note.StartsWith("Výsledok ostane MP4", StringComparison.Ordinal), "mux: subtitles left out – still MP4: " + mp4Set.Mp4Note);
+            mp4Set.Tracks[^1].Include = true;
+            mp4Set.Tracks.First(t => t.Track.Type == TrackType.Audio).Include = false;
             Check(mp4Set.Mp4Note.StartsWith("Výsledok bude MKV", StringComparison.Ordinal) && mp4Set.OutputPath.EndsWith(".mkv", StringComparison.Ordinal),
-                "mux: a track left out – an MKV, and why: " + mp4Set.Mp4Note + " | " + mp4Set.OutputPath);
+                "mux: a sound left out – an MKV, and why: " + mp4Set.Mp4Note + " | " + mp4Set.OutputPath);
         }
         finally
         {

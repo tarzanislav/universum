@@ -118,6 +118,15 @@ public sealed class Mp4Track
           HandlerName.Contains("Media Handler", StringComparison.OrdinalIgnoreCase) || HandlerName.StartsWith("ISO Media", StringComparison.OrdinalIgnoreCase) ? null
         : HandlerName;
 
+    /// <summary>The track's references to other tracks ('tref'): the type ("chap", "forc" …) and the IDs.</summary>
+    public IReadOnlyList<(string Type, IReadOnlyList<int> Ids)> References { get; private init; } = [];
+
+    /// <summary>The 'kind' boxes of the track's 'udta': (scheme, value).</summary>
+    public IReadOnlyList<(string Scheme, string Value)> Kinds { get; private init; } = [];
+
+    /// <summary>The roles of MPEG-DASH the track has ("forced-subtitle", "caption", "commentary" …; <see cref="Mp4Roles"/>).</summary>
+    public IReadOnlyList<string> Roles => [.. Kinds.Where(k => k.Scheme == Mp4Roles.Scheme).Select(k => k.Value)];
+
     /// <summary>The language of 'mdhd' (ISO 639-2, "und" when none).</summary>
     public string Language { get; private init; } = "und";
 
@@ -207,6 +216,31 @@ public sealed class Mp4Track
             name = Mp4Reader.Utf8(Mp4Reader.Content(movie, movieStart, named));
         }
 
+        var kinds = new List<(string, string)>();
+        foreach (var kind in trak.Find("udta")?.Children.Where(c => c.Type == "kind") ?? [])
+        {
+            var bytes = new Mp4Bytes(Mp4Reader.Content(movie, movieStart, kind), kind.ContentStart);
+            if (bytes.Left > 4)
+            {
+                bytes.Skip(4);
+                var scheme = bytes.ZeroEnded(256);
+                kinds.Add((scheme, bytes.ZeroEnded(256)));
+            }
+        }
+
+        var references = new List<(string, IReadOnlyList<int>)>();
+        foreach (var reference in trak.Find("tref")?.Children ?? [])
+        {
+            var bytes = new Mp4Bytes(Mp4Reader.Content(movie, movieStart, reference), reference.ContentStart);
+            var ids = new List<int>();
+            while (bytes.Left >= 4)
+            {
+                ids.Add((int)bytes.U32());
+            }
+
+            references.Add((reference.Type, ids));
+        }
+
         var (codec, entries, entryWidth, entryHeight, channels, sampleRate) = SampleEntry(trak, movie, movieStart, id, handlerType);
         return new Mp4Track(trak, movie, movieStart)
         {
@@ -214,6 +248,8 @@ public sealed class Mp4Track
             Handler = handlerType,
             HandlerName = handlerName,
             Name = name,
+            Kinds = kinds,
+            References = references,
             Language = language,
             ExtendedLanguage = elng,
             Flags = flags,

@@ -97,7 +97,10 @@ public sealed class Mp4Tests
         Assert.True(Mp4HeaderEditor.NewMovie(file, new Mp4Change([])).AsSpan().SequenceEqual(File.ReadAllBytes(TestData.Media("en-cz.mp4")).AsSpan((int)file.Movie.Start, (int)file.Movie.Size)),
             "no change: the movie box byte for byte");
         Assert.Throws<ArgumentException>(() => Mp4HeaderEditor.NewMovie(file, new Mp4Change([new Mp4TrackChange(9) { Name = "x" }])), "an unknown track");
-        Assert.Throws<ArgumentException>(() => Mp4HeaderEditor.NewMovie(file, new Mp4Change([], Order: [1, 2])), "an order without every track");
+        Assert.Throws<ArgumentException>(() => Mp4HeaderEditor.NewMovie(file, new Mp4Change([], Order: [1, 1])), "a track twice in the order");
+        Assert.Throws<ArgumentException>(() => Mp4HeaderEditor.NewMovie(file, new Mp4Change([], Order: [4, 1]) { Removed = [4] }), "a track left out in the order");
+        Assert.Throws<ArgumentException>(() => Mp4HeaderEditor.NewMovie(file, new Mp4Change([]) { Removed = [1, 2, 3, 4] }), "every track left out");
+        Assert.Sequence([1, 3, 2, 4], Mp4HeaderEditor.ResultOrder(file, new Mp4Change([], Order: [3, 2])), "the tracks not named keep their places");
     }
 
     [Test]
@@ -128,6 +131,113 @@ public sealed class Mp4Tests
         {
             File.Delete(path);
         }
+    }
+
+    [Test]
+    public async Task RolesOfTracksKeptTheWayFfmpegKeepsThem()
+    {
+        // owner, 8. 11. 2026: forced subtitles, subtitles for the hearing impaired and commentary in an MP4 – 'kind' boxes
+        // with the roles of MPEG-DASH, read and written as FFmpeg does (ffprobe and Jellyfin see them)
+        var path = Copy("en-cz.mp4");
+        try
+        {
+            Assert.True(Mp4Reader.Read(path).Tracks.All(t => t.Roles.Count == 0), "no roles in the test file");
+            Mp4HeaderEditor.Apply(path, new Mp4Change(
+            [
+                new Mp4TrackChange(4) { Roles = Mp4Roles.Of(new TrackFlags(Forced: true, HearingImpaired: true)) },
+                new Mp4TrackChange(3) { Roles = [Mp4Roles.Commentary], Name = "Vymyslený komentár" },
+            ]));
+            var edited = Mp4Reader.Read(path);
+            Assert.Sequence(["forced-subtitle", "caption"], edited.Tracks.Single(t => t.Id == 4).Roles, "the subtitles: forced, for the hearing impaired");
+            Assert.True(edited.Tracks.Single(t => t.Id == 3) is { Roles: ["commentary"], Name: "Vymyslený komentár" }, "the commentary, named");
+            Assert.True(Mp4Roles.Apply(new TrackFlags(), edited.Tracks.Single(t => t.Id == 4).Roles) is { Forced: true, HearingImpaired: true, Commentary: false }, "as flags");
+
+            // roles taken away again, the name stays
+            Mp4HeaderEditor.Apply(path, new Mp4Change([new Mp4TrackChange(3) { Roles = [] }]));
+            Assert.True(Mp4Reader.Read(path).Tracks.Single(t => t.Id == 3) is { Roles.Count: 0, Name: "Vymyslený komentár" }, "no roles, the name kept");
+
+            if (Tool("ffprobe") is { } ffprobe && Tool("ffmpeg") is { } ffmpeg)
+            {
+                Mp4HeaderEditor.Apply(path, new Mp4Change([new Mp4TrackChange(4) { Roles = [Mp4Roles.Forced] }, new Mp4TrackChange(2) { Roles = [Mp4Roles.Commentary] }]));
+                using var seen = System.Text.Json.JsonDocument.Parse(await Run(ffprobe, "-v", "error", "-show_entries", "stream=index:stream_disposition", "-of", "json", path));
+                var dispositions = seen.RootElement.GetProperty("streams").EnumerateArray().Select(stream => stream.GetProperty("disposition")).Select(d =>
+                    $"{d.GetProperty("comment").GetInt32()}{d.GetProperty("hearing_impaired").GetInt32()}{d.GetProperty("forced").GetInt32()}").ToList();
+                Assert.Sequence(["000", "100", "000", "001"], dispositions, "ffprobe sees the commentary and the forced subtitles (comment, hearing impaired, forced)");
+
+                // and what FFmpeg writes UNIVERSUM reads
+                var written = Path.Combine(Path.GetTempPath(), $"universum-mp4-kind-{Guid.NewGuid():N}.mp4");
+                try
+                {
+                    await Run(ffmpeg, "-v", "error", "-y", "-i", TestData.Media("en-cz.mp4"), "-map", "0", "-c", "copy", "-disposition:s:0", "forced+hearing_impaired", "-disposition:a:1", "comment", written);
+                    var read = Mp4Reader.Read(written);
+                    Assert.True(read.Tracks[2].Roles.Contains(Mp4Roles.Commentary) && read.Tracks[3].Roles.Contains(Mp4Roles.Forced) && read.Tracks[3].Roles.Contains(Mp4Roles.Caption),
+                        "the roles FFmpeg wrote – " + string.Join(" | ", read.Tracks.Select(t => string.Join(",", t.Roles))));
+                }
+                finally
+                {
+                    File.Delete(written);
+                }
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    public async Task SubtitlesLeftOutAndChaptersKept()
+    {
+        // owner, 8. 11. 2026: subtitles left out go from the header only (their bytes stay unused); an MP4 with chapters of
+        // QuickTime (a text track MKVToolNix does not show, referenced by the picture) keeps them in their place
+        if (Tool("ffmpeg") is not { } ffmpeg || Tool("ffprobe") is not { } ffprobe)
+        {
+            Assert.Skip("FFmpeg not on PATH");
+            return;
+        }
+
+        var work = Directory.CreateTempSubdirectory("universum-mp4-chapters-");
+        try
+        {
+            var metadata = Path.Combine(work.FullName, "kapitoly.txt");
+            File.WriteAllText(metadata, ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=1000\ntitle=Prvá\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=1000\nEND=2000\ntitle=Druhá\n");
+            var path = Path.Combine(work.FullName, "Vymyslený film s kapitolami.mp4");
+            await Run(ffmpeg, "-v", "error", "-y", "-i", TestData.Media("en-cz.mp4"), "-i", metadata, "-map", "0", "-map_chapters", "1", "-c", "copy", path);
+            var before = File.ReadAllBytes(path);
+            var original = Mp4Reader.Read(path);
+            var chapters = original.Tracks.Single(t => original.Tracks.Any(o => o.References.Any(r => r.Type == "chap" && r.Ids.Contains(t.Id)))).Id;
+            Assert.Equal(5, chapters, "the chapters are the fifth track, referenced by the picture");
+
+            // the Czech sound first, the subtitles left out – what MKVToolNix shows (the chapters are not named)
+            var change = new Mp4Change([new Mp4TrackChange(3) { Enabled = true }, new Mp4TrackChange(2) { Enabled = false }], Order: [1, 3, 2]) { Removed = [4] };
+            var (problems, probed) = await Mp4Editing.ApplyCheckedAsync(path, null, change, new Universum.Core.Processes.ProcessRunner(), () => Task.FromResult<string?>(ffprobe), null, "0.0.0");
+            Assert.True(problems.Count == 0 && probed, "changed and checked – " + string.Join("; ", problems));
+            var edited = Mp4Reader.Read(path);
+            Assert.Sequence([1, 3, 2, 5], edited.Tracks.Select(t => t.Id), "the subtitles gone, the chapters in their place");
+            Assert.True(edited.Tracks[0].References.Single(r => r.Type == "chap").Ids.SequenceEqual([5]), "the chapters still referenced");
+
+            // a referenced track left out takes its reference with it; undone byte for byte
+            var beforeRemoval = File.ReadAllBytes(path);
+            var undo = Mp4HeaderEditor.Apply(path, new Mp4Change([]) { Removed = [5] });
+            Assert.True(Mp4Reader.Read(path).Tracks is { Count: 3 } left && left[0].References.Count == 0, "no reference to a track that is gone");
+            Mp4HeaderEditor.Undo(path, undo);
+            Assert.True(File.ReadAllBytes(path).SequenceEqual(beforeRemoval) && before.Length < beforeRemoval.Length, "undone exactly");
+        }
+        finally
+        {
+            work.Delete(recursive: true);
+        }
+    }
+
+    private static string? Tool(string name) => (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+        .Select(folder => Path.Combine(folder, OperatingSystem.IsWindows() ? name + ".exe" : name)).FirstOrDefault(File.Exists);
+
+    private static async Task<string> Run(string tool, params string[] arguments)
+    {
+        var output = new System.Text.StringBuilder();
+        var result = await new Universum.Core.Processes.ProcessRunner().RunAsync(new Universum.Core.Processes.ProcessRequest(tool, arguments) { OnOutputLine = line => output.AppendLine(line) });
+        Assert.Equal(0, result.ExitCode, $"{Path.GetFileName(tool)}: {result.StandardError}");
+        return output.ToString();
     }
 
     [Test]

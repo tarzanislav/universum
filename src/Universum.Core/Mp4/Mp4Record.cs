@@ -52,7 +52,7 @@ public static class Mp4Record
                     }
 
                     text.AppendLine(invariant,
-                        $"  {track.Id}: {track.Handler} {track.Codec}{picture}, jazyk {track.Language}{(track.ExtendedLanguage is { } e ? " / " + e : "")}, názov {Hidden(track.Name)}, handler {Hidden(track.HandlerName)}, príznaky {track.Flags}, skupina {track.AlternateGroup}, časová mierka {track.Timescale}, úpravy času {track.Edits.Count}, popisov vzoriek {track.SampleEntries}, {samples}");
+                        $"  {track.Id}: {track.Handler} {track.Codec}{picture}, jazyk {track.Language}{(track.ExtendedLanguage is { } e ? " / " + e : "")}, názov {Hidden(track.Name)}, handler {Hidden(track.HandlerName)}, príznaky {track.Flags}, úlohy {(track.Kinds.Count == 0 ? "žiadne" : string.Join(",", track.Kinds.Select(k => k.Value)))}, skupina {track.AlternateGroup}, časová mierka {track.Timescale}, úpravy času {track.Edits.Count}, popisov vzoriek {track.SampleEntries}, {samples}");
                 }
             }
             catch (FormatException ex)

@@ -14,10 +14,23 @@ public sealed record Mp4TrackChange(int TrackId)
 
     /// <summary>Enabled – the default track of its kind (MP4 has no other "default").</summary>
     public bool? Enabled { get; init; }
+
+    /// <summary>
+    /// The roles UNIVERSUM manages the track is to have (<see cref="Mp4Roles.Managed"/>; empty: none of them) – null keeps
+    /// them; other roles stay.
+    /// </summary>
+    public IReadOnlyList<string>? Roles { get; init; }
 }
 
-/// <summary>The changes of an MP4's header: of its tracks, its title ("" removes it) and the order of its tracks (IDs).</summary>
-public sealed record Mp4Change(IReadOnlyList<Mp4TrackChange> Tracks, string? Title = null, IReadOnlyList<int>? Order = null);
+/// <summary>
+/// The changes of an MP4's header: of its tracks, its title ("" removes it), the order of its tracks (IDs of the tracks
+/// that stay) and the tracks left out (IDs; owner, 8. 11. 2026 – subtitles: their few bytes stay in the file unused, the
+/// track is gone from its header).
+/// </summary>
+public sealed record Mp4Change(IReadOnlyList<Mp4TrackChange> Tracks, string? Title = null, IReadOnlyList<int>? Order = null)
+{
+    public IReadOnlyList<int> Removed { get; init; } = [];
+}
 
 /// <summary>What is needed to put an edited MP4 back exactly as it was: its length and where its movie box was.</summary>
 public sealed record Mp4Undo(long Length, long MovieStart);
@@ -55,13 +68,42 @@ public static class Mp4HeaderEditor
             throw new ArgumentException($"the file has no track {unknown.TrackId}", nameof(change));
         }
 
-        if (change.Order is { } order && (order.Count != known.Count || !order.ToHashSet().SetEquals(known)))
+        if (change.Removed.Where(id => !known.Contains(id)).Select(id => (int?)id).FirstOrDefault() is { } missing)
         {
-            throw new ArgumentException("the order must name every track once", nameof(change));
+            throw new ArgumentException($"the file has no track {missing} to leave out", nameof(change));
+        }
+
+        var staying = known.Except(change.Removed).ToHashSet();
+        if (staying.Count == 0 || change.Tracks.Any(t => change.Removed.Contains(t.TrackId)))
+        {
+            throw new ArgumentException("a track left out cannot change, and some track must stay", nameof(change));
+        }
+
+        if (change.Order is { } order && (order.Distinct().Count() != order.Count || !order.All(staying.Contains)))
+        {
+            throw new ArgumentException("the order names a track twice, or one that does not stay", nameof(change));
         }
 
         var writer = new MovieWriter(file, change);
         return writer.Movie();
+    }
+
+    /// <summary>
+    /// The IDs of the tracks in the order they will have: the tracks the order names fill the places of the named ones
+    /// in its order; a track it does not name (one MKVToolNix does not show – QuickTime's chapters) keeps its place; the
+    /// tracks left out are gone.
+    /// </summary>
+    public static IReadOnlyList<int> ResultOrder(Mp4File file, Mp4Change change)
+    {
+        var staying = file.Tracks.Select(t => t.Id).Where(id => !change.Removed.Contains(id)).ToList();
+        if (change.Order is not { } order)
+        {
+            return staying;
+        }
+
+        var named = order.ToHashSet();
+        var queue = new Queue<int>(order);
+        return [.. staying.Select(id => named.Contains(id) ? queue.Dequeue() : id)];
     }
 
     /// <summary>
@@ -140,25 +182,22 @@ public static class Mp4HeaderEditor
             return output.ToArray();
         }
 
-        // the children of 'moov': the tracks in the order asked, the title in 'udta'
+        // the children of 'moov': the tracks that stay in the order asked, the title in 'udta'
         private IEnumerable<Part> MovieChildren(Mp4Box moov)
         {
-            var tracks = moov.All("trak").ToList();
-            if (change.Order is { } order)
+            // the tracks that stay take the places of the tracks that stay, in the order asked (the boxes between stay where they were)
+            var byId = file.Tracks.ToDictionary(t => t.Id, t => t.Box);
+            var queue = new Queue<Mp4Box>(ResultOrder(file, change).Select(id => byId[id]));
+            var removed = file.Tracks.Where(t => change.Removed.Contains(t.Id)).Select(t => t.Box).ToHashSet();
+            foreach (var child in moov.Children)
             {
-                var byId = file.Tracks.ToDictionary(t => t.Id, t => t.Box);
-                var queue = new Queue<Mp4Box>(order.Select(id => byId[id]));
-                // each track takes the place of the next one in the original order (the boxes between stay where they were)
-                foreach (var child in moov.Children)
+                if (child.Type != "trak")
                 {
-                    yield return child.Type == "trak" ? Part.Of(queue.Dequeue(), TrackChildren) : Part.Of(child, child.Type == "udta" && change.Title is not null ? TitleChildren : NoChange);
+                    yield return Part.Of(child, child.Type == "udta" && change.Title is not null ? TitleChildren : NoChange);
                 }
-            }
-            else
-            {
-                foreach (var child in moov.Children)
+                else if (!removed.Contains(child))
                 {
-                    yield return Part.Of(child, child.Type == "trak" ? TrackChildren : child.Type == "udta" && change.Title is not null ? TitleChildren : NoChange);
+                    yield return Part.Of(queue.Dequeue(), TrackChildren);
                 }
             }
 
@@ -177,7 +216,15 @@ public static class Mp4HeaderEditor
             _tracks.TryGetValue(id, out var wanted);
             foreach (var child in trak.Children)
             {
-                if (wanted is null)
+                if (child.Type == "tref" && change.Removed.Count > 0)
+                {
+                    // references to a track left out go with it (QuickTime's forced subtitles, chapters …)
+                    if (References(child) is { } kept)
+                    {
+                        yield return Part.New(kept);
+                    }
+                }
+                else if (wanted is null)
                 {
                     yield return Part.Of(child, null);
                 }
@@ -195,9 +242,9 @@ public static class Mp4HeaderEditor
                 {
                     yield return Part.Of(child, MediaChildren);
                 }
-                else if (child.Type == "udta" && wanted.Name is not null)
+                else if (child.Type == "udta" && (wanted.Name is not null || wanted.Roles is not null))
                 {
-                    yield return Part.Of(child, box => NamedChildren(box, wanted.Name));
+                    yield return Part.Of(child, box => TrackUserData(box, wanted));
                 }
                 else
                 {
@@ -205,9 +252,20 @@ public static class Mp4HeaderEditor
                 }
             }
 
-            if (wanted?.Name is { Length: > 0 } name && trak.Find("udta") is null)
+            if (wanted is not null && trak.Find("udta") is null && (wanted.Name is { Length: > 0 } || wanted.Roles is { Count: > 0 }))
             {
-                yield return Part.New(UserData(Box("name", Encoding.UTF8.GetBytes(name))));
+                var content = new List<byte>();
+                if (wanted.Name is { Length: > 0 } name)
+                {
+                    content.AddRange(Box("name", Encoding.UTF8.GetBytes(name)));
+                }
+
+                foreach (var role in wanted.Roles ?? [])
+                {
+                    content.AddRange(Kind(role));
+                }
+
+                yield return Part.New(UserData([.. content]));
             }
 
             IEnumerable<Part> MediaChildren(Mp4Box mdia)
@@ -263,31 +321,84 @@ public static class Mp4HeaderEditor
             return Box("hdlr", Join(fixedPart.ToArray(), written));
         }
 
-        // a track's 'udta': its 'name' replaced (or added, or removed for "")
-        private IEnumerable<Part> NamedChildren(Mp4Box udta, string name)
+        // a track's 'udta': its 'name' replaced (or added, or removed for ""), its roles of MPEG-DASH ('kind') written
+        // anew – the kinds of other schemes and all other boxes as they are
+        private IEnumerable<Part> TrackUserData(Mp4Box udta, Mp4TrackChange wanted)
         {
-            var written = false;
+            var named = false;
             foreach (var child in udta.Children)
             {
-                if (child.Type == "name")
+                if (child.Type == "name" && wanted.Name is { } name)
                 {
-                    if (!written && name.Length > 0)
+                    if (!named && name.Length > 0)
                     {
                         yield return Part.New(Box("name", Encoding.UTF8.GetBytes(name)));
                     }
 
-                    written = true;
+                    named = true;
+                    continue;
+                }
+
+                if (child.Type == "kind" && wanted.Roles is not null && IsManagedRole(child))
+                {
                     continue;
                 }
 
                 yield return Part.Of(child, null);
             }
 
-            if (!written && name.Length > 0)
+            if (!named && wanted.Name is { Length: > 0 } added)
             {
-                yield return Part.New(Box("name", Encoding.UTF8.GetBytes(name)));
+                yield return Part.New(Box("name", Encoding.UTF8.GetBytes(added)));
+            }
+
+            foreach (var role in wanted.Roles ?? [])
+            {
+                yield return Part.New(Kind(role));
             }
         }
+
+        // 'tref' without the IDs of the tracks left out (a type of reference left empty goes); null when nothing is left
+        private byte[]? References(Mp4Box tref)
+        {
+            var kept = new List<byte>();
+            foreach (var reference in tref.Children)
+            {
+                var content = _bytes.AsSpan((int)(reference.ContentStart - _start), (int)reference.ContentSize);
+                var ids = new List<byte>();
+                for (var at = 0; at + 4 <= content.Length; at += 4)
+                {
+                    if (!change.Removed.Contains((int)BinaryPrimitives.ReadUInt32BigEndian(content[at..])))
+                    {
+                        ids.AddRange(content.Slice(at, 4).ToArray());
+                    }
+                }
+
+                if (ids.Count > 0)
+                {
+                    kept.AddRange(Box(reference.Type, ids.ToArray()));
+                }
+            }
+
+            return kept.Count == 0 ? null : Box("tref", kept.ToArray());
+        }
+
+        // a 'kind' of the scheme of MPEG-DASH roles with a role UNIVERSUM sets (forced, caption, commentary, description)
+        private bool IsManagedRole(Mp4Box kind)
+        {
+            var content = new Mp4Bytes(_bytes.AsSpan((int)(kind.ContentStart - _start), (int)kind.ContentSize), kind.ContentStart);
+            if (content.Left <= 4)
+            {
+                return false;
+            }
+
+            content.Skip(4);
+            return content.ZeroEnded(256) == Mp4Roles.Scheme && Mp4Roles.Managed.Contains(content.ZeroEnded(256));
+        }
+
+        // 'kind' (a full box): the scheme and the value, each ended by zero
+        private static byte[] Kind(string role) =>
+            Box("kind", Join([0, 0, 0, 0], Encoding.UTF8.GetBytes(Mp4Roles.Scheme), [0], Encoding.UTF8.GetBytes(role), [0]));
 
         // the movie's 'udta': the title in 'meta/ilst/©nam' (and QuickTime's '©nam'), or both removed for ""
         private IEnumerable<Part> TitleChildren(Mp4Box udta)

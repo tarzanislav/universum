@@ -22,14 +22,19 @@ public static class Mp4Targets
                 Language = track.LanguageChanged ? track.Language : null,
                 Name = track.NameChanged ? track.Name ?? "" : null,
                 Enabled = track.Flags.Default != track.Source.Flags.Enabled ? track.Flags.Default : null,
+                Roles = Mp4Roles.Of(track.Flags) is var roles && !roles.SequenceEqual(Mp4Roles.Of(track.Source.Flags)) ? roles : null,
             };
-            if (change.Language is not null || change.Name is not null || change.Enabled is not null)
+            if (change.Language is not null || change.Name is not null || change.Enabled is not null || change.Roles is not null)
             {
                 tracks.Add(change);
             }
         }
 
-        return new Mp4Change(tracks, target.TitleChanged ? target.NewTitle : null, target.OrderChanged ? target.Tracks.Select(Id).ToList() : null);
+        // subtitles left out (8. 11. 2026): gone from the header; the order of the tracks that stay only when it changes
+        var removed = target.RemovedFromFile.Select(t => t.Number ?? throw new InvalidOperationException($"track {t.Id} of the MP4 has no number (its ID in the file)")).ToList();
+        var staying = target.Tracks.Select(Id).ToList();
+        var original = target.Source.Tracks.Where(t => t.ExternalFile is null && t.Number is { } n && !removed.Contains(n)).Select(t => t.Number!.Value).ToList();
+        return new Mp4Change(tracks, target.TitleChanged ? target.NewTitle : null, staying.SequenceEqual(original) ? null : staying) { Removed = removed };
     }
 
     private static int Id(TrackTarget track) =>
@@ -43,7 +48,7 @@ public static class Mp4Targets
     {
         var problems = new List<string>();
         var wanted = change.Tracks.ToDictionary(t => t.TrackId);
-        var order = change.Order ?? before.Tracks.Select(t => t.Id).ToList();
+        var order = Mp4HeaderEditor.ResultOrder(before, change);
         if (!after.Tracks.Select(t => t.Id).SequenceEqual(order))
         {
             problems.Add($"MP4 track order {string.Join(",", after.Tracks.Select(t => t.Id))}, expected {string.Join(",", order)}");
@@ -67,6 +72,10 @@ public static class Mp4Targets
             }
 
             Check(now.Enabled == (to?.Enabled ?? was.Enabled), $"{where}: default (enabled) {now.Enabled}");
+            var roles = Mp4Roles.ManagedOf(now.Roles);
+            var wantedRoles = to?.Roles is { } asked ? Mp4Roles.ManagedOf(asked) : Mp4Roles.ManagedOf(was.Roles);
+            Check(roles.SequenceEqual(wantedRoles) && now.Roles.Except(Mp4Roles.Managed).SequenceEqual(was.Roles.Except(Mp4Roles.Managed)),
+                $"{where}: roles {string.Join(",", now.Roles)}, expected {string.Join(",", wantedRoles)}");
             Check(now.Handler == was.Handler && now.Codec == was.Codec && now.Timescale == was.Timescale && now.Duration == was.Duration,
                 $"{where}: its kind, codec or length changed");
             var a = was.Samples;
@@ -117,9 +126,16 @@ public static class Mp4Targets
             }
 
             var wanted = change.Tracks.ToDictionary(t => t.TrackId);
+            // QuickTime's chapters are a text track FFmpeg shows as data: not checked
+            var chapters = after.Tracks.SelectMany(t => t.References.Where(r => r.Type == "chap").SelectMany(r => r.Ids)).ToHashSet();
             for (var i = 0; i < after.Tracks.Count; i++)
             {
                 var track = after.Tracks[i];
+                if (chapters.Contains(track.Id))
+                {
+                    continue;
+                }
+
                 var stream = streams[i];
                 var tags = stream.TryGetProperty("tags", out var t) ? t : default;
                 string? Tag(string name) => tags.ValueKind == JsonValueKind.Object && tags.TryGetProperty(name, out var value) ? value.GetString() : null;
@@ -146,6 +162,19 @@ public static class Mp4Targets
                     if (to.Name is { Length: > 0 } name && Tag("handler_name") != name)
                     {
                         problems.Add($"ffprobe: stream {i} name '{Tag("handler_name")}', expected '{name}'");
+                    }
+
+                    if (to.Roles is { } roles && stream.TryGetProperty("disposition", out var shown))
+                    {
+                        // FFmpeg reads the roles as dispositions (8. 11. 2026)
+                        foreach (var (role, field) in new[] { (Mp4Roles.Forced, "forced"), (Mp4Roles.Caption, "hearing_impaired"), (Mp4Roles.Commentary, "comment") })
+                        {
+                            var has = shown.TryGetProperty(field, out var value) && value.GetInt32() == 1;
+                            if (has != roles.Contains(role))
+                            {
+                                problems.Add($"ffprobe: stream {i} {field} {has}, expected {roles.Contains(role)}");
+                            }
+                        }
                     }
                 }
 

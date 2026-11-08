@@ -99,8 +99,9 @@ public sealed class CachingInspector : IMediaInspector
         }
     }
 
-    // the reading of an MP4's default tracks changed (7. 11. 2026: by its "enabled" flag): an MP4 read before is read again
-    private const int Mp4Revision = 2;
+    // the reading of an MP4 changed (7. 11. 2026: its default tracks by the "enabled" flag; 8. 11.: the roles of its
+    // tracks – forced, hearing impaired, commentary): an MP4 read before is read again
+    private const int Mp4Revision = 3;
 
     private sealed record Entry(long Size, long LastWriteUtcTicks, string Inspector, MediaFile File, int Revision = 0);
 }

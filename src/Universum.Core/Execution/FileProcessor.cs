@@ -314,7 +314,11 @@ public sealed class FileProcessor(
                     uids.TryAdd(track.Number!.Value, track.Uid);
                 }
 
-                if (record.Tracks.Count != uids.Count || record.Tracks.Any(t => t.Uid is not null && (!uids.TryGetValue(t.Number, out var uid) || uid != t.Uid)))
+                // an MP4 that stayed MP4 may have lost subtitles from its header (8. 11. 2026): its tracks are some of the recorded ones
+                var sameTracks = record.Mp4Length is not null
+                    ? uids.Keys.All(number => record.Tracks.Any(t => t.Number == number))
+                    : record.Tracks.Count == uids.Count;
+                if (!sameTracks || record.Tracks.Any(t => t.Uid is not null && (!uids.TryGetValue(t.Number, out var uid) || uid != t.Uid)))
                 {
                     return [$"{path} is not the file that was edited (its tracks differ); nothing was restored"];
                 }

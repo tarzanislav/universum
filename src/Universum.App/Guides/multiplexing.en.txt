@@ -57,7 +57,7 @@ You can **look at** the result first and send only the finished, flawless one to
 - Every tab has **its own preview** – you can prepare and compare several results at once.
 - If you change the settings after the preview, UNIVERSUM tells you the preview no longer matches the result.
 !info A preview is deleted with its tab or after a week. You change the folder of previews in the Settings.
-!tip **Keep MP4 as MP4:** one MP4 with all its tracks whose languages, names, default tracks, order or title only change is written **as MP4** – UNIVERSUM edits the header, picture and sound are not touched. Merging several files, leaving out a track, chapters or track properties make an MKV and the line by the option says why. A preview is always MKV.
+!tip **Keep MP4 as MP4:** one MP4 with all its sounds whose languages, names, default tracks, Forced, hearing impaired subtitles, commentary, order or title only change (subtitles may be left out) is written **as MP4** – UNIVERSUM edits the header, picture and sound are not touched. Merging several files, leaving out a sound, chapters or track properties make an MKV and the line by the option says why. A preview is always MKV.
 @otvorit Mux Open Multiplexing
 
 ## Header editing
@@ -74,7 +74,7 @@ in the library – it takes seconds to minutes.
 - The **Check** part warns e.g. about several tracks with Default or forced subtitles without Default.
 !info Changing the order or leaving out a track **writes a new file** – it takes minutes. Below the table you always see
   how the result will be written. [Undo] reverts the last saved change when possible.
-!tip For an MP4 there is **Keep MP4 as MP4** – the copy in the library stays MP4 and only its header changes; what MP4 cannot hold (a track left out, Forced…) is written as MKV.
+!tip For an MP4 there is **Keep MP4 as MP4** – the copy in the library stays MP4 and only its header changes; what MP4 cannot hold (a sound left out, an added track…) is written as MKV.
 ![Header editing](header-editor.jpg)
 @otvorit HeaderEditor Open Header editing
 

@@ -57,6 +57,13 @@ Hore sú návrhy, ktoré UNIVERSUM vypočíta samo (vybraný titul vo vstupnom p
 - [Nahrať hlasom] nahrá mikrofón a nahrávku **prepíše priamo vo vašom počítači** – nič neodchádza von.
   Nahrávka ostane pri poznámke a dá sa prehrať.
 !tip **Odkazy v poznámke** sú každý na svojom riadku; dlhý sa skráti a celý ho ukáže bublinka pri myši. **Kliknutím** sa stránka otvorí v prehliadači (aj video). Voľba [Meno namiesto linku] ukáže pri odkaze na TMDB **názov filmu alebo seriálu** – pôvodný, pri inom písme ako latinka anglický, ako v knižnici (treba kľúč TMDB). Otvorená poznámka má odkazy pod textom.
+### Zásobník TMDB
+Filmy a seriály, ktoré si otvoríte na TMDB, sa zbierajú v pripnutej poznámke **Zásobník TMDB** – s názvom a rokom podľa pravidiel knižnice a aktívnym odkazom. Pri poliach titulu a **TMDB ID** v Hromadnom, Single, Zlučovaní a štúdiách ich vyberiete jedným klikom v ponuke **Zo zásobníka TMDB…** – názov sa hneď načíta.
+1. Do prehliadača si nainštalujte rozšírenie **Tampermonkey** alebo **Violentmonkey**.
+2. V Nastaveniach (Zásobník TMDB) kliknite na [Nainštalovať skript] a potvrďte ho v rozšírení.
+3. Každá stránka filmu alebo seriálu, ktorú na TMDB otvoríte, pribudne do zásobníka sama; na stránke je aj tlačidlo **Do UNIVERSUM**.
+!tip Bez rozšírenia: [Kopírovať záložku Do UNIVERSUM] a záložku pridajte do lišty záložiek. Tlačidlo [Z prehliadača] prečíta filmy otvorené v oknách prehliadača – kartu vpredu presne, ostatné podľa názvu a roka (nejasné označí „over“).
+!info Skript posiela len na tento počítač (127.0.0.1) s tajným kľúčom; UNIVERSUM prijme len adresy filmov a seriálov TMDB.
 ![Poznámky](notes.jpg)
 @otvorit AgendaNotes Otvoriť Poznámky
 

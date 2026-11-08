@@ -11,6 +11,7 @@ using Universum.App.Setup;
 using Universum.App.Updates;
 using Universum.Core.Updates;
 using Universum.Core.MkvToolNix;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.Shell;
 
 namespace Universum.App.Shell;
@@ -951,6 +952,17 @@ public sealed class MainViewModel : ObservableObject
     {
         if (request.Paths.Count == 0)
         {
+            return;
+        }
+
+        // Zásobník TMDB (owner, 8. 11. 2026): a film or series from the browser – only a page of TMDB is taken
+        if (request.Action == ShellAction.Tmdb)
+        {
+            foreach (var entry in request.Paths.Select(TmdbTray.FromLink).OfType<TmdbTrayEntry>())
+            {
+                _services.TmdbTray.Add(entry, fromBrowser: true);
+            }
+
             return;
         }
 

@@ -24,6 +24,7 @@ public partial class App : Application
         Universum.Platform.Windows.WindowsVolumes.Register();
         Universum.Platform.Windows.WindowsDisks.Register();
         var services = new AppServices();
+        _services = services;
         Localization.Loc.Init(services.Settings.UiLanguage);
 
         if (e.Args.Contains(SelfTestSwitch, StringComparer.OrdinalIgnoreCase))
@@ -61,8 +62,14 @@ public partial class App : Application
             var (shown, handler) = await ready.Task;
             try
             {
-                shown.BringToFront();
-                await handler.HandleAsync(ShellRequest.Parse(args));
+                // a film from the browser goes to the Zásobník TMDB without taking the window away from the browser
+                var request = ShellRequest.Parse(args);
+                if (request.Action != ShellAction.Tmdb)
+                {
+                    shown.BringToFront();
+                }
+
+                await handler.HandleAsync(request);
             }
             catch (Exception ex)
             {
@@ -78,6 +85,10 @@ public partial class App : Application
         window.Show();
         ready.SetResult((window, model));
 
+        // Zásobník TMDB: the script in the browser sends films and series to 127.0.0.1; a short notice shows each one
+        services.TmdbTray.Received += entry => TrayToast.Show(Loc.F("Do zásobníka TMDB: {0}", entry.Display));
+        services.TmdbTray.StartReceiving();
+
         // the context menu of the Explorer: Zlučovanie, Hromadné spracovanie, Single spracovanie, Informácie
         await model.StartAsync(ShellRequest.Parse(e.Args));
     }
@@ -85,10 +96,13 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _instance?.Dispose();
+        _services?.TmdbTray.StopReceiving();
         base.OnExit(e);
     }
 
     private SingleInstance? _instance;
+
+    private AppServices? _services;
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {

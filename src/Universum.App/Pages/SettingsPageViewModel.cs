@@ -59,6 +59,34 @@ public sealed class SettingsPageViewModel : ObservableObject
         OpenHistraTokenPageCommand = new RelayCommand(() => OpenInBrowser(HistraApi.TokenPage));
         services.TmdbChanged += () => OnPropertyChanged(nameof(SyncStatus));
         services.KeepMp4Changed += () => OnPropertyChanged(nameof(KeepMp4));
+        InstallTrayScriptCommand = new RelayCommand(() =>
+        {
+            if (!_services.TmdbTray.Receiving)
+            {
+                TrayMessage = Loc.T("Najprv zapnite Prijímať zo skriptu v prehliadači – skript sa inštaluje z UNIVERSUM.");
+                return;
+            }
+
+            OpenInBrowser(new Uri(_services.TmdbTray.ScriptAddress));
+            TrayMessage = Loc.T("V prehliadači sa otvoril skript – potvrďte inštaláciu v Tampermonkey alebo Violentmonkey. Ak sa ukáže len text, rozšírenie nie je nainštalované.");
+        });
+        CopyTrayScriptCommand = new RelayCommand(() =>
+        {
+            System.Windows.Clipboard.SetText(_services.TmdbTray.Script);
+            TrayMessage = Loc.T("Skript je v schránke – v rozšírení zvoľte Nový skript (Vytvoriť nový skript), nahraďte text a uložte.");
+        });
+        CopyBookmarkletCommand = new RelayCommand(() =>
+        {
+            System.Windows.Clipboard.SetText(Universum.Core.Library.Tmdb.TmdbUserScript.Bookmarklet);
+            TrayMessage = Loc.T("Záložka je v schránke – pravým klikom na lištu záložiek → Pridať stránku, názov Do UNIVERSUM, adresu vložte.");
+        });
+        NewTrayKeyCommand = new RelayCommand(() =>
+        {
+            _services.TmdbTray.NewKey();
+            OnPropertyChanged(nameof(TrayScript));
+            OnPropertyChanged(nameof(TmdbTrayStatus));
+            TrayMessage = Loc.T("Nový kľúč je nastavený – skript nainštalujte znova (Nainštalovať skript).");
+        });
         OpenMp4RecordsCommand = new RelayCommand(() =>
         {
             Directory.CreateDirectory(AppSettings.Mp4RecordDirectory);
@@ -545,6 +573,40 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// of the profile saved by Uložiť).
     /// </summary>
     public bool KeepMp4 { get => _services.KeepMp4; set => _services.KeepMp4 = value; }
+
+    /// <summary>Zásobník TMDB: UNIVERSUM's script in the browser may send films and series (saved at once, the receiver follows).</summary>
+    public bool TmdbTrayReceive
+    {
+        get => _services.Settings.TmdbTrayReceive;
+        set
+        {
+            if (value != _services.Settings.TmdbTrayReceive)
+            {
+                _services.Settings.TmdbTrayReceive = value;
+                _services.Settings.Save();
+                _services.TmdbTray.StartReceiving();
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(TmdbTrayStatus));
+            }
+        }
+    }
+
+    public string TmdbTrayStatus => _services.TmdbTray.Status;
+
+    /// <summary>The script as it is installed (to read it before installing).</summary>
+    public string TrayScript => _services.TmdbTray.Script;
+
+    public string TrayMessage { get => _trayMessage; private set => SetProperty(ref _trayMessage, value); }
+
+    private string _trayMessage = "";
+
+    public RelayCommand InstallTrayScriptCommand { get; }
+
+    public RelayCommand CopyTrayScriptCommand { get; }
+
+    public RelayCommand CopyBookmarkletCommand { get; }
+
+    public RelayCommand NewTrayKeyCommand { get; }
 
     /// <summary>Opens the folder of the záznamy MP4 (what went wrong with an MP4, without names – for the developer).</summary>
     public RelayCommand OpenMp4RecordsCommand { get; }

@@ -38,6 +38,12 @@ public sealed class LibraryTargetPicker : ObservableObject
         _target = target;
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
         Tmdb.ConfirmationChanged += Update;
+        // Zásobník TMDB (owner, 8. 11. 2026): a title from the browser with one click – its address loads it
+        Tray = new TmdbTrayChoice(services, entry =>
+        {
+            TitleText = entry.FieldText;
+            return Task.CompletedTask;
+        });
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);
         services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += OnLibraryChanged;
@@ -57,6 +63,9 @@ public sealed class LibraryTargetPicker : ObservableObject
     }
 
     public TmdbPicker Tmdb { get; }
+
+    /// <summary>The choice from the Zásobník TMDB.</summary>
+    public TmdbTrayChoice Tray { get; }
 
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 

@@ -68,6 +68,12 @@ public sealed class RulesPageViewModel : ObservableObject
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
         Tmdb = new TmdbPicker(services, () => _kind, () => TitleText, ChooseTmdbTitle);
         Tmdb.ConfirmationChanged += UpdateTarget;
+        // Zásobník TMDB (owner, 8. 11. 2026): a title from the browser with one click – its address loads it
+        Tray = new TmdbTrayChoice(services, entry =>
+        {
+            TitleText = entry.FieldText;
+            return Task.CompletedTask;
+        });
         services.TitlesChanged += Tmdb.Refresh;
         services.LibraryChanged += () =>
         {
@@ -182,6 +188,9 @@ public sealed class RulesPageViewModel : ObservableObject
 
     /// <summary>Looking up the title on TMDB.</summary>
     public TmdbPicker Tmdb { get; }
+
+    /// <summary>The choice from the Zásobník TMDB.</summary>
+    public TmdbTrayChoice Tray { get; }
 
     /// <summary>A note to the title (e.g. TMDB has no English title).</summary>
     public string TitleNote { get => _titleNote; private set => SetProperty(ref _titleNote, value); }

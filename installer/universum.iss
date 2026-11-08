@@ -2,7 +2,7 @@
 ; published program are passed on the command line (/DAppVersion=..., /DSourceDir=...).
 
 #ifndef AppVersion
-  #define AppVersion "0.3.29"
+  #define AppVersion "0.3.30"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\publish"

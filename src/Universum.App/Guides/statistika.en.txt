@@ -55,16 +55,15 @@ A list of the **films and series UNIVERSUM wrote into the library** – it fills
 ## Settings
 Settings is one long page of blocks – scroll down.
 ![Settings](settings.jpg)
-- **Output folder (library)** – [Folder…] chooses the library. Films go to *MOVIES\\Title (year)*, series to
-  *TVSHOWS\\Title (year)\\Season 01*. UNIVERSUM **never deletes** the MOVIES and TVSHOWS folders.
-  A folder on another disk is offered **as a further output**; the default one is replaced only after a question. The input folder or a folder of films (a source) is no output.
-- **Output folders on other disks** – [Add…] adds an output folder on another disk or disk array (its own MOVIES and
-  TVSHOWS, another library for Jellyfin). A file is written **on the disk it lies on** – no copying between disks; a file
-  whose content does not change is only **moved** (at once) with "delete originals". **On how many disks at once** – the
-  disks work at the same time, one file on each (SSD/NVMe two). One audio or video re-encode runs at a time and the tools
-  work at a **low processor and disk priority** – the computer stays usable. Two partitions of one disk are known as one disk.
-- **Input folder** – [Change…] chooses it, [Open] shows it in File Explorer. New films and episodes arrive here;
-  UNIVERSUM **only reads** the files in it. The option [Watch the input folder – tell about new films and episodes] turns on the bar at the top.
+- **Folders on the disks** – one table, a row for every disk: **Input (source)** – new films and episodes come here,
+  UNIVERSUM **only reads** them – and **Output (library)** with MOVIES, TVSHOWS and POSTER (another library for Jellyfin each).
+  [+ Input folder…] and [+ Output folder…] add a folder, the [**…**] button in a row changes it, [Create an output]
+  makes the output beside the input (e.g. *D:\\UNIVERSUM\\VYSTUP*), [★ Main] sets the output for files from disks without one,
+  [Remove the disk] stops using it. A disk has one input and one output; an input is never an output – an output holding
+  films shows [It is a source – move it to Input]. Nothing in the folders is **ever deleted**.
+  A file is written **on the disk it lies on** – no copying; a file with no change of content is only **moved** with “delete originals”.
+  **On how many disks at once** – the disks work at the same time, one file on each (two on SSD/NVMe); re-encoding runs one
+  at a time with **low priority** – the computer stays usable. [Watch the input folders – tell about new films and episodes] turns on the bar at the top.
 - **Interface language (applies after a restart)** – Slovak, Czech or English (menu, headings, Settings, buttons).
 - **Sound notification** – the same as in the Job queue; sounds and volume are changed in the Windows sound settings.
 - **TMDB – titles of films and series** – paste your free TMDB key and press [Verify and save]. The option [Connect to TMDB]

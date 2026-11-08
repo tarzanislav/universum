@@ -723,7 +723,7 @@ public sealed class PosterPageViewModel : ObservableObject
             }
 
             Result = Loc.T("Hľadám film alebo seriál na vstupe…");
-            if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
+            if (await Task.Run(() => _services.InAnyInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 _services.WaitingPosters.Add(title, details.Id, jpeg);
                 Result = Loc.F("{0} je na vstupe ({1}), ešte nie je spracovaný – plagát čaká. Keď ho UNIVERSUM spracuje, dá {2} do jeho priečinka v {3}.",
@@ -788,7 +788,7 @@ public sealed class PosterPageViewModel : ObservableObject
             }
 
             ExtrasResult = Loc.T("Hľadám film alebo seriál na vstupe…");
-            if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
+            if (await Task.Run(() => _services.InAnyInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 var pictures = await MainFolderExtrasAsync(details, text => ExtrasResult = text);
                 if (pictures.Count == 0 && !stills)

@@ -5990,59 +5990,124 @@
                 <StackPanel Margin="32,24" MaxWidth="760" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Nastavenia'}" />
                     <TextBlock Style="{StaticResource Hint}" Text="{loc:T 'Knižnica a profil pravidiel UNIVERSUM. Predvolený profil zodpovedá špecifikácii (čeština a slovenčina).'}" Margin="0,0,0,16" />
+                    <!-- owner, 8. 11. 2026 ("v nastaveniach chaos – prerob"): every disk with its input and output side by side -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="12,5" VerticalAlignment="Top" />
-                                <StackPanel>
-                                    <TextBlock Text="{loc:T 'Výstupný priečinok (knižnica)'}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding OutputDescription}" TextWrapping="Wrap" Margin="0,4,0,0" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"
-                                       Text="{loc:T 'Filmy idú do MOVIES\\Názov (rok), seriály do TVSHOWS\\Názov (rok)\\Season 01 – podľa pravidiel Jellyfin. Priečinky MOVIES a TVSHOWS UNIVERSUM nikdy nemaže.'}" />
-                            <!-- owner, 2. 11. 2026: output folders on other disks – each file into the one on its own disk, disks at the same time -->
-                            <DockPanel Margin="0,14,0,0">
-                                <Button DockPanel.Dock="Right" Content="{loc:T 'Pridať…'}" Command="{Binding AddOtherOutputCommand}" Padding="12,5" VerticalAlignment="Top"
-                                        ToolTipService.ShowOnDisabled="True" ToolTip="{loc:T 'Výstupný priečinok na inom disku alebo diskovom poli – vznikne v ňom MOVIES, TVSHOWS a POSTER'}" />
-                                <StackPanel>
-                                    <TextBlock Text="{loc:T 'Výstupné priečinky na ďalších diskoch'}" FontWeight="SemiBold" />
-                                    <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap"
-                                               Text="{loc:T 'Súbor sa zapíše do výstupného priečinka na tom istom disku, kde leží – bez kopírovania medzi diskami; súbor z disku bez vlastného ide do predvoleného. Každý je samostatná knižnica (pre Jellyfin ďalšia knižnica).'}" />
-                                </StackPanel>
-                            </DockPanel>
-                            <ItemsControl ItemsSource="{Binding OtherOutputs}" Margin="0,6,0,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <DockPanel Margin="0,2">
-                                            <Button DockPanel.Dock="Right" Content="{loc:T 'Odobrať'}" Command="{Binding RemoveCommand}" Padding="10,2"
-                                                    ToolTip="{loc:T 'Priečinok sa prestane používať; nič v ňom sa nezmení ani nezmaže'}" />
-                                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap">
-                                                <Run Text="{Binding Folder, Mode=OneWay}" FontWeight="SemiBold" /> <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </TextBlock>
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="{Binding OutputMessage}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,0" />
-                            <TextBlock Text="{Binding OutputWarning}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
-                                       Visibility="{Binding HasOutputWarning, Converter={StaticResource BoolToVisibility}}" />
-                            <CheckBox Content="{loc:T 'Súbor zapísať do výstupného priečinka na jeho disku'}" IsChecked="{Binding OutputBySourceDisk}" Margin="0,8,0,0"
-                                      ToolTip="{loc:T 'Vypnuté: všetko do predvoleného výstupného priečinka ako doteraz'}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <TextBlock Text="{loc:T 'Na koľkých diskoch naraz:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox ItemsSource="{Binding ParallelDiskChoices}" SelectedItem="{Binding ParallelDisks}" Width="70"
-                                          ToolTip="{loc:T 'Na každom disku vždy len jeden súbor (inak by sa spomaľovali); prekódovanie zvuku a obrazu len jedno naraz a s nižšou prioritou – počítač ostane použiteľný. 1 = jeden súbor po druhom.'}" />
+                            <StackPanel DataContext="{Binding Disks}">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <Button Content="{loc:T '+ Vstupný priečinok…'}" Command="{Binding AddInputCommand}" Padding="10,4" Margin="6,0,0,0"
+                                                ToolTip="{loc:T 'Priečinok, kam prichádzajú nové filmy a epizódy – na každom disku jeden. UNIVERSUM v ňom súbory len číta.'}" />
+                                        <Button Content="{loc:T '+ Výstupný priečinok…'}" Command="{Binding AddOutputCommand}" Padding="10,4" Margin="6,0,0,0"
+                                                ToolTip="{loc:T 'Knižnica – vzniknú v nej MOVIES, TVSHOWS a POSTER; na každom disku jedna. Nikdy nie vstupný priečinok.'}" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:T 'Priečinky na diskoch'}" FontWeight="SemiBold" FontSize="15" />
+                                        <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                   Text="{loc:T 'Na každom disku vstup (sem prichádzajú filmy a epizódy – UNIVERSUM ich len číta) a výstup (knižnica s MOVIES, TVSHOWS a POSTER). Súbor sa zapíše do výstupu na svojom disku – bez kopírovania; súbor z disku bez výstupu ide do hlavného (★). V priečinkoch sa nikdy nič nemaže.'}" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <Grid Margin="0,12,0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="86" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="128" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{loc:T 'Disk'}" Style="{StaticResource Hint}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{loc:T 'Vstup (zdroj)'}" Style="{StaticResource Hint}" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="2" Text="{loc:T 'Výstup (knižnica)'}" Style="{StaticResource Hint}" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,6">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="86" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="128" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock FontWeight="SemiBold" FontSize="14">
+                                                                <Run Text="{Binding Disk, Mode=OneWay}" />
+                                                                <Run Foreground="#E0A800">
+                                                                    <Run.Style>
+                                                                        <Style TargetType="Run">
+                                                                            <Setter Property="Text" Value=" ★" />
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsMain}" Value="False">
+                                                                                    <Setter Property="Text" Value="" />
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </Run.Style>
+                                                                </Run>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{loc:T 'hlavný'}" Style="{StaticResource Hint}" FontSize="11" Visibility="{Binding IsMain, Converter={StaticResource BoolToVisibility}}"
+                                                                       ToolTip="{loc:T 'Súbory z diskov bez vlastného výstupu idú sem.'}" />
+                                                            <TextBlock Text="{Binding Free}" Style="{StaticResource Hint}" FontSize="11" />
+                                                        </StackPanel>
+                                                        <DockPanel Grid.Column="1" Margin="0,0,8,0">
+                                                            <Button DockPanel.Dock="Right" Content="…" Command="{Binding ChangeInputCommand}" Padding="8,1" VerticalAlignment="Top" Margin="4,0,0,0"
+                                                                    ToolTip="{loc:T 'Zmeniť vstupný priečinok tohto disku'}" />
+                                                            <TextBlock Text="{Binding InputText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                        </DockPanel>
+                                                        <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                                                            <DockPanel>
+                                                                <Button DockPanel.Dock="Right" Content="…" Command="{Binding ChangeOutputCommand}" Padding="8,1" VerticalAlignment="Top" Margin="4,0,0,0"
+                                                                        ToolTip="{loc:T 'Zmeniť výstupný priečinok tohto disku'}" />
+                                                                <TextBlock Text="{Binding OutputText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                            </DockPanel>
+                                                            <Button Content="{loc:T 'Vytvoriť výstup'}" Command="{Binding CreateOutputCommand}" Padding="8,2" Margin="0,4,0,0" HorizontalAlignment="Left"
+                                                                    ToolTip="{Binding SuggestedOutput}" Visibility="{Binding NeedsOutput, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="3">
+                                                            <Button Content="{loc:T '★ Hlavný'}" Command="{Binding MakeMainCommand}" Padding="8,2" Margin="0,0,0,4" HorizontalAlignment="Stretch"
+                                                                    Visibility="{Binding CanMakeMain, Converter={StaticResource BoolToVisibility}}"
+                                                                    ToolTip="{loc:T 'Výstup tohto disku bude hlavný – pôjdu sem súbory z diskov bez vlastného výstupu.'}" />
+                                                            <Button Content="{loc:T 'Odobrať disk'}" Command="{Binding RemoveCommand}" Padding="8,2" HorizontalAlignment="Stretch"
+                                                                    Visibility="{Binding IsMain, Converter={StaticResource InverseBoolToVisibility}}"
+                                                                    ToolTip="{loc:T 'Priečinky tohto disku sa prestanú používať – nič v nich sa nezmení ani nezmaže.'}" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                               Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}" />
+                                                    <WrapPanel Margin="0,4,0,0">
+                                                        <Button Content="{loc:T 'Je to zdroj – presunúť do Vstup'}" Command="{Binding OutputToInputCommand}" Padding="8,2" Margin="0,0,6,0"
+                                                                Visibility="{Binding OutputLooksLikeSource, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTip="{loc:T 'V tomto výstupe sú filmy mimo MOVIES a TVSHOWS – vyzerá ako zdrojový priečinok. Stane sa vstupom disku; nič sa v ňom nezmení.'}" />
+                                                        <Button Content="{loc:T 'Odobrať priečinky navyše'}" Command="{Binding RemoveExtrasCommand}" Padding="8,2"
+                                                                Visibility="{Binding HasExtras, Converter={StaticResource BoolToVisibility}}" />
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{loc:T 'Zatiaľ žiadne priečinky – pridajte vstupný a výstupný priečinok.'}" Style="{StaticResource Hint}" Margin="0,8,0,0"
+                                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
+                            <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+                                <StackPanel>
+                                    <CheckBox Content="{loc:T 'Súbor zo vstupu zapísať do výstupu na tom istom disku (bez kopírovania)'}" IsChecked="{Binding OutputBySourceDisk}"
+                                              ToolTip="{loc:T 'Vypnuté: všetko do hlavného výstupu (★)'}" />
+                                    <CheckBox Content="{loc:T 'Sledovať vstupné priečinky – upozorniť na nové filmy a epizódy'}" IsChecked="{Binding WatchInput}" Margin="0,6,0,0"
+                                              ToolTip="{loc:T 'Keď sa do vstupného priečinka dokopíruje film alebo epizóda, hore sa ukáže upozornenie s tlačidlom Do Hromadného spracovania. Nič sa nespracuje samo.'}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="{loc:T 'Na koľkých diskoch naraz:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <ComboBox ItemsSource="{Binding ParallelDiskChoices}" SelectedItem="{Binding ParallelDisks}" Width="70"
+                                                  ToolTip="{loc:T 'Na každom disku vždy len jeden súbor (inak by sa spomaľovali); prekódovanie zvuku a obrazu len jedno naraz a s nižšou prioritou – počítač ostane použiteľný. 1 = jeden súbor po druhom.'}" />
+                                    </StackPanel>
+                                    <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
+                                               Text="{loc:T 'Vo vstupe dajte filmy do MOVIES a seriály do TVSHOWS (každý seriál do vlastného priečinka). Filmy idú do MOVIES\\Názov (rok), seriály do TVSHOWS\\Názov (rok)\\Season 01 – podľa pravidiel Jellyfin. MOVIES a TVSHOWS UNIVERSUM nikdy nemaže.'}" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
-                    <StackPanel Margin="0,0,0,16">
-                        <ContentControl Content="{Binding InputFolder}" />
-                        <CheckBox Content="{loc:T 'Sledovať vstupný priečinok – upozorniť na nové filmy a epizódy'}" IsChecked="{Binding WatchInput}" Margin="4,8,0,0"
-                                  ToolTip="{loc:T 'Keď sa do vstupného priečinka dokopíruje film alebo epizóda, hore sa ukáže upozornenie s tlačidlom Do Hromadného spracovania. Nič sa nespracuje samo.'}" />
-                        <TextBlock Style="{StaticResource Hint}" FontSize="12" Margin="4,4,0,0" TextWrapping="Wrap"
-                                   Text="{loc:T 'Sem prichádzajú nové filmy a epizódy. Novinky – Seriály v ňom (aj v podpriečinkoch) hľadajú epizódy, ktoré odošlete na spracovanie; Single a Hromadné spracovanie v ňom otvárajú výber súborov. Súbory v ňom UNIVERSUM len číta.'}" />
-                    </StackPanel>
                     <!-- owner, 1. 11. 2026: where Zlučovanie writes its previews – never the output folders -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>

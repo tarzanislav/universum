@@ -4211,6 +4211,42 @@ internal static class SelfTest
             Check(settings.HasOutputWarning, "disks: two outputs on one disk said – " + settings.OutputWarning);
             services.Settings.OtherOutputDirectories.Clear();
             batch.Folder = batchFolder;
+
+            // owner, 8. 11. 2026 – Priečinky na diskoch: the source folder of the other disk saved among the outputs (as the
+            // owner did) is told and becomes the input of its disk; its output made with one click beside it; ★ moved and back
+            var disks = settings.Disks;
+            var stiahnute = Path.GetDirectoryName(source)!;
+            services.AddOutputDirectory(stiahnute);
+            var wrong = disks.Rows.Single(r => !r.IsMain && Core.IO.Paths.Same(r.Output!, stiahnute));
+            Check(wrong.OutputLooksLikeSource && !wrong.HasInput && disks.Rows.Single(r => r.IsMain).Output == main,
+                $"disks: a source folder among the outputs is told – {wrong.Disk} {wrong.OutputText}");
+            disks.OutputToInput(wrong.Row);
+            var row = disks.Rows.Single(r => !r.IsMain);
+            Check(row.HasInput && Core.IO.Paths.Same(row.Input!, stiahnute) && !row.HasOutput && row.NeedsOutput && row.HasWarning &&
+                  services.InputDirectories.Any(i => Core.IO.Paths.Same(i, stiahnute)) && services.Settings.OtherOutputDirectories.Count == 0,
+                "disks: … it is the input of its disk now, the disk asks for an output – " + disks.Message + " | " + row.Warning);
+            disks.CreateOutput(row.Row);
+            row = disks.Rows.Single(r => !r.IsMain);
+            Check(row.HasOutput && Core.IO.Paths.Same(row.Output!, output) && services.LibraryFor(source)?.Root == Path.GetFullPath(output) && !row.NeedsOutput,
+                $"disks: Vytvoriť výstup – {row.OutputText} beside the input, the film of that disk goes there – " + disks.Message);
+            disks.SetInput(row.Row, output);
+            Check(disks.Rows.Single(r => !r.IsMain).Input is { } stays && Core.IO.Paths.Same(stays, stiahnute) && disks.Message.Contains(output, StringComparison.OrdinalIgnoreCase),
+                "disks: an output is no input – " + disks.Message);
+            disks.AddInput(Path.Combine(folder, "druhy-zdroj"));
+            Check(services.InputDirectories.Count(i => Core.IO.Paths.SameVolume(i, folder)) == 1, "disks: one input per disk – " + disks.Message);
+            disks.MakeMain(row.Row);
+            Check(Core.IO.Paths.Same(services.Library!.Root, output) && services.Settings.OtherOutputDirectories.Any(o => Core.IO.Paths.Same(o, main)) && disks.Rows[0].IsMain && disks.Rows[0].Output == services.Library.Root,
+                "disks: ★ moved to the other disk – " + disks.Message);
+            disks.MakeMain(disks.Rows.Single(r => r.Output is { } o && Core.IO.Paths.Same(o, main)).Row);
+            Check(Core.IO.Paths.Same(services.Library!.Root, main), "disks: ★ back – " + disks.Message);
+            disks.Remove(disks.Rows.Single(r => r.IsMain).Row);
+            Check(Core.IO.Paths.Same(services.Library!.Root, main) && disks.Message.Contains("★", StringComparison.Ordinal), "disks: the disk of ★ cannot be removed – " + disks.Message);
+            model.Open(settings);
+            await Task.Delay(300);
+            await Screenshot(window, "disks-settings.png");
+            disks.Remove(disks.Rows.Single(r => !r.IsMain).Row);
+            Check(!services.InputDirectories.Any(i => Core.IO.Paths.SameVolume(i, folder)) && services.Settings.OtherOutputDirectories.Count == 0 && File.Exists(source),
+                "disks: the disk removed, nothing in its folders touched – " + disks.Message);
             settings.Ask = askBefore;
         }
         finally

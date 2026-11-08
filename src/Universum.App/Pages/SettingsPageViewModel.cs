@@ -116,6 +116,11 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// <summary>The input folder (the same on every page).</summary>
     public InputFolderViewModel InputFolder => _services.InputFolder;
 
+    /// <summary>Priečinky na diskoch – every disk with its input and output folder (owner, 8. 11. 2026).</summary>
+    public DiskFolders Disks => _disks ??= new DiskFolders(_services, this);
+
+    private DiskFolders? _disks;
+
     /// <summary>Zdroje noviniek (Premiéry, Novinky).</summary>
     public NewsSourcesViewModel NewsSources { get; }
 
@@ -165,7 +170,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         static bool Inside(string folder, string? root) =>
             root is { Length: > 0 } && (SameFolder(folder, root) || folder.StartsWith(Path.GetFullPath(root).TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
         static bool SameFolder(string a, string b) => string.Equals(a.TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
-        if (Inside(chosen, _services.Library?.Root) || Inside(chosen, _services.Settings.InputDirectory))
+        if (_services.OutputDirectories.Concat(_services.InputDirectories).Any(root => Inside(chosen, root)))
         {
             PreviewFolderNote = Loc.T("Náhľady nesmú byť vo výstupnom priečinku (knižnici) ani vo vstupnom priečinku – zvoľte iný. ") + PreviewNote();
             return;
@@ -791,7 +796,7 @@ public sealed class SettingsPageViewModel : ObservableObject
     // the checks every output folder passes: not the input folder, not a folder of films (asked)
     private bool Acceptable(string chosen)
     {
-        if (Universum.Core.Library.OutputFolders.Problem(chosen, _services.InputDirectory) is { } problem)
+        if (Universum.Core.Library.OutputFolders.Problem(chosen, _services.InputDirectories) is { } problem)
         {
             OutputMessage = problem;
             return false;

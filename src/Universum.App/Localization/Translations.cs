@@ -3339,6 +3339,8 @@ internal static class Translations
         ["Výstupný priečinok nemôže byť v MOVIES ani v TVSHOWS iného výstupu."] = "Výstupní složka nemůže být v MOVIES ani v TVSHOWS jiného výstupu.",
         ["Disk zatiaľ nemá výstup – vytvorte ho tlačidlom Vytvoriť výstup v jeho riadku."] = "Disk zatím nemá výstup – vytvořte ho tlačítkem Vytvořit výstup v jeho řádku.",
         ["Priečinok sa nedá použiť: "] = "Složku nelze použít: ",
+        ["Epizódy do zásobníka (S01E03)"] = "Epizody do zásobníku (S01E03)",
+        ["Zapnuté: tlačidlo Do UNIVERSUM na stránke epizódy pridá epizódu – výber vyplní seriál aj epizódu. Vypnuté: pridá sa len seriál."] = "Zapnuto: tlačítko Do UNIVERSUM na stránce epizody přidá epizodu – výběr vyplní seriál i epizodu. Vypnuto: přidá se jen seriál.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6674,5 +6676,7 @@ internal static class Translations
         ["Výstupný priečinok nemôže byť v MOVIES ani v TVSHOWS iného výstupu."] = "An output folder cannot lie in MOVIES or TVSHOWS of another output.",
         ["Disk zatiaľ nemá výstup – vytvorte ho tlačidlom Vytvoriť výstup v jeho riadku."] = "The disk has no output yet – create it with Create an output in its row.",
         ["Priečinok sa nedá použiť: "] = "The folder cannot be used: ",
+        ["Epizódy do zásobníka (S01E03)"] = "Episodes into the tray (S01E03)",
+        ["Zapnuté: tlačidlo Do UNIVERSUM na stránke epizódy pridá epizódu – výber vyplní seriál aj epizódu. Vypnuté: pridá sa len seriál."] = "On: the Do UNIVERSUM button on an episode page adds the episode – choosing it fills the series and the episode. Off: only the series is added.",
     };
 }

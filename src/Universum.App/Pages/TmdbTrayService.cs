@@ -96,6 +96,10 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Adds a title (at the top; one already there moves up) and asks TMDB for its name as the library names it.</summary>
     public void Add(TmdbTrayEntry entry, bool fromBrowser = false, bool byItself = false)
     {
+        // pages sent by themselves add the film or series; an episode only by the button of its page and only when episodes
+        // are switched on (owner, 8. 11. 2026: off for now)
+        entry = byItself || !_services.Settings.TmdbTrayEpisodes ? entry.WithoutEpisode() : entry;
+
         // a title already in the tray sent by itself again (a season or an episode of it opened): nothing to do
         // (owner, 8. 11. 2026: one film or series – one send); the button of the page still moves it up
         if (byItself && Entries.Any(e => e.Kind == entry.Kind && e.Id == entry.Id))
@@ -229,7 +233,7 @@ public sealed class TmdbTrayService : ObservableObject
     /// </summary>
     public async Task ReceivePosterAsync(TrayPosterRequest poster)
     {
-        var found = poster.Entry is { } exact ? (exact, true) : poster.Csfd is { } page ? await FindAsync(page) : null;
+        var found = poster.Entry is { } exact ? (exact.WithoutEpisode(), true) : poster.Csfd is { } page ? await FindAsync(page) : null;
         if (found is not { } title)
         {
             TrayToast.Show(Loc.F("Plagát z {0}: titul sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach.", poster.Source == TrayPosterSource.Csfd ? "ČSFD" : "TMDB"));
@@ -355,7 +359,7 @@ public sealed class TmdbTrayService : ObservableObject
     {
         if (Note() is { } note)
         {
-            note.Text = TmdbTray.Remove(note.Text, entry.Kind, entry.Id);
+            note.Text = TmdbTray.Remove(note.Text, entry);
             _services.Agenda.Save(note);
         }
     }

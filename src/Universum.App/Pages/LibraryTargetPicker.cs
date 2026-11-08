@@ -42,6 +42,13 @@ public sealed class LibraryTargetPicker : ObservableObject
         Tray = new TmdbTrayChoice(services, entry =>
         {
             TitleText = entry.FieldText;
+
+            // an episode from the tray (owner, 8. 11. 2026): its season and number too
+            if (entry.IsEpisode)
+            {
+                EpisodeText = entry.EpisodeTag;
+            }
+
             return Task.CompletedTask;
         });
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory);

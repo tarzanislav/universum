@@ -16,13 +16,16 @@ public sealed class TmdbTrayTests
     {
         var note = TmdbTray.Add(null, new TmdbTrayEntry(MediaKind.Movie, 111, "Vymyslený film (2026)"));
         note = TmdbTray.Add(note, new TmdbTrayEntry(MediaKind.Series, 222));
-        Assert.Sequence(["https://www.themoviedb.org/tv/222", "[Vymyslený film (2026)](https://www.themoviedb.org/movie/111)"], note.Split('\n'), "the newest first, a link per line");
+        Assert.Sequence(["[Vymyslený film (2026)](https://www.themoviedb.org/movie/111)", "https://www.themoviedb.org/tv/222"], note.Split('\n'), "by the alphabet, a title without a name at the end, a link per line");
 
         note = TmdbTray.Name(note, MediaKind.Series, 222, "Vymyslený seriál (2025)");
         note = TmdbTray.Add(note, new TmdbTrayEntry(MediaKind.Movie, 111));
         var entries = TmdbTray.Read("moja poznámka\n" + note);
         Assert.Sequence(["Movie 111 Vymyslený film (2026)", "Series 222 Vymyslený seriál (2025)"], entries.Select(e => $"{e.Kind} {e.Id} {e.Name}"),
-            "added again: moved up, its name kept; text of the user is no title");
+            "added again: its name kept; text of the user is no title");
+        var alphabet = TmdbTray.Read(TmdbTray.Add(TmdbTray.Add(TmdbTray.Add("moja poznámka", new TmdbTrayEntry(MediaKind.Movie, 3, "Žltý vymyslený film (2020)")),
+            new TmdbTrayEntry(MediaKind.Movie, 1, "chata vymyslená (2021)")), new TmdbTrayEntry(MediaKind.Movie, 2, "Hora vymyslená (2022)")));
+        Assert.Sequence(["Hora vymyslená (2022)", "chata vymyslená (2021)", "Žltý vymyslený film (2020)"], alphabet.Select(e => e.Name!), "the Slovak alphabet (ch after h, Ž last), without case");
         Assert.Equal("https://www.themoviedb.org/movie/111", entries[0].FieldText, "a title field takes the address");
         Assert.Equal(1, TmdbTray.Read(TmdbTray.Remove(note, MediaKind.Movie, 111)).Count, "removed");
         Assert.True(TmdbTray.FromPage("https://www.themoviedb.org/tv/222-vymysleny-serial/season/1/episode/3?language=sk", null) is { Kind: MediaKind.Series, Id: 222 } &&
@@ -34,9 +37,9 @@ public sealed class TmdbTrayTests
         var withEpisodes = TmdbTray.Add(TmdbTray.Add("", new TmdbTrayEntry(MediaKind.Series, 222)), episode!);
         withEpisodes = TmdbTray.Name(withEpisodes, MediaKind.Series, 222, "Vymyslený seriál (2024)");
         var read = TmdbTray.Read(withEpisodes);
-        Assert.True(read is [{ IsEpisode: true, Display: "Vymyslený seriál (2024) · S01E03" }, { IsEpisode: false, Display: "Vymyslený seriál (2024)" }],
+        Assert.True(read is [{ IsEpisode: false, Display: "Vymyslený seriál (2024)" }, { IsEpisode: true, Display: "Vymyslený seriál (2024) · S01E03" }],
             "the series and its episode side by side, both named – " + string.Join(" | ", read.Select(r => r.Display)));
-        Assert.True(TmdbTray.Read(TmdbTray.Remove(withEpisodes, read[0])) is [{ IsEpisode: false }], "the episode removed alone");
+        Assert.True(TmdbTray.Read(TmdbTray.Remove(withEpisodes, read[1])) is [{ IsEpisode: false }], "the episode removed alone");
         Assert.True(TmdbTray.FromPoster("https://www.themoviedb.org/tv/222/season/1/episode/3", "https://image.tmdb.org/t/p/w500/AbCdEf123456.jpg", null, null)?.Entry?.IsEpisode == true,
             "a poster on an episode page knows its series");
         Assert.Equal("moja poznámka", TmdbTray.Clear("moja poznámka\n" + note), "emptied: the own line stays, no TMDB title");

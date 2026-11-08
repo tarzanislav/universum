@@ -1879,6 +1879,9 @@ internal static class SelfTest
         Check(tray.Entries.Any(e => e is { Kind: MediaKind.Series, Id: 222 }) && tray.Entries.All(e => e.Id != 333),
             "tray: the address universum:// – a TMDB series taken, another page not");
         Check(services.Agenda.Items.Any(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && i.Note?.Pinned == true), "tray: kept in a pinned note of Poznámky");
+        var trayNames = model.HeaderEditor.Library.Tray.Rows.Select(r => r.Entry.Name).OfType<string>().ToList();
+        Check(trayNames.SequenceEqual(trayNames.Order(StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("sk-SK"), true))),
+            "tray: the choice by the alphabet (owner, 8. 11. 2026) – " + string.Join(" | ", trayNames));
 
         // one click beside a title field: the address in the field, the kind with it
         var library = model.HeaderEditor.Library;

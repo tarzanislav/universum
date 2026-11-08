@@ -4218,7 +4218,8 @@ internal static class SelfTest
             var stiahnute = Path.GetDirectoryName(source)!;
             services.AddOutputDirectory(stiahnute);
             var wrong = disks.Rows.Single(r => !r.IsMain && Core.IO.Paths.Same(r.Output!, stiahnute));
-            Check(wrong.OutputLooksLikeSource && !wrong.HasInput && disks.Rows.Single(r => r.IsMain).Output == main,
+            Check(wrong.OutputLooksLikeSource && !wrong.HasInput && disks.Rows.Single(r => r.IsMain).Output == main && wrong.Disk.Length == 2 && wrong.Disk[1] == ':' &&
+                  !batch.DiskHint.Contains("Volume{", StringComparison.Ordinal),
                 $"disks: a source folder among the outputs is told – {wrong.Disk} {wrong.OutputText}");
             disks.OutputToInput(wrong.Row);
             var row = disks.Rows.Single(r => !r.IsMain);

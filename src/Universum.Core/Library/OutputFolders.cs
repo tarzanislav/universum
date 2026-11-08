@@ -71,7 +71,7 @@ public static class OutputFolders
             var at = rows.FindIndex(r => string.Equals(r.Volume, volume, StringComparison.OrdinalIgnoreCase));
             if (at < 0)
             {
-                rows.Add(new DiskFolderRow(volume, null, null, false));
+                rows.Add(new DiskFolderRow(volume, null, null, false) { Root = Path.GetPathRoot(Path.GetFullPath(folder)) ?? volume });
                 at = rows.Count - 1;
             }
 
@@ -166,6 +166,9 @@ public static class OutputFolders
 /// <summary>A disk with UNIVERSUM's folders on it: its input folder, its output folder, and whether its output is the default one.</summary>
 public sealed record DiskFolderRow(string Volume, string? Input, string? Output, bool IsMain)
 {
+    /// <summary>The root as people know it ("D:\\"); <see cref="Volume"/> may be Windows' own name of the volume.</summary>
+    public string Root { get; init; } = Volume;
+
     /// <summary>Input folders beyond the first on this disk (saved before one per disk was kept) – only the first is shown as its input.</summary>
     public IReadOnlyList<string> ExtraInputs { get; init; } = [];
 

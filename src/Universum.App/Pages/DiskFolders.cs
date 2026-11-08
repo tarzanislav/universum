@@ -14,7 +14,7 @@ public sealed class DiskFolderView(DiskFolderRow row, DiskFolders owner)
     public DiskFolderRow Row { get; } = row;
 
     /// <summary>"E:".</summary>
-    public string Disk => Row.Volume.TrimEnd('\\', '/');
+    public string Disk => Row.Root.TrimEnd('\\', '/');
 
     public string? Input => Row.Input;
 
@@ -42,7 +42,7 @@ public sealed class DiskFolderView(DiskFolderRow row, DiskFolders owner)
         {
             try
             {
-                var drive = new DriveInfo(Row.Volume);
+                var drive = new DriveInfo(Row.Root);
                 return drive.IsReady ? Loc.F("voľné {0:N0} GB", drive.AvailableFreeSpace / (1024.0 * 1024 * 1024)) : Loc.T("nie je pripojený");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
@@ -295,7 +295,7 @@ public sealed class DiskFolders : CommunityToolkit.Mvvm.ComponentModel.Observabl
             _services.RemoveOutputDirectory(extra);
         }
 
-        Message = Loc.F("Disk {0} sa už nepoužíva – v jeho priečinkoch sa nič nezmenilo.", row.Volume.TrimEnd('\\'));
+        Message = Loc.F("Disk {0} sa už nepoužíva – v jeho priečinkoch sa nič nezmenilo.", row.Root.TrimEnd('\\'));
     }
 
     /// <summary>Owner, 8. 11. 2026: a source folder saved among the outputs becomes the input of its disk.</summary>

@@ -30,11 +30,11 @@ public sealed class DiskFolderView(DiskFolderRow row, DiskFolders owner)
 
     public bool IsMain => Row.IsMain;
 
-    /// <summary>"Disk E:".</summary>
-    public string DiskCaption => Loc.F("Disk {0}", Disk);
+    /// <summary>"DISK E:" – the title of the block of the disk.</summary>
+    public string DiskTitle => Loc.F("DISK {0}", Disk);
 
     /// <summary>"★ hlavný" for the disk of the default output.</summary>
-    public string MainCaption => Row.IsMain ? "  ★ " + Loc.T("hlavný") : "";
+    public string MainCaption => Row.IsMain ? "  ★ " + Loc.T("hlavný disk") : "";
 
     /// <summary>
     /// Where the films of this disk go, in one sentence (owner, 8. 11. 2026: "nikto nedokáže určiť, ktorý vstupný patrí
@@ -62,7 +62,7 @@ public sealed class DiskFolderView(DiskFolderRow row, DiskFolders owner)
             try
             {
                 var drive = new DriveInfo(Row.Root);
-                return "  · " + (drive.IsReady ? Loc.F("voľné {0:N0} GB", drive.AvailableFreeSpace / (1024.0 * 1024 * 1024)) : Loc.T("nie je pripojený"));
+                return drive.IsReady ? Loc.F("voľné {0:N0} GB", drive.AvailableFreeSpace / (1024.0 * 1024 * 1024)) : Loc.T("nie je pripojený");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {

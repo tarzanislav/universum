@@ -57,9 +57,9 @@ Nastavení je jedna dlouhá stránka s bloky – posouvejte ji dolů.
 ![Nastavení](settings.jpg)
 - **Složky na discích** – jedna tabulka, na každém disku řádek: **Vstup (zdroj)** – sem přicházejí nové filmy a epizody,
   UNIVERSUM je **jen čte** – a **Výstup (knihovna)** s MOVIES, TVSHOWS a POSTER (pro Jellyfin každý další knihovna).
-  Každý disk ukazuje **VSTUP ➜ VÝSTUP** a větou, kam jdou jeho filmy. [+ Vstupní složka…] a [+ Výstupní složka…] přidají
-  složku; v řádku disku menu [Upravit ▾] změní vstup nebo výstup, nastaví disk jako hlavní (★ – sem jdou filmy z disků
-  bez vlastního výstupu) nebo ho odebere. [Vytvořit výstup] udělá výstup vedle vstupu (např. *D:\\UNIVERSUM\\VYSTUP*). Na disku je jeden vstup a jeden výstup; vstup nikdy není výstup – výstup, ve kterém
+  Každý disk má **vlastní blok** (DISK E:, DISK D: …) se vstupem a výstupem pod sebou a větou, kam jdou jeho filmy. [Změnit…] u
+  vstupu nebo výstupu ho změní, [★ Nastavit jako hlavní] určí výstup pro filmy z disků bez vlastního, [Odebrat disk] ho
+  přestane používat; [+ Přidat disk…] přidá vstup dalšího disku. [Vytvořit výstup] udělá výstup vedle vstupu (např. *D:\\UNIVERSUM\\VYSTUP*). Na disku je jeden vstup a jeden výstup; vstup nikdy není výstup – výstup, ve kterém
   jsou filmy, ukáže [Je to zdroj – přesunout do Vstup]. Ve složkách se **nikdy nic nemaže**.
   Soubor se zapíše **na disk, kde leží** – bez kopírování; soubor beze změny obsahu se při „smazat originály“ jen **přesune**.
   **Na kolika discích najednou** – disky pracují současně, na každém vždy jen jeden soubor (SSD/NVMe dva); překódování běží jen

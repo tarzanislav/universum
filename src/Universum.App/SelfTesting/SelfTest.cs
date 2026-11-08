@@ -4259,7 +4259,7 @@ internal static class SelfTest
             row = disks.Rows.Single(r => !r.IsMain);
             Check(row.HasOutput && Core.IO.Paths.Same(row.Output!, output) && services.LibraryFor(source)?.Root == Path.GetFullPath(output) && !row.NeedsOutput &&
                   row.Flow.Contains(stiahnute, StringComparison.OrdinalIgnoreCase) && row.Flow.Contains(Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase) &&
-                  disks.Rows.Single(r => r.IsMain).MainCaption.Contains('★'),
+                  disks.Rows.Single(r => r.IsMain).MainCaption.Contains('★') && row.DiskTitle.StartsWith("DISK ", StringComparison.Ordinal) && row.DiskTitle.EndsWith(':'),
                 $"disks: Vytvoriť výstup – {row.OutputText} beside the input, the film of that disk goes there – " + disks.Message);
             disks.SetInput(row.Row, output);
             Check(disks.Rows.Single(r => !r.IsMain).Input is { } stays && Core.IO.Paths.Same(stays, stiahnute) && disks.Message.Contains(output, StringComparison.OrdinalIgnoreCase),

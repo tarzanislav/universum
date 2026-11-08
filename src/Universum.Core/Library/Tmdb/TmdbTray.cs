@@ -4,17 +4,31 @@ using Universum.Core.Text;
 
 namespace Universum.Core.Library.Tmdb;
 
-/// <summary>A film or series in the Zásobník TMDB: its kind and ID, and its name with the year when known.</summary>
-public sealed record TmdbTrayEntry(MediaKind Kind, int Id, string? Name = null)
+/// <summary>
+/// A film or series in the Zásobník TMDB: its kind and ID, and its name with the year when known; an episode of a series
+/// with its season and number (owner, 8. 11. 2026 – the button on an episode page of TMDB).
+/// </summary>
+public sealed record TmdbTrayEntry(MediaKind Kind, int Id, string? Name = null, int? Season = null, int? Episode = null)
 {
-    /// <summary>The page of the title on TMDB.</summary>
-    public Uri Address => TmdbTray.Address(Kind, Id);
+    /// <summary>The page of the title on TMDB (of the episode, when it is one).</summary>
+    public Uri Address => IsEpisode ? TmdbTray.EpisodeAddress(Id, Season!.Value, Episode!.Value) : TmdbTray.Address(Kind, Id);
 
-    /// <summary>"Vymyslený film (2026)", or the address when the name is not known yet.</summary>
-    public string Display => Name ?? WebLinks.Display(Address);
+    public bool IsEpisode => Kind == MediaKind.Series && Season is not null && Episode is not null;
 
-    /// <summary>What a title field takes: the address (UNIVERSUM loads the title by it, and knows it is a film or a series).</summary>
-    public string FieldText => Address.AbsoluteUri;
+    /// <summary>"S01E03" for an episode; empty otherwise.</summary>
+    public string EpisodeTag => IsEpisode ? $"S{Season!.Value:00}E{Episode!.Value:00}" : "";
+
+    /// <summary>"Vymyslený film (2026)", "Vymyslený seriál (2024) · S01E03", or the address when the name is not known yet.</summary>
+    public string Display => (Name ?? WebLinks.Display(Address)) + (IsEpisode && Name is not null ? " · " + EpisodeTag : "");
+
+    /// <summary>What a title field takes: the address of the film or series (UNIVERSUM loads the title by it).</summary>
+    public string FieldText => TmdbTray.Address(Kind, Id).AbsoluteUri;
+
+    /// <summary>The same title in the tray (an episode is a title of its own).</summary>
+    public bool SameAs(TmdbTrayEntry other) => Kind == other.Kind && Id == other.Id && Season == other.Season && Episode == other.Episode;
+
+    /// <summary>The film or series without the episode.</summary>
+    public TmdbTrayEntry WithoutEpisode() => this with { Season = null, Episode = null };
 }
 
 /// <summary>
@@ -28,6 +42,21 @@ public static partial class TmdbTray
     /// <summary>The mark of the note that is the tray (its Uid).</summary>
     public const string NoteUid = "universum-zasobnik-tmdb";
 
+    /// <summary>The page of an episode on TMDB.</summary>
+    public static Uri EpisodeAddress(int id, int season, int episode) =>
+        new($"https://www.themoviedb.org/tv/{id.ToString(CultureInfo.InvariantCulture)}/season/{season.ToString(CultureInfo.InvariantCulture)}/episode/{episode.ToString(CultureInfo.InvariantCulture)}");
+
+    /// <summary>The season and number of an episode page of TMDB ("/tv/222-…/season/1/episode/3"); null for any other page.</summary>
+    public static (int Season, int Episode)? EpisodeOf(Uri? address) =>
+        address is not null && EpisodePath().Match(address.AbsolutePath) is { Success: true } match &&
+        int.TryParse(match.Groups["season"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var season) &&
+        int.TryParse(match.Groups["episode"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var episode) && episode > 0
+            ? (season, episode)
+            : null;
+
+    [GeneratedRegex(@"^/tv/\d+(-[^/]*)?/season/(?<season>\d{1,3})/episode/(?<episode>\d{1,4})(/|$)", RegexOptions.CultureInvariant)]
+    private static partial Regex EpisodePath();
+
     public static Uri Address(MediaKind kind, int id) =>
         new($"https://www.themoviedb.org/{(kind == MediaKind.Series ? "tv" : "movie")}/{id.ToString(CultureInfo.InvariantCulture)}");
 
@@ -37,9 +66,14 @@ public static partial class TmdbTray
         var entries = new List<TmdbTrayEntry>();
         foreach (var row in NoteRows.Of(note))
         {
-            if (row.Tmdb is { Kind: { } kind } tmdb && !entries.Any(e => e.Kind == kind && e.Id == tmdb.Id))
+            if (row.Tmdb is { Kind: { } kind } tmdb)
             {
-                entries.Add(new TmdbTrayEntry(kind, tmdb.Id, row.Name));
+                var episode = kind == MediaKind.Series ? EpisodeOf(row.Link) : null;
+                var entry = new TmdbTrayEntry(kind, tmdb.Id, row.Name, episode?.Season, episode?.Episode);
+                if (!entries.Any(e => e.SameAs(entry)))
+                {
+                    entries.Add(entry);
+                }
             }
         }
 
@@ -67,19 +101,26 @@ public static partial class TmdbTray
     /// <summary>The note with the name of a title set (it stays where it is); the note as it was when the title is not in it.</summary>
     public static string Name(string? note, MediaKind kind, int id, string name)
     {
+        // the film or series and each of its episodes keep their place and their address
         var lines = Lines(note);
-        var at = lines.FindIndex(line => Matches(line, new TmdbTrayEntry(kind, id)));
-        if (at >= 0)
+        for (var at = 0; at < lines.Count; at++)
         {
-            lines[at] = WebLinks.Named(name, Address(kind, id));
+            if (Read(lines[at]) is [{ } entry] && entry.Kind == kind && entry.Id == id)
+            {
+                lines[at] = WebLinks.Named(name, entry.Address);
+            }
         }
 
         return string.Join('\n', lines);
     }
 
-    /// <summary>The note without a title.</summary>
+    /// <summary>The note without a film or series (and its episodes).</summary>
     public static string Remove(string? note, MediaKind kind, int id) =>
-        string.Join('\n', Lines(note).Where(line => !Matches(line, new TmdbTrayEntry(kind, id))));
+        string.Join('\n', Lines(note).Where(line => !Read(line).Any(e => e.Kind == kind && e.Id == id)));
+
+    /// <summary>The note without one title (an episode alone).</summary>
+    public static string Remove(string? note, TmdbTrayEntry entry) =>
+        string.Join('\n', Lines(note).Where(line => !Matches(line, entry)));
 
     /// <summary>
     /// The tray emptied (owner, 8. 11. 2026: "reštart – nebude tam žiaden údaj z TMDB"): every film and series line out,
@@ -90,7 +131,7 @@ public static partial class TmdbTray
     private static List<string> Lines(string? note) =>
         [.. (note ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Where(l => l.Trim().Length > 0)];
 
-    private static bool Matches(string line, TmdbTrayEntry entry) => Read(line).Any(e => e.Kind == entry.Kind && e.Id == entry.Id);
+    private static bool Matches(string line, TmdbTrayEntry entry) => Read(line).Any(e => e.SameAs(entry));
 
     /// <summary>
     /// A link the browser hands over (the button "Do UNIVERSUM": "universum://tmdb?u=…&amp;t=…" – the address of the page
@@ -139,6 +180,14 @@ public static partial class TmdbTray
         }
 
         title = title is { Length: > 300 } ? title[..300] : title;
+
+        // an episode page (owner, 8. 11. 2026): the series with the season and number; its tab names the episode, so the
+        // name of the series comes from TMDB
+        if (kind == MediaKind.Series && EpisodeOf(address) is { } episode)
+        {
+            return new TmdbTrayEntry(kind, id, null, episode.Season, episode.Episode);
+        }
+
         return new TmdbTrayEntry(kind, id, title is null ? null : FromTabTitle(title) is { } named ? named.Display : null);
     }
 

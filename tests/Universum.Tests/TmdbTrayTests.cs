@@ -27,6 +27,18 @@ public sealed class TmdbTrayTests
         Assert.Equal(1, TmdbTray.Read(TmdbTray.Remove(note, MediaKind.Movie, 111)).Count, "removed");
         Assert.True(TmdbTray.FromPage("https://www.themoviedb.org/tv/222-vymysleny-serial/season/1/episode/3?language=sk", null) is { Kind: MediaKind.Series, Id: 222 } &&
                     TmdbTray.FromPage("https://www.themoviedb.org/movie/111-vymysleny-film/cast", null) is { Kind: MediaKind.Movie, Id: 111 }, "a season, an episode, the cast: the same title");
+        // owner, 8. 11. 2026: an episode is a title of its own, named with its series, and keeps its address
+        var episode = TmdbTray.FromPage("https://www.themoviedb.org/tv/222-vymysleny-serial/season/1/episode/3?language=sk", "Vymyslená epizóda — TMDB");
+        Assert.True(episode is { Kind: MediaKind.Series, Id: 222, Season: 1, Episode: 3, Name: null, EpisodeTag: "S01E03" } &&
+                    episode.FieldText == "https://www.themoviedb.org/tv/222" && episode.Address.AbsoluteUri == "https://www.themoviedb.org/tv/222/season/1/episode/3", "an episode page");
+        var withEpisodes = TmdbTray.Add(TmdbTray.Add("", new TmdbTrayEntry(MediaKind.Series, 222)), episode!);
+        withEpisodes = TmdbTray.Name(withEpisodes, MediaKind.Series, 222, "Vymyslený seriál (2024)");
+        var read = TmdbTray.Read(withEpisodes);
+        Assert.True(read is [{ IsEpisode: true, Display: "Vymyslený seriál (2024) · S01E03" }, { IsEpisode: false, Display: "Vymyslený seriál (2024)" }],
+            "the series and its episode side by side, both named – " + string.Join(" | ", read.Select(r => r.Display)));
+        Assert.True(TmdbTray.Read(TmdbTray.Remove(withEpisodes, read[0])) is [{ IsEpisode: false }], "the episode removed alone");
+        Assert.True(TmdbTray.FromPoster("https://www.themoviedb.org/tv/222/season/1/episode/3", "https://image.tmdb.org/t/p/w500/AbCdEf123456.jpg", null, null)?.Entry?.IsEpisode == true,
+            "a poster on an episode page knows its series");
         Assert.Equal("moja poznámka", TmdbTray.Clear("moja poznámka\n" + note), "emptied: the own line stays, no TMDB title");
     }
 

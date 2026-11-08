@@ -57,6 +57,13 @@ At the top are suggestions that UNIVERSUM works out by itself (a chosen title in
 - [Nahrať hlasom] records from the microphone and **transcribes the recording right on your computer** – nothing leaves it.
   The recording stays with the note and can be played back.
 !tip **Links in a note** each have a row of their own; a long one is shortened and the tooltip shows it whole. **A click** opens the page in the browser (a video too). [Name instead of the link] shows the **name of the film or series** for a TMDB link – the original one, the English one for another script than Latin, as in the library (a TMDB key is needed). An opened note lists its links under the text.
+### TMDB tray
+Films and series you open on TMDB are gathered in the pinned note **Zásobník TMDB** – with name and year by the library rules and an active link. By the title and **TMDB ID** fields in Batch, Single, Multiplexing and the studios you pick them with one click in **From the TMDB tray…** – the name loads at once.
+1. Install the **Tampermonkey** or **Violentmonkey** extension in your browser.
+2. In Settings (TMDB tray) click [Install the script] and confirm it in the extension.
+3. Every film or series page you open on TMDB joins the tray by itself; the page has a **Do UNIVERSUM** button too.
+!tip Without an extension: [Copy the Do UNIVERSUM bookmark] and add the bookmark to the bookmarks bar. [From the browser] reads the films open in browser windows – the tab in front exactly, the others by name and year (unclear ones marked “check”).
+!info The script sends only to this computer (127.0.0.1) with a secret key; UNIVERSUM takes only addresses of TMDB films and series.
 ![Notes](notes.jpg)
 @otvorit AgendaNotes Open Notes
 

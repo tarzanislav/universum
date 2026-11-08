@@ -1475,6 +1475,7 @@ internal static class SelfTest
         await TestCalendarAsync(model, window, services);
         await TestTasksAsync(model, window, services);
         await TestNotesAsync(model, window, services);
+        await TestTmdbTrayAsync(model, services);
         await TestReportsAsync(model, services);
         await TestDashboardAgendaAsync(model, window, services);
         await TestActionsAsync(model, window, services);
@@ -1758,6 +1759,65 @@ internal static class SelfTest
         model.Open(dashboard);
         Check(!agenda.Calendar.Any(r => r.Title.StartsWith("Vymysl", StringComparison.Ordinal)) && agenda.NoTasks && !agenda.HasNotes,
             "dashboard: no record left when the records are gone (the holidays stay) – " + string.Join(", ", agenda.Calendar.Select(r => r.Title)));
+    }
+
+    /// <summary>
+    /// Zásobník TMDB (owner, 8. 11. 2026): a page sent by UNIVERSUM's script to 127.0.0.1 with the key (and refused without
+    /// it), the address universum:// (only TMDB pages taken), the pinned note, the choice beside a title field, reading the
+    /// browser windows (a stand-in, then the real ones – they must only not fail). Invented titles only.
+    /// </summary>
+    private static async Task TestTmdbTrayAsync(MainViewModel model, AppServices services)
+    {
+        var tray = services.TmdbTray;
+        services.Settings.TmdbTrayPort = 0;
+        tray.StartReceiving();
+        Check(tray.Receiving && tray.Port > 0, "tray: the receiver on 127.0.0.1 runs – " + tray.Status);
+        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        async Task<System.Net.HttpStatusCode> Send(string key, string page)
+        {
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"http://127.0.0.1:{tray.Port}/tmdb")
+            {
+                Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(new { u = page, t = "Vymyslený film zo skriptu (2026) — The Movie Database (TMDB)" }), Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("X-Universum-Key", key);
+            using var answer = await http.SendAsync(request);
+            return answer.StatusCode;
+        }
+
+        var sent = await Send(tray.Key, "https://www.themoviedb.org/movie/111-vymysleny-film-zo-skriptu");
+        for (var i = 0; i < 50 && !tray.Entries.Any(e => e.Id == 111); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(sent == System.Net.HttpStatusCode.NoContent && tray.Entries.Any(e => e is { Kind: MediaKind.Movie, Id: 111 }) &&
+              TrayToast.Shown.Any(t => t.Contains("Vymyslený film zo skriptu", StringComparison.Ordinal)),
+            $"tray: a film from the script, with a notice – {sent} | {string.Join(", ", tray.Entries.Select(e => e.Display))}");
+        Check(await Send("0123456789abcdef0123456789abcdef", "https://www.themoviedb.org/movie/112") == System.Net.HttpStatusCode.Forbidden, "tray: another key is refused");
+        using (var script = await http.GetAsync(tray.ScriptAddress))
+        {
+            var text = await script.Content.ReadAsStringAsync();
+            Check(script.IsSuccessStatusCode && text.Contains("// ==UserScript==", StringComparison.Ordinal) && text.Contains(tray.Key, StringComparison.Ordinal),
+                "tray: the script to install, with the key");
+        }
+
+        await model.HandleAsync(Core.Shell.ShellRequest.Parse(["--tmdb", "universum://tmdb?u=" + Uri.EscapeDataString("https://www.themoviedb.org/tv/222-vymysleny-serial")]));
+        await model.HandleAsync(Core.Shell.ShellRequest.Parse(["--tmdb", "universum://tmdb?u=" + Uri.EscapeDataString("https://evil.example/movie/333")]));
+        Check(tray.Entries.Any(e => e is { Kind: MediaKind.Series, Id: 222 }) && tray.Entries.All(e => e.Id != 333),
+            "tray: the address universum:// – a TMDB series taken, another page not");
+        Check(services.Agenda.Items.Any(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && i.Note?.Pinned == true), "tray: kept in a pinned note of Poznámky");
+
+        // one click beside a title field: the address in the field, the kind with it
+        var library = model.HeaderEditor.Library;
+        library.Tray.Selected = library.Tray.Rows.First(r => r.Entry.Id == 222);
+        Check(library.TitleText == "https://www.themoviedb.org/tv/222" && library.IsSeries, "tray: chosen beside a title field – " + library.TitleText);
+
+        // the browser windows: a stand-in with a TMDB film in front, then the real windows (there may be none)
+        var found = await tray.ReadBrowserAsync(() => [new BrowserWindow("themoviedb.org/movie/444-iny-vymysleny-film", ["Nejaká iná stránka – Vymyslený portál"])]);
+        Check(tray.Entries.Any(e => e is { Kind: MediaKind.Movie, Id: 444 }), "tray: the tab in front of a browser window – " + found);
+        Write("tray: the browser windows of this computer – " + await tray.ReadBrowserAsync());
+        tray.StopReceiving();
+        Check(!tray.Receiving, "tray: the receiver stopped");
     }
 
     /// <summary>

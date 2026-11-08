@@ -537,6 +537,7 @@
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="300" Margin="0,0,6,0"
                                      ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="220" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -998,6 +999,7 @@
                         <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="240" Margin="0,0,6,4"
                                  ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj adresa TMDB (/movie/ = film, /tv/ = seriál)'}" />
                         <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,4" />
+                        <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                         <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,12,4"
                                   IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                         <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -1151,6 +1153,7 @@
                                 <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                          ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                                 <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                           IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                 <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -1612,6 +1615,7 @@
                                     <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                              ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                                     <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                                    <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                                     <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                               IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                                     <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -1859,6 +1863,7 @@
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                      ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -2017,6 +2022,7 @@
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="260" Margin="0,0,6,0"
                                      ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -2180,6 +2186,7 @@
                             <TextBox Text="{Binding TitleText, UpdateSourceTrigger=PropertyChanged}" Width="280" Margin="0,0,6,0"
                                      ToolTip="{loc:T 'Názov (rok), pri inom písme ako latinka anglický názov (rok) [tmdbid-ID]; aj ID alebo adresa TMDB'}" />
                             <Button Content="{loc:T 'TMDB'}" Command="{Binding Tmdb.SearchCommand}" ToolTip="{Binding Tmdb.Tooltip}" ToolTipService.ShowOnDisabled="True" Padding="10,3" Margin="0,0,6,0" />
+                            <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <ComboBox ItemsSource="{Binding Tmdb.Results}" SelectedItem="{Binding Tmdb.Selected}" DisplayMemberPath="Display" Width="200" Margin="0,0,16,0"
                                       IsDropDownOpen="{Binding Tmdb.IsOpen}" Visibility="{Binding Tmdb.HasResults, Converter={StaticResource BoolToVisibility}}" />
                             <Button Content="{loc:T 'Potvrdiť titul'}" Command="{Binding Tmdb.ConfirmCommand}" Padding="10,3" Margin="0,0,12,0"
@@ -2971,6 +2978,7 @@
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding SeriesTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center"
                                          ToolTip="{loc:T 'Číslo seriálu na TMDB (napr. 227191) alebo adresa themoviedb.org/tv/… – názov sa načíta presne podľa neho'}" />
+                                <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBlock Text="{Binding SeriesTargetNote}" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
                                            VerticalAlignment="Center" Margin="0,0,10,0" />
                                 <TextBlock Text="{Binding OtherSeries}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"
@@ -2992,6 +3000,7 @@
                                 <TextBlock Text="{loc:T 'TMDB ID:'}" FontSize="12" VerticalAlignment="Center" Margin="4,0,4,0" />
                                 <TextBox Text="{Binding FilmTmdbId, UpdateSourceTrigger=LostFocus}" Width="90" Margin="0,0,10,0" VerticalContentAlignment="Center" IsEnabled="{Binding CanNameFilm}"
                                          ToolTip="{loc:T 'Číslo filmu na TMDB (napr. 1629051) alebo adresa themoviedb.org/movie/… – názov sa načíta presne podľa neho, aj pri filme v inom písme'}" />
+                                <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBlock Text="{Binding FilmSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                 <TextBlock Text="{Binding FilmHint}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="360" />
                             </StackPanel>
@@ -4841,6 +4850,26 @@
             </DockPanel>
         </DataTemplate>
         <!-- POZNÁMKY – Poznámky (owner, 31. 10. 2026, stage P2) -->
+        <!-- Zásobník TMDB (owner, 8. 11. 2026): the titles from the browser, one click fills the title; "Z prehliadača" reads the
+             open browser windows -->
+        <DataTemplate DataType="{x:Type pages:TmdbTrayChoice}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Grid Width="190" Margin="0,0,4,0" ToolTip="{Binding ToolTip}">
+                    <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" IsEnabled="{Binding HasRows}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Label}" ToolTip="{Binding ToolTip}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="{loc:T 'Zo zásobníka TMDB…'}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="10,0,30,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                </Grid>
+                <Button Content="{loc:T 'Z prehliadača'}" Command="{Binding ReadBrowserCommand}" Padding="8,3"
+                        ToolTip="{loc:T 'Prečíta filmy a seriály z TMDB otvorené v oknách prehliadača (Chrome, Edge, Firefox…): kartu vpredu presne podľa adresy, ostatné podľa názvu a roka – nejasné označí „over“.'}" />
+                <TextBlock Text="{Binding Note}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="6,0,0,0" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip="{Binding Note}" />
+            </StackPanel>
+        </DataTemplate>
         <!-- a link of a note on a row of its own (owner, 7. 11. 2026): shortened when long, the whole address in the tooltip,
              a click opens the page -->
         <DataTemplate DataType="{x:Type pages:NoteLinkView}">
@@ -5991,6 +6020,31 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" ToolTip="{loc:T 'The Movie Database (TMDB) – www.themoviedb.org'}" />
                                 <TextBlock Text="{Binding TmdbAttribution, Mode=OneWay}" Style="{StaticResource Hint}" FontSize="11.5" TextWrapping="Wrap" VerticalAlignment="Center" />
                             </DockPanel>
+                        </StackPanel>
+                    </Border>
+                    <!-- Zásobník TMDB (owner, 8. 11. 2026): films and series from the browser – UNIVERSUM's own script, the bookmark -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{loc:T 'Zásobník TMDB – filmy a seriály z prehliadača'}" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
+                                       Text="{loc:T 'Filmy a seriály, ktoré otvoríte na TMDB, sa zbierajú v pripnutej poznámke Zásobník TMDB (Poznámky); pri poliach titulu a TMDB ID ich vyberiete jedným klikom. 1. Do prehliadača si nainštalujte rozšírenie Tampermonkey alebo Violentmonkey (z obchodu s rozšíreniami). 2. Kliknite na Nainštalovať skript – rozšírenie ponúkne skript UNIVERSUM, potvrďte ho. Potom každá otvorená stránka filmu alebo seriálu na TMDB pribudne do zásobníka sama, a na stránke je aj tlačidlo Do UNIVERSUM. Skript posiela len na tento počítač (127.0.0.1) s tajným kľúčom; UNIVERSUM prijme len adresy filmov a seriálov TMDB.'}" />
+                            <CheckBox Content="{loc:T 'Prijímať zo skriptu v prehliadači'}" IsChecked="{Binding TmdbTrayReceive}" />
+                            <TextBlock Text="{Binding TmdbTrayStatus}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6" />
+                            <WrapPanel>
+                                <Button Content="{loc:T 'Nainštalovať skript'}" Command="{Binding InstallTrayScriptCommand}" Padding="12,5" Margin="0,0,8,4"
+                                        ToolTip="{loc:T 'Otvorí skript UNIVERSUM v prehliadači – Tampermonkey alebo Violentmonkey ho ponúkne nainštalovať'}" />
+                                <Button Content="{loc:T 'Kopírovať skript'}" Command="{Binding CopyTrayScriptCommand}" Padding="12,5" Margin="0,0,8,4"
+                                        ToolTip="{loc:T 'Skript do schránky – v rozšírení: Nový skript, vložiť, uložiť'}" />
+                                <Button Content="{loc:T 'Kopírovať záložku Do UNIVERSUM'}" Command="{Binding CopyBookmarkletCommand}" Padding="12,5" Margin="0,0,8,4"
+                                        ToolTip="{loc:T 'Bez rozšírenia: v prehliadači pravým klikom na lištu záložiek → Pridať stránku, názov Do UNIVERSUM, ako adresu vložte, čo je v schránke. Na stránke filmu na TMDB potom kliknite na záložku.'}" />
+                                <Button Content="{loc:T 'Nový kľúč'}" Command="{Binding NewTrayKeyCommand}" Padding="12,5" Margin="0,0,8,4"
+                                        ToolTip="{loc:T 'Nový tajný kľúč – doterajší skript prestane fungovať, nainštalujte ho znova'}" />
+                            </WrapPanel>
+                            <TextBlock Text="{Binding TrayMessage}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                            <Expander Header="{loc:T 'Zobraziť skript'}" Margin="0,6,0,0">
+                                <TextBox Text="{Binding TrayScript, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="11.5" TextWrapping="NoWrap"
+                                         HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="300" Margin="0,6,0,0" />
+                            </Expander>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">

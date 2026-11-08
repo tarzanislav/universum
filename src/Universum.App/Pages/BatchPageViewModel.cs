@@ -112,6 +112,21 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         };
         ShowPanelsCommand = new RelayCommand(() => ShowPanels = true);
+        // Zásobník TMDB (owner, 8. 11. 2026): a title from the browser with one click – for the film or the series of the
+        // groups chosen, as its TMDB ID typed
+        Tray = new TmdbTrayChoice(services, entry =>
+        {
+            if (IsMovies && CanNameFilm)
+            {
+                FilmTmdbId = entry.FieldText;
+            }
+            else
+            {
+                SeriesTmdbId = entry.FieldText;
+            }
+
+            return Task.CompletedTask;
+        });
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
                                                              _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);
@@ -1214,6 +1229,9 @@ public sealed class BatchPageViewModel : ObservableObject
             OnPropertyChanged();
         }
     }
+
+    /// <summary>The choice from the Zásobník TMDB (in the rows of the film and of the series).</summary>
+    public TmdbTrayChoice Tray { get; }
 
     /// <summary>A TMDB ID or address of the series (owner, 30. 10. 2026: the same row for films and series).</summary>
     public string SeriesTmdbId

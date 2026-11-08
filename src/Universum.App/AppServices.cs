@@ -255,6 +255,11 @@ public sealed class AppServices
             Mp4RecordFolder = AppSettings.Mp4RecordDirectory,
         };
 
+    /// <summary>Zásobník TMDB: the films and series picked in the browser, kept in a note of Poznámky (owner, 8. 11. 2026).</summary>
+    public Pages.TmdbTrayService TmdbTray => _tmdbTray ??= new Pages.TmdbTrayService(this);
+
+    private Pages.TmdbTrayService? _tmdbTray;
+
     /// <summary>
     /// The multiplexer of Zlučovanie, with FFmpeg (its ffprobe checks an MP4 that stays MP4) and the folder of the záznamy
     /// MP4 (owner, 7. 11. 2026).
@@ -1114,6 +1119,15 @@ public sealed class AppSettings
 
     /// <summary>Own rules profile; null = the profile of the specification.</summary>
     public RuleProfile? Profile { get; set; }
+
+    /// <summary>Zásobník TMDB: UNIVERSUM's script in the browser may send films and series (owner, 8. 11. 2026).</summary>
+    public bool TmdbTrayReceive { get; set; } = true;
+
+    /// <summary>The port of the receiver on 127.0.0.1 (the script knows it).</summary>
+    public int TmdbTrayPort { get; set; } = 47219;
+
+    /// <summary>The secret key the script sends; made at the first start, a new one makes the old script stop working.</summary>
+    public string? TmdbTrayKey { get; set; }
 
     /// <summary>
     /// Ponechať MP4 (owner, 7. 11. 2026): an MP4 whose header only changes stays MP4 – UNIVERSUM edits its header itself

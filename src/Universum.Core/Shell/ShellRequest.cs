@@ -17,6 +17,12 @@ public enum ShellAction
 
     /// <summary>"--informacie": the file is shown on the Information page.</summary>
     Info,
+
+    /// <summary>
+    /// "--tmdb universum://tmdb?u=…": a film or series from the browser goes to the Zásobník TMDB (owner, 8. 11. 2026); the
+    /// window is not brought forward.
+    /// </summary>
+    Tmdb,
 }
 
 /// <summary>
@@ -29,6 +35,7 @@ public sealed record ShellRequest(ShellAction Action, IReadOnlyList<string> Path
     public const string BatchSwitch = "--hromadne";
     public const string SingleSwitch = "--single";
     public const string InfoSwitch = "--informacie";
+    public const string TmdbSwitch = "--tmdb";
 
     /// <summary>The request of a command line; other switches (self-test, MKVToolNix setup) are not requests.</summary>
     public static ShellRequest Parse(IReadOnlyList<string> args)
@@ -42,6 +49,7 @@ public sealed record ShellRequest(ShellAction Action, IReadOnlyList<string> Path
                 BatchSwitch => ShellAction.Batch,
                 SingleSwitch => ShellAction.Single,
                 InfoSwitch => ShellAction.Info,
+                TmdbSwitch => ShellAction.Tmdb,
                 _ => action,
             };
         }

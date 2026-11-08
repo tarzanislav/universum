@@ -129,7 +129,8 @@ public sealed class InputWatch(AppServices services)
 
     public async Task ScanAsync()
     {
-        if (services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
+        var inputs = services.InputDirectories.Where(System.IO.Directory.Exists).ToList();
+        if (inputs.Count == 0)
         {
             Set([], []);
             return;
@@ -145,7 +146,7 @@ public sealed class InputWatch(AppServices services)
         var excluded = services.Libraries?.ResultFolders;
         try
         {
-            var (foundEpisodes, foundFilms) = await Task.Run(() => (EpisodeFinder.Find(episodes, input, excluded), FilmFinder.Find(films, input, excluded)));
+            var (foundEpisodes, foundFilms) = await Task.Run(() => (EpisodeFinder.Find(episodes, inputs, excluded), FilmFinder.Find(films, inputs, excluded)));
             var found = foundEpisodes.Where(f => f.Files.Count > 0).GroupBy(f => f.Episode.SeriesKey)
                 .Select(g => new FoundInFolder(g.First().Episode.Caption,
                     string.Join(", ", g.Select(f => f.Episode.Code)) + " · " + Texts.Count(g.Sum(f => f.Files.Count), Loc.T("súbor"), Loc.T("súbory"), Loc.T("súborov")),

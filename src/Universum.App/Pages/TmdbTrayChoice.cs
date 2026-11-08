@@ -53,7 +53,10 @@ public sealed class TmdbTrayChoice : ObservableObject
                 _ = _chosen(value.Entry);
             }
 
+            // owner, 8. 11. 2026: the title chosen stayed in the box over its caption – WPF ignores a change told while it
+            // is still selecting, so the box is emptied right after
             OnPropertyChanged();
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => OnPropertyChanged(nameof(Selected)), System.Windows.Threading.DispatcherPriority.Background);
         }
     }
 

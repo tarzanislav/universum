@@ -55,16 +55,15 @@ Seznam **filmů a seriálů, které UNIVERSUM zapsal do knihovny** – doplňuje
 ## Nastavení
 Nastavení je jedna dlouhá stránka s bloky – posouvejte ji dolů.
 ![Nastavení](settings.jpg)
-- **Výstupní složka (knihovna)** – [Složka…] vybere knihovnu. Filmy jdou do *MOVIES\\Název (rok)*, seriály do
-  *TVSHOWS\\Název (rok)\\Season 01*. Složky MOVIES a TVSHOWS UNIVERSUM **nikdy nemaže**.
-- **Výstupní složky na dalších discích** – [Přidat…] přidá výstupní složku na jiném disku nebo diskovém poli (vlastní
-  MOVIES a TVSHOWS, pro Jellyfin další knihovna). Soubor se zapíše **na disk, kde leží** – bez kopírování mezi disky;
-  soubor beze změny obsahu se při „smazat originály“ jen **přesune** (hned). **Na kolika discích najednou** – disky pracují
-  současně, na každém vždy jen jeden soubor (SSD/NVMe dva). Překódování zvuku a obrazu běží jen jedno najednou a nástroje
-  pracují s **nízkou prioritou procesoru i disku** – počítač zůstane použitelný. Dva oddíly jednoho disku UNIVERSUM
-  pozná jako jeden disk.
-- **Vstupní složka** – [Změnit…] ji vybere, [Otevřít] ji ukáže v Průzkumníkovi. Sem přicházejí nové filmy a epizody;
-  soubory v ní UNIVERSUM **jen čte**. Volba [Sledovat vstupní složku – upozornit na nové filmy a epizody] zapne lištu nahoře.
+- **Složky na discích** – jedna tabulka, na každém disku řádek: **Vstup (zdroj)** – sem přicházejí nové filmy a epizody,
+  UNIVERSUM je **jen čte** – a **Výstup (knihovna)** s MOVIES, TVSHOWS a POSTER (pro Jellyfin každý další knihovna).
+  [+ Vstupní složka…] a [+ Výstupní složka…] přidají složku, tlačítko [**…**] v řádku ji změní, [Vytvořit výstup]
+  udělá výstup vedle vstupu (např. *D:\\UNIVERSUM\\VYSTUP*), [★ Hlavní] určí výstup pro soubory z disků bez vlastního,
+  [Odebrat disk] ho přestane používat. Na disku je jeden vstup a jeden výstup; vstup nikdy není výstup – výstup, ve kterém
+  jsou filmy, ukáže [Je to zdroj – přesunout do Vstup]. Ve složkách se **nikdy nic nemaže**.
+  Soubor se zapíše **na disk, kde leží** – bez kopírování; soubor beze změny obsahu se při „smazat originály“ jen **přesune**.
+  **Na kolika discích najednou** – disky pracují současně, na každém vždy jen jeden soubor (SSD/NVMe dva); překódování běží jen
+  jedno najednou s **nízkou prioritou** – počítač zůstane použitelný. [Sledovat vstupní složky – upozornit na nové filmy a epizody] zapne lištu nahoře.
 - **Jazyk rozhraní (platí po restartu)** – slovenština, čeština nebo angličtina (menu, nadpisy, Nastavení, tlačítka).
 - **Zvukové upozornění** – totéž co ve Frontě úloh; zvuky a hlasitost se mění v nastavení zvuku Windows.
 - **TMDB – názvy filmů a seriálů** – vložte svůj bezplatný klíč TMDB a stiskněte [Ověřit a uložit]. Volba [Připojovat se k TMDB]

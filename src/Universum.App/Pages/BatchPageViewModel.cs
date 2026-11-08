@@ -182,6 +182,8 @@ public sealed class BatchPageViewModel : ObservableObject
         services.LibraryChanged += () =>
         {
             OnPropertyChanged(nameof(OutputDescription));
+            OnPropertyChanged(nameof(DiskHint));
+            OnPropertyChanged(nameof(HasDiskHint));
             if (_analysis is not null && _services.Library is { } layout)
             {
                 // files of the analysis that now lie among the results (MOVIES, TVSHOWS) must be left out: analysed again first
@@ -758,9 +760,39 @@ public sealed class BatchPageViewModel : ObservableObject
             _services.Settings.BatchFolder = value;
             _services.Settings.Save();
             OnPropertyChanged();
+            OnPropertyChanged(nameof(DiskHint));
+            OnPropertyChanged(nameof(HasDiskHint));
             RefreshCommands();
         }
     }
+
+    /// <summary>
+    /// The folder lies on a disk without an output folder of its own (owner, 8. 11. 2026): its files would be copied to
+    /// the default output on another disk – said beside the folder, with where to add one.
+    /// </summary>
+    public string DiskHint
+    {
+        get
+        {
+            try
+            {
+                if (Folder is not { Length: > 0 } folder || _services.Libraries is not { BySourceDisk: true } libraries ||
+                    libraries.All.Any(l => Core.IO.Paths.SameVolume(l.Root, folder)))
+                {
+                    return "";
+                }
+
+                return Loc.F("Disk {0} nemá vlastný výstupný priečinok – súbory sa skopírujú do {1} na inom disku. Výstup na tomto disku pridáte v Nastaveniach (Výstupné priečinky na ďalších diskoch → Pridať…).",
+                    Path.GetPathRoot(Path.GetFullPath(folder))?.TrimEnd('\\'), libraries.Default.Root);
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException or UnauthorizedAccessException)
+            {
+                return "";
+            }
+        }
+    }
+
+    public bool HasDiskHint => DiskHint.Length > 0;
 
     public bool Recursive
     {

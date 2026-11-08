@@ -601,6 +601,21 @@ public sealed class PosterPageViewModel : ObservableObject
         }
     }
 
+    // owner, 8. 11. 2026: the library the title is in – on any disk – gives its POSTER and its folder; else the default one
+    private (PosterPlaces Places, string? Processed) PlacesFor(LibraryLayout main, TitleInfo title, int id)
+    {
+        foreach (var library in _services.Libraries?.All ?? [main])
+        {
+            var places = new PosterPlaces(library, _services.InputDirectory);
+            if (places.LibraryFolder(title, id) is { } processed)
+            {
+                return (places, processed);
+            }
+        }
+
+        return (new PosterPlaces(main, _services.InputDirectory), null);
+    }
+
     // the posters of the tray of a title as rows to choose from
     private async Task<List<PosterOptionRow>> TrayRowsAsync(MediaKind kind, int id, CancellationToken cancellationToken)
     {
@@ -693,7 +708,7 @@ public sealed class PosterPageViewModel : ObservableObject
 
             var jpeg = PictureTools.ToJpeg(picture, Height.Value, Quality);
             var size = $"{jpeg.Length / 1024} kB";
-            var places = new PosterPlaces(library, _services.InputDirectory);
+            var (places, found) = PlacesFor(library, title, details.Id);
             if (!Merge)
             {
                 var folder = places.PosterFolder(title);
@@ -701,14 +716,14 @@ public sealed class PosterPageViewModel : ObservableObject
                 return;
             }
 
-            if (places.LibraryFolder(title, details.Id) is { } processed)
+            if (found is { } processed)
             {
                 Result = Done(PosterPlaces.Save(processed, jpeg), processed, size);
                 return;
             }
 
             Result = Loc.T("Hľadám film alebo seriál na vstupe…");
-            if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
+            if (await Task.Run(() => _services.InAnyInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 _services.WaitingPosters.Add(title, details.Id, jpeg);
                 Result = Loc.F("{0} je na vstupe ({1}), ešte nie je spracovaný – plagát čaká. Keď ho UNIVERSUM spracuje, dá {2} do jeho priečinka v {3}.",
@@ -757,7 +772,7 @@ public sealed class PosterPageViewModel : ObservableObject
         Refresh();
         try
         {
-            var places = new PosterPlaces(library, _services.InputDirectory);
+            var (places, found) = PlacesFor(library, title, details.Id);
             var kind = details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál");
             if (!ExtrasMerge)
             {
@@ -766,14 +781,14 @@ public sealed class PosterPageViewModel : ObservableObject
                 return;
             }
 
-            if (places.LibraryFolder(title, details.Id) is { } processed)
+            if (found is { } processed)
             {
                 ExtrasResult = Written(processed, await MainFolderExtrasAsync(details, text => ExtrasResult = text), stills ? await EpisodeStillsAsync(processed, details, processed: true) : 0);
                 return;
             }
 
             ExtrasResult = Loc.T("Hľadám film alebo seriál na vstupe…");
-            if (await Task.Run(() => places.InInput(details.Kind, details.Names, details.Year)) is { } input)
+            if (await Task.Run(() => _services.InAnyInput(details.Kind, details.Names, details.Year)) is { } input)
             {
                 var pictures = await MainFolderExtrasAsync(details, text => ExtrasResult = text);
                 if (pictures.Count == 0 && !stills)

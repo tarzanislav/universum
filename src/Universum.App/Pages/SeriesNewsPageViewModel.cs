@@ -429,7 +429,8 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     // the episodes' files in the input folder; null (with the reason shown) when the folder is missing
     private async Task<IReadOnlyList<EpisodeFiles>?> FindAsync(IReadOnlyList<SeriesEpisode> episodes)
     {
-        if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
+        var inputs = _services.InputDirectories.Where(System.IO.Directory.Exists).ToList();
+        if (inputs.Count == 0)
         {
             Status = Loc.T(NoInputFolder);
             return null;
@@ -440,7 +441,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         try
         {
             var excluded = _services.Libraries?.ResultFolders;
-            return await Task.Run(() => EpisodeFinder.Find(episodes, input, excluded));
+            return await Task.Run(() => EpisodeFinder.Find(episodes, inputs, excluded));
         }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {

@@ -15,6 +15,15 @@ public sealed record EpisodeFiles(SeriesEpisode Episode, IReadOnlyList<string> F
 /// </summary>
 public static class EpisodeFinder
 {
+    /// <summary>The same in several input folders (owner, 8. 11. 2026 – an input folder on every disk); the files of an episode together.</summary>
+    public static IReadOnlyList<EpisodeFiles> Find(IReadOnlyList<SeriesEpisode> episodes, IReadOnlyList<string> folders, IEnumerable<string>? excludeDirectories = null,
+        CancellationToken cancellationToken = default)
+    {
+        var excluded = excludeDirectories?.ToList();
+        var found = folders.Where(Directory.Exists).Select(folder => Find(episodes, folder, excluded, cancellationToken)).ToList();
+        return [.. episodes.Select((episode, i) => new EpisodeFiles(episode, [.. found.SelectMany(f => f[i].Files).Distinct(StringComparer.OrdinalIgnoreCase)]))];
+    }
+
     public static IReadOnlyList<EpisodeFiles> Find(IReadOnlyList<SeriesEpisode> episodes, string folder, IEnumerable<string>? excludeDirectories = null,
         CancellationToken cancellationToken = default)
     {
@@ -62,6 +71,15 @@ public sealed record FilmFiles(FilmPremiere Film, IReadOnlyList<string> Files);
 /// </summary>
 public static class FilmFinder
 {
+    /// <summary>The same in several input folders; the files of a film together.</summary>
+    public static IReadOnlyList<FilmFiles> Find(IReadOnlyList<FilmPremiere> films, IReadOnlyList<string> folders, IEnumerable<string>? excludeDirectories = null,
+        CancellationToken cancellationToken = default)
+    {
+        var excluded = excludeDirectories?.ToList();
+        var found = folders.Where(Directory.Exists).Select(folder => Find(films, folder, excluded, cancellationToken)).ToList();
+        return [.. films.Select((film, i) => new FilmFiles(film, [.. found.SelectMany(f => f[i].Files).Distinct(StringComparer.OrdinalIgnoreCase)]))];
+    }
+
     public static IReadOnlyList<FilmFiles> Find(IReadOnlyList<FilmPremiere> films, string folder, IEnumerable<string>? excludeDirectories = null,
         CancellationToken cancellationToken = default)
     {

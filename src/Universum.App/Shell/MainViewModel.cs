@@ -854,12 +854,12 @@ public sealed class MainViewModel : ObservableObject
     /// </summary>
     private async Task<string?> SendTitleToProcessingAsync(Universum.Core.Library.MediaKind kind, IReadOnlyList<string> names, int? year, string caption)
     {
-        if (_services.InputDirectory is not { } input || !System.IO.Directory.Exists(input))
+        if (!_services.InputDirectories.Any(System.IO.Directory.Exists))
         {
             return Loc.T("Nastavte vstupný priečinok (Nastavenia) – titul sa hľadá v ňom.");
         }
 
-        var found = await Task.Run(() => new Universum.Core.Posters.PosterPlaces(_services.Library ?? new Universum.Core.Library.LibraryLayout(input), input).InInput(kind, names, year));
+        var found = await Task.Run(() => _services.InAnyInput(kind, names, year));
         if (found is null)
         {
             return Loc.F("{0} sa vo vstupnom priečinku nenašiel – v Single spracovaní otvorte súbor sami.", caption);

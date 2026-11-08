@@ -3267,6 +3267,18 @@ internal static class Translations
         ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "Zapnuto: každý film a seriál, který otevřete na TMDB, se sám uloží do Zásobníku TMDB (potřebuje skript UNIVERSUM v prohlížeči – Nastavení). Vypnuto: jen tlačítkem Do UNIVERSUM na stránce.",
         ["Zásobník TMDB zbiera"] = "Zásobník TMDB sbírá",
         ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "Širší poznámka (další klik ještě širší, pak zase užší)",
+        ["Zo zásobníka"] = "Ze zásobníku",
+        ["Vybraný je plagát, ktorý ste si poslali z prehliadača ({0}). Odporúčaný z TMDB je v ponuke nižšie."] = "Vybraný je plakát, který jste si poslali z prohlížeče ({0}). Doporučený z TMDB je v nabídce níže.",
+        ["{0} · zo zásobníka"] = "{0} · ze zásobníku",
+        ["Plagát z {0}, ktorý ste si poslali z prehliadača {1}."] = "Plakát z {0}, který jste si poslali z prohlížeče {1}.",
+        ["plagáty: {0}"] = "plakáty: {0}",
+        ["{0} z ČSFD sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach alebo pridajte titul cez TMDB."] = "{0} z ČSFD se na TMDB nenašel – zadejte klíč TMDB v Nastavení nebo přidejte titul přes TMDB.",
+        ["Plagát z {0}: titul sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach."] = "Plakát z {0}: titul se na TMDB nenašel – zadejte klíč TMDB v Nastavení.",
+        ["Plagát k titulu {0} sa nepodarilo stiahnuť."] = "Plakát k titulu {0} se nepodařilo stáhnout.",
+        ["Plagát ({0}) do zásobníka: {1}"] = "Plakát ({0}) do zásobníku: {1}",
+        ["＋ plagát do UNIVERSUM"] = "＋ plakát do UNIVERSUM",
+        ["✓ plagát poslaný"] = "✓ plakát poslán",
+        ["posielam…"] = "posílám…",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6530,5 +6542,17 @@ internal static class Translations
         ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "On: every film and series you open on TMDB goes into the TMDB tray by itself (needs the UNIVERSUM script in the browser – Settings). Off: only by the Do UNIVERSUM button on the page.",
         ["Zásobník TMDB zbiera"] = "TMDB tray collecting",
         ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "A wider note (the next click wider still, then narrow again)",
+        ["Zo zásobníka"] = "From the tray",
+        ["Vybraný je plagát, ktorý ste si poslali z prehliadača ({0}). Odporúčaný z TMDB je v ponuke nižšie."] = "The poster you sent from the browser is chosen ({0}). The one TMDB recommends is in the offer below.",
+        ["{0} · zo zásobníka"] = "{0} · from the tray",
+        ["Plagát z {0}, ktorý ste si poslali z prehliadača {1}."] = "A poster from {0} you sent from the browser on {1}.",
+        ["plagáty: {0}"] = "posters: {0}",
+        ["{0} z ČSFD sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach alebo pridajte titul cez TMDB."] = "{0} from ČSFD was not found on TMDB – enter a TMDB key in Settings or add the title through TMDB.",
+        ["Plagát z {0}: titul sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach."] = "A poster from {0}: the title was not found on TMDB – enter a TMDB key in Settings.",
+        ["Plagát k titulu {0} sa nepodarilo stiahnuť."] = "The poster of {0} could not be downloaded.",
+        ["Plagát ({0}) do zásobníka: {1}"] = "Poster ({0}) into the tray: {1}",
+        ["＋ plagát do UNIVERSUM"] = "＋ poster to UNIVERSUM",
+        ["✓ plagát poslaný"] = "✓ poster sent",
+        ["posielam…"] = "sending…",
     };
 }

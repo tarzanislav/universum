@@ -21,6 +21,8 @@ public sealed class TmdbTrayListener : IDisposable
     private readonly Func<TmdbTrayEntry, bool, Task> _received;
     private readonly Func<string> _script;
     private readonly Func<bool> _automatic;
+    private Func<CsfdPage, bool, Task>? _csfd;
+    private Func<TrayPosterRequest, Task>? _poster;
     private readonly CancellationTokenSource _stop = new();
 
     private TmdbTrayListener(TcpListener listener, string key, Func<TmdbTrayEntry, bool, Task> received, Func<string> script, Func<bool> automatic)
@@ -45,8 +47,13 @@ public sealed class TmdbTrayListener : IDisposable
     public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool>? automatic = null) =>
         Start(port, key, (entry, _) => received(entry), script, automatic);
 
-    /// <summary>The same; <paramref name="received"/> learns whether the script sent the page by itself (not by its button).</summary>
-    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, bool, Task> received, Func<string> script, Func<bool>? automatic = null)
+    /// <summary>
+    /// The same; <paramref name="received"/> learns whether the script sent the page by itself (not by its button).
+    /// <paramref name="csfd"/> takes the film and series pages of ČSFD, <paramref name="poster"/> the posters picked on ČSFD
+    /// and TMDB (owner, 8. 11. 2026) – both are answered at once (202) and done after the answer.
+    /// </summary>
+    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, bool, Task> received, Func<string> script, Func<bool>? automatic = null,
+        Func<CsfdPage, bool, Task>? csfd = null, Func<TrayPosterRequest, Task>? poster = null)
     {
         if (key.Length < 16)
         {
@@ -55,7 +62,7 @@ public sealed class TmdbTrayListener : IDisposable
 
         var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Start();
-        var door = new TmdbTrayListener(listener, key, received, script, automatic ?? (() => true));
+        var door = new TmdbTrayListener(listener, key, received, script, automatic ?? (() => true)) { _csfd = csfd, _poster = poster };
         _ = Task.Run(door.AcceptAsync);
         return door;
     }
@@ -110,7 +117,7 @@ public sealed class TmdbTrayListener : IDisposable
             return KeyMatches(request.Query.GetValueOrDefault("k")) ? (200, "text/javascript", _script()) : (403, "text/plain", "");
         }
 
-        if (request.Method != "POST" || request.Path != "/tmdb")
+        if (request.Method != "POST" || request.Path is not ("/tmdb" or "/csfd" or "/poster"))
         {
             return (404, "text/plain", "");
         }
@@ -122,19 +129,46 @@ public sealed class TmdbTrayListener : IDisposable
 
         string? page;
         string? title;
+        string? imdb;
+        string? image;
         bool sentByItself;
         try
         {
             using var json = JsonDocument.Parse(request.Body);
-            page = json.RootElement.TryGetProperty("u", out var u) && u.ValueKind == JsonValueKind.String ? u.GetString() : null;
-            title = json.RootElement.TryGetProperty("t", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
+            string? Text(string name) => json.RootElement.ValueKind == JsonValueKind.Object && json.RootElement.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+            page = Text("u");
+            title = Text("t");
+            imdb = Text("m");
+            image = Text("i");
 
             // "a": sent by itself (true) or by the button (false); a script of 1.0 does not say – it sent by itself
-            sentByItself = !json.RootElement.TryGetProperty("a", out var a) || a.ValueKind != JsonValueKind.False;
+            sentByItself = !(json.RootElement.ValueKind == JsonValueKind.Object && json.RootElement.TryGetProperty("a", out var a) && a.ValueKind == JsonValueKind.False);
         }
         catch (JsonException)
         {
             return (400, "text/plain", "");
+        }
+
+        if (request.Path == "/poster")
+        {
+            // a poster is picked by a click only
+            return _poster is null ? (404, "text/plain", "")
+                : TmdbTray.FromPoster(page, image, title, imdb) is { } poster ? Later(() => _poster(poster)) : (422, "text/plain", "");
+        }
+
+        if (request.Path == "/csfd")
+        {
+            if (_csfd is null)
+            {
+                return (404, "text/plain", "");
+            }
+
+            if (TmdbTray.FromCsfdPage(page, title, imdb) is not { } csfd)
+            {
+                return (422, "text/plain", "");
+            }
+
+            return sentByItself && !_automatic() ? (202, "text/plain", "") : Later(() => _csfd(csfd, sentByItself));
         }
 
         if (TmdbTray.FromPage(page, title) is not { } entry)
@@ -159,6 +193,23 @@ public sealed class TmdbTrayListener : IDisposable
         }
 
         return (204, "text/plain", "");
+    }
+
+    // done after the answer (it may ask TMDB and download a picture); what goes wrong is told by UNIVERSUM itself
+    private static (int Status, string Type, string Body) Later(Func<Task> work)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await work().ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // the receiver keeps answering
+            }
+        });
+        return (202, "text/plain", "");
     }
 
     private bool KeyMatches(string? key) =>

@@ -167,6 +167,116 @@ public static partial class TmdbTray
         return name.Length == 0 || name.Length > 200 ? null : new TabTitle(name, year, words.Length > 0 ? MediaKind.Series : MediaKind.Movie);
     }
 
+    /// <summary>
+    /// A film or series page of ČSFD the script sends (owner, 8. 11. 2026): csfd.cz or csfd.sk, "/film/12345-…" (a season,
+    /// an episode or the gallery of it too – the first ID is the title); the IMDb ID only as "tt" and digits. Null for any
+    /// other page.
+    /// </summary>
+    public static CsfdPage? FromCsfdPage(string? page, string? title, string? imdb)
+    {
+        if (page is null || page.Length > 2048 || !Uri.TryCreate(page, UriKind.Absolute, out var address) || address.Scheme != "https" ||
+            !IsCsfdHost(address.Host) || CsfdFilm().Match(address.AbsolutePath) is not { Success: true } film ||
+            !int.TryParse(film.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
+        {
+            return null;
+        }
+
+        return new CsfdPage(id, imdb is not null && ImdbId().IsMatch(imdb) ? imdb : null, FromCsfdTitle(title is { Length: > 300 } ? title[..300] : title));
+    }
+
+    /// <summary>
+    /// The title of a ČSFD page as a tab shows it – "Vymyslený film (2026) | ČSFD.cz", "Vymyslený seriál (TV seriál) (2024)
+    /// | ČSFD.sk": the name, the year and whether it is a series. Null when it is no such title.
+    /// </summary>
+    public static TabTitle? FromCsfdTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title) || !title.Contains("ČSFD", StringComparison.OrdinalIgnoreCase) && !title.Contains("CSFD", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var first = title.Split('|')[0].Trim();
+        var years = CsfdYear().Matches(first);
+        if (years.Count == 0)
+        {
+            return null;
+        }
+
+        var name = first[..first.IndexOf('(', StringComparison.Ordinal)].Trim();
+        var series = first.Contains("seriál", StringComparison.OrdinalIgnoreCase) || first.Contains("series", StringComparison.OrdinalIgnoreCase);
+        var year = int.Parse(years[0].Groups["year"].Value, CultureInfo.InvariantCulture);
+        return name.Length is 0 or > 200 ? null : new TabTitle(name, year, series ? MediaKind.Series : MediaKind.Movie);
+    }
+
+    /// <summary>
+    /// A poster the script sends: the page it was picked on (a film or series of TMDB or ČSFD) and the picture's address –
+    /// only from the picture servers of these two sites (image.tmdb.org, media.themoviedb.org, image.pmgstatic.com) and
+    /// only posters. Null for anything else: UNIVERSUM downloads nothing else (owner, 8. 11. 2026).
+    /// </summary>
+    public static TrayPosterRequest? FromPoster(string? page, string? image, string? title, string? imdb)
+    {
+        if (image is null || image.Length > 2048)
+        {
+            return null;
+        }
+
+        image = image.StartsWith("//", StringComparison.Ordinal) ? "https:" + image : image;
+        if (!Uri.TryCreate(image, UriKind.Absolute, out var picture) || picture.Scheme != "https" || picture.UserInfo.Length > 0 || !picture.IsDefaultPort)
+        {
+            return null;
+        }
+
+        if (FromPage(page, title) is { } entry && page!.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (picture.Host is not ("image.tmdb.org" or "media.themoviedb.org") || TmdbPicture().Match(picture.AbsolutePath) is not { Success: true } tmdb)
+            {
+                return null;
+            }
+
+            var path = "/" + tmdb.Groups["file"].Value;
+            return new TrayPosterRequest(TrayPosterSource.Tmdb, [new Uri("https://image.tmdb.org/t/p/original" + path)], entry, null, path);
+        }
+
+        if (FromCsfdPage(page, title, imdb) is { } csfd)
+        {
+            if (picture.Host != "image.pmgstatic.com" || CsfdPicture().Match(picture.AbsolutePath) is not { Success: true } poster || picture.Query.Length > 0)
+            {
+                return null;
+            }
+
+            // the original first, then the large copy, then the copy the page shows
+            var file = poster.Groups["file"].Value;
+            var images = new List<Uri> { new("https://image.pmgstatic.com/files/images/film/posters/" + file), new("https://image.pmgstatic.com/cache/resized/w1080/files/images/film/posters/" + file) };
+            if (!images.Contains(picture))
+            {
+                images.Add(picture);
+            }
+
+            return new TrayPosterRequest(TrayPosterSource.Csfd, images, null, csfd, null);
+        }
+
+        return null;
+    }
+
+    private static bool IsCsfdHost(string host) => host is "www.csfd.cz" or "csfd.cz" or "www.csfd.sk" or "csfd.sk";
+
+    [GeneratedRegex(@"^/film/(?<id>\d{1,9})(-[^/]*)?(/|$)", RegexOptions.CultureInvariant)]
+    private static partial Regex CsfdFilm();
+
+    [GeneratedRegex(@"^tt\d{5,10}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ImdbId();
+
+    [GeneratedRegex(@"\((?<year>(18|19|20)\d{2})\)", RegexOptions.CultureInvariant)]
+    private static partial Regex CsfdYear();
+
+    // "/t/p/w220_and_h330_face/abc.jpg" (any size), the file only letters and digits
+    [GeneratedRegex(@"^/t/p/[a-z0-9_]{1,40}/(?<file>[A-Za-z0-9]{6,64}\.(jpg|png|webp))$", RegexOptions.CultureInvariant)]
+    private static partial Regex TmdbPicture();
+
+    // "/cache/resized/w420/files/images/film/posters/163/579/163579352_bf8737.jpg" or the original without "cache/…"
+    [GeneratedRegex(@"^/(cache/resized/[a-z0-9]{1,24}/)?files/images/film/posters/(?<file>(\d{1,4}/){1,4}[A-Za-z0-9_]{1,64}\.(jpg|jpeg|png|webp))$", RegexOptions.CultureInvariant)]
+    private static partial Regex CsfdPicture();
+
     // " — " or " - " between the parts of the title
     [GeneratedRegex(@"\s+[—–-]\s+", RegexOptions.CultureInvariant)]
     private static partial Regex Separator();

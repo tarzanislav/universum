@@ -21,6 +21,7 @@ public sealed class TmdbTrayService : ObservableObject
 {
     private readonly AppServices _services;
     private TmdbTrayListener? _listener;
+    private TrayPosters? _posters;
 
     public TmdbTrayService(AppServices services)
     {
@@ -134,6 +135,16 @@ public sealed class TmdbTrayService : ObservableObject
         var before = note.Text;
         note.Text = TmdbTray.Clear(note.Text);
         _services.Agenda.Save(note);
+        try
+        {
+            // the posters picked go aside with the titles
+            Posters.Clear();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // a poster open elsewhere: the posters stay
+        }
+
         return before;
     }
 
@@ -143,6 +154,15 @@ public sealed class TmdbTrayService : ObservableObject
         if (Note() is { } note)
         {
             var added = TmdbTray.Read(note.Text);
+            try
+            {
+                Posters.Restore();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // the posters put aside cannot come back now
+            }
+
             note.Text = before;
             foreach (var entry in added.Reverse())
             {
@@ -151,6 +171,184 @@ public sealed class TmdbTrayService : ObservableObject
 
             _services.Agenda.Save(note);
         }
+    }
+
+    /// <summary>The posters picked into the tray (ČSFD, TMDB), kept per title.</summary>
+    public TrayPosters Posters => _posters ??= new TrayPosters(AppSettings.TrayPosterDirectory);
+
+    /// <summary>How UNIVERSUM downloads a poster (the self-test puts a stand-in here).</summary>
+    public Func<Uri, CancellationToken, Task<byte[]?>> Download { get; set; } = DownloadAsync;
+
+    /// <summary>How UNIVERSUM finds a page of ČSFD on TMDB (the self-test puts a stand-in here).</summary>
+    public Func<CsfdPage, Task<(TmdbTrayEntry Entry, bool Sure)?>>? FindCsfd { get; set; }
+
+    /// <summary>The posters of a title picked into the tray, the newest first.</summary>
+    public IReadOnlyList<TrayPoster> PostersOf(MediaKind kind, int id)
+    {
+        try
+        {
+            return Posters.Of(kind, id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// A film or series page of ČSFD from the script (owner, 8. 11. 2026): found on TMDB by its link to IMDb, else by its
+    /// name and year (not clearly one – the likeliest, marked "over"), and added to the tray.
+    /// </summary>
+    public async Task ReceiveCsfdAsync(CsfdPage page, bool byItself)
+    {
+        if (await FindAsync(page) is not { } found)
+        {
+            if (!byItself)
+            {
+                TrayToast.Show(Loc.F("{0} z ČSFD sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach alebo pridajte titul cez TMDB.", page.Display));
+            }
+
+            return;
+        }
+
+        if (found.Sure)
+        {
+            Add(found.Entry, fromBrowser: true, byItself);
+        }
+        else if (!(byItself && Entries.Any(e => e.Kind == found.Entry.Kind && e.Id == found.Entry.Id)))
+        {
+            AddUncertain(found.Entry);
+            TrayToast.Show(Loc.F("Do zásobníka TMDB: {0}", found.Entry.Display));
+        }
+    }
+
+    /// <summary>
+    /// A poster picked in the browser (owner, 8. 11. 2026: posters of ČSFD too): its title found (TMDB says it, ČSFD by
+    /// IMDb or name and year), the picture downloaded – only from the picture servers of ČSFD and TMDB – and kept with
+    /// the title; the title joins the tray. What happened is told by a notice.
+    /// </summary>
+    public async Task ReceivePosterAsync(TrayPosterRequest poster)
+    {
+        var found = poster.Entry is { } exact ? (exact, true) : poster.Csfd is { } page ? await FindAsync(page) : null;
+        if (found is not { } title)
+        {
+            TrayToast.Show(Loc.F("Plagát z {0}: titul sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach.", poster.Source == TrayPosterSource.Csfd ? "ČSFD" : "TMDB"));
+            return;
+        }
+
+        byte[]? picture = null;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        foreach (var address in poster.Images)
+        {
+            try
+            {
+                picture = await Download(address, timeout.Token);
+            }
+            catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException or IOException)
+            {
+                picture = null;
+            }
+
+            if (picture is not null && TrayPosters.Extension(picture) is not null)
+            {
+                break;
+            }
+
+            picture = null;
+        }
+
+        string? kept = null;
+        try
+        {
+            kept = picture is null ? null : Posters.Add(title.Entry.Kind, title.Entry.Id, picture, poster.Source);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            kept = null;
+        }
+
+        if (kept is null)
+        {
+            TrayToast.Show(Loc.F("Plagát k titulu {0} sa nepodarilo stiahnuť.", title.Entry.Display));
+            return;
+        }
+
+        if (title.Sure)
+        {
+            Add(title.Entry);
+        }
+        else
+        {
+            AddUncertain(title.Entry);
+        }
+
+        TrayToast.Show(Loc.F("Plagát ({0}) do zásobníka: {1}", poster.Source == TrayPosterSource.Csfd ? "ČSFD" : "TMDB",
+            Entries.FirstOrDefault(e => e.Kind == title.Entry.Kind && e.Id == title.Entry.Id)?.Display ?? title.Entry.Display));
+        Changed?.Invoke();
+    }
+
+    // a ČSFD page on TMDB: by IMDb exactly, else by the name and year (sure only when one title fits)
+    private async Task<(TmdbTrayEntry Entry, bool Sure)?> FindAsync(CsfdPage page)
+    {
+        if (FindCsfd is { } standIn)
+        {
+            return await standIn(page);
+        }
+
+        try
+        {
+            if (page.Imdb is { } imdb && _services.Finder is { } finder && (await finder.FindAsync(imdb, null)).FirstOrDefault() is { } byImdb)
+            {
+                return (new TmdbTrayEntry(byImdb.Kind, byImdb.Id, page.Title?.Display), true);
+            }
+
+            if (page.Title is { } title && _services.Titles is { } search)
+            {
+                var found = await search.SearchAsync(title.Kind, title.Name, title.Year);
+                var candidates = found.Titles.Where(t => t.Kind == title.Kind).ToList();
+                var exact = candidates.Where(t => t.Year == title.Year && t.IsNamed(title.Name)).ToList();
+                if (exact.Count == 1)
+                {
+                    return (new TmdbTrayEntry(exact[0].Kind, exact[0].Id, title.Display), true);
+                }
+
+                if (candidates.FirstOrDefault() is { } likeliest)
+                {
+                    return (new TmdbTrayEntry(likeliest.Kind, likeliest.Id, NoteRows.TitleName(likeliest) + " – " + Loc.T("over")), false);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is TitleServiceException or System.Net.Http.HttpRequestException or TaskCanceledException or IOException)
+        {
+            // without TMDB nothing is found
+        }
+
+        return null;
+    }
+
+    // a poster downloaded (at most 15 MB)
+    private static async Task<byte[]?> DownloadAsync(Uri address, CancellationToken cancellationToken)
+    {
+        using var answer = await AppServices.WebClient.GetAsync(address, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!answer.IsSuccessStatusCode || answer.Content.Headers.ContentLength > TrayPosters.MaxBytes)
+        {
+            return null;
+        }
+
+        await using var stream = await answer.Content.ReadAsStreamAsync(cancellationToken);
+        using var copy = new MemoryStream();
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            copy.Write(buffer, 0, read);
+            if (copy.Length > TrayPosters.MaxBytes)
+            {
+                return null;
+            }
+        }
+
+        return copy.ToArray();
     }
 
     public void Remove(TmdbTrayEntry entry)
@@ -205,7 +403,9 @@ public sealed class TmdbTrayService : ObservableObject
             _listener = TmdbTrayListener.Start(_services.Settings.TmdbTrayPort, Key,
                 (entry, byItself) => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => Add(entry, fromBrowser: true, byItself)).Task,
                 () => TmdbUserScript.Text(Port, Key),
-                () => _services.Settings.TmdbTrayAuto);
+                () => _services.Settings.TmdbTrayAuto,
+                (page, byItself) => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => ReceiveCsfdAsync(page, byItself)).Task.Unwrap(),
+                poster => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => ReceivePosterAsync(poster)).Task.Unwrap());
             Status = Loc.F("Prijíma zo skriptu v prehliadači (len z tohto počítača, 127.0.0.1:{0}).", Port);
         }
         catch (SocketException ex)

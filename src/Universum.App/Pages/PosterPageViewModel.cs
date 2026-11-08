@@ -175,6 +175,7 @@ public sealed class PosterPageViewModel : ObservableObject
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(library.Posters) { UseShellExecute = true })?.Dispose();
             }
         });
+        Tray = new TmdbTrayChoice(services, entry => OpenAsync(entry.Kind, entry.Id));
         services.TmdbChanged += () => OnPropertyChanged(nameof(Requirement));
         services.LibraryChanged += () => OnPropertyChanged(nameof(Requirement));
         try
@@ -451,6 +452,9 @@ public sealed class PosterPageViewModel : ObservableObject
         ? Loc.F("Kreslí {0}{1}. Pošle sa len názov, rok, žánre a dej – nie herci ani iné údaje. Návrh je len pre vašu knižnicu – do TMDB sa nahrávať nesmie.", service, service == "OpenAI" ? Loc.T(" (platené, ~0,04 $ za návrh)") : Loc.T(" (zadarmo, denný limit)"))
         : Loc.T("Na návrh cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené).");
 
+    /// <summary>A title of the Zásobník TMDB opened with one click (its posters picked in the browser offered first).</summary>
+    public TmdbTrayChoice Tray { get; }
+
     /// <summary>The posters of the title are offered (awaited by the self-test).</summary>
     public Task OfferReady { get; private set; } = Task.CompletedTask;
 
@@ -570,6 +574,14 @@ public sealed class PosterPageViewModel : ObservableObject
             Recommended = offer.Recommended is { } best ? Groups.SelectMany(g => g.Posters).FirstOrDefault(r => r.Candidate?.Picture.Path == best.Picture.Path) ?? Row(best, true) : null;
             Opinion = offer.Opinion;
             Selected = Recommended;
+
+            // owner, 8. 11. 2026: the posters picked in the browser (ČSFD, TMDB) first, the newest chosen – it is the owner's pick
+            if (await TrayRowsAsync(details.Kind, details.Id, cancellationToken) is { Count: > 0 } picked)
+            {
+                Groups.Insert(0, new PosterGroupRow(Loc.T("Zo zásobníka"), picked));
+                Selected = picked[0];
+                Opinion = Loc.F("Vybraný je plagát, ktorý ste si poslali z prehliadača ({0}). Odporúčaný z TMDB je v ponuke nižšie.", picked[0].Label);
+            }
             NoPosters = posters.Count == 0;
             OnPropertyChanged(nameof(NoPosters));
             OfferStatus = posters.Count == 0 ? Loc.T("TMDB k titulu nemá žiadny plagát – môžete dať navrhnúť plagát cez AI.")
@@ -587,6 +599,33 @@ public sealed class PosterPageViewModel : ObservableObject
         {
             Refresh();
         }
+    }
+
+    // the posters of the tray of a title as rows to choose from
+    private async Task<List<PosterOptionRow>> TrayRowsAsync(MediaKind kind, int id, CancellationToken cancellationToken)
+    {
+        var rows = new List<PosterOptionRow>();
+        foreach (var poster in _services.TmdbTray.PostersOf(kind, id))
+        {
+            try
+            {
+                var picture = await File.ReadAllBytesAsync(poster.Path, cancellationToken);
+                if (PictureTools.Show(picture, 154) is null)
+                {
+                    continue;
+                }
+
+                rows.Add(new PosterOptionRow(null, null, picture, Loc.F("{0} · zo zásobníka", poster.SourceName),
+                    Loc.F("Plagát z {0}, ktorý ste si poslali z prehliadača {1}.", poster.SourceName, poster.Added.ToLocalTime().ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture)),
+                    r => Selected = r));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // a poster that cannot be read is left out
+            }
+        }
+
+        return rows;
     }
 
     private PosterOptionRow Row(PosterCandidate candidate, bool recommended)

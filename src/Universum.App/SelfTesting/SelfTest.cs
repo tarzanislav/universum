@@ -1819,6 +1819,53 @@ internal static class SelfTest
         await Task.Delay(300);
         Check(again == System.Net.HttpStatusCode.NoContent && string.Join(' ', tray.Entries.Select(e => e.Id)) == order && TrayToast.Shown.Count == toasts,
             "tray: a title already there, sent by itself again, is left alone – " + order);
+        // posters picked in the browser (owner, 8. 11. 2026: ČSFD too): a stand-in downloads, a stand-in finds the ČSFD page on
+        // TMDB; only the picture servers of TMDB and ČSFD are taken
+        var downloadBefore = tray.Download;
+        var findBefore = tray.FindCsfd;
+        var downloaded = new List<Uri>();
+        tray.Download = (address, _) =>
+        {
+            lock (downloaded)
+            {
+                downloaded.Add(address);
+            }
+
+            return Task.FromResult<byte[]?>(InventedPoster());
+        };
+        tray.FindCsfd = page => Task.FromResult<(Core.Library.Tmdb.TmdbTrayEntry Entry, bool Sure)?>((new Core.Library.Tmdb.TmdbTrayEntry(MediaKind.Movie, 555, page.Display), true));
+        async Task<System.Net.HttpStatusCode> Post(string path, object body)
+        {
+            using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"http://127.0.0.1:{tray.Port}{path}")
+            {
+                Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("X-Universum-Key", tray.Key);
+            using var answer = await http.SendAsync(request);
+            return answer.StatusCode;
+        }
+
+        const string csfdPage = "https://www.csfd.cz/film/12345-vymysleny-film-z-csfd/prehled/";
+        const string csfdTitle = "Vymyslený film z ČSFD (2026) | ČSFD.cz";
+        var tmdbPoster = await Post("/poster", new { u = "https://www.themoviedb.org/movie/111-vymysleny-film-zo-skriptu/images/posters", i = "https://media.themoviedb.org/t/p/w220_and_h330_face/VymyslenyPlagat1.jpg", a = false });
+        var csfdFilm = await Post("/csfd", new { u = csfdPage, t = csfdTitle, m = "tt0000001", a = false });
+        var csfdPoster = await Post("/poster", new { u = csfdPage, t = csfdTitle, m = "tt0000001", i = "//image.pmgstatic.com/cache/resized/w420/files/images/film/posters/111/222/111222333_ab12cd.jpg", a = false });
+        var foreign = await Post("/poster", new { u = csfdPage, i = "https://evil.example/vymysleny-plagat.jpg", a = false });
+        for (var i = 0; i < 100 && (tray.PostersOf(MediaKind.Movie, 111).Count == 0 || tray.PostersOf(MediaKind.Movie, 555).Count == 0); i++)
+        {
+            await Task.Delay(50);
+        }
+
+        Check(tmdbPoster == System.Net.HttpStatusCode.Accepted && csfdFilm == System.Net.HttpStatusCode.Accepted && csfdPoster == System.Net.HttpStatusCode.Accepted && (int)foreign == 422 &&
+              tray.PostersOf(MediaKind.Movie, 111).Count == 1 && tray.PostersOf(MediaKind.Movie, 555) is [{ Source: Core.Library.Tmdb.TrayPosterSource.Csfd }] &&
+              tray.Entries.Any(e => e.Id == 555) && downloaded.Any(u => u.AbsoluteUri == "https://image.tmdb.org/t/p/original/VymyslenyPlagat1.jpg") &&
+              downloaded.All(u => u.Host is "image.tmdb.org" or "image.pmgstatic.com") && downloaded.Any(u => u.AbsoluteUri.StartsWith("https://image.pmgstatic.com/files/images/film/posters/", StringComparison.Ordinal)) &&
+              TrayToast.Shown.Any(t => t.Contains("ČSFD", StringComparison.Ordinal)),
+            $"tray: posters from TMDB and ČSFD kept with their titles, a foreign picture refused ({tmdbPoster}, {csfdFilm}, {csfdPoster}, {(int)foreign}) – {string.Join(" ", downloaded.Select(u => u.Host))}");
+        Check(model.HeaderEditor.Library.Tray.Rows.Any(r => r.Entry.Id == 555 && r.Posters == 1 && r.Label.Contains("1", StringComparison.Ordinal)),
+            "tray: the choice beside a title tells the posters – " + string.Join(" | ", model.HeaderEditor.Library.Tray.Rows.Select(r => r.Label)));
+        tray.Download = downloadBefore;
+        tray.FindCsfd = findBefore;
         Check(services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TrayService.SwitchText);
         using (var script = await http.GetAsync(tray.ScriptAddress))
         {
@@ -1851,9 +1898,10 @@ internal static class SelfTest
         Check(trayCard.CardWidth == NotesPageViewModel.CardWidths[^1] && trayCard.ClearTrayCommand is not null, "tray: its note is the widest – " + trayCard.CardWidth);
         var count = tray.Entries.Count;
         trayCard.ClearTrayCommand!.Execute(null);
-        Check(tray.Entries.Count == 0 && notes.CanUndoTray && notes.Cards.Any(c => c.IsTray), "tray: emptied from its card – " + notes.Status);
+        Check(tray.Entries.Count == 0 && notes.CanUndoTray && notes.Cards.Any(c => c.IsTray) && tray.PostersOf(MediaKind.Movie, 555).Count == 0,
+            "tray: emptied from its card, its posters too – " + notes.Status);
         notes.UndoTrayCommand.Execute(null);
-        Check(tray.Entries.Count == count && !notes.CanUndoTray, "tray: Vrátiť puts it back – " + notes.Status);
+        Check(tray.Entries.Count == count && !notes.CanUndoTray && tray.PostersOf(MediaKind.Movie, 555).Count == 1, "tray: Vrátiť puts it back, the posters too – " + notes.Status);
         notes.Edit(services.Agenda.Items.Single(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid));
         notes.ClearTrayCommand.Execute(null);
         Check(notes.EditingTray && tray.Entries.Count == 0 && notes.Editor is AgendaEditor, "tray: emptied from inside the note – " + notes.Status);
@@ -1871,6 +1919,11 @@ internal static class SelfTest
             $"notes: a card wider with a click, more rows – {plain.Rows.Count} → {wide.Rows.Count}");
         services.Agenda.Delete(wide.Record!.Id);
         services.Agenda.EmptyBin();
+        foreach (var poster in tray.PostersOf(MediaKind.Movie, 111).Concat(tray.PostersOf(MediaKind.Movie, 555)))
+        {
+            tray.Posters.Remove(poster);
+        }
+
         tray.Automatic = automaticBefore;
         tray.StopReceiving();
         Check(!tray.Receiving, "tray: the receiver stopped");
@@ -2546,6 +2599,20 @@ internal static class SelfTest
         Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("api.cloudflare.com", StringComparison.Ordinal)),
             "posters: a draft by AI (Cloudflare) – " + page.DraftStatus);
 
+        // owner, 8. 11. 2026: a poster picked in the browser (ČSFD) offered first and chosen; processed like any other
+        var picked = services.TmdbTray.Posters.Add(MediaKind.Movie, page.Card!.Details!.Id, InventedPoster(), Core.Library.Tmdb.TrayPosterSource.Csfd);
+        await page.OpenAsync(MediaKind.Movie, page.Card!.Details!.Id);
+        Check(page.Groups[0].Name == Localization.Loc.T("Zo zásobníka") && page.Selected?.Draft is not null && page.Selected.Label.StartsWith("ČSFD", StringComparison.Ordinal) &&
+              page.Groups.Any(g => g.Name == "CZ"), $"posters: the poster from the tray first and chosen – {page.Opinion} | {string.Join(", ", page.Groups.Select(g => g.Name))}");
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(File.ReadAllBytes(jpeg) is [0xFF, 0xD8, 0xFF, ..] && page.Result.Length > 0, "posters: the poster from the tray processed – " + page.Result);
+        foreach (var poster in services.TmdbTray.PostersOf(MediaKind.Movie, page.Card!.Details!.Id))
+        {
+            services.TmdbTray.Posters.Remove(poster);
+        }
+
+        Check(picked is not null, "posters: the tray kept the picked poster");
+
         // merged: the film processed (its folder in MOVIES) gets the poster
         var movie = Path.Combine(library, "MOVIES", "Vymyslený plagát (2026)");
         Directory.CreateDirectory(movie);
@@ -2564,6 +2631,24 @@ internal static class SelfTest
         services.PostersForSelfTest = null;
         services.DraftsForSelfTest = null;
         services.DraftKeysForSelfTest = null;
+    }
+
+    // an invented poster (a JPEG of 200 × 300 in shades of blue)
+    private static byte[] InventedPoster()
+    {
+        var bitmap = new WriteableBitmap(200, 300, 96, 96, PixelFormats.Bgr32, null);
+        var pixels = new int[200 * 300];
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            pixels[i] = 0x203060 + (i / 200 % 150);
+        }
+
+        bitmap.WritePixels(new Int32Rect(0, 0, 200, 300), pixels, 200 * 4, 0);
+        var encoder = new JpegBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        return stream.ToArray();
     }
 
     private sealed class FakePosters : System.Net.Http.HttpMessageHandler

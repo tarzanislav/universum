@@ -4897,7 +4897,7 @@
         <DataTemplate DataType="{x:Type pages:TmdbTrayChoice}">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="190" Margin="0,0,4,0" ToolTip="{Binding ToolTip}">
-                    <ComboBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" IsEnabled="{Binding HasRows}">
+                    <ComboBox x:Name="TrayBox" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" IsEnabled="{Binding HasRows}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Label}" ToolTip="{Binding ToolTip}" />
@@ -4905,7 +4905,18 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
                     <TextBlock Text="{loc:T 'Zo zásobníka TMDB…'}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="10,0,30,0"
-                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Hidden" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SelectedIndex, ElementName=TrayBox}" Value="-1">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Grid>
                 <Button Content="{loc:T 'Z prehliadača'}" Command="{Binding ReadBrowserCommand}" Padding="8,3"
                         ToolTip="{loc:T 'Prečíta filmy a seriály z TMDB otvorené v oknách prehliadača (Chrome, Edge, Firefox…): kartu vpredu presne podľa adresy, ostatné podľa názvu a roka – nejasné označí „over“.'}" />

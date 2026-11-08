@@ -201,7 +201,7 @@
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'MEGA spracovanie'}" />
-                        <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
@@ -394,7 +394,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                     </StackPanel>
@@ -611,7 +611,7 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Zlučovanie'}" Margin="0,0,16,4" />
-                    <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,16,4" />
+                    <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,16,4" />
                     <TextBlock Text="{Binding Message}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </DockPanel>
                 <pages:MuxTabStrip Grid.Row="1" Margin="0,4,0,0" />
@@ -1101,7 +1101,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kapitoly'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
@@ -1217,7 +1217,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
@@ -1689,7 +1689,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
@@ -1935,7 +1935,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava videostopy'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
@@ -2087,7 +2087,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava hlavičky'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
@@ -2535,7 +2535,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
                         <TextBlock Text="{Binding Folder}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -4941,7 +4941,7 @@
                 <StackPanel DockPanel.Dock="Top">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Poznámky'}" />
-                        <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
                                Text="{loc:T 'Vaše poznámky, poznámky k dňom z Kalendára a poznámky k titulom z Premiér a Noviniek na jednom mieste. Poznámku môžete napísať aj hlasom – cez hlasové písanie Windows alebo nahrávkou, ktorú UNIVERSUM prepíše v počítači.'}" />
@@ -6093,7 +6093,7 @@
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>
                             <TextBlock Text="{loc:T 'Zásobník TMDB – filmy a seriály z prehliadača'}" FontWeight="SemiBold" />
-                            <ContentControl Content="{Binding DataContext.TmdbTray, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" HorizontalAlignment="Left" Margin="0,6,0,4" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" HorizontalAlignment="Left" Margin="0,6,0,4" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
                                        Text="{loc:T 'Filmy a seriály, ktoré otvoríte na TMDB, sa zbierajú v pripnutej poznámke Zásobník TMDB (Poznámky); pri poliach titulu a TMDB ID ich vyberiete jedným klikom. 1. Do prehliadača si nainštalujte rozšírenie Tampermonkey alebo Violentmonkey (z obchodu s rozšíreniami). 2. Kliknite na Nainštalovať skript – rozšírenie ponúkne skript UNIVERSUM, potvrďte ho. Potom každá otvorená stránka filmu alebo seriálu na TMDB pribudne do zásobníka sama, a na stránke je aj tlačidlo Do UNIVERSUM. Skript posiela len na tento počítač (127.0.0.1) s tajným kľúčom; UNIVERSUM prijme len adresy filmov a seriálov TMDB.'}" />
                             <CheckBox Content="{loc:T 'Prijímať zo skriptu v prehliadači'}" IsChecked="{Binding TmdbTrayReceive}" />

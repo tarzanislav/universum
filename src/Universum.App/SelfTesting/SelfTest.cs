@@ -1808,8 +1808,8 @@ internal static class SelfTest
         }
 
         Check(offSent == System.Net.HttpStatusCode.Accepted && buttonSent == System.Net.HttpStatusCode.NoContent &&
-              tray.Entries.All(e => e.Id != 113) && tray.Entries.Any(e => e.Id == 114) && !services.Settings.TmdbTrayAuto && model.TmdbTray.SwitchText.EndsWith(" · " + tray.Entries.Count, StringComparison.Ordinal),
-            $"tray: gathering switched off – only the button adds ({offSent}, {buttonSent}) – {model.TmdbTray.SwitchText}");
+              tray.Entries.All(e => e.Id != 113) && tray.Entries.Any(e => e.Id == 114) && !services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.EndsWith(" · " + tray.Entries.Count, StringComparison.Ordinal),
+            $"tray: gathering switched off – only the button adds ({offSent}, {buttonSent}) – {model.TrayService.SwitchText}");
         tray.Automatic = true;
 
         // one film or series – one send: a season of the series already in the tray, sent by itself, changes nothing
@@ -1819,7 +1819,7 @@ internal static class SelfTest
         await Task.Delay(300);
         Check(again == System.Net.HttpStatusCode.NoContent && string.Join(' ', tray.Entries.Select(e => e.Id)) == order && TrayToast.Shown.Count == toasts,
             "tray: a title already there, sent by itself again, is left alone – " + order);
-        Check(services.Settings.TmdbTrayAuto && model.TmdbTray.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TmdbTray.SwitchText);
+        Check(services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TrayService.SwitchText);
         using (var script = await http.GetAsync(tray.ScriptAddress))
         {
             var text = await script.Content.ReadAsStringAsync();

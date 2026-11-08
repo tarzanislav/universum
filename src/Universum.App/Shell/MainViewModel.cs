@@ -24,7 +24,7 @@ public sealed class MainViewModel : ObservableObject
     private string _updateBadge = "";
 
     /// <summary>The Zásobník TMDB – its switch at the top of the pages binds to it.</summary>
-    public TmdbTrayService TmdbTray => _services.TmdbTray;
+    public TmdbTrayService TrayService => _services.TmdbTray;
 
     public MainViewModel(AppServices services)
     {

@@ -94,8 +94,8 @@ public static partial class TmdbTray
             lines.RemoveAt(existing);
         }
 
-        lines.Insert(0, WebLinks.Named(name, entry.Address));
-        return string.Join('\n', lines);
+        lines.Add(WebLinks.Named(name, entry.Address));
+        return Sorted(lines);
     }
 
     /// <summary>The note with the name of a title set (it stays where it is); the note as it was when the title is not in it.</summary>
@@ -111,7 +111,7 @@ public static partial class TmdbTray
             }
         }
 
-        return string.Join('\n', lines);
+        return Sorted(lines);
     }
 
     /// <summary>The note without a film or series (and its episodes).</summary>
@@ -127,6 +127,24 @@ public static partial class TmdbTray
     /// the owner's own lines stay.
     /// </summary>
     public static string Clear(string? note) => string.Join('\n', Lines(note).Where(line => Read(line).Count == 0));
+
+    private static readonly CompareInfo Slovak = CultureInfo.GetCultureInfo("sk-SK").CompareInfo;
+
+    // owner, 8. 11. 2026 ("zoradené podľa abecedy, lebo sa v tom zle orientuje"): the own lines first as they were, then the
+    // titles by their names in the Slovak alphabet (an episode right after its series); titles without a name yet at the end
+    /// <summary>The note in the order of the tray (its own lines first, the titles by the alphabet).</summary>
+    public static string Sort(string? note) => Sorted(Lines(note));
+
+    private static string Sorted(List<string> lines)
+    {
+        var own = lines.Where(l => Read(l).Count == 0);
+        var titles = lines.Select(l => (Line: l, Entry: Read(l).FirstOrDefault())).Where(t => t.Entry is not null)
+            .OrderBy(t => t.Entry!.Name is null ? 1 : 0)
+            .ThenBy(t => t.Entry!.Name ?? t.Entry.Address.AbsoluteUri, Comparer<string>.Create((a, b) => Slovak.Compare(a, b, CompareOptions.IgnoreCase)))
+            .ThenBy(t => t.Entry!.Season ?? -1).ThenBy(t => t.Entry!.Episode ?? -1)
+            .Select(t => t.Line);
+        return string.Join('\n', own.Concat(titles));
+    }
 
     private static List<string> Lines(string? note) =>
         [.. (note ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Where(l => l.Trim().Length > 0)];

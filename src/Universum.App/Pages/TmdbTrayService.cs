@@ -60,8 +60,8 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Raised when the titles change (on the thread of the change – the UI's).</summary>
     public event Action? Changed;
 
-    /// <summary>The titles, the newest first.</summary>
-    public IReadOnlyList<TmdbTrayEntry> Entries => TmdbTray.Read(Note()?.Text);
+    /// <summary>The titles by the alphabet (owner, 8. 11. 2026).</summary>
+    public IReadOnlyList<TmdbTrayEntry> Entries => TmdbTray.Read(TmdbTray.Sort(Note()?.Text));
 
     /// <summary>"Prijíma na 127.0.0.1:47219", why not, or "vypnuté".</summary>
     public string Status { get; private set; } = "";
@@ -394,6 +394,13 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Starts the receiver on 127.0.0.1 when it is switched on (at the start of UNIVERSUM and when switched on).</summary>
     public void StartReceiving()
     {
+        // a tray kept before it was sorted: by the alphabet now (owner, 8. 11. 2026)
+        if (Note() is { } kept && TmdbTray.Read(kept.Text).Count > 0 && TmdbTray.Sort(kept.Text) is var sorted && sorted != kept.Text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim())
+        {
+            kept.Text = sorted;
+            _services.Agenda.Save(kept);
+        }
+
         StopReceiving();
         if (!_services.Settings.TmdbTrayReceive)
         {

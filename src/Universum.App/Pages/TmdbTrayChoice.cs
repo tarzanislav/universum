@@ -17,7 +17,7 @@ public sealed record TmdbTrayRow(TmdbTrayEntry Entry, int Posters = 0)
 
 /// <summary>
 /// The choice from the Zásobník TMDB beside a title field (owner, 8. 11. 2026: one click instead of copying the TMDB ID
-/// from the browser): the titles gathered, the newest first; a title chosen is handed to the page (which fills its field
+/// from the browser): the titles gathered, by the alphabet; a title chosen is handed to the page (which fills its field
 /// and loads the title), then the choice is empty again. "Z prehliadača" reads the open browser windows.
 /// </summary>
 public sealed class TmdbTrayChoice : ObservableObject

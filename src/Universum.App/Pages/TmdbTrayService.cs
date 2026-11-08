@@ -93,8 +93,15 @@ public sealed class TmdbTrayService : ObservableObject
     private AgendaItem? Note() => _services.Agenda.Items.FirstOrDefault(i => i.Uid == TmdbTray.NoteUid);
 
     /// <summary>Adds a title (at the top; one already there moves up) and asks TMDB for its name as the library names it.</summary>
-    public void Add(TmdbTrayEntry entry, bool fromBrowser = false)
+    public void Add(TmdbTrayEntry entry, bool fromBrowser = false, bool byItself = false)
     {
+        // a title already in the tray sent by itself again (a season or an episode of it opened): nothing to do
+        // (owner, 8. 11. 2026: one film or series – one send); the button of the page still moves it up
+        if (byItself && Entries.Any(e => e.Kind == entry.Kind && e.Id == entry.Id))
+        {
+            return;
+        }
+
         var note = Note() ?? new AgendaItem
         {
             Uid = TmdbTray.NoteUid,
@@ -196,7 +203,7 @@ public sealed class TmdbTrayService : ObservableObject
         {
             var dispatcher = Application.Current?.Dispatcher;
             _listener = TmdbTrayListener.Start(_services.Settings.TmdbTrayPort, Key,
-                entry => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => Add(entry, fromBrowser: true)).Task,
+                (entry, byItself) => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => Add(entry, fromBrowser: true, byItself)).Task,
                 () => TmdbUserScript.Text(Port, Key),
                 () => _services.Settings.TmdbTrayAuto);
             Status = Loc.F("Prijíma zo skriptu v prehliadači (len z tohto počítača, 127.0.0.1:{0}).", Port);

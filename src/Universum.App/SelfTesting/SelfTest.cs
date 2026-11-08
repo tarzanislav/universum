@@ -1811,6 +1811,14 @@ internal static class SelfTest
               tray.Entries.All(e => e.Id != 113) && tray.Entries.Any(e => e.Id == 114) && !services.Settings.TmdbTrayAuto && model.TmdbTray.SwitchText.EndsWith(" · " + tray.Entries.Count, StringComparison.Ordinal),
             $"tray: gathering switched off – only the button adds ({offSent}, {buttonSent}) – {model.TmdbTray.SwitchText}");
         tray.Automatic = true;
+
+        // one film or series – one send: a season of the series already in the tray, sent by itself, changes nothing
+        var order = string.Join(' ', tray.Entries.Select(e => e.Id));
+        var toasts = TrayToast.Shown.Count;
+        var again = await Send(tray.Key, "https://www.themoviedb.org/movie/111-vymysleny-film-zo-skriptu/cast");
+        await Task.Delay(300);
+        Check(again == System.Net.HttpStatusCode.NoContent && string.Join(' ', tray.Entries.Select(e => e.Id)) == order && TrayToast.Shown.Count == toasts,
+            "tray: a title already there, sent by itself again, is left alone – " + order);
         Check(services.Settings.TmdbTrayAuto && model.TmdbTray.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TmdbTray.SwitchText);
         using (var script = await http.GetAsync(tray.ScriptAddress))
         {

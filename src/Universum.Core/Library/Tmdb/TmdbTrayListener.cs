@@ -18,12 +18,12 @@ public sealed class TmdbTrayListener : IDisposable
     private const int MaxRequest = 16 * 1024;
     private readonly TcpListener _listener;
     private readonly string _key;
-    private readonly Func<TmdbTrayEntry, Task> _received;
+    private readonly Func<TmdbTrayEntry, bool, Task> _received;
     private readonly Func<string> _script;
     private readonly Func<bool> _automatic;
     private readonly CancellationTokenSource _stop = new();
 
-    private TmdbTrayListener(TcpListener listener, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool> automatic)
+    private TmdbTrayListener(TcpListener listener, string key, Func<TmdbTrayEntry, bool, Task> received, Func<string> script, Func<bool> automatic)
     {
         _automatic = automatic;
         _listener = listener;
@@ -42,7 +42,11 @@ public sealed class TmdbTrayListener : IDisposable
     /// <paramref name="automatic"/>: whether pages the script sends by itself are taken now (owner, 8. 11. 2026: the
     /// automatic gathering is switched on and off in UNIVERSUM; the button of the page is always taken).
     /// </summary>
-    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool>? automatic = null)
+    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, Task> received, Func<string> script, Func<bool>? automatic = null) =>
+        Start(port, key, (entry, _) => received(entry), script, automatic);
+
+    /// <summary>The same; <paramref name="received"/> learns whether the script sent the page by itself (not by its button).</summary>
+    public static TmdbTrayListener Start(int port, string key, Func<TmdbTrayEntry, bool, Task> received, Func<string> script, Func<bool>? automatic = null)
     {
         if (key.Length < 16)
         {
@@ -146,7 +150,7 @@ public sealed class TmdbTrayListener : IDisposable
 
         try
         {
-            await _received(entry).ConfigureAwait(false);
+            await _received(entry, sentByItself).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

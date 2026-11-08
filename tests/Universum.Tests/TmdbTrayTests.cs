@@ -25,6 +25,8 @@ public sealed class TmdbTrayTests
             "added again: moved up, its name kept; text of the user is no title");
         Assert.Equal("https://www.themoviedb.org/movie/111", entries[0].FieldText, "a title field takes the address");
         Assert.Equal(1, TmdbTray.Read(TmdbTray.Remove(note, MediaKind.Movie, 111)).Count, "removed");
+        Assert.True(TmdbTray.FromPage("https://www.themoviedb.org/tv/222-vymysleny-serial/season/1/episode/3?language=sk", null) is { Kind: MediaKind.Series, Id: 222 } &&
+                    TmdbTray.FromPage("https://www.themoviedb.org/movie/111-vymysleny-film/cast", null) is { Kind: MediaKind.Movie, Id: 111 }, "a season, an episode, the cast: the same title");
         Assert.Equal("moja poznámka", TmdbTray.Clear("moja poznámka\n" + note), "emptied: the own line stays, no TMDB title");
     }
 
@@ -131,6 +133,8 @@ public sealed class TmdbTrayTests
         Assert.Sequence(["https://www.themoviedb.org/movie/*", "https://www.themoviedb.org/tv/*"], matches, "only TMDB's film and series pages");
         Assert.True(script.Contains("@connect      127.0.0.1", StringComparison.Ordinal) && !script.Contains("@connect      *", StringComparison.Ordinal) &&
                     script.Contains("'http://127.0.0.1:' + PORT", StringComparison.Ordinal), "only 127.0.0.1");
+        Assert.True(script.Contains("sessionStorage.getItem(sent)", StringComparison.Ordinal) && script.Contains("AUTOMATIC && !known", StringComparison.Ordinal),
+            "a film or series is sent by itself once per tab (its seasons and episodes are the same title)");
         Assert.True(script.Contains("a: !button", StringComparison.Ordinal), "it says whether it sent by itself (UNIVERSUM takes those only while gathering)");
         Assert.True(TmdbUserScript.Bookmarklet.StartsWith("javascript:location.href='universum://tmdb?u='", StringComparison.Ordinal), "the bookmark");
     }

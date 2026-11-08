@@ -12,7 +12,7 @@ namespace Universum.Core.Library.Tmdb;
 /// </summary>
 public static class TmdbUserScript
 {
-    public const string Version = "1.1";
+    public const string Version = "1.2";
 
     public static string Text(int port, string key, bool automatic = true)
     {
@@ -78,7 +78,13 @@ public static class TmdbUserScript
                 'background:#01b4e4;color:#fff;font:600 14px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35)';
               button.addEventListener('click', function () { send(button); });
               document.body.appendChild(button);
-              if (AUTOMATIC) {
+              // one film or series is sent by itself once (owner, 8. 11. 2026: its seasons and episodes are the same title)
+              const title = location.pathname.match(/^\/(movie|tv)\/(\d+)/);
+              const sent = 'universum-' + title[1] + '-' + title[2];
+              let known = false;
+              try { known = sessionStorage.getItem(sent) === '1'; } catch (e) { }
+              if (AUTOMATIC && !known) {
+                try { sessionStorage.setItem(sent, '1'); } catch (e) { }
                 send(null);
               }
             })();

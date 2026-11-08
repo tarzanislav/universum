@@ -71,6 +71,21 @@ public sealed class NoteCard
     public required RelayCommand DeleteCommand { get; init; }
 
     public RelayCommand? RestoreCommand { get; init; }
+
+    /// <summary>The width of the card (owner, 8. 11. 2026: a note can be made wider – usual, wide, widest).</summary>
+    public double CardWidth { get; init; } = NotesPageViewModel.CardWidths[0];
+
+    /// <summary>Makes the card wider (the widest becomes usual again); null for the notes of titles and in the bin.</summary>
+    public RelayCommand? WidenCommand { get; init; }
+
+    public bool CanWiden => WidenCommand is not null;
+
+    public string WidenToolTip { get; init; } = "";
+
+    /// <summary>The card is the Zásobník TMDB (it can be emptied with one click).</summary>
+    public bool IsTray { get; init; }
+
+    public RelayCommand? ClearTrayCommand { get; init; }
 }
 
 /// <summary>The editor of the note of a title (Premiéry, Novinky): its text, kept with the title's mark.</summary>
@@ -139,6 +154,17 @@ public sealed class NotesPageViewModel : ObservableObject
     private object? _editor;
     private string _status = "";
     private bool _building;
+    private string? _trayBefore;
+    private bool _editingTray;
+
+    /// <summary>The widths of a card: usual, wide, widest.</summary>
+    public static readonly double[] CardWidths = [250, 520, 790];
+
+    // how many rows a card shows at each width
+    private static readonly int[] CardRowsAt = [8, 16, 30];
+
+    // the widths of the note opened, one click after another
+    private static readonly double[] EditorWidths = [340, 560, 820];
 
     public NotesPageViewModel(AppServices services)
     {
@@ -148,6 +174,9 @@ public sealed class NotesPageViewModel : ObservableObject
         AddCommand = new RelayCommand(Add);
         NewCommand = new RelayCommand(() => Edit(null));
         EmptyBinCommand = new RelayCommand(EmptyBin, () => _services.Agenda.Bin.Count > 0);
+        WidenEditorCommand = new RelayCommand(WidenEditor);
+        ClearTrayCommand = new RelayCommand(ClearTray);
+        UndoTrayCommand = new RelayCommand(UndoTray, () => _trayBefore is not null);
         services.Agenda.Changed += () =>
         {
             if (!_building)
@@ -247,12 +276,13 @@ public sealed class NotesPageViewModel : ObservableObject
     // how many rows a card shows (the note opened shows all its links)
     private const int CardRows = 8;
 
-    private (IReadOnlyList<NoteRowView> Rows, string More) RowsOf(string text)
+    private (IReadOnlyList<NoteRowView> Rows, string More) RowsOf(string text, int cardRows = CardRows)
     {
         var rows = NoteRows.Of(text);
-        var shown = rows.Take(CardRows).Select(r => r.IsLink ? new NoteRowView(null, LinkView(r)) : new NoteRowView(r.Text, null)).ToList();
-        return (shown, rows.Count > CardRows
-            ? L($"… a ďalšie ({rows.Count - CardRows}) – otvorte poznámku", $"… a další ({rows.Count - CardRows}) – otevřete poznámku", $"… and {rows.Count - CardRows} more – open the note")
+        var shown = rows.Take(cardRows).Select(r => r.IsLink ? new NoteRowView(null, LinkView(r)) : new NoteRowView(r.Text, null)).ToList();
+        var left = rows.Count - cardRows;
+        return (shown, left > 0
+            ? L($"… a ďalšie ({left}) – otvorte poznámku", $"… a další ({left}) – otevřete poznámku", $"… and {left} more – open the note")
             : "");
     }
 
@@ -343,6 +373,82 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public bool HasEditor => Editor is not null;
 
+    /// <summary>The width of the note opened (owner, 8. 11. 2026: larger with a click; kept for the next time).</summary>
+    public double EditorWidth => Math.Clamp(_services.Settings.NotesEditorWidth, EditorWidths[0], 1400);
+
+    public RelayCommand WidenEditorCommand { get; }
+
+    /// <summary>The note opened is the Zásobník TMDB (its button Vyprázdniť is shown).</summary>
+    public bool EditingTray { get => _editingTray; private set => SetProperty(ref _editingTray, value); }
+
+    /// <summary>Empties the Zásobník TMDB – no title of TMDB stays in it (the own lines do); Vrátiť takes it back.</summary>
+    public RelayCommand ClearTrayCommand { get; }
+
+    public RelayCommand UndoTrayCommand { get; }
+
+    public bool CanUndoTray => _trayBefore is not null;
+
+    private void WidenEditor()
+    {
+        var next = EditorWidths.FirstOrDefault(w => w > EditorWidth + 1, EditorWidths[0]);
+        _services.Settings.NotesEditorWidth = next;
+        _services.Settings.Save();
+        OnPropertyChanged(nameof(EditorWidth));
+    }
+
+    private void ClearTray()
+    {
+        if (_services.TmdbTray.Clear() is not { } before)
+        {
+            Status = L("Zásobník TMDB je prázdny.", "Zásobník TMDB je prázdný.", "The TMDB tray is empty.");
+            return;
+        }
+
+        var count = Core.Library.Tmdb.TmdbTray.Read(before).Count;
+        SetTrayBefore(before);
+        Status = L($"Zásobník TMDB vyprázdnený ({count}).", $"Zásobník TMDB vyprázdněn ({count}).", $"The TMDB tray emptied ({count}).");
+        ReopenTray();
+    }
+
+    private void UndoTray()
+    {
+        if (_trayBefore is { } before)
+        {
+            _services.TmdbTray.Restore(before);
+            SetTrayBefore(null);
+            Status = L("Zásobník TMDB vrátený.", "Zásobník TMDB vrácen.", "The TMDB tray taken back.");
+            ReopenTray();
+        }
+    }
+
+    private void SetTrayBefore(string? before)
+    {
+        _trayBefore = before;
+        OnPropertyChanged(nameof(CanUndoTray));
+        UndoTrayCommand.NotifyCanExecuteChanged();
+    }
+
+    // the tray opened shows its new text
+    private void ReopenTray()
+    {
+        if (EditingTray && _services.Agenda.Items.FirstOrDefault(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid) is { } tray)
+        {
+            Edit(tray);
+        }
+    }
+
+    private static int WidthOf(AgendaItem item) =>
+        Math.Clamp(item.Note?.Width ?? (item.Uid == Core.Library.Tmdb.TmdbTray.NoteUid ? 2 : 0), 0, CardWidths.Length - 1);
+
+    private void Widen(AgendaItem item)
+    {
+        if (item.Note is { } note)
+        {
+            note.Width = (WidthOf(item) + 1) % CardWidths.Length;
+            _services.Agenda.Save(item);
+        }
+    }
+
     /// <summary>Tlač a export (stage P3): the notes as they are shown (source, tag, search).</summary>
     public RelayCommand PrintCommand => _print ??= new RelayCommand(() => ShowReport(Report()));
 
@@ -387,15 +493,24 @@ public sealed class NotesPageViewModel : ObservableObject
         }
     }
 
-    public void Edit(AgendaItem? item) => Editor = new AgendaEditor(_services.Agenda, item, DateOnly.FromDateTime(DateTime.Now), AgendaKind.Note, () => Editor = null)
+    public void Edit(AgendaItem? item)
     {
-        Voice = _services.Voice,
-        LinkView = LinkView,
-    };
+        EditingTray = item?.Uid == Core.Library.Tmdb.TmdbTray.NoteUid;
+        Editor = new AgendaEditor(_services.Agenda, item, DateOnly.FromDateTime(DateTime.Now), AgendaKind.Note, () =>
+        {
+            Editor = null;
+            EditingTray = false;
+        })
+        {
+            Voice = _services.Voice,
+            LinkView = LinkView,
+        };
+    }
 
     private void EditTitle(string key, string caption)
     {
         var mark = _services.Marks.Get(key);
+        EditingTray = false;
         Editor = new TitleNoteEditor(caption, mark.Note, text => _services.Marks.Set(key, _services.Marks.Get(key) with { Note = text }), () => Editor = null)
         {
             LinkView = LinkView,
@@ -554,9 +669,18 @@ public sealed class NotesPageViewModel : ObservableObject
         var accent = CalendarColors.Of(CalendarLayer.Notes, item.Color);
         var day = item.Links.FirstOrDefault(l => l.Kind == LinkKind.Day);
         var kind = item.Time is not null ? L("udalosť", "událost", "event") : item.Task is not null ? L("úloha", "úkol", "task") : null;
-        var (rows, more) = RowsOf(item.Text);
+        var width = WidthOf(item);
+        var (rows, more) = RowsOf(item.Text, CardRowsAt[width]);
+        var isTray = item.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && !inBin;
         return new NoteCard
         {
+            CardWidth = CardWidths[width],
+            WidenCommand = inBin ? null : new RelayCommand(() => Widen(item)),
+            WidenToolTip = width == CardWidths.Length - 1
+                ? L("Zúžiť kartu", "Zúžit kartu", "Make the card narrow")
+                : L("Rozšíriť kartu (ukáže aj viac riadkov)", "Rozšířit kartu (ukáže i více řádků)", "Make the card wider (it shows more rows too)"),
+            IsTray = isTray,
+            ClearTrayCommand = isTray ? ClearTrayCommand : null,
             Title = item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0],
             Text = item.Text,
             Rows = rows,

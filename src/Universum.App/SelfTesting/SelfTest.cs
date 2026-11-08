@@ -1772,12 +1772,14 @@ internal static class SelfTest
         services.Settings.TmdbTrayPort = 0;
         tray.StartReceiving();
         Check(tray.Receiving && tray.Port > 0, "tray: the receiver on 127.0.0.1 runs – " + tray.Status);
+        var automaticBefore = tray.Automatic;
+        tray.Automatic = true;
         using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        async Task<System.Net.HttpStatusCode> Send(string key, string page)
+        async Task<System.Net.HttpStatusCode> Send(string key, string page, bool byItself = true)
         {
             using var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"http://127.0.0.1:{tray.Port}/tmdb")
             {
-                Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(new { u = page, t = "Vymyslený film zo skriptu (2026) — The Movie Database (TMDB)" }), Encoding.UTF8, "application/json"),
+                Content = new System.Net.Http.StringContent(System.Text.Json.JsonSerializer.Serialize(new { u = page, t = "Vymyslený film zo skriptu (2026) — The Movie Database (TMDB)", a = byItself }), Encoding.UTF8, "application/json"),
             };
             request.Headers.Add("X-Universum-Key", key);
             using var answer = await http.SendAsync(request);
@@ -1794,6 +1796,30 @@ internal static class SelfTest
               TrayToast.Shown.Any(t => t.Contains("Vymyslený film zo skriptu", StringComparison.Ordinal)),
             $"tray: a film from the script, with a notice – {sent} | {string.Join(", ", tray.Entries.Select(e => e.Display))}");
         Check(await Send("0123456789abcdef0123456789abcdef", "https://www.themoviedb.org/movie/112") == System.Net.HttpStatusCode.Forbidden, "tray: another key is refused");
+
+        // owner, 8. 11. 2026: the automatic gathering switched off at the top of a page – pages sent by themselves are not
+        // taken, the button of the page still adds; the switch shows the count
+        tray.Automatic = false;
+        var offSent = await Send(tray.Key, "https://www.themoviedb.org/movie/113");
+        var buttonSent = await Send(tray.Key, "https://www.themoviedb.org/movie/114", byItself: false);
+        for (var i = 0; i < 50 && !tray.Entries.Any(e => e.Id == 114); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Check(offSent == System.Net.HttpStatusCode.Accepted && buttonSent == System.Net.HttpStatusCode.NoContent &&
+              tray.Entries.All(e => e.Id != 113) && tray.Entries.Any(e => e.Id == 114) && !services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.EndsWith(" · " + tray.Entries.Count, StringComparison.Ordinal),
+            $"tray: gathering switched off – only the button adds ({offSent}, {buttonSent}) – {model.TrayService.SwitchText}");
+        tray.Automatic = true;
+
+        // one film or series – one send: a season of the series already in the tray, sent by itself, changes nothing
+        var order = string.Join(' ', tray.Entries.Select(e => e.Id));
+        var toasts = TrayToast.Shown.Count;
+        var again = await Send(tray.Key, "https://www.themoviedb.org/movie/111-vymysleny-film-zo-skriptu/cast");
+        await Task.Delay(300);
+        Check(again == System.Net.HttpStatusCode.NoContent && string.Join(' ', tray.Entries.Select(e => e.Id)) == order && TrayToast.Shown.Count == toasts,
+            "tray: a title already there, sent by itself again, is left alone – " + order);
+        Check(services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TrayService.SwitchText);
         using (var script = await http.GetAsync(tray.ScriptAddress))
         {
             var text = await script.Content.ReadAsStringAsync();
@@ -1816,6 +1842,36 @@ internal static class SelfTest
         var found = await tray.ReadBrowserAsync(() => [new BrowserWindow("themoviedb.org/movie/444-iny-vymysleny-film", ["Nejaká iná stránka – Vymyslený portál"])]);
         Check(tray.Entries.Any(e => e is { Kind: MediaKind.Movie, Id: 444 }), "tray: the tab in front of a browser window – " + found);
         Write("tray: the browser windows of this computer – " + await tray.ReadBrowserAsync());
+
+        // Poznámky: the tray widest, any note wider with a click, the note opened wider; the tray emptied from its card and
+        // from inside it, Vrátiť puts it back (owner, 8. 11. 2026)
+        var notes = model.AgendaNotes;
+        notes.Build();
+        var trayCard = notes.Cards.Single(c => c.IsTray);
+        Check(trayCard.CardWidth == NotesPageViewModel.CardWidths[^1] && trayCard.ClearTrayCommand is not null, "tray: its note is the widest – " + trayCard.CardWidth);
+        var count = tray.Entries.Count;
+        trayCard.ClearTrayCommand!.Execute(null);
+        Check(tray.Entries.Count == 0 && notes.CanUndoTray && notes.Cards.Any(c => c.IsTray), "tray: emptied from its card – " + notes.Status);
+        notes.UndoTrayCommand.Execute(null);
+        Check(tray.Entries.Count == count && !notes.CanUndoTray, "tray: Vrátiť puts it back – " + notes.Status);
+        notes.Edit(services.Agenda.Items.Single(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid));
+        notes.ClearTrayCommand.Execute(null);
+        Check(notes.EditingTray && tray.Entries.Count == 0 && notes.Editor is AgendaEditor, "tray: emptied from inside the note – " + notes.Status);
+        notes.UndoTrayCommand.Execute(null);
+        var widthBefore = services.Settings.NotesEditorWidth;
+        notes.WidenEditorCommand.Execute(null);
+        Check(notes.EditorWidth > widthBefore || widthBefore >= 820, $"notes: the note opened wider – {widthBefore} → {notes.EditorWidth}");
+        services.Settings.NotesEditorWidth = widthBefore;
+        ((AgendaEditor)notes.Editor!).CancelCommand.Execute(null);
+        services.Agenda.Save(new Core.Agenda.AgendaItem { Title = "Vymyslená široká poznámka", Text = string.Join('\n', Enumerable.Range(1, 20).Select(n => $"https://video.example/vymyslene-video-{n}")), Note = new Core.Agenda.AgendaNote() });
+        var plain = notes.Cards.Single(c => c.Title == "Vymyslená široká poznámka");
+        plain.WidenCommand!.Execute(null);
+        var wide = notes.Cards.Single(c => c.Title == "Vymyslená široká poznámka");
+        Check(plain.CardWidth == NotesPageViewModel.CardWidths[0] && wide.CardWidth == NotesPageViewModel.CardWidths[1] && wide.Rows.Count > plain.Rows.Count,
+            $"notes: a card wider with a click, more rows – {plain.Rows.Count} → {wide.Rows.Count}");
+        services.Agenda.Delete(wide.Record!.Id);
+        services.Agenda.EmptyBin();
+        tray.Automatic = automaticBefore;
         tray.StopReceiving();
         Check(!tray.Receiving, "tray: the receiver stopped");
     }

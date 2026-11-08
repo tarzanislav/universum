@@ -1123,6 +1123,15 @@ public sealed class AppSettings
     /// <summary>Zásobník TMDB: UNIVERSUM's script in the browser may send films and series (owner, 8. 11. 2026).</summary>
     public bool TmdbTrayReceive { get; set; } = true;
 
+    /// <summary>
+    /// Zásobník TMDB gathers by itself: every TMDB film or series page opened in the browser is added (owner, 8. 11. 2026:
+    /// switched on and off at the top of Hromadné, Single and the other pages; off, only the button of the page adds).
+    /// </summary>
+    public bool TmdbTrayAuto { get; set; }
+
+    /// <summary>The width of the note opened in Poznámky (owner, 8. 11. 2026: notes can be made larger).</summary>
+    public double NotesEditorWidth { get; set; } = 340;
+
     /// <summary>The port of the receiver on 127.0.0.1 (the script knows it).</summary>
     public int TmdbTrayPort { get; set; } = 47219;
 

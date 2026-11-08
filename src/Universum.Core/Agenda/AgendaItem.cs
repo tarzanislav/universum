@@ -102,6 +102,12 @@ public sealed class AgendaNote
 
     /// <summary>The voice recording kept with the note (a file name in the agenda's folder of recordings).</summary>
     public string? Recording { get; set; }
+
+    /// <summary>
+    /// How wide its card is (owner, 8. 11. 2026: "všetky poznámky by sa mali dať rozšíriť"): 0 usual, 1 wide, 2 widest;
+    /// null – as such a note is by default.
+    /// </summary>
+    public int? Width { get; set; }
 }
 
 /// <summary>What UNIVERSUM can do by itself at the time of a record (owner, 31. 10. 2026 – tasks for UNIVERSUM).</summary>

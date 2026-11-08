@@ -52,6 +52,7 @@ Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupn
 - **Rychlá poznámka**: první věta je název, slova s # jsou štítky – *Nápad na plakát. Zkusit tmavší pozadí #nápad*.
 - Na jednom místě jsou **moje poznámky**, **poznámky ke dnům** z Kalendáře a **poznámky k titulům** z Premiér a Novinek.
 - Špendlík na lístku připne poznámku nahoru; smazaná poznámka jde do **koše**, odkud se dá vrátit.
+- Ikona se šipkami na lístku ho **rozšíří** (širší lístek ukáže i více řádků, třetí klik ho zúží); otevřenou poznámku rozšíří tlačítko [Rozšířit].
 ### Hlasem
 - **Hlasové psaní Windows** (Win + H) píše hned tam, kam kliknete – jde však přes Microsoft (internet).
 - [Nahrať hlasom] nahraje mikrofon a nahrávku **přepíše přímo ve vašem počítači** – nic neodchází ven.
@@ -61,7 +62,8 @@ Nahoře jsou návrhy, které UNIVERSUM spočítá samo (vybraný titul ve vstupn
 Filmy a seriály, které si otevřete na TMDB, se sbírají v připnuté poznámce **Zásobník TMDB** – s názvem a rokem podle pravidel knihovny a aktivním odkazem. U polí titulu a **TMDB ID** v Hromadném, Single, Slučování a studiích je vyberete jedním klikem v nabídce **Ze zásobníku TMDB…** – název se hned načte.
 1. Do prohlížeče si nainstalujte rozšíření **Tampermonkey** nebo **Violentmonkey**.
 2. V Nastavení (Zásobník TMDB) klikněte na [Nainstalovat skript] a potvrďte ho v rozšíření.
-3. Každá stránka filmu nebo seriálu, kterou na TMDB otevřete, přibude do zásobníku sama; na stránce je i tlačítko **Do UNIVERSUM**.
+3. Zapněte **Zásobník TMDB** nahoře u názvu stránky (Hromadné, Single, Slučování, studia, Editace hlavičky, Poznámky): dokud je zapnutý, každá stránka filmu nebo seriálu, kterou na TMDB otevřete, přibude do zásobníku sama. Vypnutý přidá stránku jen tlačítko **Do UNIVERSUM** na ní.
+4. Ikonou na kartě zásobníku nebo tlačítkem [Vyprázdnit zásobník] v otevřené poznámce zásobník vyprázdníte – nezůstane v něm žádný film ani seriál z TMDB; [Vrátit] ho vrátí.
 !tip Bez rozšíření: [Kopírovat záložku Do UNIVERSUM] a záložku přidejte do lišty záložek. Tlačítko [Z prohlížeče] přečte filmy otevřené v oknech prohlížeče – kartu vpředu přesně, ostatní podle názvu a roku (nejasné označí „ověřit“).
 !info Skript posílá jen na tento počítač (127.0.0.1) s tajným klíčem; UNIVERSUM přijme jen adresy filmů a seriálů TMDB.
 ![Poznámky](notes.jpg)

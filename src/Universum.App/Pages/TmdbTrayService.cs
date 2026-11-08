@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.App.Localization;
 using Universum.App.Shell;
 using Universum.Core.Agenda;
@@ -16,7 +17,7 @@ namespace Universum.App.Pages;
 /// the open browser windows – kept in a pinned note of Poznámky, named by TMDB as the library names them; Hromadné, Single,
 /// Zlučovanie and Editácia hlavičky take a title from it with one click.
 /// </summary>
-public sealed class TmdbTrayService
+public sealed class TmdbTrayService : ObservableObject
 {
     private readonly AppServices _services;
     private TmdbTrayListener? _listener;
@@ -24,8 +25,36 @@ public sealed class TmdbTrayService
     public TmdbTrayService(AppServices services)
     {
         _services = services;
-        services.Agenda.Changed += () => Changed?.Invoke();
+        services.Agenda.Changed += () =>
+        {
+            Changed?.Invoke();
+            OnPropertyChanged(nameof(SwitchText));
+        };
     }
+
+    /// <summary>
+    /// The automatic gathering (owner, 8. 11. 2026: switched on at the top of Hromadné, Single and the other pages): on,
+    /// every TMDB film or series page opened in the browser is added; off, only the button "Do UNIVERSUM" of the page.
+    /// </summary>
+    public bool Automatic
+    {
+        get => _services.Settings.TmdbTrayAuto;
+        set
+        {
+            if (_services.Settings.TmdbTrayAuto != value)
+            {
+                _services.Settings.TmdbTrayAuto = value;
+                _services.Settings.Save();
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SwitchText));
+            }
+        }
+    }
+
+    /// <summary>"Zásobník TMDB zbiera · 3" or "Zásobník TMDB · 3" – the switch at the top of the pages.</summary>
+    public string SwitchText => (Automatic ? Loc.T("Zásobník TMDB zbiera") : Loc.T("Zásobník TMDB")) + " · " + Entries.Count;
+
+    public string SwitchToolTip => Loc.T("Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke.");
 
     /// <summary>Raised when the titles change (on the thread of the change – the UI's).</summary>
     public event Action? Changed;
@@ -64,14 +93,21 @@ public sealed class TmdbTrayService
     private AgendaItem? Note() => _services.Agenda.Items.FirstOrDefault(i => i.Uid == TmdbTray.NoteUid);
 
     /// <summary>Adds a title (at the top; one already there moves up) and asks TMDB for its name as the library names it.</summary>
-    public void Add(TmdbTrayEntry entry, bool fromBrowser = false)
+    public void Add(TmdbTrayEntry entry, bool fromBrowser = false, bool byItself = false)
     {
+        // a title already in the tray sent by itself again (a season or an episode of it opened): nothing to do
+        // (owner, 8. 11. 2026: one film or series – one send); the button of the page still moves it up
+        if (byItself && Entries.Any(e => e.Kind == entry.Kind && e.Id == entry.Id))
+        {
+            return;
+        }
+
         var note = Note() ?? new AgendaItem
         {
             Uid = TmdbTray.NoteUid,
             Title = Loc.T("Zásobník TMDB"),
             Tags = ["TMDB"],
-            Note = new AgendaNote { Pinned = true },
+            Note = new AgendaNote { Pinned = true, Width = 2 },
         };
         note.Text = TmdbTray.Add(note.Text, entry);
         _services.Agenda.Save(note);
@@ -82,6 +118,39 @@ public sealed class TmdbTrayService
         }
 
         _ = NameAsync(entry);
+    }
+
+    /// <summary>
+    /// Empties the tray (owner, 8. 11. 2026: "reštart – nebude tam žiaden údaj z TMDB"); the owner's own lines stay. The
+    /// text before, to take it back; null when there was nothing to empty.
+    /// </summary>
+    public string? Clear()
+    {
+        if (Note() is not { } note || TmdbTray.Read(note.Text).Count == 0)
+        {
+            return null;
+        }
+
+        var before = note.Text;
+        note.Text = TmdbTray.Clear(note.Text);
+        _services.Agenda.Save(note);
+        return before;
+    }
+
+    /// <summary>The tray as it was before <see cref="Clear"/> (titles added since stay at the top).</summary>
+    public void Restore(string before)
+    {
+        if (Note() is { } note)
+        {
+            var added = TmdbTray.Read(note.Text);
+            note.Text = before;
+            foreach (var entry in added.Reverse())
+            {
+                note.Text = TmdbTray.Add(note.Text, entry);
+            }
+
+            _services.Agenda.Save(note);
+        }
     }
 
     public void Remove(TmdbTrayEntry entry)
@@ -134,8 +203,9 @@ public sealed class TmdbTrayService
         {
             var dispatcher = Application.Current?.Dispatcher;
             _listener = TmdbTrayListener.Start(_services.Settings.TmdbTrayPort, Key,
-                entry => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => Add(entry, fromBrowser: true)).Task,
-                () => TmdbUserScript.Text(Port, Key));
+                (entry, byItself) => dispatcher is null ? Task.CompletedTask : dispatcher.InvokeAsync(() => Add(entry, fromBrowser: true, byItself)).Task,
+                () => TmdbUserScript.Text(Port, Key),
+                () => _services.Settings.TmdbTrayAuto);
             Status = Loc.F("Prijíma zo skriptu v prehliadači (len z tohto počítača, 127.0.0.1:{0}).", Port);
         }
         catch (SocketException ex)

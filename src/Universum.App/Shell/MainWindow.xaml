@@ -199,7 +199,10 @@
                     <RowDefinition Height="3*" MinHeight="150" />
                 </Grid.RowDefinitions>
                 <StackPanel>
-                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'MEGA spracovanie'}" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'MEGA spracovanie'}" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                    </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
                 </StackPanel>
@@ -389,7 +392,10 @@
                             ToolTip="{loc:T 'Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)'}" />
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                     </StackPanel>
                 </DockPanel>
@@ -605,6 +611,7 @@
                 </Grid.RowDefinitions>
                 <DockPanel>
                     <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Zlučovanie'}" Margin="0,0,16,4" />
+                    <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,16,4" />
                     <TextBlock Text="{Binding Message}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </DockPanel>
                 <pages:MuxTabStrip Grid.Row="1" Margin="0,4,0,0" />
@@ -1092,7 +1099,10 @@
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" VerticalAlignment="Top" />
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kapitoly'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kapitoly'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                     </StackPanel>
@@ -1205,7 +1215,10 @@
                                 ToolTip="{loc:T 'Súbory titulkov (SRT, ASS/SSA, WebVTT, TTML, SAMI, SubViewer, MicroDVD, MPL2, TMPlayer) – uložia sa ako nové SRT'}" />
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     </StackPanel>
@@ -1674,7 +1687,10 @@
                                 ToolTip="{loc:T 'Zvukové súbory (MKA, AC-3, E-AC-3, DTS, AAC, MP3, FLAC, Opus, WAV) alebo iný film, z ktorého sa zoberie zvuk (napr. CZ dabing z iného vydania)'}" />
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     </StackPanel>
@@ -1917,7 +1933,10 @@
                         <Button Content="{loc:T 'Otvoriť video…'}" Command="{Binding OpenVideoCommand}" Padding="16,6" />
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava videostopy'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava videostopy'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                     </StackPanel>
@@ -2066,7 +2085,10 @@
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava hlavičky'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava hlavičky'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                     </StackPanel>
@@ -2511,7 +2533,10 @@
                                 ToolTip="{loc:T 'Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)'}" />
                     </StackPanel>
                     <StackPanel>
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                        </StackPanel>
                         <TextBlock Text="{Binding Folder}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </DockPanel>
@@ -4852,6 +4877,15 @@
         <!-- POZNÁMKY – Poznámky (owner, 31. 10. 2026, stage P2) -->
         <!-- Zásobník TMDB (owner, 8. 11. 2026): the titles from the browser, one click fills the title; "Z prehliadača" reads the
              open browser windows -->
+        <!-- the switch of the automatic gathering of the Zásobník TMDB at the top of the pages (owner, 8. 11. 2026) -->
+        <DataTemplate x:Key="TrayAutoSwitch" DataType="{x:Type pages:TmdbTrayService}">
+            <ToggleButton IsChecked="{Binding Automatic}" Padding="10,4" ToolTip="{Binding SwitchToolTip}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE896;" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SwitchText}" VerticalAlignment="Center" />
+                </StackPanel>
+            </ToggleButton>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type pages:TmdbTrayChoice}">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="190" Margin="0,0,4,0" ToolTip="{Binding ToolTip}">
@@ -4905,7 +4939,10 @@
         <DataTemplate DataType="{x:Type pages:NotesPageViewModel}">
             <DockPanel Margin="24,20,24,12">
                 <StackPanel DockPanel.Dock="Top">
-                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Poznámky'}" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Poznámky'}" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                    </StackPanel>
                     <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
                                Text="{loc:T 'Vaše poznámky, poznámky k dňom z Kalendára a poznámky k titulom z Premiér a Noviniek na jednom mieste. Poznámku môžete napísať aj hlasom – cez hlasové písanie Windows alebo nahrávkou, ktorú UNIVERSUM prepíše v počítači.'}" />
                     <DockPanel Margin="0,0,0,8">
@@ -4939,13 +4976,35 @@
                                     Visibility="{Binding ShowBin, Converter={StaticResource BoolToVisibility}}" ToolTip="{loc:T 'Záznamy v koši sa odstránia natrvalo (aj nahrávky poznámok)'}" />
                         </WrapPanel>
                     </DockPanel>
-                    <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" Margin="0,0,0,4" />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Text="{Binding Status}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                        <Button Content="{loc:T 'Vrátiť'}" Command="{Binding UndoTrayCommand}" Padding="8,1" Margin="10,0,0,0"
+                                Visibility="{Binding CanUndoTray, Converter={StaticResource BoolToVisibility}}" ToolTip="{loc:T 'Vráti filmy a seriály do zásobníka, ako boli pred vyprázdnením'}" />
+                    </StackPanel>
                 </StackPanel>
-                <Border DockPanel.Dock="Right" Width="340" Margin="14,0,0,0" Style="{StaticResource Card}" Padding="0"
+                <Border DockPanel.Dock="Right" Width="{Binding EditorWidth}" Margin="14,0,0,0" Style="{StaticResource Card}" Padding="0"
                         Visibility="{Binding HasEditor, Converter={StaticResource BoolToVisibility}}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ContentControl Content="{Binding Editor}" Margin="16,12,16,16" />
-                    </ScrollViewer>
+                    <DockPanel>
+                        <!-- owner, 8. 11. 2026: the note opened larger with a click; the tray emptied from inside it too -->
+                        <WrapPanel DockPanel.Dock="Top" Margin="12,8,12,0">
+                            <Button Command="{Binding WidenEditorCommand}" Padding="8,3" Margin="0,0,8,0" ToolTip="{loc:T 'Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)'}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE740;" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock Text="{loc:T 'Rozšíriť'}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ClearTrayCommand}" Padding="8,3" Margin="0,0,8,0" Visibility="{Binding EditingTray, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="{loc:T 'Vyprázdniť zásobník – nezostane v ňom žiaden film ani seriál z TMDB (dá sa vrátiť)'}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE894;" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock Text="{loc:T 'Vyprázdniť zásobník'}" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ContentControl Content="{Binding Editor}" Margin="16,8,16,16" />
+                        </ScrollViewer>
+                    </DockPanel>
                 </Border>
                 <Grid>
                     <TextBlock Text="{loc:T 'Zatiaľ tu nie sú žiadne poznámky.'}" Style="{StaticResource Hint}" Margin="0,10,0,0"
@@ -4960,12 +5019,20 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Command="{Binding OpenCommand}" Template="{StaticResource CalendarDayButton}" Cursor="Hand" Margin="0,0,10,10">
-                                        <Border Width="250" MinHeight="120" CornerRadius="8" Padding="12,10" Background="{Binding Background}" BorderBrush="{Binding Accent}" BorderThickness="0,4,0,0">
+                                        <Border Width="{Binding CardWidth}" MinHeight="120" CornerRadius="8" Padding="12,10" Background="{Binding Background}" BorderBrush="{Binding Accent}" BorderThickness="0,4,0,0">
                                             <DockPanel>
                                                 <DockPanel DockPanel.Dock="Top">
                                                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                                                         <TextBlock Style="{StaticResource Icon}" Text="&#xE7C8;" FontSize="12" Margin="0,2,6,0" ToolTip="{loc:T 'Má hlasovú nahrávku'}"
                                                                    Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Button Command="{Binding ClearTrayCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="{loc:T 'Vyprázdniť zásobník – nezostane v ňom žiaden film ani seriál z TMDB (dá sa vrátiť)'}"
+                                                                Visibility="{Binding IsTray, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE894;" FontSize="11" />
+                                                        </Button>
+                                                        <Button Command="{Binding WidenCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="{Binding WidenToolTip}"
+                                                                Visibility="{Binding CanWiden, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE740;" FontSize="11" />
+                                                        </Button>
                                                         <Button Command="{Binding PinCommand}" Padding="4,1" Margin="0,0,4,0" ToolTip="{loc:T 'Pripnúť hore / odopnúť'}"
                                                                 Visibility="{Binding CanPin, Converter={StaticResource BoolToVisibility}}">
                                                             <TextBlock FontSize="11">
@@ -6026,6 +6093,7 @@
                     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                         <StackPanel>
                             <TextBlock Text="{loc:T 'Zásobník TMDB – filmy a seriály z prehliadača'}" FontWeight="SemiBold" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" HorizontalAlignment="Left" Margin="0,6,0,4" />
                             <TextBlock Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,6"
                                        Text="{loc:T 'Filmy a seriály, ktoré otvoríte na TMDB, sa zbierajú v pripnutej poznámke Zásobník TMDB (Poznámky); pri poliach titulu a TMDB ID ich vyberiete jedným klikom. 1. Do prehliadača si nainštalujte rozšírenie Tampermonkey alebo Violentmonkey (z obchodu s rozšíreniami). 2. Kliknite na Nainštalovať skript – rozšírenie ponúkne skript UNIVERSUM, potvrďte ho. Potom každá otvorená stránka filmu alebo seriálu na TMDB pribudne do zásobníka sama, a na stránke je aj tlačidlo Do UNIVERSUM. Skript posiela len na tento počítač (127.0.0.1) s tajným kľúčom; UNIVERSUM prijme len adresy filmov a seriálov TMDB.'}" />
                             <CheckBox Content="{loc:T 'Prijímať zo skriptu v prehliadači'}" IsChecked="{Binding TmdbTrayReceive}" />

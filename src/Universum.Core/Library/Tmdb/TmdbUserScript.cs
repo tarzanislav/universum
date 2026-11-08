@@ -5,13 +5,14 @@ namespace Universum.Core.Library.Tmdb;
 
 /// <summary>
 /// UNIVERSUM's script for the browser (owner, 8. 11. 2026; Tampermonkey or Violentmonkey run it): on a page of a film or
-/// series of TMDB it sends the page to the Zásobník TMDB by itself, and shows the button "Do UNIVERSUM" (when UNIVERSUM
+/// series of TMDB it sends the page to the Zásobník TMDB by itself (UNIVERSUM takes it only while its automatic gathering is
+/// switched on – 1.1), and shows the button "Do UNIVERSUM" (when UNIVERSUM
 /// does not answer, the button starts it by the address universum://). It runs only on TMDB's film and series pages and
 /// talks only to 127.0.0.1 with the key of this installation.
 /// </summary>
 public static class TmdbUserScript
 {
-    public const string Version = "1.0";
+    public const string Version = "1.2";
 
     public static string Text(int port, string key, bool automatic = true)
     {
@@ -48,7 +49,7 @@ public static class TmdbUserScript
                   method: 'POST',
                   url: 'http://127.0.0.1:' + PORT + '/tmdb',
                   headers: { 'Content-Type': 'application/json', 'X-Universum-Key': KEY },
-                  data: JSON.stringify({ u: location.href, t: document.title }),
+                  data: JSON.stringify({ u: location.href, t: document.title, a: !button }),
                   timeout: 3000,
                   onload: function (answer) {
                     if (button) {
@@ -77,7 +78,13 @@ public static class TmdbUserScript
                 'background:#01b4e4;color:#fff;font:600 14px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35)';
               button.addEventListener('click', function () { send(button); });
               document.body.appendChild(button);
-              if (AUTOMATIC) {
+              // one film or series is sent by itself once (owner, 8. 11. 2026: its seasons and episodes are the same title)
+              const title = location.pathname.match(/^\/(movie|tv)\/(\d+)/);
+              const sent = 'universum-' + title[1] + '-' + title[2];
+              let known = false;
+              try { known = sessionStorage.getItem(sent) === '1'; } catch (e) { }
+              if (AUTOMATIC && !known) {
+                try { sessionStorage.setItem(sent, '1'); } catch (e) { }
                 send(null);
               }
             })();

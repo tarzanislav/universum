@@ -42,6 +42,9 @@ public sealed record UndoRecord
     /// <summary>Ponechať MP4: where its movie box was (undo makes it count again).</summary>
     public long? Mp4MovieStart { get; init; }
 
+    /// <summary>Ponechať MP4: how large its movie box was (undo checks it is still the same; null in records of 0.3.23).</summary>
+    public long? Mp4MovieSize { get; init; }
+
     public static UndoRecord Load(string path) =>
         JsonSerializer.Deserialize<UndoRecord>(File.ReadAllText(path)) ?? throw new InvalidDataException("Empty undo record.");
 

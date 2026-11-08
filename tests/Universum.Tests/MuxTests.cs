@@ -109,9 +109,16 @@ public sealed class MuxTests
             Assert.True(read.IsMp4 && read.Tracks.Count == 4 && read.Tracks[1].Language.Primary == "cs" && read.Tracks[1].Flags.Default, "mkvmerge reads the result as planned");
             Assert.True(File.ReadAllBytes(source).SequenceEqual(original), "the source only read");
 
-            // a track left out: MP4 cannot hold it – an MKV, and why
-            var removed = spec with { Tracks = tracks[..3], OutputPath = Path.Combine(work.FullName, "Bez titulkov.mkv") };
-            Assert.True(removed.Mp4Header() is null && Mp4Mux.Plan(removed).Obstacle is { Length: > 0 }, "a track left out – " + Mp4Mux.Plan(removed).Obstacle);
+            // subtitles left out (8. 11. 2026): gone from the header, the file stays MP4
+            var withoutSubtitles = spec with { Tracks = tracks[..3], OutputPath = Path.Combine(work.FullName, "Bez titulkov.mkv") };
+            Assert.True(withoutSubtitles.Mp4Header() is { Removed: [4] }, "subtitles left out: still MP4 – " + Mp4Mux.Plan(withoutSubtitles).Obstacle);
+            var noSubtitles = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(withoutSubtitles);
+            Assert.True(noSubtitles.Status == MuxStatus.Done && Universum.Core.Mp4.Mp4Reader.Read(noSubtitles.OutputPath!).Tracks.Select(t => t.Id).SequenceEqual([1, 3, 2]),
+                "the subtitles gone from the MP4 – " + string.Join("; ", noSubtitles.Messages));
+
+            // a sound left out: the file is to be smaller – an MKV, and why
+            var removed = spec with { Tracks = [tracks[0], tracks[1], tracks[3]], OutputPath = Path.Combine(work.FullName, "Bez zvuku.mkv") };
+            Assert.True(removed.Mp4Header() is null && Mp4Mux.Plan(removed).Obstacle is { Length: > 0 }, "a sound left out – " + Mp4Mux.Plan(removed).Obstacle);
             var mkv = await new Multiplexer(installation, new ProcessRunner()).MuxAsync(removed);
             Assert.True(mkv.Status == MuxStatus.Done && mkv.OutputPath!.EndsWith(".mkv", StringComparison.Ordinal) && (await inspector.InspectAsync(mkv.OutputPath)).IsMatroska,
                 "written as MKV – " + string.Join("; ", mkv.Messages));

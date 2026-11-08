@@ -39,6 +39,12 @@ public sealed record MediaFile
     /// </summary>
     public bool IsMatroska => ContainerType == "Matroska";
 
+    /// <summary>
+    /// Why UNIVERSUM cannot edit this MP4's header in place (owner, 8. 11. 2026): "fragmented", "end" (the file does not end
+    /// with a whole box), "unreadable"; null when it can, or when it is no MP4 (or was read before this was known).
+    /// </summary>
+    public string? Mp4Problem { get; init; }
+
     /// <summary>MP4 or QuickTime (.mp4, .m4v, .mov) – its header UNIVERSUM can edit itself (Ponechať MP4).</summary>
     public bool IsMp4 => ContainerType.Contains("MP4", StringComparison.OrdinalIgnoreCase) || ContainerType.Contains("QuickTime", StringComparison.OrdinalIgnoreCase);
 

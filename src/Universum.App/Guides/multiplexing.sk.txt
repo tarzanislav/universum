@@ -57,7 +57,7 @@ Výsledok si môžete najprv **pozrieť** a až hotový, bezchybný tvar poslať
 - Každá záložka má **vlastný náhľad** – môžete pripraviť a porovnať viac výsledkov naraz.
 - Ak nastavenia po náhľade zmeníte, UNIVERSUM upozorní, že náhľad už výsledku nezodpovedá.
 !info Náhľad sa vymaže so svojou záložkou alebo po týždni. Priečinok náhľadov zmeníte v Nastaveniach.
-!tip **MP4 ponechať ako MP4:** jedno MP4 so všetkými stopami, ktorému meníte len jazyky, názvy, predvolené stopy, poradie alebo názov, sa zapíše **ako MP4** – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, vynechaní stopy, kapitolách či vlastnostiach stopy vznikne MKV a riadok pri voľbe povie prečo. Náhľad je vždy MKV.
+!tip **MP4 ponechať ako MP4:** jedno MP4 so všetkými zvukmi, ktorému meníte len jazyky, názvy, predvolené stopy, Forced, titulky pre nepočujúcich, komentár, poradie alebo názov (aj s vynechanými titulkami), sa zapíše **ako MP4** – hlavičku upraví UNIVERSUM, obraz a zvuk sa nedotknú. Pri zlučovaní viacerých súborov, vynechaní zvuku, kapitolách či vlastnostiach stopy vznikne MKV a riadok pri voľbe povie prečo. Náhľad je vždy MKV.
 @otvorit Mux Otvoriť Zlučovanie
 
 ## Úprava hlavičky
@@ -74,7 +74,7 @@ v knižnici – trvá to sekundy až minúty.
 - Časť **Kontrola** upozorní napr. na viac stôp s Default alebo na forced titulky bez Default.
 !info Zmena poradia alebo vynechanie stopy **zapíše nový súbor** – trvá to minúty. Pod tabuľkou vždy vidíte,
   ako sa výsledok zapíše. [Vrátiť späť] vráti poslednú uloženú zmenu, keď sa to dá.
-!tip Pri MP4 je voľba **MP4 ponechať ako MP4** – kópia v knižnici ostane MP4 a zmení sa len jej hlavička; čo MP4 neudrží (vynechanie stopy, Forced…), zapíše sa ako MKV.
+!tip Pri MP4 je voľba **MP4 ponechať ako MP4** – kópia v knižnici ostane MP4 a zmení sa len jej hlavička; čo MP4 neudrží (vynechanie zvuku, pridanie stopy…), zapíše sa ako MKV.
 ![Úprava hlavičky](header-editor.jpg)
 @otvorit HeaderEditor Otvoriť Úpravu hlavičky
 

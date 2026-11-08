@@ -29,9 +29,16 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
     // place for (forced, hearing impaired, commentary …, a default track switched off) make an MKV
     private IEnumerable<string> Mp4Obstacles()
     {
-        if (RemovedFromFile.Any())
+        if (Mp4.Mp4Reading.Problem(Source.Mp4Problem) is { } problem)
         {
-            yield return Text.CoreText.T("odstraňujú sa stopy");
+            yield return problem;
+        }
+
+        // subtitles left out go only from the header (their few bytes stay, 8. 11. 2026); a picture or sound left out makes
+        // an MKV – the file is to be smaller
+        if (RemovedFromFile.Any(t => t.Type != TrackType.Subtitles))
+        {
+            yield return Text.CoreText.T("odstraňuje sa obraz alebo zvuk (súbor sa zmenší)");
         }
 
         if (AddsFiles)
@@ -69,14 +76,10 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
             yield return Text.CoreText.T("titulky do SRT");
         }
 
-        if (Tracks.Any(t => t.Flags.Forced != t.Source.Flags.Forced))
+        // forced, hearing impaired, commentary and visual impaired an MP4 holds as roles of its tracks (8. 11. 2026)
+        if (Tracks.Any(t => !Mp4.Mp4Roles.CanHold(t.Source.Flags, t.Flags)))
         {
-            yield return Text.CoreText.T("príznak vynútené (Forced)");
-        }
-
-        if (Tracks.Any(t => t.OtherFlagsChanged))
-        {
-            yield return Text.CoreText.T("príznak pre nepočujúcich, komentár a podobné");
+            yield return Text.CoreText.T("príznak pôvodný jazyk alebo textový popis");
         }
 
         if (Tracks.Any(t => t.Flags.Default && !t.Flags.Enabled))
@@ -87,9 +90,10 @@ public sealed record TargetState(MediaFile Source, IReadOnlyList<TrackTarget> Tr
 
     /// <summary>
     /// What changes in an MP4 that stays MP4: the order, the title, and per track the language, the name and the default
-    /// track (MP4's "enabled" flag – MP4 has no other default; mkvmerge reads every MP4 track as default).
+    /// track (MP4's "enabled" flag – MP4 has no other default), and the roles: forced, hearing impaired, commentary.
     /// </summary>
-    public bool Mp4Changes => OrderChanged || TitleChanged || Tracks.Any(t => t.NameChanged || t.LanguageChanged || t.Flags.Default != t.Source.Flags.Enabled);
+    public bool Mp4Changes => OrderChanged || TitleChanged || RemovedFromFile.Any() || Tracks.Any(t => t.NameChanged || t.LanguageChanged || t.Flags.Default != t.Source.Flags.Enabled ||
+                                                                               !Mp4.Mp4Roles.Of(t.Flags).SequenceEqual(Mp4.Mp4Roles.Of(t.Source.Flags)));
 
     /// <summary>Tracks left out of the result (only audio and subtitles can be removed).</summary>
     public IReadOnlyList<MediaTrack> Removed { get; init; } = [];

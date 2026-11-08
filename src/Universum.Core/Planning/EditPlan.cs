@@ -62,13 +62,15 @@ public sealed record EditPlan(TargetState Target, WriteMethod Method, IReadOnlyL
 
             if (target.StaysMp4)
             {
-                // MP4 has one flag for both (the track's "enabled"): what players take as the default
+                // MP4 has one flag for both default and enabled (the track's "enabled"): what players take as the default
                 AddFlag(changes, track, ChangeKind.Default, source.Flags.Enabled, track.Flags.Default);
-                continue;
+            }
+            else
+            {
+                AddFlag(changes, track, ChangeKind.Default, source.Flags.Default, track.Flags.Default);
+                AddFlag(changes, track, ChangeKind.Enabled, source.Flags.Enabled, track.Flags.Enabled);
             }
 
-            AddFlag(changes, track, ChangeKind.Default, source.Flags.Default, track.Flags.Default);
-            AddFlag(changes, track, ChangeKind.Enabled, source.Flags.Enabled, track.Flags.Enabled);
             AddFlag(changes, track, ChangeKind.Forced, source.Flags.Forced, track.Flags.Forced);
             if (track.OtherFlagsChanged)
             {

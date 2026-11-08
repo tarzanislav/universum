@@ -8,6 +8,13 @@ namespace Universum.Core.Mp4;
 /// </summary>
 public static class Mp4Languages
 {
+    /// <summary>
+    /// The language as BCP 47 for 'elng' when 'mdhd' cannot say all of it – a region or script ("pt-BR", "zh-Hant");
+    /// null when the language alone is enough.
+    /// </summary>
+    public static string? Extended(LanguageTag language) =>
+        language.Ietf is { } ietf && ietf.Contains('-') && !language.IsUndetermined ? ietf : null;
+
     // the Macintosh language codes 0–40 (Apple's Script Manager) as ISO 639-2/B
     private static readonly string[] Macintosh =
     [

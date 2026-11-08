@@ -32,23 +32,38 @@ public static class Mp4Editing
     {
         try
         {
+            // ffprobe, when at hand, looks at the file before too: a result it cannot read, where it could before, is a problem
+            string? ffprobe = null;
+            var readBefore = false;
+            if (findFfprobe is not null)
+            {
+                try
+                {
+                    ffprobe = await findFfprobe().ConfigureAwait(false) is { } found && File.Exists(found) ? found : null;
+                    readBefore = ffprobe is not null && await Mp4Targets.ReadableAsync(runner, ffprobe, original ?? path).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or InvalidOperationException or Speech.SpeechException)
+                {
+                    ffprobe = null;
+                }
+            }
+
             var before = await Task.Run(() => Mp4Reader.Read(original ?? path)).ConfigureAwait(false);
             await Task.Run(() => Mp4HeaderEditor.Apply(path, change)).ConfigureAwait(false);
             var after = await Task.Run(() => Mp4Reader.Read(path)).ConfigureAwait(false);
             var problems = Mp4Targets.Verify(change, before, after).ToList();
             var probed = false;
-            if (problems.Count == 0 && findFfprobe is not null)
+            if (problems.Count == 0 && ffprobe is not null)
             {
                 try
                 {
-                    if (await findFfprobe().ConfigureAwait(false) is { } ffprobe && File.Exists(ffprobe) &&
-                        await Mp4Targets.ProbeAsync(runner, ffprobe, path, change, after).ConfigureAwait(false) is { } seen)
+                    if (await Mp4Targets.ProbeAsync(runner, ffprobe, path, change, after, readBefore).ConfigureAwait(false) is { } seen)
                     {
                         problems.AddRange(seen);
                         probed = seen.Count == 0;
                     }
                 }
-                catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or InvalidOperationException or Speech.SpeechException)
+                catch (Exception ex) when (ex is IOException or ProcessStartException or TimeoutException or InvalidOperationException)
                 {
                     // ffprobe is the second opinion; without it UNIVERSUM's own check stands
                 }

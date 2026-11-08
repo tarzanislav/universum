@@ -37,6 +37,7 @@ public static class Mp4Reader
         byte[]? movieBytes = null;
         string? brand = null;
         Span<byte> header = stackalloc byte[32];
+        var openEnded = false;
         long at = 0;
         while (at < length)
         {
@@ -49,6 +50,7 @@ public static class Mp4Reader
 
             stream.Position = at;
             stream.ReadExactly(header[..8]);
+            openEnded = BinaryPrimitives.ReadUInt32BigEndian(header) == 0;
             var (type, headerSize, size) = Header(header, stream, at, length);
             if (at + size > length)
             {
@@ -98,14 +100,17 @@ public static class Mp4Reader
             throw new Mp4FormatException($"the file does not begin as an MP4 ('{top[0].Type}')", 0);
         }
 
-        var tracks = movie.All("trak").Select(t => Mp4Track.From(t, movieBytes, movie.Start)).ToList();
+        // FFmpeg reads a handler's name as a length and the text (QuickTime) only in a file that is no ISO file (its brand
+        // "qt  ", or no 'ftyp'); UNIVERSUM reads and writes it the same way (8. 11. 2026)
+        var quickTime = brand is null or "qt  ";
+        var tracks = movie.All("trak").Select(t => Mp4Track.From(t, movieBytes, movie.Start, quickTime)).ToList();
         var duplicate = tracks.GroupBy(t => t.Id).FirstOrDefault(g => g.Count() > 1);
         if (duplicate is not null)
         {
             throw new Mp4FormatException($"two tracks with the ID {duplicate.Key}", movie.Start);
         }
 
-        return new Mp4File(length, top, movie, movieBytes, tracks, brand);
+        return new Mp4File(length, top, movie, movieBytes, tracks, brand) { LastBoxOpenEnded = openEnded };
     }
 
     // the type and sizes of a box whose first 8 bytes are read (a 64-bit size and a 'uuid' read on)
@@ -165,14 +170,14 @@ public static class Mp4Reader
             var at = content;
             while (at < end)
             {
+                // QuickTime ends some lists with 4 zero bytes, some programs pad with more: zeros to the end are no box
+                if (bytes.AsSpan(at, end - at).IndexOfAnyExcept((byte)0) < 0)
+                {
+                    break;
+                }
+
                 if (end - at < 8)
                 {
-                    // QuickTime ends some lists with 4 zero bytes
-                    if (bytes.AsSpan(at, end - at).IndexOfAnyExcept((byte)0) < 0)
-                    {
-                        break;
-                    }
-
                     throw new Mp4FormatException($"bytes left over in '{type}'", fileOffset + at);
                 }
 

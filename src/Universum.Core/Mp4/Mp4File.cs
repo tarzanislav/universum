@@ -36,17 +36,37 @@ public sealed class Mp4File
     /// <summary>The movie box lies after the media data (no "fast start").</summary>
     public bool MovieAtEnd => Boxes.FirstOrDefault(b => b.Type == "mdat") is { } data && data.Start < Movie.Start;
 
+    /// <summary>The last box says no size – it runs to the end of the file (a new movie after it would be swallowed).</summary>
+    public bool LastBoxOpenEnded { get; internal init; }
+
     /// <summary>The brand of the file ('isom', 'mp42', 'qt  ' …), or null.</summary>
     public string? Brand { get; }
 
-    /// <summary>The title of the film (iTunes '©nam', or QuickTime's), or null.</summary>
+    /// <summary>
+    /// The title of the film: iTunes '©nam' (in any 'meta' of 'udta'), else QuickTime's keyed one ("title",
+    /// "com.apple.quicktime.title"), else QuickTime's '©nam'; null when none.
+    /// </summary>
     public string? Title
     {
         get
         {
-            if (Movie.Find("udta/meta/ilst/©nam/data") is { ContentSize: >= 8 } data)
+            var metas = (Movie.Find("udta")?.Children ?? []).Concat(Movie.Children).Where(b => b.Type == "meta").ToList();
+            foreach (var meta in metas.Where(m => MetaHandler(m) != "mdta"))
             {
-                return Mp4Reader.Utf8(Mp4Reader.Content(MovieBytes, Movie.Start, data)[8..]);
+                if (meta.Find("ilst/©nam/data") is { ContentSize: >= 8 } data)
+                {
+                    return Mp4Reader.Utf8(Mp4Reader.Content(MovieBytes, Movie.Start, data)[8..]);
+                }
+            }
+
+            foreach (var meta in metas.Where(m => MetaHandler(m) == "mdta"))
+            {
+                var titles = TitleKeys(meta);
+                if (meta.Find("ilst")?.Children.FirstOrDefault(item => titles.Contains(ItemIndex(item))) is { } item &&
+                    item.Find("data") is { ContentSize: >= 8 } keyed)
+                {
+                    return Mp4Reader.Utf8(Mp4Reader.Content(MovieBytes, Movie.Start, keyed)[8..]);
+                }
             }
 
             // QuickTime: a 16-bit length, a 16-bit language, the text
@@ -60,6 +80,44 @@ public sealed class Mp4File
             return null;
         }
     }
+
+    /// <summary>The handler of a 'meta' box ("mdir" iTunes, "mdta" QuickTime's keyed metadata …), or "".</summary>
+    internal string MetaHandler(Mp4Box meta) =>
+        meta.Find("hdlr") is { ContentSize: >= 12 } hdlr ? Mp4Reader.TypeName(Mp4Reader.Content(MovieBytes, Movie.Start, hdlr).Slice(8, 4)) : "";
+
+    /// <summary>The numbers of the keys of a keyed 'meta' that name the title ("title", "com.apple.quicktime.title").</summary>
+    internal IReadOnlySet<uint> TitleKeys(Mp4Box meta)
+    {
+        var titles = new HashSet<uint>();
+        if (meta.Find("keys") is not { ContentSize: >= 8 } keys)
+        {
+            return titles;
+        }
+
+        var bytes = new Mp4Bytes(Mp4Reader.Content(MovieBytes, Movie.Start, keys), keys.ContentStart);
+        bytes.Skip(4);
+        var count = bytes.U32();
+        for (uint index = 1; index <= count && bytes.Left >= 8; index++)
+        {
+            var size = (int)bytes.U32();
+            if (size < 8 || size - 4 > bytes.Left)
+            {
+                break;
+            }
+
+            bytes.Skip(4); // the namespace ('mdta')
+            var name = System.Text.Encoding.UTF8.GetString(bytes.Take(size - 8));
+            if (name is "title" or "com.apple.quicktime.title")
+            {
+                titles.Add(index);
+            }
+        }
+
+        return titles;
+    }
+
+    /// <summary>The number of the key an item of a keyed list stands for (its type is the number).</summary>
+    internal uint ItemIndex(Mp4Box item) => BinaryPrimitives.ReadUInt32BigEndian(MovieBytes.AsSpan((int)(item.Start - Movie.Start) + 4, 4));
 }
 
 /// <summary>The kind of a track by its handler.</summary>
@@ -113,10 +171,25 @@ public sealed class Mp4Track
     /// The name players show: 'udta/name', else the handler's name unless it is only the program's usual one
     /// ("SoundHandler", "Core Media Audio", "GPAC ISO Audio Handler" …); null when there is none.
     /// </summary>
-    public string? DisplayName => Name is { Length: > 0 } name ? name
-        : HandlerName.Length == 0 || HandlerName.Contains("Handler", StringComparison.OrdinalIgnoreCase) || HandlerName.StartsWith("Core Media", StringComparison.Ordinal) ||
-          HandlerName.Contains("Media Handler", StringComparison.OrdinalIgnoreCase) || HandlerName.StartsWith("ISO Media", StringComparison.OrdinalIgnoreCase) ? null
-        : HandlerName;
+    public string? DisplayName => Name is { Length: > 0 } name ? name : IsUsualHandlerName(HandlerName.TrimStart(Controls)) ? null : HandlerName.TrimStart(Controls);
+
+    // the names programs give every handler ("SoundHandler", Android's "SoundHandle", "Core Media Audio", "GPAC ISO Audio
+    // Handler", "ISO Media file produced by …"); a name written as a length and the text in an ISO file keeps its length
+    // byte when read as FFmpeg reads it – it is not part of the name
+    private static readonly char[] Controls = [.. Enumerable.Range(0, 32).Select(c => (char)c)];
+
+    private static bool IsUsualHandlerName(string name) =>
+        name.Length == 0 || name.Contains("Handle", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Core Media", StringComparison.Ordinal) ||
+        name.StartsWith("ISO Media", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The track's references to other tracks ('tref'): the type ("chap", "forc" …) and the IDs.</summary>
+    public IReadOnlyList<(string Type, IReadOnlyList<int> Ids)> References { get; private init; } = [];
+
+    /// <summary>The 'kind' boxes of the track's 'udta': (scheme, value).</summary>
+    public IReadOnlyList<(string Scheme, string Value)> Kinds { get; private init; } = [];
+
+    /// <summary>The roles of MPEG-DASH the track has ("forced-subtitle", "caption", "commentary" …; <see cref="Mp4Roles"/>).</summary>
+    public IReadOnlyList<string> Roles => [.. Kinds.Where(k => k.Scheme == Mp4Roles.Scheme).Select(k => k.Value)];
 
     /// <summary>The language of 'mdhd' (ISO 639-2, "und" when none).</summary>
     public string Language { get; private init; } = "und";
@@ -160,7 +233,7 @@ public sealed class Mp4Track
     /// <summary>The samples – where each lies, how large, its decoding and presentation time, whether a key frame.</summary>
     public Mp4SampleTable Samples => _samples ??= Mp4SampleTable.Read(_box.Find("mdia/minf/stbl") ?? throw new Mp4FormatException($"track {Id} has no sample table", _box.Start), _movie, _movieStart, Id);
 
-    internal static Mp4Track From(Mp4Box trak, byte[] movie, long movieStart)
+    internal static Mp4Track From(Mp4Box trak, byte[] movie, long movieStart, bool quickTime)
     {
         var tkhd = trak.Find("tkhd") ?? throw new Mp4FormatException("a track without 'tkhd'", trak.Start);
         var header = new Mp4Bytes(Mp4Reader.Content(movie, movieStart, tkhd), tkhd.ContentStart);
@@ -191,7 +264,7 @@ public sealed class Mp4Track
         handler.Skip(8);
         var handlerType = handler.FourCc();
         handler.Skip(12);
-        var handlerName = HandlerText(handler.Take(handler.Left));
+        var handlerName = HandlerText(handler.Take(handler.Left), quickTime);
 
         string? elng = null;
         if (trak.Find("mdia/elng") is { } extended)
@@ -207,6 +280,31 @@ public sealed class Mp4Track
             name = Mp4Reader.Utf8(Mp4Reader.Content(movie, movieStart, named));
         }
 
+        var kinds = new List<(string, string)>();
+        foreach (var kind in trak.Find("udta")?.Children.Where(c => c.Type == "kind") ?? [])
+        {
+            var bytes = new Mp4Bytes(Mp4Reader.Content(movie, movieStart, kind), kind.ContentStart);
+            if (bytes.Left > 4)
+            {
+                bytes.Skip(4);
+                var scheme = bytes.ZeroEnded(256);
+                kinds.Add((scheme, bytes.ZeroEnded(256)));
+            }
+        }
+
+        var references = new List<(string, IReadOnlyList<int>)>();
+        foreach (var reference in trak.Find("tref")?.Children ?? [])
+        {
+            var bytes = new Mp4Bytes(Mp4Reader.Content(movie, movieStart, reference), reference.ContentStart);
+            var ids = new List<int>();
+            while (bytes.Left >= 4)
+            {
+                ids.Add((int)bytes.U32());
+            }
+
+            references.Add((reference.Type, ids));
+        }
+
         var (codec, entries, entryWidth, entryHeight, channels, sampleRate) = SampleEntry(trak, movie, movieStart, id, handlerType);
         return new Mp4Track(trak, movie, movieStart)
         {
@@ -214,6 +312,8 @@ public sealed class Mp4Track
             Handler = handlerType,
             HandlerName = handlerName,
             Name = name,
+            Kinds = kinds,
+            References = references,
             Language = language,
             ExtendedLanguage = elng,
             Flags = flags,
@@ -230,10 +330,13 @@ public sealed class Mp4Track
         };
     }
 
+    /// <summary>A handler's name is written as QuickTime does – its length first – when FFmpeg reads it so (owner, 8. 11. 2026).</summary>
+    internal static bool IsPascal(ReadOnlySpan<byte> name, bool quickTime) => quickTime && name.Length > 1 && name[0] == name.Length - 1;
+
     // ISO: a string ended by zero; QuickTime: its length in the first byte
-    private static string HandlerText(ReadOnlySpan<byte> bytes)
+    private static string HandlerText(ReadOnlySpan<byte> bytes, bool quickTime)
     {
-        if (bytes.Length > 0 && bytes[0] == bytes.Length - 1 && bytes[0] > 0)
+        if (IsPascal(bytes, quickTime))
         {
             return Mp4Reader.Utf8(bytes[1..]);
         }

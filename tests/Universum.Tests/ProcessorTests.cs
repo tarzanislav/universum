@@ -268,6 +268,10 @@ public sealed class ProcessorTests
         var moved = await processor.ProcessAsync(plan, placement, OriginalsMode.MoveIntoLibrary.Output());
         Assert.True(moved is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && moved.Messages.Contains(FileProcessor.MovedIntoLibraryMessage) &&
                     moved.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal) && !System.IO.File.Exists(file), "moved into the library and edited there – " + string.Join("; ", moved.Messages));
+        // processed once, the MP4 is as the rules want it (owner, 8. 11. 2026, review: the names of its tracks, which
+        // MKVToolNix does not read, made a new video name and an edit on every run)
+        var again = EditPlan.For(UniversumRules.Apply(await inspector.InspectAsync(moved.OutputPath!), keep));
+        Assert.True(again.Method == WriteMethod.None, "nothing more to change – " + string.Join("; ", again.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
         var result = Universum.Core.Mp4.Mp4Reader.Read(moved.OutputPath!);
         var czech = result.Tracks.First(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio);
         Assert.True(czech.Language == "ces" && czech.Enabled && result.Tracks.Count(t => t.Kind == Universum.Core.Mp4.Mp4TrackKind.Audio && t.Enabled) == 1,
@@ -305,11 +309,81 @@ public sealed class ProcessorTests
                     mp4Plan.Changes.Where(c => c.Kind == ChangeKind.Default).Select(c => (c.TrackId, c.After)).Order().SequenceEqual([(1, "0"), (2, "1"), (3, "0")]),
             "the English sound and the subtitles no longer default, the Czech sound default – " + string.Join("; ", mp4Plan.Changes.Select(c => $"{c.TrackId} {c.Kind} {c.Before}→{c.After}")));
 
-        // a flag MP4 has no place for (forced): MKV
-        var forced = UniversumRules.Apply(inspected, keep) is var ruled
-            ? ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true } } : t).ToList() }
-            : null;
-        Assert.True(forced is { StaysMp4: false, Mp4Obstacle: not null }, "forced subtitles: written as MKV – " + forced?.Mp4Obstacle);
+        // subtitles left out (owner, 8. 11. 2026): gone from the header only – the file stays MP4, Vrátiť puts them back
+        var noSubtitles = UniversumRules.Apply(inspected, keep) with { Removed = [inspected.Tracks.Single(t => t.Type == TrackType.Subtitles)] };
+        noSubtitles = noSubtitles with { Tracks = noSubtitles.Tracks.Where(t => t.Type != TrackType.Subtitles).ToList() };
+        Assert.True(noSubtitles is { StaysMp4: true, HasChanges: true } && EditPlan.For(noSubtitles).Method == WriteMethod.HeaderEdit, "subtitles left out: still MP4 – " + noSubtitles.Mp4Obstacle);
+        var otherBytes = System.IO.File.ReadAllBytes(other);
+        var lighter = await processor.ProcessAsync(EditPlan.For(noSubtitles), work.Movie(EditPlan.For(noSubtitles)), OriginalsMode.MoveIntoLibrary.Output());
+        Assert.True(lighter is { Status: ProcessingStatus.Done, UndoRecordPath: not null } && Universum.Core.Mp4.Mp4Reader.Read(lighter.OutputPath!).Tracks.All(t => t.Kind != Universum.Core.Mp4.Mp4TrackKind.Subtitles),
+            "moved, the subtitles gone – " + string.Join("; ", lighter.Messages));
+        var undoProblems = await processor.UndoAsync(lighter.UndoRecordPath!);
+        Assert.True(undoProblems.Count == 0 && System.IO.File.ReadAllBytes(other).SequenceEqual(otherBytes),
+            $"Vrátiť: the original with its subtitles, byte for byte – {string.Join("; ", undoProblems)} {System.IO.File.Exists(other)} {(System.IO.File.Exists(other) ? new FileInfo(other).Length : -1)} vs {otherBytes.Length}");
+
+        // forced subtitles for the hearing impaired (owner, 8. 11. 2026): roles of the track an MP4 holds – it stays MP4, and
+        // the roles are read back as flags (MKVToolNix does not read them)
+        var ruled = UniversumRules.Apply(inspected, keep);
+        var forced = ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Subtitles ? t with { Flags = t.Flags with { Forced = true, HearingImpaired = true } } : t).ToList() };
+        Assert.True(forced is { StaysMp4: true, Mp4Changes: true } && EditPlan.For(forced).Changes.Any(c => c.Kind == ChangeKind.Forced) && EditPlan.For(forced).Changes.Any(c => c.Kind == ChangeKind.OtherFlags),
+            "forced subtitles for the hearing impaired stay MP4 – " + forced.Mp4Obstacle);
+        var withRoles = await processor.ProcessAsync(EditPlan.For(forced), work.Movie(EditPlan.For(forced)), Keep);
+        Assert.True(withRoles.Status == ProcessingStatus.Done && withRoles.OutputPath!.EndsWith(".mp4", StringComparison.Ordinal), "written – " + string.Join("; ", withRoles.Messages));
+        var reread = await inspector.InspectAsync(withRoles.OutputPath!);
+        Assert.True(reread.Tracks.Single(t => t.Type == TrackType.Subtitles).Flags is { Forced: true, HearingImpaired: true } &&
+                    EditPlan.For(UniversumRules.Apply(reread, keep) with { Tracks = forced.Tracks.Select(t => t with { Source = reread.Tracks.Single(r => r.Number == t.Source.Number) }).ToList() }).Changes
+                        .All(c => c.Kind is not (ChangeKind.Forced or ChangeKind.OtherFlags)),
+            "read back: forced, for the hearing impaired – nothing to set again");
+
+        // a flag MP4 has no place for (original language): MKV
+        var originalFlag = ruled with { Tracks = ruled.Tracks.Select(t => t.Type == TrackType.Audio ? t with { Flags = t.Flags with { Original = !t.Source.Flags.Original } } : t).ToList() };
+        Assert.True(originalFlag is { StaysMp4: false, Mp4Obstacle: not null }, "the original language flag: written as MKV – " + originalFlag.Mp4Obstacle);
+    }
+
+    [Test]
+    public async Task RolesOfAnMp4KeptInTheMkv()
+    {
+        // owner, 8. 11. 2026 (review): the roles of an MP4's tracks (mkvmerge does not read them) written into the MKV
+        using var work = new WorkFolder();
+        var (processor, inspector) = await CreateAsync(work);
+        var file = work.Copy("en-cz.mp4", "vymysleny-film-s-titulkami-pre-nepocujucich.mp4");
+        Universum.Core.Mp4.Mp4HeaderEditor.Apply(file, new Universum.Core.Mp4.Mp4Change([new Universum.Core.Mp4.Mp4TrackChange(4) { Roles = [Universum.Core.Mp4.Mp4Roles.Caption] }]));
+        var source = await inspector.InspectAsync(file);
+        Assert.True(source.Tracks.Single(t => t.Type == TrackType.Subtitles).Flags.HearingImpaired, "read from the MP4");
+        var plan = EditPlan.For(UniversumRules.Apply(source));
+        var result = await processor.ProcessAsync(plan, work.Movie(plan), Keep);
+        Assert.True(result.Status == ProcessingStatus.Done && result.OutputPath!.EndsWith(".mkv", StringComparison.Ordinal), "an MKV – " + string.Join("; ", result.Messages));
+        Assert.True((await inspector.InspectAsync(result.OutputPath!)).Tracks.Single(t => t.Type == TrackType.Subtitles).Flags.HearingImpaired, "for the hearing impaired in the MKV too");
+    }
+
+    [Test]
+    public async Task Mp4UniversumCannotEditBecomesMkv()
+    {
+        // owner, 8. 11. 2026 (review): an MP4 UNIVERSUM would refuse to edit (fragmented, not ending with a whole box) is
+        // planned as an MKV at once, not as a header edit that fails
+        var ffmpeg = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(folder => Path.Combine(folder, OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg")).FirstOrDefault(System.IO.File.Exists);
+        using var work = new WorkFolder();
+        var (_, inspector) = await CreateAsync(work);
+        var keep = RuleProfile.Default with { KeepMp4 = true };
+
+        var junk = work.Copy("en-cz.mp4", "vymysleny-film-so-zvyskom.mp4");
+        await using (var stream = new FileStream(junk, FileMode.Append))
+        {
+            stream.Write(new byte[24]);
+        }
+
+        var ended = UniversumRules.Apply(await inspector.InspectAsync(junk), keep);
+        Assert.True(ended is { StaysMp4: false, Mp4Obstacle: not null } && EditPlan.For(ended).Method == WriteMethod.Remux, "loose bytes at the end: an MKV – " + ended.Mp4Obstacle);
+
+        if (ffmpeg is not null)
+        {
+            var fragmented = Path.Combine(work.Path, "vymysleny-fragmentovany-film.mp4");
+            await new ProcessRunner().RunAsync(new ProcessRequest(ffmpeg, ["-v", "error", "-y", "-i", TestData.Media("en-cz.mp4"), "-map", "0", "-c", "copy", "-movflags", "+frag_keyframe", fragmented]));
+            var target = UniversumRules.Apply(await inspector.InspectAsync(fragmented), keep);
+            Assert.True(target.Source.Mp4Problem == Universum.Core.Mp4.Mp4Reading.Fragmented && !target.StaysMp4 && target.Mp4Obstacle is not null,
+                "a fragmented MP4: an MKV – " + target.Mp4Obstacle);
+        }
     }
 
     [Test]

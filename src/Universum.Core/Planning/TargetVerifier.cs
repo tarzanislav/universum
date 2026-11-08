@@ -41,7 +41,7 @@ public static class TargetVerifier
             Check(problems, actual.Flags.Default == expected.Flags.Default, $"{where}: default {actual.Flags.Default}, expected {expected.Flags.Default}");
             Check(problems, actual.Flags.Enabled == expected.Flags.Enabled, $"{where}: enabled {actual.Flags.Enabled}, expected {expected.Flags.Enabled}");
             Check(problems, actual.Flags.Forced == expected.Flags.Forced, $"{where}: forced {actual.Flags.Forced}, expected {expected.Flags.Forced}");
-            if (expected.OtherFlagsChanged)
+            if (expected.OtherFlagsChanged || target.Source.IsMp4)
             {
                 var flags = actual.Flags with { Default = expected.Flags.Default, Enabled = expected.Flags.Enabled, Forced = expected.Flags.Forced };
                 Check(problems, flags == expected.Flags, $"{where}: flags {actual.Flags}, expected {expected.Flags}");

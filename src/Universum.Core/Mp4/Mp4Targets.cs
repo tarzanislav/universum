@@ -22,14 +22,19 @@ public static class Mp4Targets
                 Language = track.LanguageChanged ? track.Language : null,
                 Name = track.NameChanged ? track.Name ?? "" : null,
                 Enabled = track.Flags.Default != track.Source.Flags.Enabled ? track.Flags.Default : null,
+                Roles = Mp4Roles.Of(track.Flags) is var roles && !roles.SequenceEqual(Mp4Roles.Of(track.Source.Flags)) ? roles : null,
             };
-            if (change.Language is not null || change.Name is not null || change.Enabled is not null)
+            if (change.Language is not null || change.Name is not null || change.Enabled is not null || change.Roles is not null)
             {
                 tracks.Add(change);
             }
         }
 
-        return new Mp4Change(tracks, target.TitleChanged ? target.NewTitle : null, target.OrderChanged ? target.Tracks.Select(Id).ToList() : null);
+        // subtitles left out (8. 11. 2026): gone from the header; the order of the tracks that stay only when it changes
+        var removed = target.RemovedFromFile.Select(t => t.Number ?? throw new InvalidOperationException($"track {t.Id} of the MP4 has no number (its ID in the file)")).ToList();
+        var staying = target.Tracks.Select(Id).ToList();
+        var original = target.Source.Tracks.Where(t => t.ExternalFile is null && t.Number is { } n && !removed.Contains(n)).Select(t => t.Number!.Value).ToList();
+        return new Mp4Change(tracks, target.TitleChanged ? target.NewTitle : null, staying.SequenceEqual(original) ? null : staying) { Removed = removed };
     }
 
     private static int Id(TrackTarget track) =>
@@ -43,7 +48,7 @@ public static class Mp4Targets
     {
         var problems = new List<string>();
         var wanted = change.Tracks.ToDictionary(t => t.TrackId);
-        var order = change.Order ?? before.Tracks.Select(t => t.Id).ToList();
+        var order = Mp4HeaderEditor.ResultOrder(before, change);
         if (!after.Tracks.Select(t => t.Id).SequenceEqual(order))
         {
             problems.Add($"MP4 track order {string.Join(",", after.Tracks.Select(t => t.Id))}, expected {string.Join(",", order)}");
@@ -57,6 +62,12 @@ public static class Mp4Targets
             var where = $"MP4 track {now.Id}";
             var language = to?.Language is { } newLanguage ? Mp4Languages.Unpack(Mp4Languages.Pack(newLanguage)) : was.Language;
             Check(now.Language == language, $"{where}: language {now.Language}, expected {language}");
+            if (to?.Language is { } changedTo)
+            {
+                var extended = Mp4Languages.Extended(changedTo);
+                Check(now.ExtendedLanguage == extended, $"{where}: extended language {now.ExtendedLanguage}, expected {extended}");
+            }
+
             if (to?.Name is { } name)
             {
                 Check((now.Name ?? "") == name && (name.Length == 0 || now.HandlerName == name), $"{where}: name '{now.Name}' / '{now.HandlerName}', expected '{name}'");
@@ -67,6 +78,10 @@ public static class Mp4Targets
             }
 
             Check(now.Enabled == (to?.Enabled ?? was.Enabled), $"{where}: default (enabled) {now.Enabled}");
+            var roles = Mp4Roles.ManagedOf(now.Roles);
+            var wantedRoles = to?.Roles is { } asked ? Mp4Roles.ManagedOf(asked) : Mp4Roles.ManagedOf(was.Roles);
+            Check(roles.SequenceEqual(wantedRoles) && now.Roles.Except(Mp4Roles.Managed).SequenceEqual(was.Roles.Except(Mp4Roles.Managed)),
+                $"{where}: roles {string.Join(",", now.Roles)}, expected {string.Join(",", wantedRoles)}");
             Check(now.Handler == was.Handler && now.Codec == was.Codec && now.Timescale == was.Timescale && now.Duration == was.Duration,
                 $"{where}: its kind, codec or length changed");
             var a = was.Samples;
@@ -93,8 +108,12 @@ public static class Mp4Targets
     /// with the change: the streams in order and their kinds, the languages and names changed, the default disposition
     /// (MP4's enabled) of every sound and subtitle track, the title. Null when ffprobe could not tell (not counted then).
     /// </summary>
-    public static async Task<IReadOnlyList<string>?> ProbeAsync(IProcessRunner runner, string ffprobe, string path, Mp4Change change, Mp4File after, CancellationToken cancellationToken = default)
+    /// <param name="readBefore">ffprobe could read the file before the change: then a result it cannot read is a problem.</param>
+    public static async Task<IReadOnlyList<string>?> ProbeAsync(
+        IProcessRunner runner, string ffprobe, string path, Mp4Change change, Mp4File after, bool readBefore = false, CancellationToken cancellationToken = default)
     {
+        IReadOnlyList<string>? Unread(string why) => readBefore ? [$"ffprobe: the result cannot be read ({why}), the file before could"] : null;
+
         var output = new System.Text.StringBuilder();
         var result = await runner.RunAsync(new ProcessRequest(ffprobe, ["-v", "error", "-show_streams", "-show_format", "-of", "json", path])
         {
@@ -103,7 +122,7 @@ public static class Mp4Targets
         }, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
-            return null;
+            return Unread($"exit code {result.ExitCode}");
         }
 
         try
@@ -117,9 +136,16 @@ public static class Mp4Targets
             }
 
             var wanted = change.Tracks.ToDictionary(t => t.TrackId);
+            // QuickTime's chapters are a text track FFmpeg shows as data: not checked
+            var chapters = after.Tracks.SelectMany(t => t.References.Where(r => r.Type == "chap").SelectMany(r => r.Ids)).ToHashSet();
             for (var i = 0; i < after.Tracks.Count; i++)
             {
                 var track = after.Tracks[i];
+                if (chapters.Contains(track.Id))
+                {
+                    continue;
+                }
+
                 var stream = streams[i];
                 var tags = stream.TryGetProperty("tags", out var t) ? t : default;
                 string? Tag(string name) => tags.ValueKind == JsonValueKind.Object && tags.TryGetProperty(name, out var value) ? value.GetString() : null;
@@ -147,6 +173,19 @@ public static class Mp4Targets
                     {
                         problems.Add($"ffprobe: stream {i} name '{Tag("handler_name")}', expected '{name}'");
                     }
+
+                    if (to.Roles is { } roles && stream.TryGetProperty("disposition", out var shown))
+                    {
+                        // FFmpeg reads the roles as dispositions (8. 11. 2026)
+                        foreach (var (role, field) in new[] { (Mp4Roles.Forced, "forced"), (Mp4Roles.Caption, "hearing_impaired"), (Mp4Roles.Commentary, "comment") })
+                        {
+                            var has = shown.TryGetProperty(field, out var value) && value.GetInt32() == 1;
+                            if (has != roles.Contains(role))
+                            {
+                                problems.Add($"ffprobe: stream {i} {field} {has}, expected {roles.Contains(role)}");
+                            }
+                        }
+                    }
                 }
 
                 var isDefault = stream.TryGetProperty("disposition", out var disposition) && disposition.TryGetProperty("default", out var d) && d.GetInt32() == 1;
@@ -170,7 +209,17 @@ public static class Mp4Targets
         }
         catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            return null;
+            return Unread("no answer it could give");
         }
+    }
+
+    /// <summary>ffprobe can read the file (its format and streams).</summary>
+    public static async Task<bool> ReadableAsync(IProcessRunner runner, string ffprobe, string path, CancellationToken cancellationToken = default)
+    {
+        var result = await runner.RunAsync(new ProcessRequest(ffprobe, ["-v", "error", "-show_format", "-show_streams", "-of", "json", path])
+        {
+            Timeout = TimeSpan.FromMinutes(2),
+        }, cancellationToken).ConfigureAwait(false);
+        return result.ExitCode == 0;
     }
 }

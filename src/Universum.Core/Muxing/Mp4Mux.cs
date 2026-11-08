@@ -42,16 +42,19 @@ public static class Mp4Mux
                 Language = !string.Equals(was.Language.Primary, track.Language.Primary, StringComparison.OrdinalIgnoreCase) ? track.Language : null,
                 Name = (track.Name ?? "") != (was.Name ?? "") ? track.Name ?? "" : null,
                 Enabled = track.Flags.Default != was.Flags.Enabled ? track.Flags.Default : null,
+                Roles = Mp4Roles.Of(track.Flags) is var roles && !roles.SequenceEqual(Mp4Roles.Of(was.Flags)) ? roles : null,
             };
-            if (change.Language is not null || change.Name is not null || change.Enabled is not null)
+            if (change.Language is not null || change.Name is not null || change.Enabled is not null || change.Roles is not null)
             {
                 changes.Add(change);
             }
         }
 
-        var original = source.File.Tracks.Select(t => t.Number!.Value).ToList();
+        // subtitles left out go only from the header (8. 11. 2026)
+        var removed = source.File.Tracks.Where(t => spec.Tracks.All(c => c.TrackId != t.Id)).Select(t => t.Number!.Value).ToList();
+        var original = source.File.Tracks.Select(t => t.Number!.Value).Where(id => !removed.Contains(id)).ToList();
         // the title of a source is never taken over (owner, 29. 10. 2026): the result has the one typed, or none
-        return (new Mp4Change(changes, spec.Title ?? "", order.SequenceEqual(original) ? null : order), null);
+        return (new Mp4Change(changes, spec.Title ?? "", order.SequenceEqual(original) ? null : order) { Removed = removed }, null);
     }
 
     // the first thing MP4 cannot hold, in words
@@ -59,14 +62,15 @@ public static class Mp4Mux
     {
         var file = source.File;
         var tracks = spec.Tracks.Select(t => (Track: t, Was: t.Source == 0 ? file.Tracks.FirstOrDefault(s => s.Id == t.TrackId) : null)).ToList();
-        return spec.Sources.Count > 1 || tracks.Any(t => t.Track.Source != 0) ? CoreText.T("zlučujú sa viaceré súbory")
+        return Mp4Reading.Problem(file.Mp4Problem) is { } problem ? problem
+            : spec.Sources.Count > 1 || tracks.Any(t => t.Track.Source != 0) ? CoreText.T("zlučujú sa viaceré súbory")
             : source.AdditionalParts.Count > 0 || source.Appended.Count > 0 ? CoreText.T("pripájajú sa ďalšie súbory")
-            : tracks.Any(t => t.Was is null) || tracks.Count != file.Tracks.Count || tracks.Select(t => t.Track.TrackId).Distinct().Count() != tracks.Count
-                ? CoreText.T("odstraňujú sa stopy")
+            : tracks.Any(t => t.Was is null) || tracks.Select(t => t.Track.TrackId).Distinct().Count() != tracks.Count || file.Tracks.Any(t => t.Number is null)
+                ? CoreText.T("stopa MP4 bez čísla")
+            : file.Tracks.Any(t => t.Type != Media.TrackType.Subtitles && tracks.All(c => c.Track.TrackId != t.Id))
+                ? CoreText.T("odstraňuje sa obraz alebo zvuk (súbor sa zmenší)")
             : tracks.Any(t => !t.Track.Options.IsEmpty) ? CoreText.T("vlastnosti stopy (oneskorenie, FPS, pomer strán, orez, SRT…)")
-            : tracks.Any(t => t.Track.Flags.Forced != t.Was!.Flags.Forced) ? CoreText.T("príznak vynútené (Forced)")
-            : tracks.Any(t => (t.Track.Flags with { Default = false, Enabled = false, Forced = false }) != (t.Was!.Flags with { Default = false, Enabled = false, Forced = false }))
-                ? CoreText.T("príznak pre nepočujúcich, komentár a podobné")
+            : tracks.Any(t => !Mp4Roles.CanHold(t.Was!.Flags, t.Track.Flags)) ? CoreText.T("príznak pôvodný jazyk alebo textový popis")
             : tracks.Any(t => t.Track.Flags.Default && !t.Track.Flags.Enabled) ? CoreText.T("predvolená stopa je vypnutá")
             : !string.IsNullOrEmpty(spec.ChaptersFile) || (!source.KeepChapters && file.ChapterEntries > 0) ? CoreText.T("kapitoly")
             : spec.Attachments.Count > 0 || (!source.KeepAttachments && file.AttachmentCount > 0) ? CoreText.T("prílohy")

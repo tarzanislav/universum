@@ -85,8 +85,7 @@ public partial class App : Application
         window.Show();
         ready.SetResult((window, model));
 
-        // Zásobník TMDB: the script in the browser sends films and series to 127.0.0.1; a short notice shows each one
-        services.TmdbTray.Received += entry => TrayToast.Show(Loc.F("Do zásobníka TMDB: {0}", entry.Display));
+        // Zásobník TMDB: the script in the browser sends films and series to 127.0.0.1 (a short notice shows each one)
         services.TmdbTray.StartReceiving();
 
         // the context menu of the Explorer: Zlučovanie, Hromadné spracovanie, Single spracovanie, Informácie

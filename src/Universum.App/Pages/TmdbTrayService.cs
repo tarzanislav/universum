@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Windows;
 using Universum.App.Localization;
+using Universum.App.Shell;
 using Universum.Core.Agenda;
 using Universum.Core.Library;
 using Universum.Core.Library.Tmdb;
@@ -28,9 +29,6 @@ public sealed class TmdbTrayService
 
     /// <summary>Raised when the titles change (on the thread of the change – the UI's).</summary>
     public event Action? Changed;
-
-    /// <summary>Raised when a title comes from the browser (the window shows a short notice).</summary>
-    public event Action<TmdbTrayEntry>? Received;
 
     /// <summary>The titles, the newest first.</summary>
     public IReadOnlyList<TmdbTrayEntry> Entries => TmdbTray.Read(Note()?.Text);
@@ -79,7 +77,8 @@ public sealed class TmdbTrayService
         _services.Agenda.Save(note);
         if (fromBrowser)
         {
-            Received?.Invoke(entry);
+            // a title from the browser: a short notice at the corner of the screen (UNIVERSUM stays where it is)
+            TrayToast.Show(Loc.F("Do zásobníka TMDB: {0}", entry.Display));
         }
 
         _ = NameAsync(entry);

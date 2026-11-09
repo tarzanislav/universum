@@ -1,0 +1,848 @@
+02:10:24.495 --- MKVToolNix
+02:10:24.853 ok    MKVToolNix found
+02:10:24.854 using MKVToolNix 103.0 (D:\a\_temp\mkvtoolnix\mkvtoolnix)
+02:10:24.854 ok    version 103.0 >= 100.0
+02:10:24.868 ok    languages: all of MKVToolNix (8782), the common ones first, Filipino among them
+02:10:24.869 ok    tool present: mkvmerge.exe
+02:10:24.869 ok    tool present: mkvpropedit.exe
+02:10:24.869 ok    tool present: mkvextract.exe
+02:10:24.869 ok    tool present: mkvinfo.exe
+02:10:24.869 ok    tool present: mkvtoolnix-gui.exe
+02:10:25.015 mkvmerge.exe signature: valid=True, signer=LINET Services GmbH, status=0x00000000, revocation checked=True
+02:10:25.015 ok    mkvmerge.exe signed by LINET Services GmbH
+02:10:25.025 ok    unsigned file is rejected
+02:10:25.035 Recycle Bin on the work drive: available
+02:10:25.035 ok    Recycle Bin usable on the work drive (volume, settings and content read): ok
+02:10:25.035 ok    network share refused
+02:10:25.047 registry candidates: none
+02:10:25.048 --- inspection
+02:10:25.142 ok    en-und-cz-forced: 6 tracks (6)
+02:10:25.142 ok    en-und-cz-forced: one undetermined audio track
+02:10:25.142 ok    en-und-cz-forced: tags and chapters
+02:10:25.142 identification format version 20
+02:10:25.143 --- release feed and download
+02:10:25.687 latest MKVToolNix release: 103.0
+02:10:25.687 ok    release feed is not older than the tested version
+02:10:28.714 ok    installer downloaded and verified (SHA-256 + signature)
+02:10:28.716 --- windows
+02:10:29.548 ok    information page shows 6 tracks (6)
+02:10:29.548 ok    information page shows no error: 
+02:10:29.548 ok    the program starts with the Dashboard
+02:10:29.585 ok    languages: English and Czech texts, Slovak by default – (Save, Batch processing, Vymyslený text bez prekladu) Hromadné zpracování
+02:10:29.678 ok    languages: the choice kept for the next start
+02:10:29.679 ok    left rail: Dashboard, the groups, then NÁPOVEDA with the guides in the order of the groups (owner, 1. 11. 2026)
+02:10:30.161 screenshot main-info.png
+02:10:42.139 ok    dashboard: Pondelok 9. novembra 2026, Meniny majú Teodor, Teo
+02:10:42.139 ok    dashboard: no weather without a town
+02:10:42.499 screenshot dashboard-no-town.png
+02:10:42.505 ok    settings: a town Open-Meteo does not know is not stored
+02:10:42.514 ok    settings: the town stored with its coordinates – Počasie pre: Vymyslené Mesto – Slovensko (súradnice 48.70, 19.15).
+02:10:42.514 ok    dashboard: weather −3 °C, Slabé sneženie, days 3
+02:10:42.514 ok    dashboard: the days of the forecast – Dnes 0° / −5° zrážky 70 %, Zajtra 2° / −3° zrážky 40 %, Streda 5° / −1° zrážky 10 %
+02:10:42.514 ok    dashboard: only the town, then its coordinates went to Open-Meteo – https://geocoding-api.open-meteo.com/v1/search?count=10&language=sk&format=json&name=Nikde | https://geocoding-api.open-meteo.com/v1/search?count=10&language=sk&format=json&name=Vymyslené Mesto | https://api.open-meteo.com/v1/forecast?latitude=48.7&longitude=19.15&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=3
+02:10:42.516 ok    dashboard: a failed reading keeps the last weather – Služba počasia odpovedala chybou 503. (zobrazené je počasie z 02:10)
+02:10:42.516 ok    dashboard: the overview – Fronta úloh: Prázdna | Zlučovanie: Žiadne súbory | Hromadné spracovanie: Nie je otvorený žiadny priečinok | Knižnica: Nie je nastavená – výstupný priečinok zvolíte v Nastaveniach | Názvy titulov: TMDB: bez kľúča · HISTRA: bez tokenu | MKVToolNix a aktualizácie: MKVToolNix 103.0 · aktualizácie sa ešte nekontrolovali
+02:10:42.858 screenshot dashboard.png
+02:10:42.858 ok    dashboard: a line of the overview opens its tool
+02:10:42.859 ok    settings: several towns of one name are offered, nothing stored yet – Vymyslená Lehota – okres Prvý, Trnavský kraj, Slovensko · 140 m n. m. | Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m n. m.
+02:10:42.859 ok    settings: a town is told apart by its district, region and height – Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m n. m.
+02:10:43.245 ok    settings: the list of places is shown
+02:10:43.576 screenshot settings-weather-choice.png
+02:10:43.578 ok    settings: the chosen town is stored and shown with its district – Počasie pre: Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m n. m. (súradnice 48.90, 19.60). | Vymyslená Lehota, okres Druhý
+02:10:43.581 ok    lists: a HISTRA token is needed – Na import listov uložte v Nastaveniach svoj token HISTRA.
+02:10:43.590 ok    lists: import possible with HISTRA
+02:10:43.603 ok    lists: the overview of the lists with five preview posters – 
+02:10:44.087 screenshot histra-import.png
+02:10:44.094 ok    lists: two lists chosen – Importovať vybrané (2)
+02:10:44.130 ok    lists: imported with all titles, read in pages – Importované: 2 listy (33 titulov).
+02:10:44.131 ok    lists: only read from HISTRA, the long list in pages – GET https://histra.net/api/v1/lists?limit=500&offset=0 | GET https://histra.net/api/v1/lists?limit=500&offset=3 | GET https://image.tmdb.org/t/p/w154/p1.jpg | GET https://image.tmdb.org/t/p/w154/p2.jpg | GET https://image.tmdb.org/t/p/w154/p3.jpg | GET https://image.tmdb.org/t/p/w154/p4.jpg | GET https://image.tmdb.org/t/p/w154/p5.jpg | GET https://image.tmdb.org/t/p/w154/p6.jpg | GET https://image.tmdb.org/t/p/w154/p7.jpg | GET https://histra.net/api/v1/lists/1?extended=full&lang=cs-CZ&limit=500&offset=0 | GET https://histra.net/api/v1/lists/1?extended=full&lang=cs-CZ&limit=500&offset=20 | GET https://histra.net/api/v1/lists/2?extended=full&lang=cs-CZ&limit=500&offset=0
+02:10:44.132 ok    lists: the first posters, then Zobraziť všetky – Zobraziť všetky (30)
+02:10:44.132 ok    lists: kept in a file of this account
+02:10:44.132 ok    lists: the arrows at the ends of the order
+02:10:44.140 ok    lists: moved up, the order kept for the next start – List „Na víkend“ je na 1. mieste.
+02:10:44.141 ok    lists: moved back (as when dragged with the mouse)
+02:10:44.141 ok    lists: search without diacritics – Zhoda: 9
+02:10:44.147 ok    lists: the detail of a title – Invented Story 1 (1991) / Vymyslený príbeh 1
+02:10:44.148 ok    lists: the card of the title (names, Trakt, IDs) – Invented Story 1 (1991) | HISTRA, TMDB, IMDb, Trakt, ČSFD (hľadať)
+02:10:44.148 ok    lists: links of the title – HISTRA https://histra.net/movie/1001, TMDB https://www.themoviedb.org/movie/9001, IMDb https://www.imdb.com/title/tt0009001/, ČSFD (hľadať) https://www.csfd.cz/hledat/?q=Invented%20Story%201
+02:10:44.148 ok    lists: IDs of the title – HISTRA 1001, TMDB 9001, IMDb tt0009001, Trakt 5001
+02:10:44.148 ok    lists: the HISTRA link opens the title's page
+02:10:44.150 ok    lists: Otvoriť v TMDB Poster and Do Single spracovania – (Movie, 9001) | Invented Story 1/Vymyslený príbeh 1 1991 Invented Story 1 (1991) | vymyslené: nenašiel sa
+02:10:44.583 screenshot histra-lists.png
+02:10:44.589 ok    lists: a list HISTRA no longer has stays, marked – Synchronizované 9. 11. 2026 2:10: 1 list; v HISTRA už nie je: 1 (ostávajú tu, odstrániť ich môžete sami).
+02:10:44.590 ok    lists: removed from UNIVERSUM
+02:10:44.591 ok    lists: kept for the next start
+02:10:44.599 ok    sources: TVmaze and TMDB by default
+02:10:44.603 ok    sources: a file that is no rules is refused – Zdroj sa nepridal: Súbor pravidiel nie je platný JSON: JSON deserialization for type 'Universum.Core.News.PageRules' was missing required properties including: 'name', 'address', 'item', 'fields'.
+02:10:44.618 ok    sources: an invented page added from its rules – Zdroj „Vymyslený rozpis“ je pridaný (rozpis.example, 1 deň dozadu a 60 dní dopredu). Premiéry a Novinky ho načítajú pri ďalšom zobrazení.
+02:10:45.039 screenshot settings-sources.png
+02:10:45.217 ok    premieres: all sources read – 
+02:10:45.218 ok    premieres: Czech and Slovak films in the cinemas here, the nearest first – Today Invented (2026) 9. 11. 2026 DNES CZ · SK ČR, SR · Invented Pictures kino 9. 11. 2026 · VOD 24. 12. 2026 · TV 28. 5. 2027 (USA) | The Invented Premiere (2026) 12. 11. 2026 o 3 dni CZ · SK 13. 11. ČR, SR · Invented Pictures kino 12. 11. 2026 · VOD 27. 12. 2026 · TV 31. 5. 2027 (USA)
+02:10:45.218 ok    premieres: only coming films of the world, the past one is in the history – Later Invented Film (2026) 19. 11. 2026
+02:10:45.219 ok    premieres: a new series on a Czech channel, its rhythm from TVmaze – Invented Show (2026) ČT1 nový seriál · S01E01 každý pracovný deň (po–pi) 10 epizód
+02:10:45.219 ok    premieres: new series and seasons of the world – World Invented (2024) Netflix 2. séria · S02E01 – – | Invented Network Show (2026) INV · USA nový seriál · S01E01 každý deň 6 epizód | Invented Stream (2024) Invented+ 3. séria · S03E01 raz do týždňa – pondelok 8 epizód
+02:10:45.219 ok    premieres: robots.txt first, then each day of the window once – Czech channels 60 days ahead (62 days)
+02:10:45.219 ok    premieres: only the sources were asked
+02:10:45.219 ok    premieres: UNIVERSUM introduces itself to the pages
+02:10:45.228 ok    premieres: Zobraziť vybrané shows only the chosen film, its note kept
+02:10:45.229 ok    premieres: the note is searched too
+02:10:45.235 ok    premieres: the note's text without addresses, its links as words – teším sa [Kino](https://kino.example/vymyslena-premiera) [trailer.example](https://www.trailer.example/vymyslena)
+02:10:45.236 ok    premieres: a link removed, the text changed, the other link kept – teším sa veľmi [Kino](https://kino.example/vymyslena-premiera)
+02:10:45.236 ok    premieres: a web address in the note is kept and shown as a link
+02:10:45.237 ok    premieres: posters up to twice as large, kept
+02:10:45.676 screenshot premieres-films.png
+02:10:45.791 ok    premieres: posters of the series found on TMDB
+02:10:46.118 screenshot premieres-series.png
+02:10:46.119 ok    premieres: posters can be hidden (kept in the settings)
+02:10:46.451 screenshot premieres-series-noposters.png
+02:10:46.462 ok    premieres: Posledný týždeň shows the premieres of the last days – World Invented Film (2026) pred 2 dňami
+02:10:46.463 ok    premieres: the film that is over is in the history
+02:10:46.810 screenshot premieres-history.png
+02:10:46.814 ok    premieres: Zobraziť všetko shows the history and the coming premieres, the latest first (2 of 2)
+02:10:46.841 ok    premieres: the kept days are used again without asking the sources (266 → 266)
+02:10:46.850 ok    premieres: kept for the next start and shown at once, without asking the sources – Uložené premiéry z 9. 11. 2026 2:10.
+02:10:46.856 ok    interests: a source added in the settings (https only) – Adresa musí začínať https:// (napr. https://stránka/feed/).
+02:10:46.858 ok    interests: sources imported from a file – Pridané zdroje: 1. Načítajú sa pri ďalšej aktualizácii (alebo tlačidlom Obnoviť v Zaujímavostiach).
+02:10:46.858 ok    interests: nothing kept yet
+02:10:46.885 ok    interests: this week's articles, translated – SK: Invented festival opens + 2 | 
+02:10:46.885 ok    interests: one batch to DeepL, Czech too
+02:10:46.885 ok    interests: Všetko shows the history
+02:10:46.885 ok    interests: only one source
+02:10:46.885 ok    interests: the original text
+02:10:46.886 ok    interests: the starred article
+02:10:46.892 ok    interests: pictures of the articles
+02:10:47.265 screenshot zaujimavosti.png
+02:10:47.273 ok    interests: nothing translated twice
+02:10:47.273 ok    interests: kept for the next start
+02:10:47.273 ok    interests: only the sources and DeepL were asked
+02:10:47.673 screenshot settings-interests.png
+02:10:48.005 screenshot settings.png
+02:10:49.088 ok    rules: the subtitles' language read from their text – návrh UNIVERSUM: isté – ě, ř, ů 2×
+02:10:49.088 ok    rules: undetermined languages block the file
+02:10:49.088 ok    rules: apply disabled while blocked
+02:10:49.088 ok    rules: asks for the output folder – Najprv nastavte výstupný priečinok (knižnicu).
+02:10:49.427 screenshot rules-undetermined.png
+02:10:49.434 ok    rules: subtitles in the order of the rules – cs!,cs,en
+02:10:49.434 ok    rules: forced subtitles are named Forced, the other names removed (owner, 29. 10. 2026)
+02:10:49.439 ok    rules: English subtitles moved up – cs!,en,cs
+02:10:49.843 screenshot rules-track-order.png
+02:10:49.849 ok    rules: and back – cs!,cs,en
+02:10:49.849 ok    rules: the file's language is shown in the list
+02:10:49.850 ok    rules: a language written in the file corrected
+02:10:49.850 ok    rules: the file's own language again
+02:10:49.850 ok    rules: the name to write is the result's
+02:10:49.852 ok    rules: the names written are used
+02:10:49.852 ok    rules: the rules' name again, an empty one = no name
+02:10:49.862 ok    library: MOVIES and TVSHOWS created
+02:10:49.867 ok    rules: target in the library – MOVIES\Vymyslený film Návrat (2026)\Vymyslený film Návrat (2026) - CZ EN SD H264 SMALL.mkv
+02:10:49.867 ok    rules: apply enabled after choosing languages and title
+02:10:50.234 screenshot rules-preview.png
+02:10:50.469 ok    rules: written – Hotovo: D:\a\_temp\selftest\library\MOVIES\Vymyslený film Návrat (2026)\Vymyslený film Návrat (2026) - CZ EN SD H264 SMALL.mkv
+02:10:50.470 ok    rules: result in the library, original kept
+02:10:50.804 screenshot rules-done.png
+02:10:50.866 ok    rules: the same stream is not written twice – Rovnaký stream už v knižnici je: D:\a\_temp\selftest\library\MOVIES\Vymyslený film Návrat (2026)\Vymyslený film Návrat (2026) - CZ EN SD H264 SMALL.mkv
+Nič sa nezapísalo, originál ostal. Ak ho chcete spracovať znova ako novú verziu, stlačte Revízia.
+02:10:50.883 ok    titles: HISTRA found another title – waits for confirmation: Titul z TMDB Vymyslený vlak (2019) (TMDB 9500): HISTRA našla iný titul: Vymyslený vlak (2019) (TMDB 9001) – skontrolujte a potvrďte.
+02:10:51.241 screenshot title-unconfirmed.png
+02:10:51.256 ok    titles: confirmed by the user – MOVIES\Vymyslený vlak (2019)\Vymyslený vlak (2019) - CZ EN SD H264 SMALL.mkv
+02:10:51.256 ok    titles: only the name goes to HISTRA – https://api.themoviedb.org/3/search/movie?language=en-US&include_adult=false&query=Vymyslený vlak&year=2019&api_key=selftest-key | https://histra.net/api/v1/catalog/movies/search?q=Vymyslený vlak
+02:10:51.296 ok    titles: HISTRA confirmed the title – HISTRA titul potvrdila.
+02:10:51.360 ok    titles: found nowhere – the suggestion waits: TMDB ani HISTRA titul nenašli – ponechaný je návrh „Neexistujúci vlak (2020)“. Skontrolujte ho a potvrďte (alebo ho opravte).
+02:10:51.361 ok    titles: a typed title needs no confirmation – MOVIES\Neexistujúci vlak (2021)\Neexistujúci vlak (2021) - CZ EN SD H264 SMALL.mkv
+02:10:51.361 ok    titles: the text that waited waits again when typed back
+02:10:51.362 ok    titles: HISTRA not reachable – waits for confirmation: Titul z TMDB Vymyslený vlak 3 (2023) (TMDB 9003): HISTRA sa nedala opýtať (Token HISTRA nie je platný – skontrolujte ho v Nastaveniach.) – titul nie je overený. Skontrolujte ho a potvrďte.
+02:10:51.442 ok    header editor: 6 tracks (6)
+02:10:51.442 ok    header editor: check panel shows the undetermined language
+02:10:51.442 ok    header editor: the File title is removed by default
+02:10:51.444 ok    header editor: result goes into the library – MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+02:10:51.813 screenshot header-editor.png
+02:10:52.047 ok    header editor: saved – Uložené do knižnice: MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv. Originál ostal nezmenený.
+02:10:52.047 ok    header editor: original unchanged, byte for byte
+02:10:52.110 ok    header editor: new file named by the rules – Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+02:10:52.110 ok    header editor: the library file has the changes
+02:10:52.468 ok    header editor: a library file edited again can be undone – Uložené do knižnice: MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv. Zmenu súboru v knižnici je možné vrátiť späť.
+02:10:52.716 ok    header editor: undo – Pôvodná hlavička je obnovená.
+02:10:52.781 ok    header editor: rules put the Czech audio first, default
+02:10:52.781 ok    header editor: new order needs a new file – Zapíše sa nový súbor do knižnice (15 zmien; poradie alebo vynechané stopy) – trvá to minúty. Originál ostane nezmenený.
+02:10:52.781 ok    header editor: nothing to check after the rules – 
+02:10:53.164 screenshot header-editor-rules.png
+02:10:53.164 ok    header editor: audio cannot move above video
+02:10:53.167 ok    header editor: audio moved among audio
+02:10:53.167 ok    header editor: check panel notices the order
+02:10:53.177 ok    queue: header editor adds a job – Pridané do fronty ako úloha 1.
+02:10:53.806 ok    queue: job done – Done Hotovo: D:\a\_temp\selftest\library\MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv Úprava hlavičky: D:\a\_temp\selftest\rules\header.mkv | the earlier result of this original went to the Recycle Bin: Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+02:10:53.806 ok    queue: original unchanged, byte for byte
+02:10:53.860 ok    queue: job wrote the library file
+02:10:53.860 ok    queue: editor shows the job's outcome – Úloha 1: Hotovo: D:\a\_temp\selftest\library\MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+02:10:54.204 screenshot queue.png
+02:10:54.206 ok    output: the job's messages are shown
+02:10:54.551 screenshot job-output.png
+02:10:54.702 ok    mux: asked how to add two files (2), one settings (1)
+02:10:54.702 ok    mux: two inputs, 7 tracks (2, 7) 
+02:10:54.702 ok    mux: the output is beside the source by default, as in MKVToolNix – D:\a\universum\universum\testdata\media\en-und-cz-forced (1).mkv
+02:10:54.709 ok    mux: the Czech dub moved above the English audio as soon as its language was set
+02:10:54.711 ok    mux: the Slovak subtitles moved above the English ones
+02:10:54.715 ok    mux: nothing to check after the rules – 
+02:10:54.715 ok    mux: with a title the name follows the rules, still beside the source – D:\a\universum\universum\testdata\media\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv
+02:10:54.715 ok    mux: the library can be used
+02:10:54.716 ok    mux: into the library, the path is greyed out, ready to write – 
+02:10:54.716 ok    mux: name by the rules – MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv
+02:10:54.722 ok    mux: the properties show the selected track
+02:10:55.097 screenshot mux.png
+02:10:55.101 ok    mux: the properties show the selected source file
+02:10:55.447 screenshot mux-source.png
+02:10:55.462 ok    mux: in the queue, nothing unprocessed
+02:10:55.979 ok    mux: job done – Done Hotovo: D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv Zlučovanie: 2 vstup(y), 6 stôp → D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) … (názov podľa pravidiel, veľkosť sa doplní po zápise)
+02:10:56.033 ok    mux: written into the library in the rules' order – D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv und,cs,en,cs,cs,sk
+02:10:56.033 ok    mux: the tab shows the outcome and 100 % – Úloha 2: Hotovo: D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv 100%
+02:10:56.033 ok    mux: the status line shows the queue – Fronta: nič nebeží, čaká 0, dokončené 2.
+02:10:56.041 ok    mux: new empty settings as a second tab
+02:10:56.154 ok    mux: new settings for each file – 3 tabs
+02:10:56.218 ok    mux: a file appended to the film – 
+02:10:56.218 ok    mux: two settings not yet in the queue (2)
+02:10:56.218 ok    mux: the appended file's tracks under the main tracks (12 rows)
+02:10:56.218 ok    mux: the main file green (colour 0), the appended one blue (colour 1)
+02:10:56.219 ok    mux: a track of the appended file is not editable – Pripojená časť zo súboru film-časť-2.mkv: pokračuje stopou 1 (Video, neurčený (und)) zo súboru en-und-cz-forced.mkv. Názov, jazyk a príznaky má od nej – upravte hlavnú stopu.
+02:10:56.562 screenshot mux-appended.png
+02:10:56.566 ok    mux: from the appended track to its main track
+02:10:56.569 ok    mux: a moved track takes the appended track along and stays selected
+02:10:56.575 ok    mux menu: Vybrať všetky stopy zo súboru
+02:10:56.576 ok    mux menu: the output named by the selected file, never over the source – D:\a\universum\universum\testdata\media\en-und-cz-forced (1).mkv
+02:10:56.577 ok    mux menu: named by the appended file, in the output's folder – D:\a\universum\universum\testdata\media\film-časť-2.mkv
+02:10:56.577 ok    mux menu: the commands of a selected file are available
+02:10:56.927 screenshot mux-tabs.png
+02:10:56.927 ok    mux: closing changed settings asks first – Nastavenia zlučovania „film-časť-2.mkv“ boli zmenené. Naozaj ich chcete zavrieť? Všetky zmeny sa stratia.
+02:10:57.036 ok    info: the multiplexer's files are listed and the chosen one is shown (3, 6)
+02:10:57.368 screenshot info-files.png
+02:10:57.493 ok    mux: the subtitles go with their film whatever the order (4 tabs, 2 inputs)
+02:10:57.494 ok    mux: a typed output path – 
+02:10:57.494 ok    mux: into the library without a title asks for the title – Názov titulu: chýba rok – napr. Creep (2004).
+02:10:57.494 ok    mux: unticking the library returns the typed path – D:\a\_temp\selftest\rules\ručne pomenovaný.mkv
+02:10:57.494 ok    mux: a delay that is not a number stops writing
+02:10:57.495 ok    mux: a delay in ms is taken – 
+02:10:57.547 ok    mux menu: Pridať súbory… (3 sources, not asked)
+02:10:57.598 ok    mux menu: Pripojiť súbory… appends to the selected file (the next files get the next colours)
+02:10:57.599 ok    mux menu: Odstrániť všetky súbory
+02:10:57.966 screenshot mux-add-files.png
+02:10:58.052 ok    mux: an MP4 stays MP4 – Výsledok ostane MP4 – UNIVERSUM zmení len hlavičku, obraz a zvuk sa nedotknú. | D:\a\_temp\selftest\rules\Vymyslený film na zlúčenie (1).mp4 | 
+02:10:58.140 ok    mux: written as MP4 (ffprobe: True) – the MP4 stayed MP4, only its header was edited; the MP4 checked by ffprobe too
+02:10:58.141 ok    mux: subtitles left out – still MP4: Výsledok ostane MP4 – UNIVERSUM zmení len hlavičku, obraz a zvuk sa nedotknú.
+02:10:58.141 ok    mux: a sound left out – an MKV, and why: Výsledok bude MKV – MP4 neudrží: odstraňuje sa obraz alebo zvuk (súbor sa zmenší). | D:\a\_temp\selftest\rules\Vymyslený film na zlúčenie (1).mkv
+02:10:58.143 ok    mux: closed after the question (1)
+02:10:58.264 ok    mega/mux: a preview and MEGA offered – 
+02:10:58.444 ok    mega/mux: the preview in the folder of previews, nothing in the output – D:\a\_temp\selftest\settings\nahlady\Zlúčený pre MEGA – náhľad 1 – 9. 11. 02-10-58.mkv · Náhľad celého filmu je hotový (27 kB) – prehrajte ho; keď je výsledok v poriadku, odošlite ho do MEGA.
+02:10:58.445 ok    mega/mux: Prehrať náhľad opens the preview
+02:10:58.727 ok    mega/mux: the preview in UNIVERSUM's player with the subtitles of the result – bez titulkov | 1: čeština (cs) – Forced (forced) | 2: čeština (cs) | 3: slovenčina (sk) | 4: angličtina (en)
+02:10:59.060 screenshot mux-preview.png
+02:10:59.071 ok    mega/mux: the settings changed since the preview
+02:10:59.072 ok    mega/mux: the same again
+02:10:59.424 screenshot mux-mega.png
+02:10:59.499 ok    mega/mux: the result sent to a new batch – Odoslané do MEGA spracovania ako Dávka 1. Zapíše sa, keď dávku spustíte alebo v nastavenom čase; originál ostane.
+02:10:59.671 ok    mega/single: Odoslať do MEGA offered – MOVIES\Vymyslený film pre MEGA (2026)\Vymyslený film pre MEGA (2026) - CZ EN SD H264 SMALL.mkv
+02:10:59.678 ok    mega/single: the file added to the batch with its decisions – Pridané do Dávka 1 MEGA spracovania. Zapíše sa, keď dávku spustíte alebo v nastavenom čase; originál ostane.
+02:10:59.679 ok    mega: where the files came from; nothing to open in Hromadné spracovanie
+02:11:00.061 screenshot mega-sources.png
+02:11:00.062 ok    mega: Upraviť v Single spracovaní offered for the file of Single
+02:11:00.169 ok    mega/single: the file opened in Single spracovanie with its decisions – Vymyslený film pre MEGA (2026) · Uložiť do Dávka 1 · Súbor z Dávka 1 MEGA spracovania – upravte ho a dajte Uložiť do Dávka 1.
+02:11:00.169 ok    mega/single: the studios offered from Single spracovanie
+02:11:00.496 screenshot mega-edit-single.png
+02:11:00.503 ok    mega/single: a studio's edits back in Single spracovanie –  Úpravy zo štúdií: vynechané 1
+02:11:00.938 screenshot studio-video-single.png
+02:11:00.942 ok    mega/single: Obraz v štúdiu → Uložiť do úlohy – the proportions back in Single spracovanie, the subtitles' edits stay – Úpravy zo štúdií: vynechané 1, pomer strán 4:3
+02:11:00.950 ok    mega/single: the changes saved back into the batch, back in MEGA spracovanie – Zmeny sú uložené v Dávka 1 MEGA spracovania.
+02:11:01.365 ok    mega: the result of Zlučovanie and the file of Single written into the library, originals kept – Done: D:\a\_temp\selftest\library\MOVIES\Zlúčený pre MEGA (2026)\Zlúčený pre MEGA (2026) - CZ EN SD H264 SMALL.mkv | Done: D:\a\_temp\selftest\library\MOVIES\Vymyslený film pre MEGA (2026)\Vymyslený film pre MEGA (2026) - CZ EN SD H264 Remaster SMALL.mkv
+02:11:01.365 ok    mega/mux: the preview went with its tab
+02:11:01.530 ok    mux recognition: three audio tracks without a language, the button offered (3)
+02:11:20.129 mux recognition: audio (18.6 s): Jazyk zvuku z reči: 3 z 3 stôp. stopa 1 (speech-und.mkv): čeština (cs) – rozpoznané len z jedného úseku; stopa 2 (speech-und.mkv): angličtina (en) – rozpoznané len z jedného úseku; stopa 3 (speech-und.mkv): slovenčina (sk) – podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku. | čeština (cs), angličtina (en), slovenčina (sk)
+02:11:20.129 ok    mux recognition: the languages of the speech written into the tracks – čeština (cs), angličtina (en), slovenčina (sk)
+02:11:20.142 mux recognition: subtitles: Titulky: jazyk určený pri 2 stopách, forced pri 1. stopa 0 (Vymyslený film.forced.srt): slovenčina (sk) – bez ě, ř, ů, ľ, ô – podľa krátkych slov (české 12×, slovenské 72×) – overte; stopa 0 (Vymyslený film.forced.srt): forced – podľa názvu súboru.
+02:11:20.142 ok    mux recognition: Slovak subtitles, forced by the file's name – slovenčina (sk), forced True
+02:11:20.142 ok    mux order: Czech subtitles above the Slovak ones, Czech and Slovak audio above the English – und, cs, sk, en, cs, sk
+02:11:20.143 ok    mux order: a track moved by its arrow and dragged back
+02:11:20.144 ok    mux order: a language set by hand puts the track in its place
+02:11:21.347 ok    mux order: arranged after the pause, not at once (stayed True, arranged True)
+02:11:22.087 mux languages drop-down: 8782 languages, 9 items made, opened in 44 ms; list scrolls by items True, drop-down True, panel VirtualizingStackPanel, virtualizing True, scroller ScrollViewer 256 px
+02:11:22.089 ok    mux languages drop-down: only the items seen are made (9 of 8782)
+02:11:22.462 screenshot mux-recognition.png
+02:11:22.610 ok    srt: Zlučovanie offers Na SRT for the WebVTT only – WebVTT → SRT vo vnútri výsledku; pôvodný formát v ňom nebude
+02:11:22.612 ok    srt: ticked – shown in the list and in the recipe
+02:11:22.973 screenshot mux-srt.png
+02:11:23.050 ok    srt: a film with WebVTT made – 
+02:11:23.229 ok    srt: Single offers Na SRT for the WebVTT track only
+02:11:23.233 ok    srt: Single plans the WebVTT as SRT – Vznikne nový súbor (13 zmien). Tagy sa odstránia. Kapitoly ostanú.
+02:11:23.595 screenshot single-srt.png
+02:11:24.009 ok    news → agenda: the film in Poznámky, opened to edit (1 records)
+02:11:24.332 screenshot news-to-note.png
+02:11:24.333 ok    news → agenda: the same film again – its note, not a second one
+02:11:24.754 ok    news → agenda: the episode in Plánované úlohy, due on its airing (11/12/2026)
+02:11:25.086 screenshot news-to-task.png
+02:11:25.098 disks: D:\a\_temp\selftest\library – #1 NVMe SSD (SSD, key disk:1)
+02:11:25.098 disks: C:\Users\runneradmin\AppData\Local\Temp\ – #0 NVMe SSD (SSD, key disk:0)
+02:11:25.099 disks: C:\Windows – #0 NVMe SSD (SSD, key disk:0)
+02:11:25.102 ok    superfast: a file of one name – 1
+02:11:25.131 ok    superfast: a hard link is seen – 2 Hardlink created for D:\a\_temp\selftest\UNIVERSUM-selftest-fast-00a820b9\druh� meno.mkv <<===>> D:\a\_temp\selftest\UNIVERSUM-selftest-fast-00a820b9\Vymysleny rychly film.mkv 
+02:11:25.379 ok    superfast: a file with a hard link is written anew, never edited in place – superfast was not possible, the whole file was copied: the file has another name too (a hard link); the original went to the Recycle Bin
+02:11:25.591 ok    superfast: moved into the library and edited there in 0.21 s – the original was moved into the library and edited there
+02:11:25.591 ok    titles: the film written into the library is in Spracované tituly – Hlavička test (2026) | Vymyslený film Návrat (2026) | Vymyslený film pre MEGA (2026) | Vymyslený samostatný film (2026) | Vymyslený zdieľaný film (2026)
+02:11:25.694 ok    superfast: Vrátiť originály puts it back – 
+02:11:25.696 ok    MP4: Ponechať MP4 is a part of the profile
+02:11:25.749 ok    MP4: stays MP4, a header edit – HeaderEdit 
+02:11:25.863 ok    MP4: moved into the library and its header edited in 0.11 s (ffprobe: True) – the MP4 checked by ffprobe too; the original was moved into the library and edited there
+02:11:25.863 ok    MP4: the title and the Czech sound first and default – 1 und True, 3 ces True, 2 eng False, 4 ces False
+02:11:25.918 ok    MP4: Vrátiť originály puts it back byte for byte – 
+02:11:25.934 ok    disks: a file on the other disk goes into the output folder there (C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP)
+02:11:26.154 ok    disks: Single shows the output folder of the other disk – C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP → MOVIES\Vymyslený film na druhom disku (2026)\Vymyslený film na druhom disku (2026) - CZ EN SD H264 SMALL.mkv
+02:11:26.694 ok    disks: written on the same disk in 0.5 s, original kept – Hotovo: C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP\MOVIES\Vymyslený film na druhom disku (2026)\Vymyslený film na druhom disku (2026) - CZ EN SD H264 SMALL.mkv
+02:11:27.026 screenshot disks-single.png
+02:11:27.029 ok    disks: Hromadné – the disk has its output folder, nothing said
+02:11:27.033 ok    disks: Hromadné – a disk without an output folder said – Disk C: nemá vlastný výstupný priečinok – súbory sa skopírujú do D:\a\_temp\selftest\library na inom disku. Výstup tohto disku vytvoríte v Nastaveniach (Priečinky na diskoch → blok disku → Vytvoriť výstup).
+02:11:27.035 ok    disks: Priečinok… on another disk asks first – cancelled, nothing changed – Výstupný priečinok sa nezmenil.
+02:11:27.043 ok    disks: … Áno – added as the output of the other disk, the default one kept – Pridaný výstupný priečinok: C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP – súbory z tohto disku pôjdu sem.
+02:11:27.044 ok    disks: a folder with films is no output unless confirmed – Výstupný priečinok sa nezmenil.
+02:11:27.046 ok    disks: … Nie – the default output replaced, the old one named – Predvolený výstupný priečinok je teraz C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP (predtým D:\a\_temp\selftest\library – v ňom sa nič nezmenilo).
+02:11:27.047 ok    disks: the default output back
+02:11:27.049 ok    disks: two outputs on one disk said – Na jednom disku je viac výstupných priečinkov (D:\a\_temp\selftest\library, D:\a\_temp\selftest\library\druhy-na-tom-istom-disku) – súbory z neho pôjdu len do jedného. Odoberte ten, ktorý je navyše.
+02:11:27.058 ok    disks: a source folder among the outputs is told – C: C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\Stiahnute
+02:11:27.068 ok    disks: … it is the input of its disk now, the disk says its films go to the main output – C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\Stiahnute je teraz vstupný priečinok disku (nie výstup). Výstup na tomto disku vytvoríte tlačidlom Vytvoriť výstup. | Disk nemá vlastný výstup – filmy z C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\Stiahnute sa skopírujú do hlavného výstupu D:\a\_temp\selftest\library na inom disku.
+02:11:27.078 ok    disks: Vytvoriť výstup – C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP beside the input, the film of that disk goes there – Výstupný priečinok: C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP.
+02:11:27.083 ok    disks: Hromadné – all inputs chosen – Všetky vstupy (D:, C:) | DISK D:  D:\a\_temp\selftest\vstup-hlavneho-disku | DISK C:  C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\Stiahnute
+02:11:27.264 ok    disks: Hromadné – the film of the other disk found among all inputs – 1 súborov v 1 skupinách. | Vymyslený film na druhom disku · C:
+02:11:27.264 ok    disks: Hromadné – the input of one disk chosen
+02:11:27.266 ok    disks: an output is no input – C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP nemôže byť vstupný priečinok – je to výstupný priečinok, leží v ňom alebo ho obsahuje (C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP). Vstup musí byť samostatný priečinok.
+02:11:27.269 ok    disks: one input per disk – Na tomto disku už vstupný priečinok je: C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\Stiahnute. Zmeňte ho v jeho riadku.
+02:11:27.281 ok    disks: ★ moved to the other disk – Hlavný výstup je teraz C:\Users\runneradmin\AppData\Local\Temp\UNIVERSUM-selftest-disk-10d56e7f\VYSTUP; súbory z diskov bez výstupu pôjdu sem.
+02:11:27.288 ok    disks: ★ back – Hlavný výstup je teraz D:\a\_temp\selftest\library; súbory z diskov bez výstupu pôjdu sem.
+02:11:27.290 ok    disks: the disk of ★ cannot be removed – Disk s hlavným výstupom sa nedá odobrať – najprv označte iný disk ako hlavný (★).
+02:11:27.923 screenshot disks-settings.png
+02:11:27.931 ok    disks: the disk removed, nothing in its folders touched – Disk C: sa už nepoužíva – v jeho priečinkoch sa nič nezmenilo.
+02:11:28.072 ok    chapters: two read (2) – Trvanie 00:00:02.176, kapitoly: 2.
+02:11:28.073 ok    chapters: ready to save –  MOVIES\Kapitoly test (2026)\Kapitoly test (2026) - CZ titulky SD H264 SMALL.mkv
+02:11:28.439 screenshot chapters.png
+02:11:28.711 ok    chapters: saved – Uložené do knižnice (3 kapitoly): MOVIES\Kapitoly test (2026)\Kapitoly test (2026) - CZ titulky SD H264 SMALL.mkv. Originál ostal nezmenený.
+02:11:28.711 ok    chapters: original unchanged, byte for byte
+02:11:28.711 ok    chapters: the library copy has them, sorted by time – Začiatok|Koniec|Polovica
+02:11:29.092 ok    chapters: library file edited again, can be undone – Uložené do knižnice (2 kapitoly): MOVIES\Kapitoly test (2026)\Kapitoly test (2026) - CZ titulky SD H264 SMALL.mkv. Zmenu súboru v knižnici je možné vrátiť späť.
+02:11:29.312 ok    chapters: undo – Pôvodné kapitoly sú vrátené.
+02:11:29.312 ok    chapters: wrong time blocks saving
+02:11:29.313 ok    chapters: generated for a 2-second file
+02:11:29.406 ok    subtitles: three tracks of the video, two files found with it (not another film) – MKV, titulkové stopy: 3, video 10 FPS | vymysleny_titulkovy_film_2026_en.vtt – rovnaký názov ako video, jazyk z názvu en | Vymyslený.Titulkový.Film.2026.sk.srt – rovnaký názov ako video, jazyk z názvu sk
+02:11:29.619 ok    subtitles: Slovak file in Windows-1250 – SRT, Windows-1250 · návrh UNIVERSUM: isté – ä, ĺ, ľ, ô, ŕ 3×, slovenské slová 3×
+02:11:29.619 ok    subtitles: English WebVTT by the title words – WebVTT, UTF-8
+02:11:29.623 ok    studio: the rules' names shown – 
+02:11:29.623 ok    studio: the name written wins over the rules'
+02:11:29.627 ok    subtitles: 25 → 23,976 FPS and +250 ms in the preview – 0:00:00,771
+02:11:29.627 ok    subtitles: the summary – pridá sa, FPS 25 → 23,976, posun +250 ms, → SRT
+02:11:29.627 ok    studio: the film open in the player, its first picture shown (1) – 
+02:11:29.696 ok    studio: at 0,8 s the Slovak subtitles with their changes (from 0,771 s) and the English ones to compare – „Ľudia sa vrátia domov, päť dní je veľmi dlho.“ / „People will come home.“
+02:11:29.701 ok    studio: Titulok začína teraz – the shift grows by 29 ms (279) – Posun +29 ms: „Ľudia sa vrátia domov, päť dní je veľmi dlho.“ začína v 0:00:00,800 (posun spolu 279 ms).
+02:11:30.403 ok    studio: playing moves the film on (00:00:01.4991784, 7 pictures)
+02:11:30.457 ok    studio: the subtitle can be changed in the list
+02:11:30.462 ok    studio: the subtitle left out
+02:11:30.464 ok    studio: and back
+02:11:30.567 ok    studio: the text changed – „Ľudia sa vrátia
+domov.“ | player „Ľudia sa vrátia
+domov.“
+02:11:30.573 ok    studio: repairs of the whole text work on the changed text, the list cannot be changed then
+02:11:31.094 screenshot studio-subtitles.png
+02:11:31.158 ok    subtitles: automatic sync says something and changes nothing it cannot tell – Nedalo sa nič zistiť: FFmpeg neprečítal zvukovú stopu 1 (súbor je nedostupný alebo poškodený).
+02:11:31.214 ok    subtitles: the check of the video's tracks – Zvuk filmu sa nepodarilo prečítať: FFmpeg neprečítal zvukovú stopu 1 (súbor je nedostupný alebo poškodený).
+02:11:31.216 ok    subtitles: −100 % is not possible
+02:11:31.217 ok    subtitles: the rules stop on the audio of an undetermined language – Pravidlá UNIVERSUM: stopa 2 (Zvuk) má neurčený jazyk. stopa 3 (Titulky) má neurčený jazyk. Určte ho v Úprave hlavičky alebo v Single spracovaní – alebo vypnite pravidlá (stopy ostanú, ako sú).
+02:11:31.218 ok    subtitles: without the rules ready to save – MOVIES\Titulkový test (2026)\Titulkový test (2026) - CZ titulky SD H264 SMALL.mkv
+02:11:31.551 screenshot subtitles.png
+02:11:31.744 ok    subtitles: saved – Uložené do knižnice: D:\a\_temp\selftest\library\MOVIES\Titulkový test (2026)\Titulkový test (2026) - CZ titulky SD H264 SMALL.mkv. Originál ostal nezmenený.
+02:11:31.744 ok    subtitles: original unchanged, byte for byte
+02:11:31.744 ok    subtitles: the result in the library
+02:11:31.804 ok    subtitles: Slovak and English added – und, cs, en, en, sk
+02:11:31.809 ok    studio: the work saved – Práca je uložená (9. 11. 2026 2:11) – pri ďalšom otvorení tohto videa sa obnoví.
+02:11:31.916 ok    studio: the work comes back with the video, the changed text too – Obnovená uložená práca z 9. 11. 2026 2:11. | pridá sa, FPS 25 → 23,976, posun +250 ms, → SRT, upravené titulky (1)
+02:11:31.917 ok    studio: the work discarded
+02:11:32.004 ok    studio: the .sup next to the video found –  |  |  | pridá sa
+02:11:32.241 ok    studio: the picture subtitle shown where it stands – 66.66666666666666,600,4,1.3333333333333333 | 
+02:11:32.241 ok    studio: the picture subtitles in Časy titulkov – 0:00:00,200 (obrázok)
+02:11:32.242 ok    studio: shifted by a second, the picture subtitle is not shown at 1 s any more
+02:11:32.577 screenshot studio-pictures.png
+02:11:32.694 ok    OCR: the picture subtitles selected, Rozpoznať text ready
+02:11:35.552 screenshot ocr-question.png
+02:11:35.589 ok    OCR: the reading finished – RanToCompletion 
+02:11:35.589 ok    OCR: the text read and added as a new track (1 shape(s) asked) – Vymyslený titulok číslo jeden. | Žltý kôň úpel ďábelské ódy! | ■ Ľudia ťahajú kapra ■ | Text rozpoznaný (3 titulkov) a uložený vedľa videa ako Vymyslený.Čítaný.Film.2026.sk.srt; pridaný ako nová titulková stopa. Skontrolujte ho prehraním.
+02:11:35.589 ok    OCR: the unknown shape asked and kept for other films
+02:11:35.589 ok    OCR: the .sup unchanged, the text shown at once
+02:11:35.923 screenshot ocr-read.png
+02:11:35.931 ok    subtitles: a WebVTT file alone – Súbory titulkov – uložia sa ako nové súbory SRT (UTF-8) vedľa pôvodných; pôvodné ostanú nezmenené.
+02:11:35.934 ok    subtitles: converted to SRT next to it, the original kept – Uložené ako SRT (UTF-8), pôvodné súbory ostali: vymysleny_titulkovy_film_2026_en.srt.
+02:11:35.937 ok    subtitles: saved as WebVTT too, never over the original – Uložené ako WebVTT (UTF-8), pôvodné súbory ostali: vymysleny_titulkovy_film_2026_en (upravené).vtt.
+02:11:35.976 ok    audio: an invented dub made – 
+02:11:36.066 ok    audio: the video's two sounds – MKV, zvukové stopy: 2, video 10 FPS
+02:11:36.282 ok    audio: the film in the player – 
+02:11:36.344 ok    audio: the dub added and selected – 
+02:11:36.467 ok    audio: Napasovať on two seconds says something – Zvuky sa nedajú porovnať (príliš krátke alebo tiché).
+02:11:36.478 ok    audio: the dub's changes – pridá sa, časy × 1,04271 (zvuk o 4,096 % pomalšie), výška tónu ostane, posun −279 ms, AAC 192 kbit/s, stereo – zvuk sa zapíše znova
+02:11:36.817 screenshot studio-audio.png
+02:11:36.818 ok    audio: the rules say where to set the subtitles' language – Pravidlá UNIVERSUM: stopa 2 má neurčený jazyk. titulková stopa 3 má neurčený jazyk (určte ho v Úprave titulkostopy alebo hlavičky). Určte jazyk – alebo vypnite pravidlá (stopy ostanú, ako sú).
+02:11:36.819 ok    audio: ready to save –  MOVIES\Zvukový test (2026)\Zvukový test (2026) - EN CZ SD H264 SMALL.mkv
+02:11:37.109 ok    audio: saved – Uložené do knižnice: D:\a\_temp\selftest\library\MOVIES\Zvukový test (2026)\Zvukový test (2026) - EN CZ SD H264 SMALL.mkv. Originály ostali nezmenené.
+02:11:37.109 ok    audio: the originals unchanged
+02:11:37.174 ok    audio: the dub written as stereo AAC with its language and name – A_AAC 1 en English 2.0 | A_AC3 1 und CZ Dabing | A_AAC 2 cs Vymyslený dabing CZ
+02:11:37.181 ok    audio: the work saved – Práca je uložená (9. 11. 2026 2:11) – pri ďalšom otvorení tohto videa sa obnoví.
+02:11:37.359 ok    audio: the work comes back with the video – Obnovená uložená práca z 9. 11. 2026 2:11. | pridá sa, časy × 1,04271 (zvuk o 4,096 % pomalšie), výška tónu ostane, posun −279 ms, AAC 192 kbit/s, stereo – zvuk sa zapíše znova
+02:11:37.359 ok    audio: the work discarded
+02:11:37.454 ok    video: the film open – MKV, video AVC/H.264/MPEG-4p10 64x36, 10 FPS, 0:00:02,176
+02:11:37.631 ok    video: in the player, its key frames read – Kľúčové snímky: 1 (strih bez prekódovania sa posunie na najbližšiu nasledujúcu). | 
+02:11:37.632 ok    video: 4:3 ready to save – pomer strán 4:3. 
+02:11:37.809 ok    video: saved – Uložené do knižnice: D:\a\_temp\selftest\library\MOVIES\Obrazový test (2026)\Obrazový test (2026) - CZ titulky SD H264 SMALL.mkv. Originál ostal nezmenený.
+02:11:37.868 ok    video: shown 4:3 – 64x48
+02:11:37.932 ok    video: the part moved to key frames (lost between two of them: said) – nič – kratší ako vzdialenosť kľúčových snímok | Úsek 1 je kratší ako vzdialenosť kľúčových snímok – nezostalo by z neho nič; predĺžte ho alebo zapnite Presný strih.
+02:11:37.939 ok    video: an exact cut, turned – strih: 1 úsek, ostane 0:00:01,200 (presne); otočiť o 90°, H.264 kvalita 75 – obraz sa zapíše znova.
+02:11:38.280 screenshot studio-video.png
+02:11:38.853 ok    video: written anew by the encoders of Windows, cut exactly – 36x64 00:00:01.2360000
+02:11:38.853 ok    video: turned on its side – 64x36 1.778 → 36x64 0.563
+02:11:38.853 ok    video: the original unchanged
+02:11:38.983 ok    posters: the film found and opened – Nájdené: 1. Kliknite na titul.
+02:11:38.983 ok    posters: the card – Vymyslený plagát (2026) | Invented Poster (2026) / Vymyšlený plakát (2026) | Film · 1 h 40 min (100 min) | komédia | Vymyslená Režisérka | 2
+02:11:38.983 ok    posters: the Czech one recommended, the groups – Odporúčam český plagát – názov je na ňom po česky, jediný v tomto jazyku (hodnotenie 5,3, 1 hlas), pestré farby – sedí to k žánru (komédia), 1000 × 1500 px. | EN, CZ
+02:11:39.351 screenshot tmdb-poster.png
+02:11:39.360 ok    posters: folder.jpg (JPEG) in POSTER – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (3 kB).
+02:11:39.365 ok    posters: the older one renamed – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (2 kB). Pôvodný folder.jpg tam už bol – premenovaný na folder-povodny.jpg.
+02:11:39.366 ok    posters: a WebP poster written as a real JPEG – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (2 kB). Pôvodný folder.jpg tam už bol – premenovaný na folder-povodny.jpg.
+02:11:39.371 ok    posters: WebP to JPEG, shrunk (40 × 30)
+02:11:39.373 ok    posters: WebP to PNG (a logo) and on the screen
+02:11:39.376 ok    posters: a WebP under a .jpg name shown and measured by its content
+02:11:39.385 ok    posters: an older WebP folder.jpg kept as folder-povodny.webp – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (2 kB). Pôvodný folder.jpg tam už bol – premenovaný na folder-povodny.webp.
+02:11:39.385 ok    posters: the other pictures are off by default, nothing offered
+02:11:39.387 ok    posters: the backgrounds and logos offered, the best chosen (2, 1)
+02:11:39.398 ok    posters: Spracovať poster writes only the poster – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (2 kB). Pôvodný folder.jpg tam už bol – premenovaný na folder-povodny-2.jpg.
+02:11:39.398 ok    posters: another background chosen with the mouse
+02:11:39.734 screenshot tmdb-poster-extras.png
+02:11:39.746 ok    posters: Spracovať ďalšie TMDB obrázky – fanart.jpg and clearlogo.png in POSTER – Uložené do D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026): fanart.jpg, clearlogo.png. | pozadie: 1920 × 1080 bez textu · logo: CZ | Podľa nastavení plagátu: pozadie a obrázky epizód najviac 1920 × 1080, plagáty sérií ako folder.jpg (1000 × 1500 (odporúčané)), kvalita JPEG 90. Logo ostáva PNG (priehľadné).
+02:11:39.752 ok    posters: a draft by AI (Cloudflare) – Návrh je hotový (Cloudflare). Vybraný – spracujete ho ako iný plagát; ďalší návrh vyzerá inak.
+02:11:39.777 ok    posters: the poster from the tray first and chosen – Vybraný je plagát, ktorý ste si poslali z prehliadača (ČSFD · zo zásobníka). Odporúčaný z TMDB je v ponuke nižšie. | Zo zásobníka, EN, CZ
+02:11:39.779 ok    posters: the poster from the tray processed – Uložené: D:\a\_temp\selftest\library\POSTER\Vymyslený plagát (2026)\folder.jpg (3 kB). Pôvodný folder.jpg tam už bol – premenovaný na folder-povodny-3.jpg.
+02:11:39.779 ok    posters: the tray kept the picked poster
+02:11:39.781 ok    posters: merged into the film's folder – Uložené: D:\a\_temp\selftest\library\MOVIES\Vymyslený plagát (2026)\folder.jpg (3 kB).
+02:11:39.793 ok    posters: Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom – to the film processed – Uložené do D:\a\_temp\selftest\library\MOVIES\Vymyslený plagát (2026): fanart.jpg, clearlogo.png.
+02:11:39.795 ok    napovedkyňa: an unknown series is not named
+02:11:39.799 ok    napovedkyňa: the next episode gets the remembered series
+02:11:39.799 ok    napovedkyňa: the series is listed in Nastavenia
+02:11:39.799 ok    napovedkyňa: a forgotten series is searched again
+02:11:39.801 ok    TMDB key protected with DPAPI
+02:11:39.801 ok    rules: TMDB button disabled without a key
+02:11:39.810 ok    rules: TMDB button enabled with a key
+02:11:39.811 ok    settings: TMDB switched off, key kept
+02:11:39.811 ok    settings: TMDB switched on again
+02:11:39.811 ok    settings hold no plain TMDB key
+02:11:39.812 ok    settings: unsafe HISTRA token refused
+02:11:39.812 ok    settings: HISTRA token saved
+02:11:39.812 ok    settings: TMDB and HISTRA both on
+02:11:39.813 ok    settings: HISTRA client ready with a token
+02:11:39.813 ok    settings: HISTRA switched off, token kept
+02:11:39.813 ok    settings: no HISTRA client while switched off
+02:11:39.814 ok    settings: only HISTRA on
+02:11:39.815 ok    titles: without TMDB the title button searches the HISTRA catalog – Nájde titul v katalógu HISTRA podľa názvu a roku (ID a adresy TMDB načíta len TMDB s kľúčom)
+02:11:39.815 ok    settings hold no plain HISTRA token
+02:11:39.815 ok    TMDB logo bundled
+02:11:40.240 screenshot settings-library.png
+02:11:40.243 ok    settings: HISTRA token removed
+02:11:40.322 ok    novinky: only the series, alphabetically – Domáci seriál (2020), Invented Show (2026) 
+02:11:40.322 ok    novinky: the last week – the nearest episode, the tree of the aired ones, the rhythm – S05E38 DNES 2 každý deň
+02:11:40.324 ok    novinky: Nadchádzajúce – the episodes to come, 60 days ahead (49)
+02:11:40.325 ok    novinky: a new series – nový seriál · 1 epizóda
+02:11:40.333 ok    novinky: one episode ticked – Odoslať na spracovanie (1)
+02:11:40.334 ok    novinky: without the input folder nothing is sent – Najprv nastavte vstupný priečinok – tam UNIVERSUM hľadá epizódy (tlačidlo Zmeniť… hore).
+02:11:40.334 ok    input folder: not in the library – Vstupný priečinok nemôže byť v MOVIES ani v TVSHOWS knižnice – tam sú výsledky.
+02:11:40.341 ok    input folder: one setting for every page
+02:11:40.341 ok    novinky: the old message goes once the folder is set – Vstupný priečinok je nastavený – epizódy môžete odoslať.
+02:11:41.172 ok    input folder: a new film is told – Na vstupe pribudli nové súbory (1): Vymyslený.Prichádzajúci.Film.2026.mkv
+02:11:41.495 screenshot input-arrivals.png
+02:11:41.495 ok    input folder: the notice hidden
+02:11:41.497 ok    novinky: a series chosen here is chosen in Premiéry too
+02:11:41.501 ok    novinky: Zobraziť vybrané
+02:11:41.502 ok    novinky: posters of the whole series
+02:11:41.852 screenshot novinky.png
+02:11:41.924 ok    novinky: one file goes to Single spracovanie with its series – Odoslané do Single spracovania: Invented.Show.S01E01.1080p.WEB.mkv. | Invented Show (2026) | S01E01
+02:11:42.336 screenshot novinky-single.png
+02:11:42.342 ok    novinky: the series' tick ticks its aired episodes only – 2/2
+02:11:42.515 ok    novinky: episodes of a series go to Hromadné spracovanie, only their files – Odoslané do Hromadného spracovania: Domáci seriál (2020) (2 súbory). Ešte nie sú vo vstupnom priečinku: 1 (čakajú nižšie). | Domáci seriál (2020) | Súbory poslané z Noviniek (2) · 2 súborov v 1 skupinách. Celý priečinok spracujete po jeho výbere tlačidlom Priečinok….
+02:11:42.515 ok    batch: a series is in Skupina Seriál – series 1, films 0
+02:11:42.515 ok    novinky: an episode not in the input folder waits – Odoslané do Hromadného spracovania: Domáci seriál (2020) (2 súbory). Ešte nie sú vo vstupnom priečinku: 1 (čakajú nižšie).
+02:11:42.876 screenshot novinky-batch.png
+02:11:42.950 ok    novinky: Skontrolovať znova finds the episode now in the folder – Odoslané do Single spracovania: World.Invented.S02E01.mkv.
+02:11:42.952 ok    novinky: files in the input folder are only read
+02:11:43.104 ok    novinky: episodes of two series go to one batch – Odoslané do Hromadného spracovania: 2 seriály, 3 súbory (Domáci seriál (2020), World Invented (2024)). | Domáci seriál (2020) | Ďalšie seriály v tejto dávke – každá epizóda ide do priečinka svojho seriálu (stĺpec Cieľ v knižnici):
+World Invented (2024)
+02:11:43.556 screenshot novinky-batch-two.png
+02:11:43.563 ok    batch: Vymazať frontu forgets the files not processed – Fronta je prázdna – vyberte priečinok a dajte Analyzovať, alebo pošlite epizódy z Noviniek.
+02:11:43.564 ok    single: Vymazať frontu forgets the opened file
+02:11:43.564 ok    Vymazať frontu: the files stay on the disk
+02:11:43.670 ok    novinky: older episodes are in the history – Starý seriál (2019)
+02:11:44.006 screenshot novinky-history.png
+02:11:44.009 ok    novinky: Zobraziť všetko shows the history, the last week and the coming episodes – Domáci seriál (2020) 50, Invented Show (2026) 1, Starý seriál (2019) 1
+02:11:44.038 ok    watch: where the chosen titles can be watched legally – Invented Show (2026): Vymyslené+ (SK) | The Invented Premiere (2026): Obchod (SK) – požičanie
+02:11:44.038 ok    watch: shown under the title in Premiéry
+02:11:44.069 ok    input watch: an episode found in the input folder – Domáci seriál (2020) S05E37, S05E38 · 2 súbory | Invented Show (2026) S01E01 · 1 súbor | World Invented (2024) S02E01 · 1 súbor
+02:11:44.069 ok    input watch: episodes of series not chosen are found too (owner, 29. 10. 2026)
+02:11:44.091 ok    dashboard: this week's episodes and films – pondelok 9. 11. Invented Show (2026) S01E01 · nový seriál · ČT1 | pondelok 9. 11. Invented Network Show (2026) S01E01 · nový seriál · INV | pondelok 9. 11. Invented Stream (2024) S03E01 · nová séria · Invented+ | pondelok 9. 11. World Invented (2024) S02E01 · nová séria · Netflix
+02:11:44.482 screenshot dashboard-week.png
+02:11:44.495 ok    novinky: the kept days are shown at once at the next start, without asking the sources
+02:11:44.607 ok    calendar: the month of 42 days with today – 
+02:11:44.607 ok    calendar: today's episode of Novinky – Today Invented (2026), ★ Invented Show (2026), World Invented (2024), Invented Network Show (2026), Invented Stream (2024), ★ Invented Show (2026) S01E01, World Invented (2024) S02E01, Domáci seriál (2020) S05E38, Invented Network Show (2026) S01E01, Invented Stream (2024) S03E01, Úprava videostopy, Úprava videostopy, Úprava audiostopy, Úprava titulkostopy, Kapitoly, Kapitoly, Single spracovanie, MEGA spracovanie – Dávka 1, Zlučovanie, Úprava hlavičky, Úprava hlavičky, Úprava hlavičky, Single spracovanie, Single spracovanie
+02:11:44.608 ok    calendar: the premiere of Premiéry on its day – Premiéry filmov: World Invented Film (2026)
+02:11:44.611 ok    calendar: the premieres switched off all at once (kept in the settings)
+02:11:44.612 ok    calendar: one layer of the group on – the group's switch shows some
+02:11:44.614 ok    calendar: a holiday and the names of the day – SK: Adam, Eva, CZ: Adam, Eva
+02:11:44.618 ok    calendar: the spring holidays of the district Zlín
+02:11:44.618 ok    calendar: the Czech holidays switched on
+02:11:44.620 ok    calendar: a record without a name is not saved – Napíšte názov.
+02:11:45.057 screenshot calendar-editor.png
+02:11:45.073 ok    calendar: the event saved, weekly three times
+02:11:45.076 ok    calendar: the reminder an hour before – 12. 11. 20:00  Kino – vymyslený film
+02:11:45.461 screenshot calendar-reminder.png
+02:11:45.472 ok    calendar: the event, the task and the note of the day together – Tasks Spracovať vymyslený seriál, Notes Poznámka k vymyslenému dňu, Events Kino – vymyslený film
+02:11:45.472 ok    calendar: a record opens in the editor
+02:11:45.891 screenshot calendar-detail.png
+02:11:45.901 ok    calendar: the panel of the layers folded (kept in the settings)
+02:11:46.352 screenshot calendar-month.png
+02:11:46.361 ok    calendar: the week of seven days
+02:11:46.746 screenshot calendar-week.png
+02:11:46.754 ok    calendar: the week as a list
+02:11:47.232 screenshot calendar-weeklist.png
+02:11:47.243 ok    calendar: the month as a list
+02:11:47.244 ok    calendar: the empty days left out
+02:11:47.780 screenshot calendar-monthlist.png
+02:11:47.798 ok    calendar: the year as twelve months
+02:11:48.312 screenshot calendar-year.png
+02:11:48.334 ok    calendar: the year in rows (31 days in seven months)
+02:11:48.822 screenshot calendar-yearrows.png
+02:11:48.840 ok    calendar: the agenda – only the days with something
+02:11:49.411 screenshot calendar-agenda.png
+02:11:49.411 ok    calendar: the view kept in the settings
+02:11:49.437 ok    calendar: an episode opens in Novinky with its series looked for – ★ Invented Show (2026) S01E01 → Invented Show (2026)
+02:11:49.439 ok    calendar: today's runs of processing in the layer UNIVERSUM – 02:10 Single spracovanie, 02:10 Single spracovanie, 02:10 Úprava hlavičky, 02:10 Úprava hlavičky, 02:10 Úprava hlavičky, 02:10 Zlučovanie, 02:11 MEGA spracovanie – Dávka 1, 02:11 Single spracovanie, 02:11 Kapitoly, 02:11 Kapitoly, 02:11 Úprava titulkostopy, 02:11 Úprava audiostopy, 02:11 Úprava videostopy, 02:11 Úprava videostopy
+02:11:49.440 ok    calendar: a run opens its log – Single spracovanie
+02:11:49.468 ok    tasks: the line understood before it is added – → vymyslená úloha · zajtra 20:00 · ! vysoká · #test
+02:11:49.471 ok    tasks: a task of tomorrow 20:00, high priority, tagged – Pridané: vymyslená úloha · zajtra 20:00
+02:11:49.476 ok    tasks: the groups by due day, the overdue one first – Po termíne, Zajtra, Bez termínu
+02:11:49.861 screenshot tasks-list.png
+02:11:49.865 ok    tasks: a task done leaves the open groups
+02:11:49.866 ok    tasks: the done tasks shown on demand
+02:11:50.219 screenshot tasks-editor.png
+02:11:50.223 ok    tasks: the checklist of the task – 1 of 2 done
+02:11:50.223 ok    tasks: looked for without diacritics
+02:11:50.224 ok    tasks: by the tag
+02:11:50.227 ok    tasks: on the board to In progress
+02:11:50.583 screenshot tasks-board.png
+02:11:50.586 ok    tasks: on the board to Done
+02:11:50.587 ok    tasks: UNIVERSUM suggests to process a chosen title found in the input folder – Spracovať: Domáci seriál (2020), Spracovať: Invented Show (2026), Spracovať: World Invented (2024), Premiéra vybraného filmu: The Invented Premiere (2026)
+02:11:50.589 ok    tasks: a suggestion taken as a task of today, then hidden
+02:11:50.590 ok    tasks: the task of tomorrow is in Kalendár
+02:11:50.603 ok    notes: a quick note – the first sentence its title, the tag – Poznámka pridaná: Vymyslený nápad na plagát.
+02:11:50.606 ok    notes: every link on a row of its own – themoviedb.org/tv/111-vymysleny-serial | themoviedb.org/movie/222-vymysleny-film | upútavka: | video.example/vymyslena-upoutavka
+02:11:50.606 ok    notes: the opened note shows its links to open
+02:11:50.607 ok    notes: Meno namiesto linku remembered – Názvy filmov a seriálov sa načítajú z TMDB – zadajte kľúč TMDB v Nastaveniach.
+02:11:50.610 ok    notes: the note of a day written in Kalendár – Vymyslená poznámka k dňu / k dňu 9. 11. 2026
+02:11:50.611 ok    notes: the note of a title of Premiéry, by its name – Today Invented (2026)
+02:11:50.612 ok    notes: the note of a title changed – kept with the title (Premiéry show it too)
+02:11:50.613 ok    notes: a pinned note first
+02:11:50.613 ok    notes: looked for in the text
+02:11:50.988 screenshot notes.png
+02:11:50.993 ok    notes: in the bin – Kôš (1)
+02:11:50.994 ok    notes: taken back from the bin
+02:11:50.994 ok    notes: the editor of a note offers the voice
+02:12:20.139 notes: the voice written down (29.1 s): Good evening, and welcome to tonight's invented story. A small village below the mountains wakes up to a cold morning. The old miller opens the door and looks at the frozen river. He tells his son that today they must repair the wheel, or there will be no flour for bread. The son smiles, takes a hammer, and walks down to the stream. They work together all day, and in the evening they sit by the stove and talk about summer.
+02:12:20.140 ok    notes: English speech written down in the computer – Good evening, and welcome to tonight's invented story. A small village below the mountains wakes up to a cold morning. The old miller opens the door and looks at the frozen river. He tells his son that today they must repair the wheel, or there will be no flour for bread. The son smiles, takes a hammer, and walks down to the stream. They work together all day, and in the evening they sit by the stove and talk about summer.
+02:12:20.140 ok    notes: the written text added to the note
+02:12:20.470 screenshot notes-editor.png
+02:12:20.483 ok    tray: the receiver on 127.0.0.1 runs – Prijíma zo skriptu v prehliadači (len z tohto počítača, 127.0.0.1:60856).
+02:12:20.528 ok    tray: a film from the script, with a notice – NoContent | Vymyslený film zo skriptu (2026)
+02:12:20.529 ok    tray: another key is refused
+02:12:20.548 ok    tray: gathering switched off – only the button adds (Accepted, NoContent) – Zásobník TMDB · 2
+02:12:20.853 ok    tray: a title already there, sent by itself again, is left alone – 111 114
+02:12:20.928 ok    tray: posters from TMDB and ČSFD kept with their titles, a foreign picture refused (Accepted, Accepted, Accepted, 422) – image.tmdb.org image.pmgstatic.com
+02:12:20.929 ok    tray: the choice beside a title tells the posters – Vymyslený film z ČSFD (2026) · film · plagáty: 1 | Vymyslený film zo skriptu (2026) · film | Vymyslený film zo skriptu (2026) · film · plagáty: 1
+02:12:20.929 ok    tray: gathering switched on – Zásobník TMDB zbiera · 3
+02:12:20.930 ok    tray: the script to install, with the key
+02:12:20.949 ok    tray: the address universum:// – a TMDB series taken, another page not
+02:12:20.949 ok    tray: kept in a pinned note of Poznámky
+02:12:20.949 ok    tray: the choice by the alphabet (owner, 8. 11. 2026) – Vymyslený film z ČSFD (2026) | Vymyslený film zo skriptu (2026) | Vymyslený film zo skriptu (2026)
+02:12:20.950 ok    tray: chosen beside a title field – https://www.themoviedb.org/tv/222
+02:12:20.960 ok    tray: episodes off (as by default) – the button on an episode page adds its series
+02:12:20.998 ok    tray: an episode by the button, only its series by itself – Vymyslený film z ČSFD (2026) | Vymyslený film zo skriptu (2026) | Vymyslený film zo skriptu (2026) | themoviedb.org/tv/222 | themoviedb.org/tv/222/season/1/episode/3 | themoviedb.org/tv/333 | themoviedb.org/tv/444
+02:12:21.298 ok    tray: an episode chosen fills the series and the episode – https://www.themoviedb.org/tv/222 S01E03
+02:12:21.306 ok    tray: the tab in front of a browser window – Do zásobníka pribudlo: 1.
+02:12:21.355 tray: the browser windows of this computer – Nenašlo sa žiadne okno prehliadača (Chrome, Edge, Firefox…).
+02:12:21.357 ok    tray: its note is the widest – 790
+02:12:21.359 ok    tray: emptied from its card, its posters too – Zásobník TMDB vyprázdnený (8).
+02:12:21.362 ok    tray: Vrátiť puts it back, the posters too – Zásobník TMDB vrátený.
+02:12:21.363 ok    tray: emptied from inside the note – Zásobník TMDB vyprázdnený (8).
+02:12:21.365 ok    notes: the note opened wider – 340 → 560
+02:12:21.367 ok    notes: a card wider with a click, more rows – 8 → 16
+02:12:21.387 ok    tray: the receiver stopped
+02:12:21.478 ok    print: the month of the calendar on one sheet – 
+02:12:21.504 ok    print: every form of the calendar laid out – screen 1, day 1, month 1, monthlist 2, week 1, yearrows 1, yearmonths 1, agenda 3
+02:12:21.512 ok    print: two pages on a sheet
+02:12:21.521 ok    print: the choices kept in the settings
+02:12:21.567 ok    print: the own PDF with the font embedded (55 kB, font Segoe UI)
+02:12:21.592 ok    print: PDF, HTML, iCalendar and CSV saved – Záloha uložená: D:\a\_temp\selftest\tlac\UNIVERSUM – záloha poznámok 2026-11-09.json
+02:12:21.610 ok    print: the backup brings the record back – Zo zálohy pridané alebo obnovené záznamy: 1
+02:12:22.177 screenshot print-preview.png
+02:12:22.195 ok    print: the tasks
+02:12:22.197 ok    print: the tasks in Markdown
+02:12:22.204 ok    print: the notes
+02:12:22.266 ok    dashboard: the event of the coming week in the calendar, the tasks not there – St 11. 11. 19:30 Vymyslený koncert
+02:12:22.267 ok    dashboard: the late task first, then today's, the one of a month later not yet – včera Vymyslená úloha po termíne | dnes Vymyslená úloha na dnes
+02:12:22.267 ok    dashboard: only the pinned note, with the beginning of its text
+02:12:22.267 ok    dashboard: the line understood before it is added – → vymyslená úloha z dashboardu · zajtra 18:00 · ! vysoká · #test
+02:12:22.269 ok    dashboard: a task written in one line – Pridané: vymyslená úloha z dashboardu · zajtra 18:00
+02:12:22.964 screenshot dashboard-agenda.png
+02:12:22.967 ok    dashboard: a task ticked off – done, it leaves the list
+02:12:22.968 ok    dashboard: an event opens in Kalendár on its day, in its editor
+02:12:22.973 ok    dashboard: a pinned note opens in Poznámky
+02:12:22.981 ok    dashboard: no record left when the records are gone (the holidays stay) – 
+02:12:23.004 ok    actions: a new action of UNIVERSUM – every night at three – Synchronizovať listy HISTRA
+02:12:23.004 ok    actions: an action needs an hour – Akcia UNIVERSUM potrebuje čas (zrušte Celý deň).
+02:12:23.381 screenshot actions-editor.png
+02:12:23.388 ok    actions: kept, listed with its next time – Vymyslená nočná synchronizácia nabudúce 9. 11. 2026 03:00 · každý deň
+02:12:23.392 ok    actions: done at its time and told – ⚙ UNIVERSUM vykonal – Vymyslená nočná synchronizácia: HISTRA nie je zapnutá, nemá listy alebo práve pracuje – vynechané
+02:12:23.392 ok    actions: done once
+02:12:23.392 ok    actions: the last outcome listed
+02:12:23.727 screenshot actions-tasks.png
+02:12:23.728 ok    actions: in Kalendár in the layer UNIVERSUM
+02:12:23.737 ok    actions: an iCalendar file read, the second time nothing added – Z iCalendar pridané záznamy: 2 z 2 / Z iCalendar pridané záznamy: 0 z 2 (ostatné tu už sú)
+02:12:23.738 ok    actions: the counts in the left rail – úlohy 1 (red), poznámky 1
+02:12:24.073 screenshot rail-counts.png
+02:12:24.079 ok    actions: no counts without records
+02:12:24.082 ok    guide novinky: Nápoveda – NOVINKY A OBSAH – parts 7
+02:12:24.083 ok    guide novinky: the cs translation has the same parts and pictures – 7
+02:12:24.083 ok    guide novinky: the en translation has the same parts and pictures – 7
+02:12:24.083 ok    guide novinky: every picture there – missing: 
+02:12:24.084 ok    guide novinky: the button opens Premieres
+02:12:24.089 ok    guide novinky: the button opens SeriesNews
+02:12:24.089 ok    guide novinky: the button opens HistraLists
+02:12:24.089 ok    guide novinky: the button opens Posters
+02:12:24.089 ok    guide novinky: the button opens Interests
+02:12:24.093 ok    guide novinky: the button opens Dashboard
+02:12:24.094 ok    guide novinky: nothing found for a word not in it
+02:12:24.094 ok    guide novinky: a part of the contents shown
+02:12:24.535 screenshot guide-novinky.png
+02:12:24.642 ok    guide novinky: printed – 7 pages, PDF 534 kB with its pictures
+02:12:24.667 ok    guide poznamky: Nápoveda – POZNÁMKY – parts 5
+02:12:24.667 ok    guide poznamky: the cs translation has the same parts and pictures – 5
+02:12:24.667 ok    guide poznamky: the en translation has the same parts and pictures – 5
+02:12:24.667 ok    guide poznamky: every picture there – missing: 
+02:12:24.667 ok    guide poznamky: the button opens Calendar
+02:12:24.672 ok    guide poznamky: the button opens AgendaTasks
+02:12:24.672 ok    guide poznamky: the button opens AgendaNotes
+02:12:24.691 ok    guide poznamky: nothing found for a word not in it
+02:12:24.691 ok    guide poznamky: a part of the contents shown
+02:12:25.069 screenshot guide-poznamky.png
+02:12:25.103 ok    guide poznamky: printed – 6 pages, PDF 605 kB with its pictures
+02:12:25.125 ok    guide multiplexing: Nápoveda – MULTIPLEXING – parts 5
+02:12:25.125 ok    guide multiplexing: the cs translation has the same parts and pictures – 5
+02:12:25.125 ok    guide multiplexing: the en translation has the same parts and pictures – 5
+02:12:25.125 ok    guide multiplexing: every picture there – missing: 
+02:12:25.125 ok    guide multiplexing: the button opens Mux
+02:12:25.125 ok    guide multiplexing: the button opens HeaderEditor
+02:12:25.125 ok    guide multiplexing: the button opens Chapters
+02:12:25.126 ok    guide multiplexing: the button opens Info
+02:12:25.126 ok    guide multiplexing: the button opens Queue
+02:12:25.143 ok    guide multiplexing: nothing found for a word not in it
+02:12:25.143 ok    guide multiplexing: a part of the contents shown
+02:12:25.517 screenshot guide-multiplexing.png
+02:12:25.551 ok    guide multiplexing: printed – 6 pages, PDF 421 kB with its pictures
+02:12:25.574 ok    guide editacia: Nápoveda – EDITÁCIA VIDEOSTÔP – parts 5
+02:12:25.574 ok    guide editacia: the cs translation has the same parts and pictures – 5
+02:12:25.574 ok    guide editacia: the en translation has the same parts and pictures – 5
+02:12:25.574 ok    guide editacia: every picture there – missing: 
+02:12:25.574 ok    guide editacia: the button opens Video
+02:12:25.574 ok    guide editacia: the button opens Audio
+02:12:25.574 ok    guide editacia: the button opens Subtitles
+02:12:25.574 ok    guide editacia: the button opens Batch
+02:12:25.592 ok    guide editacia: nothing found for a word not in it
+02:12:25.592 ok    guide editacia: a part of the contents shown
+02:12:25.971 screenshot guide-editacia.png
+02:12:26.014 ok    guide editacia: printed – 6 pages, PDF 533 kB with its pictures
+02:12:26.036 ok    guide sablony: Nápoveda – ŠABLÓNY – parts 5
+02:12:26.036 ok    guide sablony: the cs translation has the same parts and pictures – 5
+02:12:26.037 ok    guide sablony: the en translation has the same parts and pictures – 5
+02:12:26.037 ok    guide sablony: every picture there – missing: 
+02:12:26.037 ok    guide sablony: the button opens Rules
+02:12:26.037 ok    guide sablony: the button opens Batch
+02:12:26.037 ok    guide sablony: the button opens Mega
+02:12:26.037 ok    guide sablony: the button opens Queue
+02:12:26.054 ok    guide sablony: nothing found for a word not in it
+02:12:26.054 ok    guide sablony: a part of the contents shown
+02:12:26.435 screenshot guide-sablony.png
+02:12:26.463 ok    guide sablony: printed – 7 pages, PDF 434 kB with its pictures
+02:12:26.484 ok    guide statistika: Nápoveda – ŠTATISTIKA – parts 8
+02:12:26.484 ok    guide statistika: the cs translation has the same parts and pictures – 8
+02:12:26.484 ok    guide statistika: the en translation has the same parts and pictures – 8
+02:12:26.484 ok    guide statistika: every picture there – missing: 
+02:12:26.485 ok    guide statistika: the button opens Queue
+02:12:26.485 ok    guide statistika: the button opens Output
+02:12:26.485 ok    guide statistika: the button opens Logs
+02:12:26.485 ok    guide statistika: the button opens ProcessedTitles
+02:12:26.485 ok    guide statistika: the button opens Settings
+02:12:26.489 ok    guide statistika: the button opens Dashboard
+02:12:26.506 ok    guide statistika: nothing found for a word not in it
+02:12:26.506 ok    guide statistika: a part of the contents shown
+02:12:26.888 screenshot guide-statistika.png
+02:12:26.911 ok    guide statistika: printed – 6 pages, PDF 378 kB with its pictures
+02:12:27.036 ok    batch: originals in the output folder are found, the results in MOVIES and TVSHOWS are not – 1 súborov v 1 skupinách.
+02:12:27.062 ok    batch: a folder without readable video says why – V priečinku a jeho podpriečinkoch sú len formáty, ktoré MKVToolNix nevie prečítať: 1 × WMV. · 0 súborov v 0 skupinách.
+02:12:27.399 screenshot batch-no-video.png
+02:12:27.489 ok    batch: MP4, TS and AVI are analysed and planned as a new MKV – 3 súborov v 3 skupinách. | en-cz.mp4 NeedsReview, sk-en.ts NeedsReview, und.avi NeedsReview
+02:12:27.868 screenshot batch-other-formats.png
+02:12:45.755 ok    batch: the blinking line of the steps after the analysis is gone when they end
+02:12:45.755 ok    batch: the group is named by its film – Zlatý kapor
+02:12:45.755 ok    batch: speech recognition still offered by hand
+02:12:45.756 speech (17.9 s): Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy). | Zvuk 1: čeština (cs) – NÁVRH podľa reči – potvrďte (rozpoznané len z jedného úseku) | Zvuk 2: angličtina (en) – NÁVRH podľa reči – potvrďte (rozpoznané len z jedného úseku) | Zvuk 3: slovenčina (sk) – NÁVRH podľa reči – potvrďte (podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku)
+02:12:45.756 ok    batch: the language of the three audio tracks is suggested from the speech – Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy).
+02:12:45.756 ok    batch: English speech recognised – angličtina (en)
+02:12:45.756 ok    batch: Czech and Slovak speech recognised as Czech or Slovak
+02:12:46.100 screenshot batch-speech.png
+02:12:54.281 speech detail (8.2 s; accurate model installed; Cutting@0.0s CzechOrSlovak@1.7s CzechOrSlovak@2.5s CzechOrSlovak@3.4s CzechOrSlovak@4.2s CzechOrSlovak@5.1s CzechOrSlovak@5.9s CzechOrSlovak@6.8s CzechOrSlovak@7.6s Done@8.2s): audio 1 spoken cs → cs, margin sk−cs 0.000, written in cs, pieces cs:0.57, doubt: rozpoznané len z jedného úseku | as cs: Hora mi se probou mí do hladné horána. Starým lidá dotemírá dveře a dívá se na nám. | as sk: Hora mi se probou mí do hladné horána. Starým lidá dotemírá dveře a dívá se na nám.
+02:13:01.143 speech detail, quick model only (6.9 s): audio 1 spoken cs → cs, doubt: rozpoznané len z jedného úseku
+02:13:14.494 speech detail, the way of 0.3.17 (13.4 s): audio 1
+02:13:16.237 speech detail (1.7 s; accurate model installed; Cutting@0.0s): audio 2 spoken en → en, margin sk−cs –, written in –, pieces en:0.97, doubt: rozpoznané len z jedného úseku | as cs:  | as sk: 
+02:13:24.483 speech detail (8.2 s; accurate model installed; Cutting@0.0s CzechOrSlovak@1.9s CzechOrSlovak@2.7s CzechOrSlovak@3.6s CzechOrSlovak@4.4s CzechOrSlovak@5.3s CzechOrSlovak@6.2s CzechOrSlovak@7.1s CzechOrSlovak@7.9s): audio 3 spoken sk → sk, margin sk−cs 0.000, written in sk, pieces cs:0.85, doubt: podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku | as cs: Vytajte pri dnešnom vymyslenom príbehu. Malá dědina pod horami sa prebudza do chladného... ... ... | as sk: Vytajte pri dnešnom vymyslenom príbehu. Malá dědina pod horami sa prebudza do chladného... ... ...
+02:13:31.696 speech detail, quick model only (7.2 s): audio 3 spoken sk → sk, doubt: podľa prepisu slovenčina, nie čeština; čeština alebo slovenčina – overte; rozpoznané len z jedného úseku
+02:13:47.107 speech detail, the way of 0.3.17 (15.4 s): audio 3
+02:13:55.339 speech timing of the accurate model (8.2 s, 4 processors): system_info: n_threads = 4 / 4 | WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VNNI = 1 | OPENMP = 1 | REPACK = 1 | | whisper_print_timings:     load time =   438.57 ms | whisper_print_timings:      mel time =    12.36 ms | whisper_print_timings:   sample time =    23.26 ms /     1 runs (    23.26 ms per run) | whisper_print_timings:   encode time =  7197.11 ms /     1 runs (  7197.11 ms per run) | whisper_print_timings:   decode time =   369.66 ms /    41 runs (     9.02 ms per run) | whisper_print_timings:   batchd time =    28.14 ms /     4 runs (     7.03 ms per run) | whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run) | whisper_print_timings:    total time =  8085.44 ms
+02:13:55.411 ok    batch: two films in one group – Iný kapor + 1 ďalší
+02:14:16.182 speech, selected file (20.8 s): Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy). | Zvuk 1: návrh: čeština (cs) (rozpoznané len z jedného úseku) | Zvuk 2: návrh: angličtina (en) (rozpoznané len z jedného úseku) | Zvuk 3: návrh: slovenčina (sk) (podľa prepisu slovenčina, nie čeština; rozpoznané len z jedného úseku)
+02:14:16.182 ok    batch: the file's list shows what applies without a choice – návrh (čeština) – overte | návrh (angličtina) – overte | návrh (slovenčina) – overte
+02:14:16.182 ok    batch: only the selected film was listened to, its own suggestions shown at it
+02:14:33.439 speech, whole group (17.3 s): Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy), 3 už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania).
+02:14:33.439 ok    batch: the group's films each on their own, the film heard before not again – Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy), 3 už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania).
+02:14:33.444 ok    batch: a language chosen for the file is shown in its list
+02:14:33.444 ok    batch: Potvrdiť návrhy takes each film's own suggestion (English) – Audio: 3 rozpoznané (návrh pri stope – potvrďte ho tlačidlom Potvrdiť návrhy), 3 už jazyk má (z názvu stopy, vašej voľby alebo skoršieho rozpoznania).
+02:14:33.787 screenshot batch-speech-files.png
+02:14:33.820 ok    batch: a name unlike the found title waits, with the titles found to choose from – Spresnené názvy (TMDB + HISTRA): 1 z 2 navrhnutých, 1 majú viac možných titulov (⚠ pri súbore – vyberte správny) – skontrolujte ich a dajte Prijať návrhy názvov. | návrh: Iný kapor (2019) ⚠ TMDB našlo len The Golden Carp (2021) – iný rok, než má súbor – vyberte správny zo zoznamu pri súbore, napíšte Názov (rok), vložte TMDB ID (číslo alebo adresu z themoviedb.org) alebo potvrďte návrh z mena súboru. | návrh: The Golden Carp (2021)
+02:14:34.157 screenshot batch-title-candidates.png
+02:14:34.167 ok    batch: a title chosen from the list, confirmed in HISTRA – Iný kapor 2019 WEB-DL CZ 1080p.mkv: The Golden Carp (2021)
+02:14:34.167 ok    batch: the second file has only a suggestion before
+02:14:34.170 ok    batch: a film named by its TMDB ID – Zlatý kapor 2021 WEB-DL CZ 1080p.mkv: The Golden Carp (2021)
+02:14:34.172 ok    batch: Doplnok k názvu in the target – MOVIES\The Golden Carp (2021)\The Golden Carp (2021) - CZ SK EN SD H264 Directors Cut SMALL.mkv
+02:14:34.172 ok    batch: a size class is no addition – Zlatý kapor 2021 WEB-DL CZ 1080p.mkv: Veľkostnú triedu (BIG, SMALL, BluRay …) dáva UNIVERSUM na koniec názvu samo – do doplnku nepatrí.
+02:14:34.172 ok    batch: the addition taken away
+02:14:34.358 ok    batch: 2 groups, the series first (4 súborov v 2 skupinách.)
+02:14:34.358 ok    batch: series recognised from the episode numbers
+02:14:34.358 ok    batch: series title suggested – návrh: Seriál
+02:14:34.358 ok    batch: everything waits for the title and the subtitle language
+02:14:34.359 ok    batch: the language named in the track name (CZ Dabing) is shown as chosen
+02:14:34.359 ok    batch: the subtitles' language read after the analysis – NÁVRH UNIVERSUM podľa textu titulkov (isté – ě, ř, ů 2×) – iný jazyk vyberte
+02:14:34.693 screenshot batch-analysed.png
+02:14:34.695 ok    batch: the tracks shown in the order of the result – Zvuk 2,Zvuk 1,Titulky 1,Titulky 2,Titulky 3 | cs!,cs,en
+02:14:34.698 ok    batch: English subtitles moved up for all files – Zvuk 2,Zvuk 1,Titulky 1,Titulky 3,Titulky 2 | cs!,en,cs
+02:14:35.036 screenshot batch-track-order.png
+02:14:35.038 ok    batch: and back – Zvuk 2,Zvuk 1,Titulky 1,Titulky 2,Titulky 3 | cs!,cs,en
+02:14:35.038 ok    batch: the file's language is shown in the list
+02:14:35.039 ok    batch: the corrected language is used for all files – vaša voľba (v súbore: angličtina (en))
+02:14:35.040 ok    batch: the names the result gets – „“, „Forced“
+02:14:35.042 ok    batch: the names written are used for all files of the group
+02:14:35.044 ok    batch: the rules' name again needs no decision
+02:14:35.044 ok    batch: the file's own language again needs no decision
+02:14:35.046 ok    batch: group decision applies to all three episodes
+02:14:35.046 ok    batch: clean file only goes into the library (suggested episode 1)
+02:14:35.047 ok    batch: run enabled
+02:14:35.383 screenshot batch-ready.png
+02:14:35.781 ok    batch: four files in the library – 
+02:14:35.781 ok    batch: episode 10 in Season 01
+02:14:35.781 ok    batch: the loose file as episode 1
+02:14:35.781 ok    batch: the end of the run is shown boldly – HOTOVO – spracovanie skončilo o 2:14 | 4 súbory v knižnici · trvanie 1 s · úloha 4 vo Fronte úloh
+02:14:36.119 screenshot batch-done.png
+02:14:36.119 ok    batch: the run is in the job queue with its output – Hromadné spracovanie: 4 súborov do knižnice. | 1 / 4 · OK: Seriál E2.mkv → D:\a\_temp\selftest\library\TVSHOWS\Seriál (2026)\Season 01\Seriál S01E02 - CZ EN SD H264 SMALL.mkv | 2 / 4 · OK: Seriál E3.mkv → D:\a\_temp\selftest\library\TVSHOWS\Seriál (2026)\Season 01\Seriál S01E03 - CZ EN SD H264 SMALL.mkv | 3 / 4 · OK: cz-only.mkv → D:\a\_temp\selftest\library\TVSHOWS\Seriál (2026)\Season 01\Seriál S01E01 - CZ SD H264 SMALL.mkv | 4 / 4 · OK: Seriál E10.mkv → D:\a\_temp\selftest\library\TVSHOWS\Seriál (2026)\Season 01\Seriál S01E10 - CZ EN SD H264 SMALL.mkv
+02:14:36.589 screenshot batch-in-queue.png
+02:14:36.839 ok    batch: the written originals are 'už v knižnici' at the analysis – Do knižnice 0 súborov (0 nový súbor, 0 len hlavička, 0 bez zmeny obsahu) · už v knižnici 4 · na kontrolu 0
+02:14:36.839 ok    batch: Revízia offered for a file 'už v knižnici'
+02:14:36.841 ok    batch: the revision will write it again – revízia – nová verzia nahradí výsledok v knižnici
+02:14:36.842 ok    batch: without the revision it is 'už v knižnici' again
+02:14:37.317 screenshot studio-task.png
+02:14:37.321 ok    batch: Upraviť v štúdiu → Uložiť do úlohy – the new times in the task (1500,1/1) – Seriál E2.mkv: úpravy zo štúdií v úlohe – časy titulkov 1.
+02:14:37.429 ok    batch: Zvuk v štúdiu opens the file's sounds – MKV, zvukové stopy: 2, video 10 FPS
+02:14:38.317 screenshot studio-audio-task.png
+02:14:38.321 ok    batch: Zvuk v štúdiu → Uložiť do úlohy – the sound's shift and name in the task, the subtitles' times stay – 250,1/1 Vymyslený zvuk v úlohe
+02:14:40.328 screenshot studio-video-task.png
+02:14:40.332 ok    batch: Obraz v štúdiu → Uložiť do úlohy – the cut, the proportions and the picture anew in the task, the subtitles' times stay – Seriál E2.mkv: úpravy zo štúdií v úlohe – časy titulkov 1, zvuk 1, strih 1, pomer strán 4:3, obraz znova.
+02:14:40.763 screenshot studio-video-back.png
+02:14:40.765 ok    batch: the edits of the studio forgotten again
+02:14:41.137 screenshot template-editor.png
+02:14:41.900 ok    batch: a sorted folder – one group per title (2) – 4 súborov v 2 skupinách.
+02:14:41.905 ok    batch: TVSHOWS – a series named by its folder, episodes by the numbers – návrh: Vymyslený seriál (2024) | návrh: S01E01, návrh: S01E02
+02:14:41.907 ok    batch: Prijať všetko v skupine – the series and its episodes accepted – Skupina B (Vymyslený seriál): návrhy prijaté.
+02:14:42.298 screenshot batch-sorted-series.png
+02:14:42.304 ok    batch: MOVIES – the numbered versions stay a film, its kind certain
+02:14:42.304 ok    batch: the row Film: names the group's 2 versions – pre 2 súbory (verzie jedného filmu)
+02:14:42.305 ok    batch: the film typed in the row Film: names all its versions – D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL.mkv | D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL.mkv | D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E01 - CZ SD H264 SMALL.mkv | D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E02 - CZ SD H264 SMALL.mkv
+02:14:42.667 screenshot batch-film-row.png
+02:14:42.667 ok    batch: Odoslať do MEGA enabled (4 ready)
+02:14:42.675 ok    mega: a batch with the 4 prepared files – Odoslané do MEGA spracovania ako Dávka 1 (4 súbory).
+02:14:42.675 ok    batch: its files are shown in the batch, not written here
+02:14:42.676 ok    mega: a time to start – čaká na 10. 11. 2026 2:00
+02:14:42.676 ok    calendar: the scheduled batch of MEGA on its day and hour – 02:00 Dávka 1: zoradene: Vymyslený film na skúšku, Vymyslený seriál · čaká na spustenie · 4 súbory
+02:14:42.677 ok    calendar: the scheduled batch opens in MEGA spracovanie
+02:14:43.072 screenshot mega.png
+02:14:43.198 ok    mega: the batch is open in Hromadné spracovanie – Upravujete Dávka 1 MEGA spracovania (4 súbory) – po úprave dajte Uložiť do Dávka 1. · 4 súborov v 1 skupinách.
+02:14:43.198 ok    mega: opened with every decision – the same places in the library: Place D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL.mkv | Place D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL.mkv | Place D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E01 - CZ SD H264 SMALL.mkv | Place D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E02 - CZ SD H264 SMALL.mkv
+02:14:43.536 screenshot mega-edit.png
+02:14:43.542 ok    mega: saved back into the batch – Dávka 1: 0 pridaných súborov, 4 upravené.
+02:14:43.961 ok    mega: the batch written into the library after the check – 4 z 4 súborov v knižnici. | MEGA Dávka 1: 4 súborov – kontrola pred spustením. | 1 / 4 · OK: Vymyslený film 1080p.mkv → D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL.mkv | 2 / 4 · OK: Vymyslený film 720p.mkv → D:\a\_temp\selftest\library\MOVIES\Vymyslený film na skúšku (2020)\Vymyslený film na skúšku (2020) - CZ SD H264 SMALL2.mkv | 3 / 4 · OK: Vymysleny serial 02.mkv → D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E02 - CZ SD H264 SMALL.mkv | 4 / 4 · OK: Vymysleny serial 01.mkv → D:\a\_temp\selftest\library\TVSHOWS\Vymyslený seriál (2024)\Season 01\Vymyslený seriál S01E01 - CZ SD H264 SMALL.mkv
+02:14:43.961 ok    mega: the batch ran as a job of the job queue
+02:14:44.298 screenshot mega-done.png
+02:14:44.303 ok    mega: finished batches cleared
+02:14:44.303 ok    batch: originals kept – nothing to delete
+02:14:44.303 ok    batch: Zmazať originály offered after the runs – Zmazať originály (8)
+02:14:44.628 screenshot batch-delete-originals.png
+02:14:45.789 ok    batch: originals to the Recycle Bin (7; kept 1: Seriál E2.mkv: do Koša sa nedal presunúť – 'D:\a\_temp\selftest\batch\Sezóna 1\Seriál E2.mkv' could not be moved to the Recycle Bin (code 32).), the library intact – Do Koša: 7 originálov · ostalo 1: Seriál E2.mkv: do Koša sa nedal presunúť – 'D:\a\_temp\selftest\batch\Sezóna 1\Seriál E2.mkv' could not be moved to the Recycle Bin (code 32). · Pre ďalšiu prácu s priečinkom dajte Analyzovať.
+02:14:45.789 ok    batch: back to keeping the originals
+02:14:45.889 ok    batch: the first analysis of a folder – nothing marked new
+02:14:46.854 ok    batch: the new file's group at the end, marked new – Druhý Vymyslený Film  | Prvý Vymyslený Film  | Tretí Vymyslený Film NEW
+02:14:46.854 ok    batch: films in Skupina Film, chosen there – films 3, series 0
+02:14:47.176 screenshot batch-new-groups.png
+02:14:47.178 ok    batch: analysed again with nothing new – no group marked
+02:14:47.331 ok    batch: three series groups – 3
+02:14:47.331 ok    batch: the row Seriál: names the 2 groups marked – → pre 2 označených skupín
+02:14:47.332 ok    batch: both groups marked got the series, the third did not – Vymyslený spoločný seriál (2025) [tmdbid-424242] | Vymyslený spoločný seriál (2025) [tmdbid-424242] | 
+02:14:47.654 screenshot batch-series-groups.png
+02:14:47.655 ok    queue: the sound of the end after Hromadné spracovanie
+02:14:47.656 ok    logs: the runs of the self-test – MEGA spracovanie – Dávka 1, Hromadné spracovanie, Úprava videostopy, Úprava audiostopy, Úprava titulkostopy, Kapitoly, Single spracovanie, Zlučovanie, Úprava hlavičky
+02:14:47.657 ok    logs: the files of a batch run in words – Hotovo – nový súbor v knižnici | Hotovo – nový súbor v knižnici | Hotovo – súbor je v knižnici
+02:14:48.017 screenshot logs.png
+02:14:48.024 ok    logs: a ticked log deleted
+02:14:48.026 ok    logs: all deleted
+02:14:49.901 update check: MKVToolNix 103.0 (news 0), UNIVERSUM release 0.3.30; problems: 
+02:14:49.901 ok    update check reads the MKVToolNix release feed
+02:14:50.261 screenshot updates.png
+02:14:52.806 ok    a folder from the command line opens in batch processing
+02:14:53.584 ok    context menu: Informácie o súbore opens the Information page
+02:14:54.750 ok    context menu: files of one action handled once, in order, the rest named – D:\a\_temp\selftest\menu\a-film.mkv | Otvorené: a-film.mkv
+
+Single spracovanie spracúva jeden súbor. Viac súborov naraz spracuje Hromadné spracovanie. Neotvorené (1):
+b-film.mkv
+02:14:54.753 ok    single instance: the first UNIVERSUM owns the name
+02:14:54.753 ok    single instance: a second start sees the running one
+02:14:54.773 ok    single instance: the second start hands its files over the pipe – --zlucovanie D:\a\universum\universum\testdata\media\en-und-cz-forced.mkv
+02:14:58.129 screenshot setup.png
+02:14:58.138 --- languages
+02:14:58.149 ok    languages: 3335 translations with the same values as the Slovak texts – 
+02:14:58.150 ok    languages: the core's texts in en – German, light snow
+02:14:59.214 screenshot lang-en-dashboard.png
+02:15:01.665 screenshot lang-en-kalendar.png
+02:15:03.004 screenshot lang-en-zlucovanie.png
+02:15:05.657 screenshot lang-en-single.png
+02:15:06.361 screenshot lang-en-hromadne.png
+02:15:07.002 screenshot lang-en-mega.png
+02:15:09.062 screenshot lang-en-nastavenia.png
+02:15:09.063 languages: en – 76 texts on the pages still look Slovak
+02:15:09.064 ok    languages: the left rail in en – (Batch processing, Settings)
+02:15:09.071 ok    languages: the core's texts in cs – němčina, slabé sněžení
+02:15:10.122 screenshot lang-cs-dashboard.png
+02:15:12.569 screenshot lang-cs-kalendar.png
+02:15:14.655 screenshot lang-cs-zlucovanie.png
+02:15:17.309 screenshot lang-cs-single.png
+02:15:17.984 screenshot lang-cs-hromadne.png
+02:15:18.630 screenshot lang-cs-mega.png
+02:15:21.600 screenshot lang-cs-nastavenia.png
+02:15:21.600 languages: cs – 10 texts on the pages still look Slovak
+02:15:21.600 ok    languages: the left rail in cs – (Hromadné zpracování, Nastavení)
+02:15:21.610 SELFTEST OK

@@ -1,0 +1,21 @@
+{
+  "format": "UNIVERSUM-zdroj 1",
+  "name": "Vymyslený rozpis",
+  "address": "https://rozpis.example/den/{yyyy}-{MM}-{dd}",
+  "item": "div.zaznam",
+  "section": "h3",
+  "sections": [ { "contains": "Nové seriály", "kind": "series-premiere" }, { "contains": "Ostatné", "kind": "episode" } ],
+  "fields": {
+    "title": { "select": "a.meno", "take": "own" },
+    "years": { "select": "a.meno > span" },
+    "original": { "select": "a.povodny" },
+    "genres": { "select": "div.zaner" },
+    "episode": { "select": "div.cislo", "take": "own" },
+    "channel": { "select": "div.cislo span" },
+    "channelId": { "select": ":self", "take": "attr:data-kanal" },
+    "link": { "select": "a.meno", "take": "attr:href" }
+  },
+  "domestic": [ "ct1", "nova" ],
+  "daysBack": 1,
+  "daysAhead": 2
+}

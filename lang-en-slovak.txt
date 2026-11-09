@@ -1,0 +1,76 @@
+1. Registrácia (zadarmo)…
+1. Registrácia DeepL API Free (zadarmo)…
+2 z 2 súborov v knižnici.
+2. Získať kľúč API…
+2. Získať kľúč…
+3. Vytvoriť API token…
+4 z 4 súborov v knižnici.
+Alžbeta, Liliana
+Aurélia
+Bibiána, Viviána
+Bohumír
+Cecília
+Dnešný vymyslený
+Dnešný vymyslený · CZ · SK
+Elvíra
+Emília
+Films and series you open on TMDB are gathered in the pinned note Zásobník TMDB (Notes); by the title and TMDB ID fields you pick them with one click. 1. Install the Tampermonkey or Violentmonkey extension in your browser (from its extension store). 2. Click Install the script – the extension offers UNIVERSUM's script, confirm it. Then every film or series page you open on TMDB joins the tray by itself, and the page has a Do UNIVERSUM button too. The script sends only to this computer (127.0.0.1) with a secret key; UNIVERSUM takes only addresses of TMDB films and series.
+Félix
+Henrietta, René
+Hlavička test (2026)
+Hotovo: D:\a\_temp\selftest\library\MOVIES\Hlavička test (2026)\Hlavička test (2026) - EN CZ SD H264 SMALL.mkv
+Hotovo: D:\a\_temp\selftest\library\MOVIES\Zlúčený film (2026)\Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv
+Hromadné spracovanie: batch → knižnica
+Katarína
+Klára, Kiara
+MEGA Dávka 1: Zlučovanie: Zlúčený pre MEGA
+MEGA Dávka 1: zoradene: Vymyslený film na skúšku, Vymyslený seriál
+Martin, Maroš
+Mikuláš, Nikolas
+Obrazový test (2026)
+Obrazový test strih (2026)
+OpenSubtitles: API kľúč…
+OpenSubtitles: registrácia (zadarmo)…
+Prijíma zo skriptu v prehliadači (len z tohto počítača, 127.0.0.1:60856).
+Renáta
+René
+SK: Krátky úvod.
+SK: Vymyšlená novinka z kina
+Sabína
+Season 2 · Netflix · Svetový seriál
+Seriál (2026)
+Slovenčina
+Svätopluk, Jonáš
+Titulkový test (2026)
+Vymyslená premiéra
+Vymyslené filmy
+Vymyslené filmy · 3
+Vymyslené kino
+Vymyslené kino · 1
+Vymyslené príbehy
+Vymyslené+ (SK)
+Vymyslený Obrazový Film
+Vymyslený Titulkový Film
+Vymyslený Zvukový Film
+Vymyslený film
+Vymyslený film Návrat (2026)
+Vymyslený film na druhom disku (2026)
+Vymyslený film na skúšku (2020)
+Vymyslený film pre MEGA (2026)
+Vymyslený rýchly film
+Vymyslený seriál (2024)
+Vymyslený zdieľaný film (2026)
+Weather for: Vymyslená Lehota – okres Druhý, Banskobystrický kraj, Slovensko · 612 m above sea level (coordinates 48.90, 19.60).
+Zlučovanie: Zlúčený film (2026) - CZ EN SD H264 SMALL.mkv (6 stôp)
+Zvukový test (2026)
+Získať kľúč (platené)…
+Získať kľúč (zadarmo)…
+celý film
+new series · ČT1 · Vymyslený seriál
+podľa zmeny
+pozrieť s rodinou
+svsub.net: účet a token…
+teším sa veľmi
+Úprava hlavičky: header.mkv
+ČR, SR · Invented Pictures
+Šimon, Simon, Simona

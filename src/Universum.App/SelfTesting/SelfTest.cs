@@ -4300,10 +4300,10 @@ internal static class SelfTest
 
             if (!Equals(services.Settings.InputDirectory, inputBefore))
             {
-                var other = services.InputDirectories.Where(i => !Core.IO.Paths.Same(i, services.Settings.InputDirectory!)).ToList();
+                var otherInputs = services.InputDirectories.Where(i => !Core.IO.Paths.Same(i, services.Settings.InputDirectory!)).ToList();
                 services.Settings.OtherInputDirectories.Clear();
                 services.Settings.InputDirectory = inputBefore;
-                services.Settings.OtherInputDirectories.AddRange(other.Where(i => inputBefore is null || !Core.IO.Paths.Same(i, inputBefore)));
+                services.Settings.OtherInputDirectories.AddRange(otherInputs.Where(i => inputBefore is null || !Core.IO.Paths.Same(i, inputBefore)));
                 services.Settings.Save();
             }
 

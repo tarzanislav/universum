@@ -4266,6 +4266,17 @@ internal static class SelfTest
                 $"disks: Vytvoriť výstup – {row.OutputText} beside the input, the film of that disk goes there – " + disks.Message);
             // owner, 9. 11. 2026: Hromadné analyses every input folder at once – the film on the other disk is found even when
             // the input of the main disk holds nothing of it; its group says its disk
+            // the main disk gets an (empty) input folder of its own for the check when the self-test has none
+            var inputBefore = services.Settings.InputDirectory;
+            if (services.InputDirectories.Count <= 1 && !Core.IO.Paths.SameVolume(main, stiahnute))
+            {
+                var empty = Path.Combine(Path.GetDirectoryName(main)!, "vstup-hlavneho-disku");
+                Directory.CreateDirectory(empty);
+                services.Settings.OtherInputDirectories.Remove(stiahnute);
+                services.SetInputDirectory(empty);
+                services.SetInputFolder(stiahnute, null);
+            }
+
             if (services.InputDirectories.Count > 1)
             {
                 var batchBefore = (batch.Folder, services.Settings.BatchAllInputs);
@@ -4285,6 +4296,15 @@ internal static class SelfTest
             else
             {
                 Write("disks: Hromadné – all inputs not checked (one input folder only)");
+            }
+
+            if (!Equals(services.Settings.InputDirectory, inputBefore))
+            {
+                var other = services.InputDirectories.Where(i => !Core.IO.Paths.Same(i, services.Settings.InputDirectory!)).ToList();
+                services.Settings.OtherInputDirectories.Clear();
+                services.Settings.InputDirectory = inputBefore;
+                services.Settings.OtherInputDirectories.AddRange(other.Where(i => inputBefore is null || !Core.IO.Paths.Same(i, inputBefore)));
+                services.Settings.Save();
             }
 
             disks.SetInput(row.Row, output);

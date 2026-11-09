@@ -2070,7 +2070,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var others = seen.Count - 1;
-        var title = first is null ? ""
+        var caption = first is null ? ""
             : others switch
             {
                 0 => first,
@@ -2080,12 +2080,12 @@ public sealed class BatchPageViewModel : ObservableObject
             };
 
         // several disks analysed: the disk of the group too (owner, 9. 11. 2026)
-        if (title.Length > 0 && _analysis is { Folders.Count: > 1 } && group.Files.FirstOrDefault() is { } any)
+        if (caption.Length > 0 && _analysis is { Folders.Count: > 1 } && group.Files.FirstOrDefault() is { } any)
         {
-            title += " · " + Disk(any.Path);
+            caption += " · " + Disk(any.Path);
         }
 
-        return title;
+        return caption;
     }
 
     // the title read from a file's name, remembered (the analysis names its groups after every file it reads)

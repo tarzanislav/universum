@@ -1272,6 +1272,9 @@ public sealed class AppSettings
     /// <summary>Last folder of the batch page.</summary>
     public string? BatchFolder { get; set; }
 
+    /// <summary>Hromadné analyses every input folder at once (owner, 9. 11. 2026 – one on each disk); off: only <see cref="BatchFolder"/>.</summary>
+    public bool BatchAllInputs { get; set; } = true;
+
     public bool BatchRecursive { get; set; } = true;
 
     /// <summary>Hromadné spracovanie: the language of audio tracks without one is heard right after the analysis (owner, 7. 11. 2026).</summary>

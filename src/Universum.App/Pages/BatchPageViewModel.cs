@@ -179,6 +179,14 @@ public sealed class BatchPageViewModel : ObservableObject
                 _ = FindMoviesAsync(automatic: true);
             }
         };
+        services.InputDirectoryChanged += () =>
+        {
+            OnPropertyChanged(nameof(FolderChoices));
+            OnPropertyChanged(nameof(FolderChoice));
+            OnPropertyChanged(nameof(AllInputs));
+            OnPropertyChanged(nameof(DiskHint));
+            OnPropertyChanged(nameof(HasDiskHint));
+        };
         services.LibraryChanged += () =>
         {
             OnPropertyChanged(nameof(OutputDescription));
@@ -760,11 +768,61 @@ public sealed class BatchPageViewModel : ObservableObject
             _services.Settings.BatchFolder = value;
             _services.Settings.Save();
             OnPropertyChanged();
+            OnPropertyChanged(nameof(FolderChoices));
+            OnPropertyChanged(nameof(FolderChoice));
+            OnPropertyChanged(nameof(AllInputs));
             OnPropertyChanged(nameof(DiskHint));
             OnPropertyChanged(nameof(HasDiskHint));
             RefreshCommands();
         }
     }
+
+    /// <summary>
+    /// All input folders are analysed at once (owner, 9. 11. 2026: "na hlavný disk som nedal nič, seriály na druhý disk –
+    /// analyzovať vypísalo, že tam nie sú žiadne súbory"): when chosen and there is more than one.
+    /// </summary>
+    public bool AllInputs => _only is null && _services.Settings.BatchAllInputs && _services.InputDirectories.Count > 1 &&
+                             Folder is { } folder && _services.InputDirectories.Any(i => Paths.Same(i, folder));
+
+    /// <summary>What Hromadné analyses: all input folders, the input folder of one disk, or a folder chosen.</summary>
+    public IReadOnlyList<BatchFolderChoice> FolderChoices
+    {
+        get
+        {
+            var inputs = _services.InputDirectories;
+            var choices = new List<BatchFolderChoice>();
+            if (inputs.Count > 1)
+            {
+                choices.Add(new BatchFolderChoice(null, Loc.F("Všetky vstupy ({0})", string.Join(", ", inputs.Select(Disk)))));
+            }
+
+            choices.AddRange(inputs.Select(i => new BatchFolderChoice(i, Loc.F("DISK {0}  {1}", Disk(i), i))));
+            if (Folder is { } folder && !inputs.Any(i => Paths.Same(i, folder)))
+            {
+                choices.Add(new BatchFolderChoice(folder, folder));
+            }
+
+            return choices;
+        }
+    }
+
+    /// <summary>The choice shown (the list rebuilt each time, so the one equal to it).</summary>
+    public BatchFolderChoice? FolderChoice
+    {
+        get => FolderChoices.FirstOrDefault(c => AllInputs ? c.Folder is null : c.Folder is { } f && Folder is { } folder && Paths.Same(f, folder));
+        set
+        {
+            if (value is null || Busy)
+            {
+                return;
+            }
+
+            _services.Settings.BatchAllInputs = value.Folder is null;
+            Folder = value.Folder ?? _services.InputDirectories.FirstOrDefault() ?? Folder;
+        }
+    }
+
+    private static string Disk(string folder) => Path.GetPathRoot(Path.GetFullPath(folder))?.TrimEnd('\\', '/') ?? folder;
 
     /// <summary>
     /// The folder lies on a disk without an output folder of its own (owner, 8. 11. 2026): its files would be copied to
@@ -776,8 +834,13 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             try
             {
-                if (Folder is not { Length: > 0 } folder || _services.Libraries is not { BySourceDisk: true } libraries ||
-                    libraries.All.Any(l => Core.IO.Paths.SameVolume(l.Root, folder)))
+                if (Folder is not { Length: > 0 } chosen || _services.Libraries is not { BySourceDisk: true } libraries)
+                {
+                    return "";
+                }
+
+                // every input folder analysed: the first one of them on a disk without an output folder
+                if ((AllInputs ? _services.InputDirectories : [chosen]).FirstOrDefault(f => !libraries.All.Any(l => Core.IO.Paths.SameVolume(l.Root, f))) is not { } folder)
                 {
                     return "";
                 }
@@ -1546,6 +1609,8 @@ public sealed class BatchPageViewModel : ObservableObject
         {
             var inspector = _services.Inspector(installation);
             var only = _only;
+            // owner, 9. 11. 2026: the input folders of every disk at once
+            var also = AllInputs ? (IReadOnlyList<string>)[.. _services.InputDirectories.Where(i => !Paths.Same(i, folder) && Directory.Exists(i))] : null;
             _analysis = await BatchAnalyzer.AnalyzeAsync(folder, recursive, inspector,
                 new Progress<(int Done, int Total)>(p =>
                 {
@@ -1576,14 +1641,16 @@ public sealed class BatchPageViewModel : ObservableObject
                     row.Title = GroupTitle(row.Group);
                     row.Refresh();
                 }),
-                only: only);
+                only: only,
+                alsoFolders: also);
 
             // nothing to process: why (no video, only in subfolders, only results…) – still stoppable
             string? why = null;
             if (_analysis.FileCount == 0 && _analysis.Failed.Count == 0)
             {
                 Summary = Loc.T("Zisťujem, prečo sa nič nenašlo…");
-                why = await Task.Run(() => BatchAnalyzer.WhyEmpty(folder, recursive, skipped, cancellation.Token), cancellation.Token);
+                why = await Task.Run(() => string.Join(" ", _analysis.Folders.Select(f =>
+                    (_analysis.Folders.Count > 1 ? f + ": " : "") + BatchAnalyzer.WhyEmpty(f, recursive, skipped, cancellation.Token))), cancellation.Token);
             }
 
             _analysisCancellation = null;
@@ -2003,7 +2070,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         var others = seen.Count - 1;
-        return first is null ? ""
+        var title = first is null ? ""
             : others switch
             {
                 0 => first,
@@ -2011,6 +2078,14 @@ public sealed class BatchPageViewModel : ObservableObject
                 < 5 => Loc.F("{0} + {1} ďalšie", first, others),
                 _ => Loc.F("{0} + {1} ďalších", first, others),
             };
+
+        // several disks analysed: the disk of the group too (owner, 9. 11. 2026)
+        if (title.Length > 0 && _analysis is { Folders.Count: > 1 } && group.Files.FirstOrDefault() is { } any)
+        {
+            title += " · " + Disk(any.Path);
+        }
+
+        return title;
     }
 
     // the title read from a file's name, remembered (the analysis names its groups after every file it reads)
@@ -3620,6 +3695,8 @@ public sealed class BatchPageViewModel : ObservableObject
 
         if (dialog.ShowDialog() == true)
         {
+            // a folder chosen is analysed alone
+            _services.Settings.BatchAllInputs = false;
             Folder = dialog.FolderName;
         }
     }
@@ -3722,3 +3799,6 @@ public sealed class BatchPageViewModel : ObservableObject
         }
     }
 }
+
+/// <summary>A choice of what Hromadné analyses: all input folders (no folder), or one folder.</summary>
+public sealed record BatchFolderChoice(string? Folder, string Label);

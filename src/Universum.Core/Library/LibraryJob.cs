@@ -24,6 +24,18 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// <summary>The analysed folder (one series, or films); season folders are looked for only below it.</summary>
     public string? Root { get; private set; }
 
+    /// <summary>Every folder analysed (owner, 9. 11. 2026 – the input folders of all disks); a file belongs to the one it lies in.</summary>
+    public IReadOnlyList<string> Roots { get; private set; } = [];
+
+    /// <summary>The analysed folder a file lies in (its season folders and numbers are read below it).</summary>
+    public string? RootOf(string path) => RootIn(Roots, path) ?? Root;
+
+    private static string? RootIn(IReadOnlyList<string> roots, string path) =>
+        roots.Where(r => Paths.IsUnder(path, r)).OrderByDescending(r => r.Length).FirstOrDefault();
+
+    // the series name of files read below the folder each lies in
+    private string? OneRoot => Roots.Count <= 1 ? Root : null;
+
     /// <summary>
     /// The titles of a folder the user sorted into MOVIES and TVSHOWS (owner, 29. 10. 2026; <see cref="TitleUnits"/>); null
     /// when the folder is one title. Then each file has its own kind (<see cref="KindFor"/>) and series.
@@ -143,12 +155,15 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// </param>
     public static LibraryJob Guess(LibraryLayout layout, BatchAnalysis analysis, bool splitTitles = true)
     {
-        var job = new LibraryJob(layout) { Root = analysis.Folder };
+        var job = new LibraryJob(layout) { Root = analysis.Folder, Roots = analysis.Folders };
         var root = analysis.Folder;
+        var roots = analysis.Folders;
+        string rootOf(string file) => RootIn(roots, file) ?? root;
+        var single = roots.Count <= 1;
         var files = analysis.Groups.SelectMany(g => g.Files).Select(f => f.Path).Order(NaturalComparer.Instance).ToList();
-        var content = files.Where(f => !EpisodeParser.IsExtra(f, root)).ToList();
+        var content = files.Where(f => !EpisodeParser.IsExtra(f, rootOf(f))).ToList();
         var parts = NumberedParts(content);
-        var numbered = content.Count(f => LooksLikeEpisode(f, root) || SeasonFolderBelow(root, f) is not null || parts.Contains(f));
+        var numbered = content.Count(f => LooksLikeEpisode(f, rootOf(f)) || SeasonFolderBelow(rootOf(f), f) is not null || parts.Contains(f));
         job._kind = content.Count > 0 && numbered * 2 > content.Count ? MediaKind.Series : MediaKind.Movie;
 
         // series: the folder of the series (above a "Season 2" folder) or the start of the file names
@@ -158,8 +173,9 @@ public sealed class LibraryJob(LibraryLayout layout)
             folder = parent;
         }
 
-        var fromFolder = TitleGuess.FromName(Path.GetFileName(folder), MediaKind.Series);
-        var fromFile = SeriesNameOfFiles(content, root);
+        // several input folders are no series of their own: the series come from their own folders (the title units)
+        var fromFolder = single ? TitleGuess.FromName(Path.GetFileName(folder), MediaKind.Series) : null;
+        var fromFile = single ? SeriesNameOfFiles(content, root) : null;
         if (fromFolder is { TmdbId: not null })
         {
             job.Series = Title(MediaKind.Series, fromFolder);
@@ -174,7 +190,7 @@ public sealed class LibraryJob(LibraryLayout layout)
         foreach (var file in content)
         {
             var directory = Path.GetDirectoryName(file)!;
-            var ownFolder = Paths.Same(directory, root) ? null : TitleGuess.FromName(Path.GetFileName(directory), MediaKind.Movie);
+            var ownFolder = Paths.Same(directory, rootOf(file)) ? null : TitleGuess.FromName(Path.GetFileName(directory), MediaKind.Movie);
             var guess = ownFolder is { Year: not null } ? ownFolder : TitleGuess.FromName(Path.GetFileNameWithoutExtension(file), MediaKind.Movie) ?? ownFolder;
             if (guess is { TmdbId: not null })
             {
@@ -189,18 +205,18 @@ public sealed class LibraryJob(LibraryLayout layout)
 
         // episodes without a number in the name: a bare number ("03.mkv") or the next free numbers of their season (from
         // the season folder, else 1) in folder order
-        var used = content.Select(f => EpisodeParser.FromPath(f, root)).OfType<EpisodeMatch>()
+        var used = content.Select(f => EpisodeParser.FromPath(f, rootOf(f))).OfType<EpisodeMatch>()
             .SelectMany(m => Enumerable.Range(m.Number.Episode, (m.Number.LastEpisode ?? m.Number.Episode) - m.Number.Episode + 1).Select(e => (m.Number.Season, e)))
             .ToHashSet();
         // a numbered sequence ("Name 01", "CF01") gives its numbers when the folder is a series (only suggested: whether
         // the folder holds a series or versions of a film the user decides – owner, 29. 10. 2026)
-        var sequence = content.Where(f => EpisodeParser.FromPath(f, root) is null)
+        var sequence = content.Where(f => EpisodeParser.FromPath(f, rootOf(f)) is null)
             .GroupBy(f => Path.GetDirectoryName(f)!, Paths.Comparer)
             .SelectMany(g => TitleUnits.Sequence(g.ToList()))
             .ToDictionary(x => x.Key, x => x.Value, Paths.Comparer);
-        foreach (var file in content.Where(f => EpisodeParser.FromPath(f, root) is null))
+        foreach (var file in content.Where(f => EpisodeParser.FromPath(f, rootOf(f)) is null))
         {
-            var season = SeasonFolderBelow(root, file) ?? 1;
+            var season = SeasonFolderBelow(rootOf(file), file) ?? 1;
             // under a specials folder ("Specials\Season 1\Bonus.mkv", or above the analysed folder): Season 00 or the
             // season is a question
             if (season != 0 && EpisodeParser.UnderSpecials(file))
@@ -228,7 +244,7 @@ public sealed class LibraryJob(LibraryLayout layout)
         // or a regular season: a question
         foreach (var file in content)
         {
-            if (EpisodeParser.FromPath(file, root) is { NeedsConfirmation: true } doubtful)
+            if (EpisodeParser.FromPath(file, rootOf(file)) is { NeedsConfirmation: true } doubtful)
             {
                 job.EpisodeSuggestions[file] = doubtful.Number;
                 if (doubtful.IsSeasonQuestion)
@@ -240,7 +256,9 @@ public sealed class LibraryJob(LibraryLayout layout)
 
         if (splitTitles)
         {
-            job.ApplyUnits(TitleUnits.Split(root, files));
+            // each input folder split into its titles; together the titles of all disks
+            var units = roots.Select(r => TitleUnits.Split(r, [.. files.Where(f => Paths.Same(rootOf(f), r))])).ToList();
+            job.ApplyUnits(single ? units[0] : units.All(u => u is null) ? null : [.. units.SelectMany(u => u ?? [])]);
         }
 
         return job;
@@ -298,7 +316,7 @@ public sealed class LibraryJob(LibraryLayout layout)
 
             // numbers of a sequence ("Name 01"), then the next free numbers of the title's own seasons for files without one
             var used = new HashSet<(int Season, int Episode)>();
-            foreach (var match in unit.Files.Select(f => EpisodeParser.FromPath(f, Root)).OfType<EpisodeMatch>())
+            foreach (var match in unit.Files.Select(f => EpisodeParser.FromPath(f, RootOf(f))).OfType<EpisodeMatch>())
             {
                 for (var e = match.Number.Episode; e <= (match.Number.LastEpisode ?? match.Number.Episode); e++)
                 {
@@ -308,15 +326,15 @@ public sealed class LibraryJob(LibraryLayout layout)
 
             foreach (var (file, number) in unit.Numbers)
             {
-                var season = EpisodeParser.SeasonOfPath(file, Root) ?? 1;
+                var season = EpisodeParser.SeasonOfPath(file, RootOf(file)) ?? 1;
                 EpisodeSuggestions[file] = new EpisodeNumber(season, number);
                 used.Add((season, number));
             }
 
-            foreach (var file in unit.Files.Where(f => !EpisodeParser.IsExtra(f, Root) && !unit.Numbers.ContainsKey(f) && EpisodeParser.FromPath(f, Root) is null)
+            foreach (var file in unit.Files.Where(f => !EpisodeParser.IsExtra(f, RootOf(f)) && !unit.Numbers.ContainsKey(f) && EpisodeParser.FromPath(f, RootOf(f)) is null)
                          .Order(NaturalComparer.Instance))
             {
-                var season = EpisodeParser.SeasonOfPath(file, Root) ?? 1;
+                var season = EpisodeParser.SeasonOfPath(file, RootOf(file)) ?? 1;
                 var next = 1;
                 while (used.Contains((season, next)))
                 {
@@ -393,7 +411,7 @@ public sealed class LibraryJob(LibraryLayout layout)
                 Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer)) is { } unit)
             {
                 var name = unit.Kind == MediaKind.Series ? unit.Name
-                    : File.Exists(unit.Folder) ? SeriesNameOfFiles([path], Root) : TitleGuess.FromName(Path.GetFileName(unit.Folder), MediaKind.Series);
+                    : File.Exists(unit.Folder) ? SeriesNameOfFiles([path], RootOf(path)) : TitleGuess.FromName(Path.GetFileName(unit.Folder), MediaKind.Series);
                 if (name is not null)
                 {
                     SeriesSuggestionOfFile[path] = Title(MediaKind.Series, name);
@@ -421,7 +439,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             names.Add(guess);
         }
 
-        if (SeriesNameOfFiles([path], Root) is { } own)
+        if (SeriesNameOfFiles([path], RootOf(path)) is { } own)
         {
             names.Add(own);
         }
@@ -442,7 +460,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             foreach (var unit in units.Where(u => u is { Kind: MediaKind.Series, Sorted: true }))
             {
                 var open = unit.Files.Where(f => !SeriesOfFile.ContainsKey(f)).ToList();
-                if (open.Count > 0 && memory.Find([unit.Name, .. open.Select(f => SeriesNameOfFiles([f], Root))]) is { } title)
+                if (open.Count > 0 && memory.Find([unit.Name, .. open.Select(f => SeriesNameOfFiles([f], RootOf(f)))]) is { } title)
                 {
                     foreach (var file in open)
                     {
@@ -453,7 +471,7 @@ public sealed class LibraryJob(LibraryLayout layout)
                 }
             }
         }
-        else if (_kind == MediaKind.Series && Series is null && memory.Find([SeriesNameGuess, SeriesNameOfFiles(files, Root)]) is { } title)
+        else if (_kind == MediaKind.Series && Series is null && memory.Find([SeriesNameGuess, SeriesNameOfFiles(files, OneRoot)]) is { } title)
         {
             Series = title;
             SeriesUnverified = false;
@@ -542,7 +560,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             return (suggested, true);
         }
 
-        return EpisodeParser.FromPath(path, Root) is { } found ? (found.Number, found.NeedsConfirmation) : (null, false);
+        return EpisodeParser.FromPath(path, RootOf(path)) is { } found ? (found.Number, found.NeedsConfirmation) : (null, false);
     }
 
     /// <summary>Why the episode of a file is only suggested (Slovak), or null.</summary>
@@ -553,7 +571,7 @@ public sealed class LibraryJob(LibraryLayout layout)
             return null;
         }
 
-        return EpisodeParser.FromPath(path, Root) switch
+        return EpisodeParser.FromPath(path, RootOf(path)) switch
         {
             { NameSeason: { } named } found =>
                 CoreText.F("OTÁZKA: súbor je v priečinku špeciálov (Season 00), ale meno uvádza sezónu {0:00} – patrí do Season 00 ({1}) " +

@@ -343,6 +343,39 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task AllInputFoldersAtOnce()
+    {
+        // owner, 9. 11. 2026: the input folder of the main disk empty, a series in the input folder of the other disk – the
+        // analysis of all input folders finds it, named and numbered as in its own folder (all names invented)
+        using var work = new Work();
+        var first = Path.Combine(work.Path, "E", "ZDROJ");
+        var second = Path.Combine(work.Path, "D", "ZDROJ");
+        Directory.CreateDirectory(Path.Combine(first, "MOVIES"));
+        Directory.CreateDirectory(Path.Combine(first, "TVSHOWS"));
+        string P(string root, params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.Copy(TestData.Media("en-only-cz-subs.mkv"), path, overwrite: true);
+            return path;
+        }
+
+        var episodes = new[] { P(second, "TVSHOWS", "Vymyslený seriál (2024)", "Vymysleny Serial 01.mkv"), P(second, "TVSHOWS", "Vymyslený seriál (2024)", "Vymysleny Serial 02.mkv") };
+        var film = P(first, "MOVIES", "Vymyslený film (2020)", "Vymysleny film.mkv");
+        var inspector = await InspectorAsync();
+        var onlyFirst = await BatchAnalyzer.AnalyzeAsync(Path.Combine(first, "TVSHOWS"), recursive: true, inspector);
+        Assert.Equal(0, onlyFirst.FileCount, "the empty folder alone finds nothing (as the owner saw)");
+        var analysis = await BatchAnalyzer.AnalyzeAsync(first, recursive: true, inspector, alsoFolders: [second]);
+        Assert.True(analysis.FileCount == 3 && analysis.Folders.Count == 2, $"all input folders: the series of the other one found ({analysis.FileCount})");
+
+        var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "E", "VYSTUP")), analysis);
+        Assert.True(job.Mixed && job.KindFor(episodes[0]) == MediaKind.Series && job.KindFor(film) == MediaKind.Movie, "each file of its own folder kind");
+        Assert.Equal("Vymyslený seriál (2024)", job.SuggestedTitleFor(episodes[1])?.FolderName, "the series named by its folder on the other disk");
+        Assert.Equal((new EpisodeNumber(1, 2), true), job.EpisodeFor(episodes[1]), "numbered below its own input folder");
+        Assert.True(Paths.Same(job.RootOf(episodes[0])!, second) && Paths.Same(job.RootOf(film)!, first), "each file belongs to the input folder it lies in");
+    }
+
+    [Test]
     public void FolderSortedIntoMoviesAndShowsIsSplit()
     {
         // owner, 29. 10. 2026: the user sorts films into MOVIES and series into TVSHOWS (each series in its own folder,

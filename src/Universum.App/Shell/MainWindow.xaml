@@ -2537,7 +2537,10 @@
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
                             <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
                         </StackPanel>
-                        <TextBlock Text="{Binding Folder}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <!-- owner, 9. 11. 2026: all input folders at once (one on each disk), one of them, or a folder chosen -->
+                        <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding FolderChoice}" DisplayMemberPath="Label" MinWidth="320" MaxWidth="700"
+                                  HorizontalAlignment="Left" FontWeight="SemiBold" Margin="0,2,0,0"
+                                  ToolTip="{loc:T 'Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…'}" />
                         <TextBlock Text="{Binding DiskHint}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left"
                                    Visibility="{Binding HasDiskHint, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>

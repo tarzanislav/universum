@@ -4264,6 +4264,29 @@ internal static class SelfTest
                   row.Flow.Contains(stiahnute, StringComparison.OrdinalIgnoreCase) && row.Flow.Contains(Path.GetFullPath(output), StringComparison.OrdinalIgnoreCase) &&
                   disks.Rows.Single(r => r.IsMain).MainCaption.Contains('★') && row.DiskTitle.StartsWith("DISK ", StringComparison.Ordinal) && row.DiskTitle.EndsWith(':'),
                 $"disks: Vytvoriť výstup – {row.OutputText} beside the input, the film of that disk goes there – " + disks.Message);
+            // owner, 9. 11. 2026: Hromadné analyses every input folder at once – the film on the other disk is found even when
+            // the input of the main disk holds nothing of it; its group says its disk
+            if (services.InputDirectories.Count > 1)
+            {
+                var batchBefore = (batch.Folder, services.Settings.BatchAllInputs);
+                batch.FolderChoice = batch.FolderChoices.First(c => c.Folder is null);
+                Check(batch.AllInputs && batch.FolderChoices[0].Label.Contains(Path.GetPathRoot(stiahnute)!.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase),
+                    "disks: Hromadné – all inputs chosen – " + string.Join(" | ", batch.FolderChoices.Select(c => c.Label)));
+                await batch.AnalyzeAsync();
+                var foundThere = batch.Analysis?.Groups.SelectMany(g => g.Files).Any(f => Core.IO.Paths.Same(f.Path, source)) == true;
+                Check(foundThere && batch.Analysis!.Folders.Count == services.InputDirectories.Count &&
+                      batch.Groups.Any(g => g.Title.EndsWith(" · " + Path.GetPathRoot(stiahnute)!.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)),
+                    $"disks: Hromadné – the film of the other disk found among all inputs – {batch.Summary} | {string.Join(" | ", batch.Groups.Select(g => g.Title))}");
+                batch.FolderChoice = batch.FolderChoices.First(c => c.Folder is { } f && Core.IO.Paths.Same(f, stiahnute));
+                Check(!batch.AllInputs && Core.IO.Paths.Same(batch.Folder!, stiahnute), "disks: Hromadné – the input of one disk chosen");
+                services.Settings.BatchAllInputs = batchBefore.BatchAllInputs;
+                batch.Folder = batchBefore.Folder;
+            }
+            else
+            {
+                Write("disks: Hromadné – all inputs not checked (one input folder only)");
+            }
+
             disks.SetInput(row.Row, output);
             Check(disks.Rows.Single(r => !r.IsMain).Input is { } stays && Core.IO.Paths.Same(stays, stiahnute) && disks.Message.Contains(output, StringComparison.OrdinalIgnoreCase),
                 "disks: an output is no input – " + disks.Message);

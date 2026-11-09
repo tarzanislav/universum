@@ -31,7 +31,7 @@ Jeden soubor podle pravidel UNIVERSUM. Hodí se na rychlou úpravu jednoho filmu
 ## Hromadné zpracování
 Celá složka najednou. UNIVERSUM soubory analyzuje, seřadí je do **skupin** (jeden film nebo jeden seriál) a ukáže *výsledek simulace* – ještě před zápisem vidíte, co ze kterého souboru vznikne.
 
-1. Klikněte na [Složka…], podle potřeby zaškrtněte **i podsložky** a klikněte na [Analyzovat].
+1. Pod nadpisem vyberte, co se analyzuje – **Všechny vstupy** (vstupní složky všech disků najednou; každý soubor půjde do výstupu na svém disku a skupina ukáže svůj disk), vstup jednoho disku, nebo jinou složku tlačítkem [Složka…]; podle potřeby zaškrtněte **i podsložky** a klikněte na [Analyzovat].
 2. Vlevo vyberte skupinu – seriály jsou nahoře v seznamu **Skupina Seriál**, filmy dole v seznamu **Skupina Film**. Vpravo uvidíte její soubory a pod nimi **Stopy skupiny** – čarou mezi nimi změníte, kolik místa má která část.
    Epizody ve složkách, které nejsou pojmenované podle seriálu: označte jejich skupiny s **Ctrl** nebo **Shift** a do řádku
    **Seriál:** zadejte název, [TMDB] nebo **TMDB ID** – dostanou ho všechny označené skupiny najednou.

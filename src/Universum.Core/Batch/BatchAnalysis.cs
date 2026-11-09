@@ -16,6 +16,12 @@ public sealed record BatchAnalysis(
 {
     public int FileCount => Groups.Sum(g => g.Files.Count);
 
+    /// <summary>
+    /// Every folder analysed (owner, 9. 11. 2026: all input folders at once – one on each disk); <see cref="Folder"/> is
+    /// the first of them.
+    /// </summary>
+    public IReadOnlyList<string> Folders { get; init; } = [Folder];
+
     public BatchGroup? GroupOf(string path) => Groups.FirstOrDefault(g => g.Files.Any(f => f.Path == path));
 
     /// <summary>
@@ -211,9 +217,13 @@ public static class BatchAnalyzer
         CancellationToken cancellationToken = default,
         IProgress<MediaFile>? found = null,
         IReadOnlyList<string>? only = null,
-        bool externalSubtitles = true)
+        bool externalSubtitles = true,
+        IReadOnlyList<string>? alsoFolders = null)
     {
         folder = Path.GetFullPath(folder);
+
+        // owner, 9. 11. 2026: the input folders of the other disks too – every file is read where it lies
+        var roots = new[] { folder }.Concat((alsoFolders ?? []).Select(Path.GetFullPath)).Distinct(IO.Paths.Comparer).ToList();
         // owner, 30. 10. 2026 (bod 5): subtitle files lying with a video belong to it – each folder is listed once
         var folders = new System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<(IReadOnlyList<string> Files, int Videos)>>(
             OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
@@ -222,7 +232,12 @@ public static class BatchAnalyzer
         // (episodes sent from Novinky) are analysed as they are, in natural order
         var (files, leftovers) = only is not null
             ? ((IReadOnlyList<string>)only.Select(Path.GetFullPath).Distinct().Order(NaturalComparer.Instance).ToList(), (IReadOnlyList<string>)[])
-            : await Task.Run(() => FindFiles(folder, recursive, excludeDirectories, cancellationToken), cancellationToken).ConfigureAwait(false);
+            : await Task.Run(() =>
+            {
+                var everything = roots.Where(r => r == folder || Directory.Exists(r)).Select(r => FindFiles(r, recursive, excludeDirectories, cancellationToken)).ToList();
+                return ((IReadOnlyList<string>)[.. everything.SelectMany(e => e.Files).Distinct(IO.Paths.Comparer)],
+                        (IReadOnlyList<string>)[.. everything.SelectMany(e => e.Leftovers).Distinct(IO.Paths.Comparer)]);
+            }, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         var results = new (MediaFile? File, string? Error)[files.Count];
         var done = 0;
@@ -297,7 +312,7 @@ public static class BatchAnalyzer
             })
             .ToList();
 
-        return new BatchAnalysis(folder, recursive, groups, failed, leftovers);
+        return new BatchAnalysis(folder, recursive, groups, failed, leftovers) { Folders = roots };
     }
 }
 

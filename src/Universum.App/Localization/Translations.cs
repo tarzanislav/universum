@@ -3361,6 +3361,9 @@ internal static class Translations
         ["★ Nastaviť ako hlavný"] = "★ Nastavit jako hlavní",
         ["DISK {0}"] = "DISK {0}",
         ["hlavný disk"] = "hlavní disk",
+        ["Všetky vstupy ({0})"] = "Všechny vstupy ({0})",
+        ["DISK {0}  {1}"] = "DISK {0}  {1}",
+        ["Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…"] = "Co se analyzuje: všechny vstupní složky najednou (každý soubor půjde do výstupu na svém disku), vstup jednoho disku, nebo složka vybraná tlačítkem Složka…",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6718,5 +6721,8 @@ internal static class Translations
         ["★ Nastaviť ako hlavný"] = "★ Make it the main one",
         ["DISK {0}"] = "DISK {0}",
         ["hlavný disk"] = "main disk",
+        ["Všetky vstupy ({0})"] = "All inputs ({0})",
+        ["DISK {0}  {1}"] = "DISK {0}  {1}",
+        ["Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…"] = "What is analysed: all input folders at once (every file goes into the output on its own disk), the input of one disk, or a folder chosen with Folder…",
     };
 }

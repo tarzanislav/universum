@@ -32,7 +32,7 @@ One file according to the UNIVERSUM rules. Handy for a quick edit of one film or
 ## Batch processing
 A whole folder at once. UNIVERSUM analyzes the files, sorts them into **groups** (one film or one series) and shows the *simulation result* – before anything is written, you can see what each file will become.
 
-1. Click [Folder…], tick **subfolders too** if needed, and click [Analyze].
+1. Under the title choose what is analysed – **All inputs** (the input folders of all disks at once; every file goes into the output on its own disk and a group shows its disk), the input of one disk, or another folder with [Folder…]; tick **subfolders too** if needed and click [Analyze].
 2. On the left, choose a group – series are at the top in the **Series groups** list, films below in the **Film groups** list. On the right you will see its files and, below them, **Group tracks** – drag the line between them to share the height.
    Episodes in folders not named after their series: mark their groups with **Ctrl** or **Shift** and in the **Series:** row
    enter the name, [TMDB] or the **TMDB ID** – all the marked groups get it at once.

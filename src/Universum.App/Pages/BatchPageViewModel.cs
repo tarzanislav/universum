@@ -845,7 +845,7 @@ public sealed class BatchPageViewModel : ObservableObject
                     return "";
                 }
 
-                return Loc.F("Disk {0} nemá vlastný výstupný priečinok – súbory sa skopírujú do {1} na inom disku. Výstup na tomto disku pridáte v Nastaveniach (Výstupné priečinky na ďalších diskoch → Pridať…).",
+                return Loc.F("Disk {0} nemá vlastný výstupný priečinok – súbory sa skopírujú do {1} na inom disku. Výstup tohto disku vytvoríte v Nastaveniach (Priečinky na diskoch → blok disku → Vytvoriť výstup).",
                     Path.GetPathRoot(Path.GetFullPath(folder))?.TrimEnd('\\'), libraries.Default.Root);
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException or UnauthorizedAccessException)

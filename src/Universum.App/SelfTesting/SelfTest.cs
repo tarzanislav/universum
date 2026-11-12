@@ -1934,6 +1934,15 @@ internal static class SelfTest
             "tray: emptied from its card, its posters too – " + notes.Status);
         notes.UndoTrayCommand.Execute(null);
         Check(tray.Entries.Count == count && !notes.CanUndoTray && tray.PostersOf(MediaKind.Movie, 555).Count == 1, "tray: Vrátiť puts it back, the posters too – " + notes.Status);
+
+        // owner, 12. 11. 2026: one title removed with its × on the card – the others stay; Vrátiť brings it back
+        notes.Build();
+        var oneOut = notes.Cards.Single(c => c.IsTray).Rows.Select(r => r.Link).OfType<NoteLinkView>().First(l => l.CanRemove);
+        var before = tray.Entries.Count;
+        oneOut.RemoveCommand!.Execute(null);
+        Check(tray.Entries.Count == before - 1 && notes.CanUndoTray, $"tray: one title removed with its × – {before} → {tray.Entries.Count} – {notes.Status}");
+        notes.UndoTrayCommand.Execute(null);
+        Check(tray.Entries.Count == before, "tray: … Vrátiť brings it back");
         notes.Edit(services.Agenda.Items.Single(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid));
         notes.ClearTrayCommand.Execute(null);
         Check(notes.EditingTray && tray.Entries.Count == 0 && notes.Editor is AgendaEditor, "tray: emptied from inside the note – " + notes.Status);

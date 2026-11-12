@@ -410,6 +410,23 @@ public sealed class NotesPageViewModel : ObservableObject
         ReopenTray();
     }
 
+    // one title out of the tray (an episode alone; its series stays)
+    private void RemoveFromTray(NoteRow row)
+    {
+        if (row.Tmdb is not { Kind: { } kind } tmdb || _services.Agenda.Items.FirstOrDefault(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid) is not { } tray)
+        {
+            return;
+        }
+
+        var episode = kind == Core.Library.MediaKind.Series ? Core.Library.Tmdb.TmdbTray.EpisodeOf(row.Link) : null;
+        var entry = new Core.Library.Tmdb.TmdbTrayEntry(kind, tmdb.Id, row.Name, episode?.Season, episode?.Episode);
+        var before = tray.Text;
+        _services.TmdbTray.Remove(entry);
+        SetTrayBefore(before);
+        Status = L($"Zo zásobníka odstránený: {entry.Display}.", $"Ze zásobníku odstraněn: {entry.Display}.", $"Removed from the tray: {entry.Display}.");
+        ReopenTray();
+    }
+
     private void UndoTray()
     {
         if (_trayBefore is { } before)
@@ -672,6 +689,14 @@ public sealed class NotesPageViewModel : ObservableObject
         var width = WidthOf(item);
         var (rows, more) = RowsOf(item.Text, CardRowsAt[width]);
         var isTray = item.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && !inBin;
+        if (isTray)
+        {
+            // each title of the tray removed alone with its ×; Vrátiť takes it back
+            foreach (var link in rows.Select(r => r.Link).OfType<NoteLinkView>().Where(l => l.Row.Tmdb is { Kind: not null }))
+            {
+                link.RemoveCommand = new RelayCommand(() => RemoveFromTray(link.Row));
+            }
+        }
         return new NoteCard
         {
             CardWidth = CardWidths[width],

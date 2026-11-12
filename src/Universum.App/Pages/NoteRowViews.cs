@@ -33,6 +33,11 @@ public sealed class NoteLinkView : ObservableObject
 
     public RelayCommand OpenCommand { get; }
 
+    /// <summary>Removes this title from the Zásobník TMDB (owner, 12. 11. 2026: "pri každom odkaze krížik"); null elsewhere.</summary>
+    public RelayCommand? RemoveCommand { get; set; }
+
+    public bool CanRemove => RemoveCommand is not null;
+
     /// <summary>The title of TMDB found (a link the note names itself keeps its name).</summary>
     public void Named(string name)
     {

@@ -4929,16 +4929,23 @@
         <!-- a link of a note on a row of its own (owner, 7. 11. 2026): shortened when long, the whole address in the tooltip,
              a click opens the page -->
         <DataTemplate DataType="{x:Type pages:NoteLinkView}">
-            <Button Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Cursor="Hand" HorizontalAlignment="Left" Margin="0,1" Focusable="False">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="Transparent">
-                            <ContentPresenter />
-                        </Border>
-                    </ControlTemplate>
-                </Button.Template>
-                <TextBlock Text="{Binding Shown}" TextTrimming="CharacterEllipsis" TextDecorations="Underline" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-            </Button>
+            <DockPanel HorizontalAlignment="Left" LastChildFill="True">
+                <!-- owner, 12. 11. 2026: a title of the Zásobník TMDB removed alone -->
+                <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
+                        Padding="3,0" Margin="6,0,0,0" VerticalAlignment="Center" Cursor="Hand" ToolTip="{loc:T 'Odstrániť tento titul zo zásobníka (dá sa vrátiť)'}">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="10" />
+                </Button>
+                <Button Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Cursor="Hand" HorizontalAlignment="Left" Margin="0,1" Focusable="False">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock Text="{Binding Shown}" TextTrimming="CharacterEllipsis" TextDecorations="Underline" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                </Button>
+            </DockPanel>
         </DataTemplate>
         <DataTemplate DataType="{x:Type pages:TitleNoteEditor}">
             <StackPanel>

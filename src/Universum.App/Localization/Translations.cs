@@ -3366,6 +3366,7 @@ internal static class Translations
         ["Odstrániť tento titul zo zásobníka (dá sa vrátiť)"] = "Odstranit tento titul ze zásobníku (lze vrátit)",
         ["Zásobník seriálov TMDB"] = "Zásobník seriálů TMDB",
         ["Zásobník filmov TMDB"] = "Zásobník filmů TMDB",
+        ["Práca na pozadí zlyhala: {0} (podrobnosti v chyby.log)"] = "Práce na pozadí selhala: {0} (podrobnosti v chyby.log)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6728,5 +6729,6 @@ internal static class Translations
         ["Odstrániť tento titul zo zásobníka (dá sa vrátiť)"] = "Remove this title from the tray (it can be taken back)",
         ["Zásobník seriálov TMDB"] = "TMDB series tray",
         ["Zásobník filmov TMDB"] = "TMDB films tray",
+        ["Práca na pozadí zlyhala: {0} (podrobnosti v chyby.log)"] = "Background work failed: {0} (details in chyby.log)",
     };
 }

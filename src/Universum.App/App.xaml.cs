@@ -20,6 +20,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnUnhandledException;
+
+        // a task nobody waited for failed (found when it is collected): written to the log, not lost
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            BackgroundWork.Report(args.Exception, "úloha bez čakania");
+            args.SetObserved();
+        };
         QuickDropDowns.Register();
         Universum.Platform.Windows.WindowsVolumes.Register();
         Universum.Platform.Windows.WindowsDisks.Register();
@@ -105,6 +112,7 @@ public partial class App : Application
 
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        BackgroundWork.Log.Write("okno", e.Exception);
         MessageBox.Show(
             Loc.F("Nastala neočakávaná chyba. Program môže pokračovať, ale posledná akcia sa nemusela dokončiť.\n\n{0}", e.Exception.Message),
             "UNIVERSUM", MessageBoxButton.OK, MessageBoxImage.Error);

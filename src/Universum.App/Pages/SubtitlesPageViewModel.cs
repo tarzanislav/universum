@@ -397,7 +397,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
                 {
                     Found.Remove(found!);
                     OnPropertyChanged(nameof(HasFound));
-                    _ = AddFilesAsync([match.Path], match);
+                    BackgroundWork.Run(AddFilesAsync([match.Path], match));
                 }));
                 Found.Add(found);
             }
@@ -550,7 +550,7 @@ public sealed partial class SubtitlesPageViewModel : ObservableObject
         _readingStop.Dispose();
         _readingStop = new CancellationTokenSource();
         CompareRow = null;
-        _ = Player.CloseAsync();
+        BackgroundWork.Run(Player.CloseAsync());
         HasWork = false;
         WorkNote = "";
         if (_task is not null)

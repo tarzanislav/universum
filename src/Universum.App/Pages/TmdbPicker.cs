@@ -86,7 +86,7 @@ public sealed class TmdbPicker : ObservableObject
                 {
                     // a search result has no seasons: the details do, for the check that the episode exists; until they
                     // come the page keeps what it has (also a title waiting for confirmation)
-                    _ = ChooseWithSeasonsAsync(tmdb, value, version);
+                    BackgroundWork.Run(ChooseWithSeasonsAsync(tmdb, value, version));
                 }
                 else
                 {

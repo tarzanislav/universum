@@ -381,7 +381,21 @@ public sealed class AppServices
             Mp4RecordFolder = AppSettings.Mp4RecordDirectory,
         };
 
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+    /// <summary>
+    /// One pool of connections for the services of the program – TMDB, HISTRA, OMDb, DeepL, the weather, the posters, the
+    /// subtitles, the drafts (14. 11. 2026, step 1 of the review of the code): no cookies (no site can follow the user),
+    /// compressed answers (the JSON of TMDB is several times smaller), connections renewed every 10 minutes (a server
+    /// that moved is found again); each client keeps its own time limit.
+    /// </summary>
+    private static readonly SocketsHttpHandler Shared = new()
+    {
+        UseCookies = false,
+        AutomaticDecompression = System.Net.DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        MaxAutomaticRedirections = 10,
+    };
+
+    private static readonly HttpClient Http = new(Shared, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(20) };
 
     /// <summary>The web client of UNIVERSUM (the posters of the Zásobník TMDB are downloaded with it).</summary>
     public static HttpClient WebClient => Http;
@@ -672,6 +686,7 @@ public sealed class AppServices
         AllowAutoRedirect = true,
         MaxAutomaticRedirections = 3,
         AutomaticDecompression = System.Net.DecompressionMethods.All,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
     })
     { Timeout = TimeSpan.FromSeconds(30) };
 
@@ -756,7 +771,7 @@ public sealed class AppServices
     public Universum.Core.Posters.PendingPosters WaitingPosters => _waitingPosters ??= new Universum.Core.Posters.PendingPosters(AppSettings.WaitingPosterDirectory, () => Settings.OutputDirectory, () => Settings.OtherOutputDirectories);
 
     // drawing takes up to a minute or two
-    private static readonly HttpClient DraftHttp = new() { Timeout = TimeSpan.FromMinutes(3) };
+    private static readonly HttpClient DraftHttp = new(Shared, disposeHandler: false) { Timeout = TimeSpan.FromMinutes(3) };
 
     /// <summary>Posters drawn by AI (OpenAI with the user's key, else Cloudflare with the user's account).</summary>
     public Universum.Core.Posters.PosterDrafts Drafts => DraftsForSelfTest ?? new Universum.Core.Posters.PosterDrafts(DraftHttp);
@@ -826,7 +841,7 @@ public sealed class AppServices
 
     // owner, 30. 10. 2026: subtitles from OpenSubtitles.com and translations by svsub.net with the user's own accounts,
     // kept encrypted for this Windows account (like the DeepL key)
-    private static readonly HttpClient SubtitleHttp = new() { Timeout = TimeSpan.FromSeconds(60) };
+    private static readonly HttpClient SubtitleHttp = new(Shared, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(60) };
 
     /// <summary>The name and version UNIVERSUM introduces itself with to subtitle services.</summary>
     public static string SubtitleUserAgent { get; } = "UNIVERSUM v" + (typeof(AppServices).Assembly.GetName().Version?.ToString(3) ?? "0");
@@ -1438,6 +1453,9 @@ public sealed class AppSettings
 
     /// <summary>Záznamy MP4 for the developer (owner, 7. 11. 2026): the structure of an MP4 that could not be edited, no names.</summary>
     public static string Mp4RecordDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "zaznamy-mp4");
+
+    /// <summary>The log of unexpected errors of work in the background (14. 11. 2026).</summary>
+    public static string ErrorLogFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "chyby.log");
 
     /// <summary>Index of library files and the originals they were made from.</summary>
     public static string LibraryIndexFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "library-index.json");

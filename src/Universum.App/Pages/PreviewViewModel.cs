@@ -45,7 +45,7 @@ public sealed class PreviewViewModel : ObservableObject
         {
             if (value is not null && SetProperty(ref _subtitle, value))
             {
-                _ = ShowAsync(value.Value);
+                BackgroundWork.Run(ShowAsync(value.Value));
             }
         }
     }

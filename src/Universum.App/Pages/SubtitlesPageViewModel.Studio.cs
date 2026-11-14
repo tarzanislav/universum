@@ -525,7 +525,7 @@ public sealed partial class SubtitlesPageViewModel
         }
 
         LiveStatus = row.IsExternal ? Loc.T("Načítavam titulky súboru pre prehrávač…") : Loc.F("Načítavam titulky stopy {0} pre prehrávač (číta sa celý súbor)…", row.Track.Id);
-        _ = row.IsText ? ReadTrackAsync(row, file, installation) : ReadPicturesAsync(row, file, installation);
+        BackgroundWork.Run(row.IsText ? ReadTrackAsync(row, file, installation) : ReadPicturesAsync(row, file, installation));
     }
 
     // picture subtitles are read once a video (mkvextract reads the whole file): also none or a failure is kept, so a

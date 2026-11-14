@@ -194,7 +194,7 @@ public sealed class TmdbTrayService : ObservableObject
             TrayToast.Show(Loc.F("Do zásobníka TMDB: {0}", entry.Display));
         }
 
-        _ = NameAsync(entry);
+        BackgroundWork.Run(NameAsync(entry));
     }
 
     /// <summary>
@@ -412,25 +412,7 @@ public sealed class TmdbTrayService : ObservableObject
     private static async Task<byte[]?> DownloadAsync(Uri address, CancellationToken cancellationToken)
     {
         using var answer = await AppServices.WebClient.GetAsync(address, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!answer.IsSuccessStatusCode || answer.Content.Headers.ContentLength > TrayPosters.MaxBytes)
-        {
-            return null;
-        }
-
-        await using var stream = await answer.Content.ReadAsStreamAsync(cancellationToken);
-        using var copy = new MemoryStream();
-        var buffer = new byte[81920];
-        int read;
-        while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            copy.Write(buffer, 0, read);
-            if (copy.Length > TrayPosters.MaxBytes)
-            {
-                return null;
-            }
-        }
-
-        return copy.ToArray();
+        return answer.IsSuccessStatusCode ? await Core.IO.HttpBodies.ReadAsync(answer.Content, TrayPosters.MaxBytes, cancellationToken) : null;
     }
 
     /// <summary>One title out of the tray (an episode alone; its series stays).</summary>

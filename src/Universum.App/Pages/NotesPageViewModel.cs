@@ -238,7 +238,7 @@ public sealed class NotesPageViewModel : ObservableObject
         if (tmdb is not null && name is null && row.Name is null)
         {
             _waiting.Add(view);
-            _ = NameAsync(tmdb);
+            BackgroundWork.Run(NameAsync(tmdb));
         }
 
         return view;

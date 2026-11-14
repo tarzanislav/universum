@@ -133,21 +133,9 @@ public sealed partial class WebPageClient(HttpClient http)
                 throw new NewsSourceException(CoreText.F("Stránka {0} je neprimerane veľká – nepoužila sa.", address.Host));
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                if (buffer.Length + read > MaxBytes)
-                {
-                    throw new NewsSourceException(CoreText.F("Stránka {0} je neprimerane veľká – nepoužila sa.", address.Host));
-                }
-
-                buffer.Write(chunk, 0, read);
-            }
-
-            return (response.StatusCode, Decode(buffer.ToArray(), response.Content.Headers.ContentType?.CharSet), final);
+            var body = await Universum.Core.IO.HttpBodies.ReadAsync(response.Content, MaxBytes, cancellationToken).ConfigureAwait(false)
+                ?? throw new NewsSourceException(CoreText.F("Stránka {0} je neprimerane veľká – nepoužila sa.", address.Host));
+            return (response.StatusCode, Decode(body, response.Content.Headers.ContentType?.CharSet), final);
         }
     }
 

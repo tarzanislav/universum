@@ -16,12 +16,34 @@ public static class TrayToast
     private static DispatcherTimer? _timer;
     private static int _count;
 
-    /// <summary>The texts shown (the self-test reads them).</summary>
-    public static List<string> Shown { get; } = [];
+    // the texts shown, the last ones only (14. 11. 2026: the list grew for as long as UNIVERSUM ran)
+    private const int Kept = 200;
+
+    private static readonly List<string> _shown = [];
+
+    /// <summary>The last texts shown (the self-test reads them).</summary>
+    public static IReadOnlyList<string> Shown
+    {
+        get
+        {
+            lock (_shown)
+            {
+                return [.. _shown];
+            }
+        }
+    }
 
     public static void Show(string message)
     {
-        Shown.Add(message);
+        lock (_shown)
+        {
+            _shown.Add(message);
+            if (_shown.Count > Kept)
+            {
+                _shown.RemoveRange(0, _shown.Count - Kept);
+            }
+        }
+
         if (Application.Current?.Dispatcher is not { } dispatcher)
         {
             return;

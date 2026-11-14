@@ -33,7 +33,7 @@ public static partial class SubtitleCleanup
             var line = Bracketed().Replace(raw, " ");
             line = Speaker().Replace(line, "$1");
             line = Music().Replace(line, "");
-            line = Regex.Replace(line, @"\s{2,}", " ").Trim();
+            line = ManySpaces().Replace(line, " ").Trim();
             // a dash left alone after a removed sound
             if (WithoutTags(line).Trim() is "" or "-" or "–")
             {
@@ -46,7 +46,7 @@ public static partial class SubtitleCleanup
         // one line of a dialogue left: no dash in front of it
         if (lines.Count == 1)
         {
-            lines[0] = Regex.Replace(lines[0], @"^((?:<[ibu]>)*)\s*[-–]\s*", "$1");
+            lines[0] = LeadingDash().Replace(lines[0], "$1");
         }
 
         return string.Join("\n", lines);
@@ -100,4 +100,10 @@ public static partial class SubtitleCleanup
 
     [GeneratedRegex(@"[♪♫]+")]
     private static partial Regex Music();
+
+    [GeneratedRegex(@"\s{2,}", RegexOptions.CultureInvariant)]
+    private static partial Regex ManySpaces();
+
+    [GeneratedRegex(@"^((?:<[ibu]>)*)\s*[-–]\s*", RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingDash();
 }

@@ -125,23 +125,7 @@ public sealed partial class PosterCache
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                if (buffer.Length + read > limit)
-                {
-                    Fail(file, remember);
-                    return null;
-                }
-
-                buffer.Write(chunk, 0, read);
-            }
-
-            var bytes = buffer.ToArray();
-            if (!IsPicture(bytes))
+            if (await Universum.Core.IO.HttpBodies.ReadAsync(response.Content, limit, cancellationToken).ConfigureAwait(false) is not { } bytes || !IsPicture(bytes))
             {
                 Fail(file, remember);
                 return null;

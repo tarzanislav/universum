@@ -135,21 +135,7 @@ public sealed class MkvToolNixInstaller
             using var response = await Http.GetAsync(address, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             RequireOfficial(response.RequestMessage?.RequestUri ?? address);
             response.EnsureSuccessStatusCode();
-            var total = response.Content.Headers.ContentLength ?? 0;
-            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using var output = File.Create(target);
-            var buffer = new byte[1 << 16];
-            long done = 0;
-            int read;
-            while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
-            {
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                done += read;
-                if (total > 0)
-                {
-                    progress?.Report((double)done / total);
-                }
-            }
+            await Universum.Core.IO.HttpBodies.CopyToFileAsync(response.Content, target, progress, cancellationToken);
         }
         catch (HttpRequestException ex)
         {

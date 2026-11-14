@@ -61,12 +61,12 @@ public static partial class SubtitleReader
 
         if (start.StartsWith('<'))
         {
-            if (Regex.IsMatch(start, @"<sami[\s>]", RegexOptions.IgnoreCase))
+            if (SamiStart().IsMatch(start))
             {
                 return new SubtitleDocument(Sami(text), "SAMI");
             }
 
-            if (Regex.IsMatch(text, @"<(\w+:)?tt[\s>]"))
+            if (TtmlStart().IsMatch(text))
             {
                 return new SubtitleDocument(Ttml(text), "TTML");
             }
@@ -105,7 +105,7 @@ public static partial class SubtitleReader
     private static List<SubtitleCue> Srt(string text)
     {
         var cues = new List<SubtitleCue>();
-        foreach (var block in Regex.Split(text, @"\n\s*\n"))
+        foreach (var block in BlankLine().Split(text))
         {
             var lines = block.Split('\n').ToList();
             var at = lines.FindIndex(l => SrtTime().IsMatch(l));
@@ -125,7 +125,7 @@ public static partial class SubtitleReader
     private static List<SubtitleCue> WebVtt(string text)
     {
         var cues = new List<SubtitleCue>();
-        foreach (var block in Regex.Split(text, @"\n\s*\n"))
+        foreach (var block in BlankLine().Split(text))
         {
             var lines = block.Split('\n').ToList();
             var at = lines.FindIndex(l => l.Contains("-->", StringComparison.Ordinal));
@@ -190,7 +190,7 @@ public static partial class SubtitleReader
 
             var body = parts[textAt];
             // drawings ({\p1} … {\p0}) are pictures, not text
-            if (Regex.IsMatch(body, @"\{[^}]*\\p[1-9]"))
+            if (AssDrawing().IsMatch(body))
             {
                 continue;
             }
@@ -267,7 +267,7 @@ public static partial class SubtitleReader
 
             var body = new StringBuilder();
             Collect(p, body);
-            var cleaned = string.Join("\n", body.ToString().Split('\n').Select(l => Regex.Replace(l, @"\s+", " ").Trim()).Where(l => l.Length > 0));
+            var cleaned = string.Join("\n", body.ToString().Split('\n').Select(l => Spaces().Replace(l, " ").Trim()).Where(l => l.Length > 0));
             if (cleaned.Length > 0)
             {
                 cues.Add(new SubtitleCue(begin.Value, end.Value, cleaned));
@@ -309,7 +309,7 @@ public static partial class SubtitleReader
         var cues = new List<SubtitleCue>();
         for (var i = 0; i < syncs.Count; i++)
         {
-            var body = Html(Regex.Replace(syncs[i].Body, @"<br\s*/?>", "\n", RegexOptions.IgnoreCase));
+            var body = Html(LineBreak().Replace(syncs[i].Body, "\n"));
             body = string.Join("\n", body.Split('\n').Select(l => System.Net.WebUtility.HtmlDecode(l).Replace('\u00A0', ' ').Trim()).Where(l => l.Length > 0));
             if (body.Length == 0)
             {
@@ -432,9 +432,9 @@ public static partial class SubtitleReader
     private static string MicroDvdStyle(string text) =>
         string.Join("|", text.Split('|').Select(line =>
         {
-            var italic = Regex.IsMatch(line, @"\{[yY]:[^}]*i");
-            var bold = Regex.IsMatch(line, @"\{[yY]:[^}]*b");
-            var clean = Regex.Replace(line, @"\{[^}]*\}", "").Trim();
+            var italic = MicroDvdItalic().IsMatch(line);
+            var bold = MicroDvdBold().IsMatch(line);
+            var clean = Braces().Replace(line, "").Trim();
             if (clean.StartsWith('/'))
             {
                 italic = true;
@@ -446,7 +446,7 @@ public static partial class SubtitleReader
 
     // HTML-like text: only <i>, <b>, <u> stay (lower case); other tags (font, c, v, span …) are left out
     private static string Html(string text) =>
-        Balanced(Regex.Replace(text, @"<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9.]*)[^>]*>", m =>
+        Balanced(HtmlTag().Replace(text, m =>
         {
             var tag = m.Groups[2].Value.ToLowerInvariant();
             return tag is "i" or "b" or "u" ? "<" + m.Groups[1].Value + tag + ">" : "";
@@ -456,7 +456,7 @@ public static partial class SubtitleReader
     private static string Balanced(string text)
     {
         var open = new List<string>();
-        var result = Regex.Replace(text, @"<(/?)([ibu])>", m =>
+        var result = StyleTag().Replace(text, m =>
         {
             var tag = m.Groups[2].Value;
             if (m.Groups[1].Value.Length == 0)
@@ -482,7 +482,7 @@ public static partial class SubtitleReader
             result += "</" + open[i] + ">";
         }
 
-        return Regex.Replace(result, @"<([ibu])></\1>", "").Trim();
+        return EmptyStyle().Replace(result, "").Trim();
     }
 
     /// <summary>"01:02:03,456", "1:02:03.45", "02:03.456" (WebVTT), "0:00:01.00" (ASS) → time.</summary>
@@ -536,4 +536,40 @@ public static partial class SubtitleReader
 
     [GeneratedRegex(@"<sync\s+start\s*=\s*""?(?<ms>\d+)""?[^>]*>(?<body>.*?)(?=<sync|</body|\z)", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex SamiSync();
+
+    [GeneratedRegex(@"<sami[\s>]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SamiStart();
+
+    [GeneratedRegex(@"<(\w+:)?tt[\s>]", RegexOptions.CultureInvariant)]
+    private static partial Regex TtmlStart();
+
+    [GeneratedRegex(@"\n\s*\n", RegexOptions.CultureInvariant)]
+    private static partial Regex BlankLine();
+
+    [GeneratedRegex(@"\{[^}]*\\p[1-9]", RegexOptions.CultureInvariant)]
+    private static partial Regex AssDrawing();
+
+    [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex Spaces();
+
+    [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex LineBreak();
+
+    [GeneratedRegex(@"\{[yY]:[^}]*i", RegexOptions.CultureInvariant)]
+    private static partial Regex MicroDvdItalic();
+
+    [GeneratedRegex(@"\{[yY]:[^}]*b", RegexOptions.CultureInvariant)]
+    private static partial Regex MicroDvdBold();
+
+    [GeneratedRegex(@"\{[^}]*\}", RegexOptions.CultureInvariant)]
+    private static partial Regex Braces();
+
+    [GeneratedRegex(@"<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9.]*)[^>]*>", RegexOptions.CultureInvariant)]
+    private static partial Regex HtmlTag();
+
+    [GeneratedRegex(@"<(/?)([ibu])>", RegexOptions.CultureInvariant)]
+    private static partial Regex StyleTag();
+
+    [GeneratedRegex(@"<([ibu])></\1>", RegexOptions.CultureInvariant)]
+    private static partial Regex EmptyStyle();
 }

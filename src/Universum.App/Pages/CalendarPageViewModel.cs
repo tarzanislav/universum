@@ -114,7 +114,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
         // a batch planned or changed in MEGA spracovanie, a run of processing ended or a log deleted (from other threads too)
         services.MegaChanged += () => Jobs.JobRow.OnUi(Build);
-        services.ProcessingLogs.Changed += () => Jobs.JobRow.OnUi(() => _ = ReloadRunsAsync());
+        services.ProcessingLogs.Changed += () => Jobs.JobRow.OnUi(() => BackgroundWork.Run(ReloadRunsAsync()));
         Build();
     }
 

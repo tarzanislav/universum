@@ -73,25 +73,25 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             _layers[layer] = new CalendarLayerSwitch(layer, title, !hidden.Contains(layer.ToString()), LayersChanged);
         LayerGroups =
         [
-            new CalendarLayerGroup(L("Premiéry", "Premiéry", "Premieres"),
-                [Layer(CalendarLayer.FilmsDomestic, L("filmy CZ/SK", "filmy CZ/SK", "films CZ/SK")), Layer(CalendarLayer.FilmsWorld, L("filmy SVET", "filmy SVĚT", "films WORLD")),
-                 Layer(CalendarLayer.SeriesDomestic, L("seriály CZ/SK", "seriály CZ/SK", "series CZ/SK")), Layer(CalendarLayer.SeriesWorld, L("seriály SVET", "seriály SVĚT", "series WORLD"))], LayersChanged),
-            new CalendarLayerGroup(L("Novinky – Seriály", "Novinky – Seriály", "New episodes"),
-                [Layer(CalendarLayer.EpisodesDomestic, "CZ/SK"), Layer(CalendarLayer.EpisodesWorld, L("SVET", "SVĚT", "WORLD"))], LayersChanged),
-            new CalendarLayerGroup(L("Moje", "Moje", "Mine"),
-                [Layer(CalendarLayer.Events, L("udalosti", "události", "events")), Layer(CalendarLayer.Tasks, L("úlohy", "úkoly", "tasks")), Layer(CalendarLayer.Notes, L("poznámky k dňu", "poznámky ke dni", "notes of the day"))], LayersChanged),
-            new CalendarLayerGroup(L("Kalendárium", "Kalendárium", "Almanac"),
-                [Layer(CalendarLayer.Holidays, L("sviatky a voľné dni", "svátky a volné dny", "holidays")), Layer(CalendarLayer.Memorial, L("pamätné dni", "významné dny", "memorial days")),
-                 Layer(CalendarLayer.School, L("školské prázdniny", "školní prázdniny", "school holidays")), Layer(CalendarLayer.NameDays, L("meniny", "jmeniny", "name days"))], LayersChanged),
+            new CalendarLayerGroup(Loc.T("Premiéry"),
+                [Layer(CalendarLayer.FilmsDomestic, Loc.T("filmy CZ/SK")), Layer(CalendarLayer.FilmsWorld, Loc.T("filmy SVET")),
+                 Layer(CalendarLayer.SeriesDomestic, Loc.T("seriály CZ/SK")), Layer(CalendarLayer.SeriesWorld, Loc.T("seriály SVET"))], LayersChanged),
+            new CalendarLayerGroup(Loc.T("Novinky – Seriály"),
+                [Layer(CalendarLayer.EpisodesDomestic, "CZ/SK"), Layer(CalendarLayer.EpisodesWorld, Loc.T("SVET"))], LayersChanged),
+            new CalendarLayerGroup(Loc.T("Moje"),
+                [Layer(CalendarLayer.Events, Loc.T("udalosti")), Layer(CalendarLayer.Tasks, Loc.T("úlohy")), Layer(CalendarLayer.Notes, Loc.T("poznámky k dňu"))], LayersChanged),
+            new CalendarLayerGroup(Loc.T("Kalendárium"),
+                [Layer(CalendarLayer.Holidays, Loc.T("sviatky a voľné dni")), Layer(CalendarLayer.Memorial, Loc.T("pamätné dni")),
+                 Layer(CalendarLayer.School, Loc.T("školské prázdniny")), Layer(CalendarLayer.NameDays, Loc.T("meniny"))], LayersChanged),
             // what UNIVERSUM plans (MEGA batches with a time) and did (the logs of processing)
             new CalendarLayerGroup("UNIVERSUM",
-                [Layer(CalendarLayer.Actions, L("naplánované akcie", "naplánované akce", "scheduled actions")), Layer(CalendarLayer.Mega, L("MEGA dávky", "MEGA dávky", "MEGA batches")),
-                 Layer(CalendarLayer.Processed, L("spracované", "zpracované", "processed"))], LayersChanged),
+                [Layer(CalendarLayer.Actions, Loc.T("naplánované akcie")), Layer(CalendarLayer.Mega, Loc.T("MEGA dávky")),
+                 Layer(CalendarLayer.Processed, Loc.T("spracované"))], LayersChanged),
         ];
         var regions = Regions;
         RegionSwitches = [.. HolidayRegions.All.Select(r => new CalendarRegionSwitch(r, HolidayRegions.Name(r, Loc.Language), regions.Contains(r), RegionsChanged))];
-        SchoolRegions = [new VideoChoice<string?>(null, L("všetky kraje", "všechny kraje", "all regions")), .. SchoolHolidays.SlovakRegions.Select(r => new VideoChoice<string?>(r.Code, r.Name))];
-        SchoolDistricts = [new VideoChoice<string?>(null, L("všetky okresy", "všechny okresy", "all districts")), .. SchoolHolidays.CzechDistricts.Select(d => new VideoChoice<string?>(d, d))];
+        SchoolRegions = [new VideoChoice<string?>(null, Loc.T("všetky kraje")), .. SchoolHolidays.SlovakRegions.Select(r => new VideoChoice<string?>(r.Code, r.Name))];
+        SchoolDistricts = [new VideoChoice<string?>(null, Loc.T("všetky okresy")), .. SchoolHolidays.CzechDistricts.Select(d => new VideoChoice<string?>(d, d))];
         PreviousCommand = new RelayCommand(() => Move(-1));
         NextCommand = new RelayCommand(() => Move(1));
         TodayCommand = new RelayCommand(() =>
@@ -293,8 +293,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
     public string DetailTitle => Capitalized(CalendarTexts.LongDate(_selected, Loc.Language));
 
-    public string DetailWeek => L($"{CalendarTexts.Week(_selected)}. týždeň · {_selected.DayOfYear}. deň roka", $"{CalendarTexts.Week(_selected)}. týden · {_selected.DayOfYear}. den roku",
-        $"week {CalendarTexts.Week(_selected)} · day {_selected.DayOfYear} of the year");
+    public string DetailWeek => Loc.F("{0}. týždeň · {1}. deň roka", CalendarTexts.Week(_selected), _selected.DayOfYear);
 
     /// <summary>"SK: Sabína", "CZ: Sabina", "EN: Sabina" – the names on and the day without a name.</summary>
     public IReadOnlyList<string> DetailNames { get => _detailNames; private set => SetProperty(ref _detailNames, value); }
@@ -361,44 +360,44 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     {
         IReadOnlyList<VideoChoice<string>> forms =
         [
-            new("screen", L("Ako na obrazovke", "Jako na obrazovce", "As on the screen")), new("day", L("Vybraný deň", "Vybraný den", "The chosen day")),
-            new("month", L("Mesiac – mriežka", "Měsíc – mřížka", "Month – grid")), new("monthlist", L("Mesiac – zoznam dní", "Měsíc – seznam dní", "Month – list of days")),
-            new("week", L("Týždeň – zoznam dní", "Týden – seznam dní", "Week – list of days")), new("yearrows", L("Rok na jednej strane (riadky)", "Rok na jedné straně (řádky)", "Year on one page (rows)")),
-            new("yearmonths", L("Rok – 12 mesiacov", "Rok – 12 měsíců", "Year – 12 months")), new("agenda", L("Agenda", "Agenda", "Agenda")),
+            new("screen", Loc.T("Ako na obrazovke")), new("day", Loc.T("Vybraný deň")),
+            new("month", Loc.T("Mesiac – mriežka")), new("monthlist", Loc.T("Mesiac – zoznam dní")),
+            new("week", Loc.T("Týždeň – zoznam dní")), new("yearrows", Loc.T("Rok na jednej strane (riadky)")),
+            new("yearmonths", Loc.T("Rok – 12 mesiacov")), new("agenda", Loc.T("Agenda")),
         ];
         var store = _services.Agenda;
         IReadOnlyList<ReportExport> exports =
         [
-            new(L("iCalendar (.ics) – moje záznamy…", "iCalendar (.ics) – moje záznamy…", "iCalendar (.ics) – my records…"), "iCalendar|*.ics", "UNIVERSUM – kalendár.ics",
+            new(Loc.T("iCalendar (.ics) – moje záznamy…"), "iCalendar|*.ics", "UNIVERSUM – kalendár.ics",
                 path =>
                 {
                     File.WriteAllText(path, AgendaExport.Ics(store.Items, null, Loc.Language));
-                    return L("Uložené pre Outlook a Google: ", "Uloženo pro Outlook a Google: ", "Saved for Outlook and Google: ") + path;
+                    return Loc.T("Uložené pre Outlook a Google: ") + path;
                 }, ToolTip: Loc.T("Udalosti s opakovaním a pripomienkou, úlohy, poznámky k dňom")),
-            new(L("iCalendar (.ics) – sviatky roka…", "iCalendar (.ics) – svátky roku…", "iCalendar (.ics) – holidays of the year…"), "iCalendar|*.ics", $"UNIVERSUM – sviatky {_anchor.Year}.ics",
+            new(Loc.T("iCalendar (.ics) – sviatky roka…"), "iCalendar|*.ics", $"UNIVERSUM – sviatky {_anchor.Year}.ics",
                 path =>
                 {
                     File.WriteAllText(path, AgendaExport.Ics([], Regions.SelectMany(r => Holidays.Of(_anchor.Year, r)), Loc.Language));
-                    return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                    return Loc.T("Uložené: ") + path;
                 }),
             new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – záznamy.csv", path =>
             {
                 File.WriteAllText(path, AgendaExport.Csv(store.Items, Loc.Language));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }),
-            new(L("Záloha všetkých záznamov (JSON)…", "Záloha všech záznamů (JSON)…", "Backup of all records (JSON)…"), "JSON|*.json", $"UNIVERSUM – záloha poznámok {DateTime.Now:yyyy-MM-dd}.json",
+            new(Loc.T("Záloha všetkých záznamov (JSON)…"), "JSON|*.json", $"UNIVERSUM – záloha poznámok {DateTime.Now:yyyy-MM-dd}.json",
                 path =>
                 {
                     store.Export(path);
-                    return L("Záloha uložená: ", "Záloha uložena: ", "Backup saved: ") + path;
+                    return Loc.T("Záloha uložená: ") + path;
                 }),
-            new(L("Obnoviť zo zálohy…", "Obnovit ze zálohy…", "Restore from a backup…"), "JSON|*.json", "",
-                path => L("Zo zálohy pridané alebo obnovené záznamy: ", "Ze zálohy přidané nebo obnovené záznamy: ", "Records added or restored: ") + store.Import(path).ToString(CultureInfo.InvariantCulture),
+            new(Loc.T("Obnoviť zo zálohy…"), "JSON|*.json", "",
+                path => Loc.T("Zo zálohy pridané alebo obnovené záznamy: ") + store.Import(path).ToString(CultureInfo.InvariantCulture),
                 Opens: true, ToolTip: Loc.T("Pridá záznamy, ktoré tu nie sú, a obnoví staršie verzie novšími zo zálohy – nič sa nemaže")),
-            new(L("Načítať iCalendar (.ics)…", "Načíst iCalendar (.ics)…", "Read an iCalendar file (.ics)…"), "iCalendar|*.ics", "", ImportIcs,
+            new(Loc.T("Načítať iCalendar (.ics)…"), "iCalendar|*.ics", "", ImportIcs,
                 Opens: true, ToolTip: Loc.T("Udalosti a úlohy z Outlooku, Googlu alebo zo súboru UNIVERSUM – čo tu už je, sa nepridá druhý raz")),
         ];
-        return new ReportViewModel(_services, L("Kalendár", "Kalendář", "Calendar") + " – " + PeriodText, forms, BuildReport, exports);
+        return new ReportViewModel(_services, Loc.T("Kalendár") + " – " + PeriodText, forms, BuildReport, exports);
     }
 
     private IReadOnlyList<ReportPage> BuildReport(string form, ReportOptions options, ReportFonts fonts)
@@ -446,7 +445,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
             }
         }
 
-        var title = L("Kalendár", "Kalendář", "Calendar");
+        var title = Loc.T("Kalendár");
         var layout = new ReportLayout(fonts, options, title, landscape: view is "month" or "yearrows" or "yearmonths");
         var months = Culture.DateTimeFormat.MonthNames.Take(12).Select(Capitalized).ToList();
         switch (view)
@@ -468,11 +467,11 @@ public sealed partial class CalendarPageViewModel : ObservableObject
                 AgendaReports.DayList(layout, months[_anchor.Month - 1] + " " + _anchor.Year.ToString(CultureInfo.InvariantCulture), Range(from, to, HideEmptyDays));
                 break;
             case "week":
-                AgendaReports.DayList(layout, L($"{CalendarTexts.Week(from)}. týždeň", $"{CalendarTexts.Week(from)}. týden", $"Week {CalendarTexts.Week(from)}") + $" · {from:d. M.} – {to:d. M. yyyy}",
+                AgendaReports.DayList(layout, Loc.F("{0}. týždeň", CalendarTexts.Week(from)) + $" · {from:d. M.} – {to:d. M. yyyy}",
                     Range(from, to, false));
                 break;
             default:
-                AgendaReports.DayList(layout, L("Agenda", "Agenda", "Agenda") + $" · {from:d. M.} – {to:d. M. yyyy}", Range(from, to, true));
+                AgendaReports.DayList(layout, Loc.T("Agenda") + $" · {from:d. M.} – {to:d. M. yyyy}", Range(from, to, true));
                 break;
         }
 
@@ -513,20 +512,20 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     {
         var read = AgendaImport.Ics(File.ReadAllText(path));
         var added = _services.Agenda.Add(read.Items);
-        var text = L($"Z iCalendar pridané záznamy: {added} z {read.Items.Count}", $"Z iCalendar přidané záznamy: {added} z {read.Items.Count}", $"Records added from iCalendar: {added} of {read.Items.Count}");
+        var text = Loc.F("Z iCalendar pridané záznamy: {0} z {1}", added, read.Items.Count);
         if (read.Items.Count > added)
         {
-            text += L(" (ostatné tu už sú)", " (ostatní tu už jsou)", " (the others are here already)");
+            text += Loc.T(" (ostatné tu už sú)");
         }
 
         if (read.Skipped > 0)
         {
-            text += L($" · vynechané: {read.Skipped} (bez dňa alebo sviatky)", $" · vynechané: {read.Skipped} (bez dne nebo svátky)", $" · left out: {read.Skipped} (no day, or holidays)");
+            text += Loc.F(" · vynechané: {0} (bez dňa alebo sviatky)", read.Skipped);
         }
 
         if (read.Simplified > 0)
         {
-            text += L($" · zjednodušené opakovanie: {read.Simplified}", $" · zjednodušené opakování: {read.Simplified}", $" · repeat simplified: {read.Simplified}");
+            text += Loc.F(" · zjednodušené opakovanie: {0}", read.Simplified);
         }
 
         Status = text;
@@ -576,7 +575,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
     private async Task LoadAsync()
     {
-        Status = L("Čítam premiéry a epizódy, ktoré UNIVERSUM uchováva…", "Čtu premiéry a epizody, které UNIVERSUM uchovává…", "Reading the premieres and episodes UNIVERSUM keeps…");
+        Status = Loc.T("Čítam premiéry a epizódy, ktoré UNIVERSUM uchováva…");
         try
         {
             await _sources.LoadAsync();
@@ -584,7 +583,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            Status = L("Premiéry a epizódy sa nedajú prečítať: ", "Premiéry a epizody nelze přečíst: ", "The premieres and episodes cannot be read: ") + ex.Message;
+            Status = Loc.T("Premiéry a epizódy sa nedajú prečítať: ") + ex.Message;
         }
 
         Build();
@@ -770,10 +769,10 @@ public sealed partial class CalendarPageViewModel : ObservableObject
     private string Period(DateOnly from, DateOnly to) => _view switch
     {
         CalendarView.Month or CalendarView.MonthList => Capitalized(Culture.DateTimeFormat.MonthNames[_anchor.Month - 1]) + " " + _anchor.Year.ToString(CultureInfo.InvariantCulture),
-        CalendarView.Week or CalendarView.WeekList => L($"{CalendarTexts.Week(from)}. týždeň", $"{CalendarTexts.Week(from)}. týden", $"Week {CalendarTexts.Week(from)}") +
+        CalendarView.Week or CalendarView.WeekList => Loc.F("{0}. týždeň", CalendarTexts.Week(from)) +
                                                       $" · {from:d. M.} – {to:d. M. yyyy}",
         CalendarView.YearMonths or CalendarView.YearRows => _anchor.Year.ToString(CultureInfo.InvariantCulture),
-        _ => L($"Najbližších {AgendaSpan.Value} dní od {from:d. M. yyyy}", $"Nejbližších {AgendaSpan.Value} dní od {from:d. M. yyyy}", $"Next {AgendaSpan.Value} days from {from:d. M. yyyy}"),
+        _ => Loc.F("Najbližších {0} dní od {1:d. M. yyyy}", AgendaSpan.Value, from),
     };
 
     private CalendarDay Day(DateOnly date, bool inPeriod, IReadOnlyList<CalendarEntry> entries, int shown)
@@ -942,7 +941,7 @@ public sealed partial class CalendarPageViewModel : ObservableObject
         var parts = new List<string>();
         if (item.Time is { } t)
         {
-            parts.Add(t.StartTime is { } s ? s.ToString("HH:mm", CultureInfo.InvariantCulture) + (t.EndTime is { } e ? "–" + e.ToString("HH:mm", CultureInfo.InvariantCulture) : "") : L("celý deň", "celý den", "all day"));
+            parts.Add(t.StartTime is { } s ? s.ToString("HH:mm", CultureInfo.InvariantCulture) + (t.EndTime is { } e ? "–" + e.ToString("HH:mm", CultureInfo.InvariantCulture) : "") : Loc.T("celý deň"));
             if (t.Length > 1)
             {
                 parts.Add($"{t.Start:d. M.} – {t.Start.AddDays(t.Length - 1):d. M. yyyy}");
@@ -956,12 +955,12 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
         if (item.Task is { } task)
         {
-            parts.Add(AgendaEditor.Priorities[Math.Clamp(task.Priority, 0, 2)].Label + " " + L("priorita", "priorita", "priority"));
+            parts.Add(AgendaEditor.Priorities[Math.Clamp(task.Priority, 0, 2)].Label + " " + Loc.T("priorita"));
         }
 
         if (item.Action is { } action)
         {
-            parts.Add(AgendaEditor.ActionText(action.Kind) + (action.LastOutcome.Length > 0 ? " · " + L("naposledy: ", "naposledy: ", "last: ") + action.LastOutcome : ""));
+            parts.Add(AgendaEditor.ActionText(action.Kind) + (action.LastOutcome.Length > 0 ? " · " + Loc.T("naposledy: ") + action.LastOutcome : ""));
         }
 
         if (item.Text.Length > 0)
@@ -1006,20 +1005,18 @@ public sealed partial class CalendarPageViewModel : ObservableObject
 
         DetailSections = new[]
         {
-            Section(L("Moje", "Moje", "Mine"), CalendarLayer.Events, CalendarLayer.Events, CalendarLayer.Tasks, CalendarLayer.Notes),
-            Section(L("Sviatky a pamätné dni", "Svátky a významné dny", "Holidays and memorial days"), CalendarLayer.Holidays, CalendarLayer.Holidays, CalendarLayer.Memorial),
-            Section(L("Školský rok", "Školní rok", "School year"), CalendarLayer.School, CalendarLayer.School),
-            Section(L("Premiéry filmov", "Premiéry filmů", "Film premieres"), CalendarLayer.FilmsDomestic, CalendarLayer.FilmsDomestic, CalendarLayer.FilmsWorld),
-            Section(L("Premiéry seriálov", "Premiéry seriálů", "Series premieres"), CalendarLayer.SeriesDomestic, CalendarLayer.SeriesDomestic, CalendarLayer.SeriesWorld),
-            Section(L("Novinky – Seriály", "Novinky – Seriály", "New episodes"), CalendarLayer.EpisodesWorld, CalendarLayer.EpisodesDomestic, CalendarLayer.EpisodesWorld),
+            Section(Loc.T("Moje"), CalendarLayer.Events, CalendarLayer.Events, CalendarLayer.Tasks, CalendarLayer.Notes),
+            Section(Loc.T("Sviatky a pamätné dni"), CalendarLayer.Holidays, CalendarLayer.Holidays, CalendarLayer.Memorial),
+            Section(Loc.T("Školský rok"), CalendarLayer.School, CalendarLayer.School),
+            Section(Loc.T("Premiéry filmov"), CalendarLayer.FilmsDomestic, CalendarLayer.FilmsDomestic, CalendarLayer.FilmsWorld),
+            Section(Loc.T("Premiéry seriálov"), CalendarLayer.SeriesDomestic, CalendarLayer.SeriesDomestic, CalendarLayer.SeriesWorld),
+            Section(Loc.T("Novinky – Seriály"), CalendarLayer.EpisodesWorld, CalendarLayer.EpisodesDomestic, CalendarLayer.EpisodesWorld),
             Section("UNIVERSUM", CalendarLayer.Actions, CalendarLayer.Actions, CalendarLayer.Mega, CalendarLayer.Processed),
         }.OfType<CalendarSection>().ToList();
         OnPropertyChanged(nameof(DetailIsEmpty));
     }
 
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpper(text[0], Culture) + text[1..];
-
-    internal static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
 
     // the runs of processing read again (a run ended, logs deleted) – only once the calendar has read its sources
     private async Task ReloadRunsAsync()
@@ -1126,12 +1123,12 @@ internal sealed partial class CalendarSources(AppServices services)
 
     private static string MegaState(MegaBatchState state) => state switch
     {
-        MegaBatchState.Waiting => CalendarPageViewModel.L("čaká na spustenie", "čeká na spuštění", "waiting for its start"),
-        MegaBatchState.Queued => CalendarPageViewModel.L("vo fronte úloh", "ve frontě úloh", "in the job queue"),
-        MegaBatchState.Done => CalendarPageViewModel.L("hotová", "hotová", "done"),
-        MegaBatchState.DoneWithProblems => CalendarPageViewModel.L("hotová s problémami", "hotová s problémy", "done with problems"),
-        MegaBatchState.Cancelled => CalendarPageViewModel.L("zrušená", "zrušená", "cancelled"),
-        _ => CalendarPageViewModel.L("zmeškaná – UNIVERSUM vtedy nebežal", "zmeškaná – UNIVERSUM tehdy neběžel", "missed – UNIVERSUM was not running"),
+        MegaBatchState.Waiting => Loc.T("čaká na spustenie"),
+        MegaBatchState.Queued => Loc.T("vo fronte úloh"),
+        MegaBatchState.Done => Loc.T("hotová"),
+        MegaBatchState.DoneWithProblems => Loc.T("hotová s problémami"),
+        MegaBatchState.Cancelled => Loc.T("zrušená"),
+        _ => Loc.T("zmeškaná – UNIVERSUM vtedy nebežal"),
     };
 
     private static string Files(int count) => Loc.Language switch

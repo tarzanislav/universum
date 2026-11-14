@@ -185,6 +185,48 @@ public sealed class TmdbTrayTests
         Assert.True(TmdbUserScript.Bookmarklet.StartsWith("javascript:location.href='universum://tmdb?u='", StringComparison.Ordinal), "the bookmark");
     }
 
+    // 14. 11. 2026: the script is a file of its own – every name in it is put in, and the result is valid JavaScript (node
+    // checks it where it is installed, as on the machines of the CI)
+    [Test]
+    public async Task TheScriptIsValidJavaScript()
+    {
+        var script = TmdbUserScript.Text(47219, "0123456789abcdef0123456789abcdef", automatic: false);
+        Assert.True(!script.Contains("__UNIVERSUM_", StringComparison.Ordinal) && !script.Contains("__T_", StringComparison.Ordinal) &&
+                    script.Contains("const AUTOMATIC = false;", StringComparison.Ordinal) && script.Contains("// @version      " + TmdbUserScript.Version, StringComparison.Ordinal),
+            "every name of the source put in");
+        var file = Path.Combine(Path.GetTempPath(), "universum-skript-" + Guid.NewGuid().ToString("N") + ".js");
+        await File.WriteAllTextAsync(file, script);
+        try
+        {
+            System.Diagnostics.Process? node;
+            try
+            {
+                node = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("node", ["--check", file]) { RedirectStandardError = true, UseShellExecute = false });
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                node = null;
+            }
+
+            if (node is null)
+            {
+                Assert.Skip("node is not installed");
+                return;
+            }
+
+            using (node)
+            {
+                var errors = await node.StandardError.ReadToEndAsync();
+                await node.WaitForExitAsync();
+                Assert.True(node.ExitCode == 0, "node --check: " + errors);
+            }
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     [Test]
     public void CsfdPagesAndPostersOnlyFromTheirServers()
     {

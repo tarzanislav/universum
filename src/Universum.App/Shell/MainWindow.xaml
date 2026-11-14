@@ -1742,6 +1742,259 @@
                     </Border>
                 </Grid>
             </DataTemplate>
+            <DataTemplate DataType="{x:Type pages:SeriesNewsPageViewModel}">
+                <DockPanel Margin="24,20,24,12">
+                    <DockPanel.Resources>
+                        <Style x:Key="NewsRow" TargetType="DataGridRow" BasedOn="{StaticResource NewsRowBase}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                                    <Setter Property="Background" Value="{Binding DataContext.SelectedTab.Tint, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DockPanel.Resources>
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Novinky – Seriály'}" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
+                                   Text="{loc:T 'Epizódy bežiacich seriálov za posledný týždeň (staršie sú v Histórii). Zaškrtnite epizódy a odošlite ich na spracovanie: UNIVERSUM ich hneď nájde vo vstupnom priečinku – jeden súbor ide do Single spracovania, viac do Hromadného spracovania. Súbory sa len čítajú.'}" />
+                        <ContentControl Content="{Binding InputFolder}" Margin="0,0,0,8" />
+                        <DockPanel Margin="0,0,0,8">
+                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                <Button Command="{Binding SendCommand}" Padding="12,5" Margin="0,0,8,0" ToolTip="{loc:T 'Nájde zaškrtnuté epizódy vo vstupnom priečinku a odošle ich na spracovanie'}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE724;" Margin="0,0,8,0" />
+                                        <TextBlock Text="{Binding SendText}" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" ToolTip="{loc:T 'Opýta sa zdrojov na dnešok a ďalšie dni hneď'}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" Margin="0,0,8,0" />
+                                        <TextBlock Text="{loc:T 'Obnoviť'}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Content="{loc:T 'Zastaviť'}" Command="{Binding StopCommand}" Padding="12,5" Margin="0,0,12,0"
+                                        Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                            <TextBlock />
+                        </DockPanel>
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="2,0,0,6" />
+                        <ListBox ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" BorderThickness="0" Background="Transparent"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Left" Width="520" Margin="0,0,0,8">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="1" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Margin" Value="0,0,8,0" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Card" CornerRadius="10" BorderThickness="2" BorderBrush="{Binding Accent}" Background="{Binding Tint}" Padding="14,8">
+                                                    <DockPanel>
+                                                        <Border DockPanel.Dock="Right" CornerRadius="9" Background="{Binding Accent}" Padding="8,1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding CountText}" Foreground="White" FontWeight="SemiBold" />
+                                                        </Border>
+                                                        <TextBlock x:Name="Title" Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                    </DockPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Card" Property="Background" Value="{Binding Accent}" />
+                                                        <Setter TargetName="Title" Property="Foreground" Value="White" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                        <!-- what is shown: the last week or the history; posters; only the chosen series; search -->
+                        <DockPanel Margin="0,0,0,6">
+                            <TextBox DockPanel.Dock="Right" Width="170" Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                                     ToolTip="{loc:T 'Hľadať seriál, stanicu alebo poznámku (bez diakritiky)'}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{loc:T 'Hľadať:'}" VerticalAlignment="Center" Margin="12,0,8,0" />
+                            <!-- owner, 29. 10. 2026: the size of the posters above the column of titles, the views further right -->
+                            <WrapPanel VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,40,0" IsEnabled="{Binding ShowPosters}"
+                                            ToolTip="{loc:T 'Zväčší postery v tabuľke až dvojnásobne (veľkosť sa zapamätá)'}">
+                                    <TextBlock Text="{loc:T 'Veľkosť POSTERU'}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                    <Slider Minimum="1" Maximum="2" TickFrequency="0.25" IsSnapToTickEnabled="True" TickPlacement="BottomRight" Width="130"
+                                            Value="{Binding PosterScale}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding PosterScale, StringFormat={}{0:0.##}×}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="34"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <RadioButton Content="{loc:T 'Týždeň spätne'}" IsChecked="{Binding ShowRecent}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                                <RadioButton Content="{loc:T 'Nadchádzajúce'}" IsChecked="{Binding ShowUpcoming}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                                <RadioButton Content="{loc:T 'História'}" IsChecked="{Binding ShowHistory}" GroupName="NewsView" MinWidth="0" Margin="0,0,16,0" />
+                                <RadioButton Content="{loc:T 'Zobraziť všetko'}" IsChecked="{Binding ShowAll}" GroupName="NewsView" MinWidth="0" Margin="0,0,24,0"
+                                             ToolTip="{loc:T 'História, posledný týždeň aj nadchádzajúce – všetky informácie'}" />
+                                <CheckBox Content="{loc:T 'Zobraziť aj postery'}" IsChecked="{Binding ShowPosters}" MinWidth="0" Margin="0,0,16,0" />
+                                <CheckBox Content="{loc:T 'Zobraziť vybrané'}" IsChecked="{Binding OnlyChosen}" MinWidth="0" Margin="0,0,16,0" ToolTip="{loc:T 'Len seriály zaškrtnuté v stĺpci Vybrané'}" />
+                                <CheckBox Content="{loc:T 'len z mojich listov HISTRA'}" IsChecked="{Binding OnlyMyLists}" MinWidth="0"
+                                          Visibility="{Binding HasMyLists, Converter={StaticResource BoolToVisibility}}" />
+                            </WrapPanel>
+                        </DockPanel>
+                        <TextBlock Text="{Binding Problems}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" Margin="2,0,0,6"
+                                   Visibility="{Binding HasProblems, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <!-- further series for Hromadné spracovanie, and episodes not in the input folder yet -->
+                        <Border Style="{StaticResource Card}" Padding="12,8" Margin="0,8,0,0" Visibility="{Binding HasReady, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="{loc:T 'Pripravené pre Hromadné spracovanie (čakajú, kým Hromadné spracovanie pracuje)'}" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding Ready}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,3,0,0">
+                                                <Button DockPanel.Dock="Right" Content="{loc:T 'Do Hromadného spracovania'}" Command="{Binding SendCommand}" Padding="10,2" />
+                                                <TextBlock Text="{Binding Text}" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Padding="12,8" Margin="0,8,0,0" Visibility="{Binding HasWaiting, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="{loc:T 'Skontrolovať znova'}" Command="{Binding CheckAgainCommand}" Padding="10,2" />
+                                    <TextBlock Text="{loc:T 'Čaká na súbor vo vstupnom priečinku'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Waiting}" MaxHeight="120">
+                                    <ItemsControl.Template>
+                                        <ControlTemplate TargetType="ItemsControl">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsPresenter />
+                                            </ScrollViewer>
+                                        </ControlTemplate>
+                                    </ItemsControl.Template>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,2,0,0">
+                                                <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}" Padding="6,1" ToolTip="{loc:T 'Odstrániť zo zoznamu'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="11" />
+                                                </Button>
+                                                <TextBlock Text="{Binding Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding Attribution}" Style="{StaticResource Hint}" FontSize="11.5" Margin="2,8,0,0" />
+                    </StackPanel>
+                    <Grid>
+                        <!-- the series alphabetically with their nearest episode; opened, the tree of their episodes right under them -->
+                        <DataGrid ItemsSource="{Binding SelectedTab.Rows}" Style="{StaticResource NewsGrid}" BorderBrush="{Binding SelectedTab.Accent}"
+                                  AlternatingRowBackground="{Binding SelectedTab.Stripe}" RowStyle="{StaticResource NewsRow}" ColumnHeaderStyle="{StaticResource NewsHeader}"
+                                  RowDetailsVisibilityMode="Collapsed" LoadingRow="OnNewsLoadingRow">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="36" MinWidth="36" CanUserSort="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Command="{Binding ToggleCommand}" Padding="4" MinWidth="0" Margin="4,0,0,0" VerticalAlignment="Center" Background="Transparent" BorderThickness="0"
+                                                    ToolTip="{loc:T 'Zobraziť alebo skryť epizódy seriálu'}">
+                                                <TextBlock Style="{StaticResource Icon}" Text="{Binding ExpandGlyph}" FontSize="12" />
+                                            </Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="{loc:T 'Názov seriálu'}" Width="3*" MinWidth="210" SortMemberPath="Caption" CellTemplate="{StaticResource NewsTitleCell}" />
+                                <DataGridTextColumn Header="{loc:T 'Žáner'}" Binding="{Binding Genre.Text, Mode=OneWay}" Width="1*" MinWidth="90" SortMemberPath="Genre.Sorted" ElementStyle="{StaticResource NewsCell}" />
+                                <DataGridTextColumn Header="{loc:T 'Produkcia'}" Binding="{Binding Production}" Width="1.1*" MinWidth="90" ElementStyle="{StaticResource NewsCell}" />
+                                <DataGridTemplateColumn Header="{loc:T 'Spracovať'}" Width="88" MinWidth="88" CanUserSort="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanCheck}" MinWidth="0" Padding="0"
+                                                          ToolTip="{loc:T 'Zaškrtne všetky odvysielané epizódy seriálu na spracovanie'}" />
+                                                <TextBlock Text="{Binding CheckedText}" Style="{StaticResource Hint}" FontSize="11" VerticalAlignment="Center" Margin="2,0,0,0" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="{loc:T 'Dátum'}" Binding="{Binding Date}" Width="96" MinWidth="96" SortMemberPath="SortDate" ElementStyle="{StaticResource NewsCell}" />
+                                <DataGridTextColumn Header="{loc:T 'Kedy'}" Binding="{Binding When}" Width="96" MinWidth="96" SortMemberPath="SortDate">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource NewsCell}">
+                                            <Setter Property="FontWeight" Value="Bold" />
+                                            <Setter Property="Foreground" Value="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="{loc:T 'Deň'}" Binding="{Binding Day}" Width="70" MinWidth="70" ElementStyle="{StaticResource NewsCell}" />
+                                <DataGridTemplateColumn Header="{loc:T 'Najbližšia'}" Width="104" MinWidth="104" SortMemberPath="NearestCode">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel VerticalAlignment="Center" Margin="6,0">
+                                                <TextBlock Text="{Binding NearestCode}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding NearestNote}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" />
+                                                <TextBlock Text="{Binding FolderText}" Style="{StaticResource NewsSubtitle}" FontSize="11.5" FontWeight="SemiBold" Foreground="#2F9461" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="{loc:T 'Vybrané'}" Width="72" MinWidth="72" SortMemberPath="IsChosen" CellTemplate="{StaticResource NewsChosenCell}" />
+                                <DataGridTemplateColumn Header="{loc:T 'Poznámky'}" Width="1.6*" MinWidth="120" SortMemberPath="Note" CellTemplate="{StaticResource NewsNoteCell}" />
+                            </DataGrid.Columns>
+                            <DataGrid.RowDetailsTemplate>
+                                <DataTemplate>
+                                    <Border Margin="36,0,8,8" Padding="10,6" CornerRadius="6" BorderThickness="1"
+                                            BorderBrush="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                                        <ItemsControl ItemsSource="{Binding Episodes}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="20" />
+                                                            <ColumnDefinition Width="150" />
+                                                            <ColumnDefinition Width="110" />
+                                                            <ColumnDefinition Width="140" />
+                                                            <ColumnDefinition Width="80" />
+                                                            <ColumnDefinition Width="100" />
+                                                            <ColumnDefinition Width="110" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Button Command="{Binding ToNoteCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať epizódu do Poznámok (a otvoriť na úpravu)'}">
+                                                                <TextBlock><Run Text="&#xE70B;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do poznámok'}" /></TextBlock>
+                                                            </Button>
+                                                            <Button Command="{Binding ToTaskCommand}" Style="{StaticResource NewsLink}" ToolTip="{loc:T 'Pridať epizódu do Plánovaných úloh s termínom vysielania (a otvoriť na úpravu)'}">
+                                                                <TextBlock><Run Text="&#xE9D5;" FontFamily="{StaticResource IconFont}" /> <Run Text="{loc:T 'Do úloh'}" /></TextBlock>
+                                                            </Button>
+                                                        </StackPanel>
+                                                        <TextBlock Text="•" Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" VerticalAlignment="Center" />
+                                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanCheck}" MinWidth="0" VerticalAlignment="Center"
+                                                                  ToolTip="{loc:T 'Zaškrtnuté epizódy odošlete tlačidlom Odoslať na spracovanie (len odvysielané)'}">
+                                                            <TextBlock Text="{Binding Code}" FontWeight="SemiBold" />
+                                                        </CheckBox>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Mark}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding Production}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="4" Text="{Binding Day}" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="5" Text="{Binding Date}" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="6" Text="{Binding When}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   Foreground="{Binding DataContext.SelectedTab.Accent, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                                                        <TextBlock Grid.Column="7" Text="{Binding State}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGrid.RowDetailsTemplate>
+                        </DataGrid>
+                        <TextBlock Text="{Binding EmptyText}" Style="{StaticResource Hint}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" IsHitTestVisible="False"
+                                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+                </DockPanel>
+            </DataTemplate>
             <!-- POZNÁMKY – Kalendár (owner, 31. 10. 2026): seven views, layers, the day's detail and the editor on the left -->
             <DataTemplate DataType="{x:Type pages:AgendaEditor}">
                 <StackPanel>

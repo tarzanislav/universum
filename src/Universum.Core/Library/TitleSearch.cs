@@ -214,6 +214,53 @@ public sealed record TitleResults(IReadOnlyList<TmdbTitle> Titles, string Source
     public TmdbTitle? OnlyOne(int? year) =>
         Titles.Where(t => year is null || t.Year is null || Math.Abs(t.Year.Value - year.Value) <= 1).ToList() is { Count: 1 } only ? only[0] : null;
 
+    /// <summary>
+    /// The film found for the name and year read from a file's name (owner, 28. 10. 2026: the name of a file may be wrong):
+    /// the title named so (with the year, unless the search had to loosen it), else one with a similar name, else the only
+    /// one found – with what speaks against it (the search loosened, a different name, a year further than one off). The
+    /// file waits for the user's confirmation when there is any doubt. No title when none can be told.
+    /// </summary>
+    public FilmMatch Match(string name, int? year)
+    {
+        var asked = Loosened is null ? year : null;
+        var match = Best(name, asked);
+        var doubts = new List<string>();
+        if (Loosened is { } how)
+        {
+            doubts.Add(how);
+        }
+
+        if (match is null && Similar(name) is { } similar)
+        {
+            match = similar.Title;
+            doubts.Add(CoreText.F("názov v mene súboru sa líši (zhoda {0:0} %)", similar.Similarity * 100));
+        }
+
+        if (match is null && OnlyOne(asked) is { } only)
+        {
+            match = only;
+            doubts.Add(CoreText.T("jediný nájdený titul, jeho názov sa s menom súboru nezhoduje"));
+        }
+
+        if (match is { Year: { } foundYear } && year is { } fileYear && Math.Abs(foundYear - fileYear) > 1)
+        {
+            doubts.Add(CoreText.F("rok v mene súboru {0}, na {1} {2}", fileYear, Source, foundYear));
+        }
+
+        return new FilmMatch(match, doubts);
+    }
+
+    /// <summary>
+    /// The title a name and year of a browser tab or a page of ČSFD means (the Zásobník TMDB): the only one of the kind with
+    /// that name and year – sure; else the likeliest of the kind – not sure (the user checks it); null when there is none.
+    /// </summary>
+    public (TmdbTitle Title, bool Sure)? Likeliest(MediaKind kind, string name, int year)
+    {
+        var candidates = Titles.Where(t => t.Kind == kind).ToList();
+        var exact = candidates.Where(t => t.Year == year && t.IsNamed(name)).ToList();
+        return exact.Count == 1 ? (exact[0], true) : candidates.FirstOrDefault() is { } likeliest ? (likeliest, false) : null;
+    }
+
     /// <summary>The title is in HISTRA's own catalog (not only passed on from TMDB).</summary>
     public bool InHistraCatalog(TmdbTitle title) =>
         title.HistraId is not null || HistraTitles?.Any(h => h.Kind == title.Kind && h.Id == title.Id && h.HistraId is not null) == true;
@@ -488,3 +535,6 @@ public sealed class TitleSearch
         : _tmdb is not null ? CoreText.T("TMDB nič nenašlo – výsledky sú z katalógu HISTRA.")
         : "";
 }
+
+/// <summary>The film found for the name of a file, and what speaks against it (empty: sure).</summary>
+public sealed record FilmMatch(TmdbTitle? Title, IReadOnlyList<string> Doubts);

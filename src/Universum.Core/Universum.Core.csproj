@@ -14,5 +14,7 @@
     <EmbeddedResource Include="Calendar\english-names.txt" LogicalName="Universum.Core.Calendar.english-names.txt" />
     <EmbeddedResource Include="Calendar\holidays.txt" LogicalName="Universum.Core.Calendar.holidays.txt" />
     <EmbeddedResource Include="Calendar\school-holidays.txt" LogicalName="Universum.Core.Calendar.school-holidays.txt" />
+    <!-- the script for the browser of the Zásobník TMDB (TmdbUserScript) -->
+    <EmbeddedResource Include="Library\Tmdb\universum.user.js" LogicalName="Universum.Core.Library.Tmdb.universum.user.js" />
   </ItemGroup>
 </Project>

@@ -178,7 +178,7 @@ public sealed class AgendaOverview : ObservableObject
     public bool NoTasks => Tasks.Count == 0;
 
     /// <summary>"a ďalšie 3 v Plánovaných úlohách" when the list is longer.</summary>
-    public string MoreTasks => _moreTasks == 0 ? "" : L($"a ďalšie ({_moreTasks}) v Plánovaných úlohách", $"a další ({_moreTasks}) v Plánovaných úkolech", $"and {_moreTasks} more in Planned tasks");
+    public string MoreTasks => _moreTasks == 0 ? "" : Loc.F("a ďalšie ({0}) v Plánovaných úlohách", _moreTasks);
 
     public bool HasMoreTasks => _moreTasks > 0;
 
@@ -200,8 +200,7 @@ public sealed class AgendaOverview : ObservableObject
     }
 
     public string QuickHint => QuickText.Trim().Length == 0
-        ? L("Úloha jedným riadkom, napr. „zajtra 18:00 skontrolovať titulky #film !“ – Enter ju pridá.", "Úkol jedním řádkem, např. „zítra 18:00 zkontrolovat titulky #film !“ – Enter ho přidá.",
-            "A task in one line, e.g. “tomorrow 18:00 check the subtitles #film !” – Enter adds it.")
+        ? Loc.T("Úloha jedným riadkom, napr. „zajtra 18:00 skontrolovať titulky #film !“ – Enter ju pridá.")
         : TasksPageViewModel.HintOf(QuickText);
 
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
@@ -286,14 +285,14 @@ public sealed class AgendaOverview : ObservableObject
 
         var item = TasksPageViewModel.AddQuick(_services.Agenda, line);
         QuickText = "";
-        Status = L("Pridané: ", "Přidáno: ", "Added: ") + item.Title + " · " + TasksPageViewModel.Due(item.Task?.Due, item.Task?.DueTime);
+        Status = Loc.T("Pridané: ") + item.Title + " · " + TasksPageViewModel.Due(item.Task?.Due, item.Task?.DueTime);
         Refresh();
     }
 
     private void Done(AgendaItem item)
     {
         _main.AgendaTasks.SetDone(item, true);
-        Status = L("Hotovo: ", "Hotovo: ", "Done: ") + item.Title;
+        Status = Loc.T("Hotovo: ") + item.Title;
         Refresh();
     }
 
@@ -328,12 +327,10 @@ public sealed class AgendaOverview : ObservableObject
 
     private static string DayLabel(DateOnly day, DateOnly today, CultureInfo culture) => (day.DayNumber - today.DayNumber) switch
     {
-        0 => L("Dnes", "Dnes", "Today"),
-        1 => L("Zajtra", "Zítra", "Tomorrow"),
+        0 => Loc.T("Dnes"),
+        1 => Loc.T("Zajtra"),
         _ => Capitalized(day.ToString("ddd", culture)) + " " + day.ToString("d. M.", CultureInfo.InvariantCulture),
     };
 
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
-
-    private static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
 }

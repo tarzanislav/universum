@@ -214,8 +214,7 @@ public sealed class NotesPageViewModel : ObservableObject
                 _services.Settings.Save();
                 OnPropertyChanged();
                 Status = value && _services.Tmdb is null
-                    ? L("Názvy filmov a seriálov sa načítajú z TMDB – zadajte kľúč TMDB v Nastaveniach.", "Názvy filmů a seriálů se načtou z TMDB – zadejte klíč TMDB v Nastavení.",
-                        "The names of films and series come from TMDB – enter a TMDB key in Settings.")
+                    ? Loc.T("Názvy filmov a seriálov sa načítajú z TMDB – zadajte kľúč TMDB v Nastaveniach.")
                     : "";
                 Build();
                 (Editor as AgendaEditor)?.RefreshLinks();
@@ -293,11 +292,11 @@ public sealed class NotesPageViewModel : ObservableObject
         var shown = rows.Take(cardRows).Select(r => r.IsLink ? new NoteRowView(null, LinkView(r)) : new NoteRowView(r.Text, null)).ToList();
         var left = rows.Count - cardRows;
         return (shown, left > 0
-            ? L($"… a ďalšie ({left}) – otvorte poznámku", $"… a další ({left}) – otevřete poznámku", $"… and {left} more – open the note")
+            ? Loc.F("… a ďalšie ({0}) – otvorte poznámku", left)
             : "");
     }
 
-    public static string AllTags => L("všetky", "všechny", "all");
+    public static string AllTags => Loc.T("všetky");
 
     public static IReadOnlyList<VideoChoice<int>> Sorts { get; } = [new(0, Loc.T("podľa zmeny")), new(1, Loc.T("podľa vytvorenia")), new(2, Loc.T("podľa názvu"))];
 
@@ -323,7 +322,7 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public bool ShowBin { get => _source == NotesSource.Bin; set => SetSource(value, NotesSource.Bin); }
 
-    public string BinText => L("Kôš", "Koš", "Bin") + $" ({_services.Agenda.Bin.Count})";
+    public string BinText => Loc.T("Kôš") + $" ({_services.Agenda.Bin.Count})";
 
     public string Filter
     {
@@ -421,13 +420,13 @@ public sealed class NotesPageViewModel : ObservableObject
         var name = TmdbTrayService.NoteTitle(kind);
         if (_services.TmdbTray.Clear(kind) is not { } before)
         {
-            Status = L($"{name} je prázdny.", $"{name} je prázdný.", $"{name} is empty.");
+            Status = Loc.F("{0} je prázdny.", name);
             return;
         }
 
         SetTrayUndo((kind, before, true));
         var count = TmdbTray.Read(before).Count;
-        Status = L($"{name} vyprázdnený ({count}).", $"{name} vyprázdněn ({count}).", $"{name} emptied ({count}).");
+        Status = Loc.F("{0} vyprázdnený ({1}).", name, count);
         ReopenTray();
     }
 
@@ -444,7 +443,7 @@ public sealed class NotesPageViewModel : ObservableObject
         var before = tray.Text;
         _services.TmdbTray.Remove(entry);
         SetTrayUndo((kind, before, false));
-        Status = L($"Zo zásobníka odstránený: {entry.Display}.", $"Ze zásobníku odstraněn: {entry.Display}.", $"Removed from the tray: {entry.Display}.");
+        Status = Loc.F("Zo zásobníka odstránený: {0}.", entry.Display);
         ReopenTray();
     }
 
@@ -455,7 +454,7 @@ public sealed class NotesPageViewModel : ObservableObject
             _services.TmdbTray.Restore(undo.Kind, undo.Before, undo.Posters);
             SetTrayUndo(null);
             var name = TmdbTrayService.NoteTitle(undo.Kind);
-            Status = L($"{name} vrátený.", $"{name} vrácen.", $"{name} taken back.");
+            Status = Loc.F("{0} vrátený.", name);
             ReopenTray();
         }
     }
@@ -498,7 +497,7 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public ReportViewModel Report()
     {
-        var title = L("Poznámky", "Poznámky", "Notes");
+        var title = Loc.T("Poznámky");
         var cards = Cards.ToList();
         var records = cards.Select(c => c.Record).OfType<AgendaItem>().ToList();
         IReadOnlyList<ReportExport> exports =
@@ -506,19 +505,19 @@ public sealed class NotesPageViewModel : ObservableObject
             new("Markdown…", "Markdown|*.md", "UNIVERSUM – poznámky.md", path =>
             {
                 File.WriteAllText(path, AgendaExport.Markdown(title, [.. cards.Select(c => c.Record ?? new AgendaItem { Title = c.Title, Text = c.Text, Note = new AgendaNote() })]));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }),
             new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – poznámky.csv", path =>
             {
                 File.WriteAllText(path, AgendaExport.Csv(records, Loc.Language));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }),
         ];
-        return new ReportViewModel(_services, title, [new("list", L("Ako na obrazovke", "Jako na obrazovce", "As on the screen"))], (_, options, fonts) =>
+        return new ReportViewModel(_services, title, [new("list", Loc.T("Ako na obrazovke"))], (_, options, fonts) =>
         {
             var layout = new ReportLayout(fonts, options, title, landscape: false);
             AgendaReports.Notes(layout, title, cards.Select(c => new ReportNote(c.Title, c.Text,
-                string.Join(" · ", new[] { c.Pinned ? L("pripnutá", "připnutá", "pinned") : "", c.Where }.Where(t => t.Length > 0)), c.Tags, CalendarPageViewModel.ColorOf(c.Accent), c.Pinned)));
+                string.Join(" · ", new[] { c.Pinned ? Loc.T("pripnutá") : "", c.Where }.Where(t => t.Length > 0)), c.Tags, CalendarPageViewModel.ColorOf(c.Accent), c.Pinned)));
             return layout.Finish();
         }, exports);
     }
@@ -589,7 +588,7 @@ public sealed class NotesPageViewModel : ObservableObject
         var rest = end is > 0 and < 80 ? plain[(end + 1)..].Trim() : plain.Length <= 80 ? "" : plain;
         _services.Agenda.Save(new AgendaItem { Title = title, Text = rest, Tags = tags, Note = new AgendaNote() });
         QuickText = "";
-        Status = L("Poznámka pridaná: ", "Poznámka přidána: ", "Note added: ") + title;
+        Status = Loc.T("Poznámka pridaná: ") + title;
     }
 
     private void Pin(AgendaItem item)
@@ -618,7 +617,7 @@ public sealed class NotesPageViewModel : ObservableObject
             }
         }
 
-        Status = L($"Kôš vysypaný ({removed}).", $"Koš vysypán ({removed}).", $"The bin emptied ({removed}).");
+        Status = Loc.F("Kôš vysypaný ({0}).", removed);
     }
 
     /// <summary>The cards again.</summary>
@@ -664,7 +663,7 @@ public sealed class NotesPageViewModel : ObservableObject
                             Text = note,
                             Rows = rows,
                             More = more,
-                            Where = L("poznámka k titulu (Premiéry, Novinky)", "poznámka k titulu (Premiéry, Novinky)", "note of a title (Premieres, New episodes)"),
+                            Where = Loc.T("poznámka k titulu (Premiéry, Novinky)"),
                             Background = Tint(CalendarColors.Of(CalendarLayer.FilmsWorld)),
                             Accent = CalendarColors.Of(CalendarLayer.FilmsWorld),
                             TitleKey = key,
@@ -714,7 +713,7 @@ public sealed class NotesPageViewModel : ObservableObject
     {
         var accent = CalendarColors.Of(CalendarLayer.Notes, item.Color);
         var day = item.Links.FirstOrDefault(l => l.Kind == LinkKind.Day);
-        var kind = item.Time is not null ? L("udalosť", "událost", "event") : item.Task is not null ? L("úloha", "úkol", "task") : null;
+        var kind = item.Time is not null ? Loc.T("udalosť") : item.Task is not null ? Loc.T("úloha") : null;
         var width = WidthOf(item);
         var (rows, more) = RowsOf(item.Text, CardRowsAt[width]);
         var trayKind = inBin ? null : TmdbTray.KindOfNote(item.Uid);
@@ -733,8 +732,8 @@ public sealed class NotesPageViewModel : ObservableObject
             CardWidth = CardWidths[width],
             WidenCommand = inBin ? null : new RelayCommand(() => Widen(item)),
             WidenToolTip = width == CardWidths.Length - 1
-                ? L("Zúžiť kartu", "Zúžit kartu", "Make the card narrow")
-                : L("Rozšíriť kartu (ukáže aj viac riadkov)", "Rozšířit kartu (ukáže i více řádků)", "Make the card wider (it shows more rows too)"),
+                ? Loc.T("Zúžiť kartu")
+                : Loc.T("Rozšíriť kartu (ukáže aj viac riadkov)"),
             IsTray = isTray,
             ClearTrayCommand = trayKind is null ? null : new RelayCommand(() => ClearTray(trayKind.Value)),
             Title = item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0],
@@ -742,8 +741,8 @@ public sealed class NotesPageViewModel : ObservableObject
             Rows = rows,
             More = more,
             Tags = string.Join(" ", item.Tags.Select(t => "#" + t)),
-            Where = inBin ? L("v koši od ", "v koši od ", "in the bin since ") + item.Deleted?.ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture) + (kind is null ? "" : " · " + kind)
-                : day is not null ? L("k dňu ", "ke dni ", "of the day ") + day.Caption : "",
+            Where = inBin ? Loc.T("v koši od ") + item.Deleted?.ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture) + (kind is null ? "" : " · " + kind)
+                : day is not null ? Loc.T("k dňu ") + day.Caption : "",
             When = item.Modified.ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture),
             Background = Tint(accent),
             Accent = accent,
@@ -768,7 +767,7 @@ public sealed class NotesPageViewModel : ObservableObject
                 }
 
                 _services.Agenda.Delete(item.Id);
-                Status = L("Poznámka je v koši – dá sa vrátiť.", "Poznámka je v koši – lze ji vrátit.", "The note is in the bin – it can be taken back.");
+                Status = Loc.T("Poznámka je v koši – dá sa vrátiť.");
             }),
             RestoreCommand = new RelayCommand(() => _services.Agenda.Restore(item.Id)),
         };
@@ -810,6 +809,4 @@ public sealed class NotesPageViewModel : ObservableObject
         brush.Freeze();
         return brush;
     }
-
-    private static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
 }

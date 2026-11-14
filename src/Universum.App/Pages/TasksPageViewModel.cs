@@ -205,8 +205,7 @@ public sealed class TasksPageViewModel : ObservableObject
         {
             if (QuickText.Trim().Length == 0)
             {
-                return L("Napríklad: zajtra o 20:00 spracovať film #kino !   ·   do piatku zavolať   ·   za 3 dni …", "Například: zítra ve 20:00 zpracovat film #kino !   ·   do pátku zavolat   ·   za 3 dny …",
-                    "For example: tomorrow 20:00 process the film #cinema !   ·   friday call   ·   in 3 days …");
+                return Loc.T("Napríklad: zajtra o 20:00 spracovať film #kino !   ·   do piatku zavolať   ·   za 3 dni …");
             }
 
             return HintOf(QuickText);
@@ -218,7 +217,7 @@ public sealed class TasksPageViewModel : ObservableObject
     {
         var task = QuickEntry.Parse(line, Today);
         return "→ " + (task.Title.Length > 0 ? task.Title : "…") + " · " + Due(task.Due, task.Time) +
-               (task.Priority == 2 ? L(" · ! vysoká", " · ! vysoká", " · ! high") : task.Priority == 0 ? L(" · nízka", " · nízká", " · low") : "") +
+               (task.Priority == 2 ? Loc.T(" · ! vysoká") : task.Priority == 0 ? Loc.T(" · nízka") : "") +
                (task.Tags.Count > 0 ? " · " + string.Join(" ", task.Tags.Select(t => "#" + t)) : "");
     }
 
@@ -244,7 +243,7 @@ public sealed class TasksPageViewModel : ObservableObject
     }
 
     /// <summary>The choice of the tag filter that shows all tasks.</summary>
-    public static string AllTags => L("všetky", "všechny", "all");
+    public static string AllTags => Loc.T("všetky");
 
     /// <summary>The tags of the tasks, for the filter (the first: all).</summary>
     public IReadOnlyList<string> TagChoices { get; private set; } = [AllTags];
@@ -349,27 +348,27 @@ public sealed class TasksPageViewModel : ObservableObject
 
     public ReportViewModel Report()
     {
-        var title = L("Plánované úlohy", "Plánované úkoly", "Planned tasks");
+        var title = Loc.T("Plánované úlohy");
         var shown = Groups.SelectMany(g => g.Rows).Select(r => r.Item).ToList();
         IReadOnlyList<ReportExport> exports =
         [
             new("iCalendar (.ics)…", "iCalendar|*.ics", "UNIVERSUM – úlohy.ics", path =>
             {
                 File.WriteAllText(path, AgendaExport.Ics(shown.Select(i => new AgendaItem { Id = i.Id, Title = i.Title, Text = i.Text, Tags = i.Tags, Task = i.Task, Created = i.Created })));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }, ToolTip: Loc.T("Úlohy pre Outlook a Google (VTODO)")),
             new("CSV (Excel)…", "CSV|*.csv", "UNIVERSUM – úlohy.csv", path =>
             {
                 File.WriteAllText(path, AgendaExport.Csv(shown, Loc.Language));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }),
             new("Markdown…", "Markdown|*.md", "UNIVERSUM – úlohy.md", path =>
             {
                 File.WriteAllText(path, AgendaExport.Markdown(title, shown));
-                return L("Uložené: ", "Uloženo: ", "Saved: ") + path;
+                return Loc.T("Uložené: ") + path;
             }),
         ];
-        return new ReportViewModel(_services, title, [new("list", L("Ako na obrazovke", "Jako na obrazovce", "As on the screen"))], (_, options, fonts) =>
+        return new ReportViewModel(_services, title, [new("list", Loc.T("Ako na obrazovke"))], (_, options, fonts) =>
         {
             var layout = new ReportLayout(fonts, options, title, landscape: false);
             AgendaReports.Tasks(layout, title, Groups.Select(g => (g.Title, CalendarPageViewModel.ColorOf(g.Color),
@@ -405,7 +404,7 @@ public sealed class TasksPageViewModel : ObservableObject
     internal void Delete(AgendaItem item)
     {
         _services.Agenda.Delete(item.Id);
-        Status = L("Úloha je v koši: ", "Úkol je v koši: ", "The task is in the bin: ") + item.Title;
+        Status = Loc.T("Úloha je v koši: ") + item.Title;
     }
 
     internal void SetDone(AgendaItem item, bool done)
@@ -452,7 +451,7 @@ public sealed class TasksPageViewModel : ObservableObject
         var item = AddQuick(_services.Agenda, line);
         QuickText = "";
         OnPropertyChanged(nameof(QuickHint));
-        Status = L("Pridané: ", "Přidáno: ", "Added: ") + item.Title + " · " + Due(item.Task?.Due, item.Task?.DueTime);
+        Status = Loc.T("Pridané: ") + item.Title + " · " + Due(item.Task?.Due, item.Task?.DueTime);
     }
 
     /// <summary>A task made of one line of the quick entry and kept (here and on the Dashboard).</summary>
@@ -476,7 +475,7 @@ public sealed class TasksPageViewModel : ObservableObject
             _services.Agenda.Delete(item.Id);
         }
 
-        Status = L("Hotové úlohy sú v koši.", "Hotové úkoly jsou v koši.", "The done tasks are in the bin.");
+        Status = Loc.T("Hotové úlohy sú v koši.");
     }
 
     /// <summary>The list and the board again.</summary>
@@ -512,15 +511,15 @@ public sealed class TasksPageViewModel : ObservableObject
             }
 
             bool Open(AgendaItem i) => i.Task!.IsOpen;
-            Group(L("Po termíne", "Po termínu", "Overdue"), CalendarLayer.Holidays, i => Open(i) && i.Task!.Due < today);
-            Group(L("Dnes", "Dnes", "Today"), CalendarLayer.Events, i => Open(i) && i.Task!.Due == today);
-            Group(L("Zajtra", "Zítra", "Tomorrow"), CalendarLayer.Tasks, i => Open(i) && i.Task!.Due == today.AddDays(1));
-            Group(L("Tento týždeň", "Tento týden", "This week"), CalendarLayer.SeriesDomestic, i => Open(i) && i.Task!.Due > today.AddDays(1) && i.Task.Due <= endOfWeek);
-            Group(L("Neskôr", "Později", "Later"), CalendarLayer.FilmsWorld, i => Open(i) && i.Task!.Due > endOfWeek && i.Task.Due > today.AddDays(1));
-            Group(L("Bez termínu", "Bez termínu", "No due day"), CalendarLayer.Memorial, i => Open(i) && i.Task!.Due is null);
+            Group(Loc.T("Po termíne"), CalendarLayer.Holidays, i => Open(i) && i.Task!.Due < today);
+            Group(Loc.T("Dnes"), CalendarLayer.Events, i => Open(i) && i.Task!.Due == today);
+            Group(Loc.T("Zajtra"), CalendarLayer.Tasks, i => Open(i) && i.Task!.Due == today.AddDays(1));
+            Group(Loc.T("Tento týždeň"), CalendarLayer.SeriesDomestic, i => Open(i) && i.Task!.Due > today.AddDays(1) && i.Task.Due <= endOfWeek);
+            Group(Loc.T("Neskôr"), CalendarLayer.FilmsWorld, i => Open(i) && i.Task!.Due > endOfWeek && i.Task.Due > today.AddDays(1));
+            Group(Loc.T("Bez termínu"), CalendarLayer.Memorial, i => Open(i) && i.Task!.Due is null);
             if (ShowDone)
             {
-                Group(L("Hotové", "Hotové", "Done"), CalendarLayer.NameDays, i => !Open(i));
+                Group(Loc.T("Hotové"), CalendarLayer.NameDays, i => !Open(i));
             }
 
             var now = DateTime.Now;
@@ -536,8 +535,7 @@ public sealed class TasksPageViewModel : ObservableObject
             Fill(Done, shown.Where(i => i.Task!.State is TaskState.Done or TaskState.Cancelled && (ShowDone || i.Task.Finished > DateTimeOffset.Now.AddDays(-7))).Select(Row));
             var open = tasks.Count(t => t.Task!.IsOpen);
             var overdue = tasks.Count(t => t.Task!.IsOpen && t.Task.Due < today);
-            Summary = L($"Otvorené: {open} · po termíne: {overdue} · hotové: {tasks.Count - open}", $"Otevřené: {open} · po termínu: {overdue} · hotové: {tasks.Count - open}",
-                $"Open: {open} · overdue: {overdue} · done: {tasks.Count - open}");
+            Summary = Loc.F("Otvorené: {0} · po termíne: {1} · hotové: {2}", open, overdue, tasks.Count - open);
             OnPropertyChanged(nameof(Summary));
             OnPropertyChanged(nameof(IsEmpty));
             ShowSuggestions();
@@ -575,7 +573,7 @@ public sealed class TasksPageViewModel : ObservableObject
         };
         _services.Agenda.Save(item);
         Hide(key);
-        Status = L("Prevzaté do úloh: ", "Převzato do úkolů: ", "Taken as a task: ") + item.Title;
+        Status = Loc.T("Prevzaté do úloh: ") + item.Title;
     }
 
     internal void Hide(string key)
@@ -615,8 +613,8 @@ public sealed class TasksPageViewModel : ObservableObject
         foreach (var title in _services.InputWatch.Found)
         {
             var key = $"vstup|{title.Title}|{title.Episode}|{title.Files.Count}";
-            found.Add(new TaskSuggestion(key, "", L("Spracovať: ", "Zpracovat: ", "Process: ") + title.Title, title.Detail, today, null,
-                L("Spracovať", "Zpracovat", "Process"), () => ProcessFound(title), this));
+            found.Add(new TaskSuggestion(key, "", Loc.T("Spracovať: ") + title.Title, title.Detail, today, null,
+                Loc.T("Spracovať"), () => ProcessFound(title), this));
         }
 
         try
@@ -626,9 +624,9 @@ public sealed class TasksPageViewModel : ObservableObject
             foreach (var episode in kept.Episodes.Where(e => e.AirDate <= today && e.AirDate >= today.AddDays(-7) && marks.Get(MarkStore.Series(e)).Chosen && !_services.InputWatch.Contains(e)))
             {
                 var name = (episode.Caption + " " + episode.Code).Trim();
-                found.Add(new TaskSuggestion($"epizoda|{MarkStore.Series(episode)}|{episode.Code}", "", L("Čaká na súbor: ", "Čeká na soubor: ", "Waiting for the file: ") + name,
+                found.Add(new TaskSuggestion($"epizoda|{MarkStore.Series(episode)}|{episode.Code}", "", Loc.T("Čaká na súbor: ") + name,
                     $"{episode.AirDate:d. M. yyyy}" + (episode.Channel.Length > 0 ? " · " + episode.Channel : ""), today, new AgendaLink(LinkKind.Episode, MarkStore.Series(episode) + ":" + episode.Code, name),
-                    L("Otvoriť v Novinkách", "Otevřít v Novinkách", "Open in New episodes"), () =>
+                    Loc.T("Otvoriť v Novinkách"), () =>
                     {
                         OpenNews(episode.Region == NewsRegion.Domestic ? CalendarLayer.EpisodesDomestic : CalendarLayer.EpisodesWorld, episode.Caption);
                         return Task.CompletedTask;
@@ -638,9 +636,9 @@ public sealed class TasksPageViewModel : ObservableObject
             var archive = await Task.Run(() => _services.PremiereStore.Load());
             foreach (var film in archive.Films.Where(f => f.Premiere >= today && f.Premiere <= today.AddDays(7) && marks.Get(MarkStore.Film(f.TmdbId)).Chosen))
             {
-                found.Add(new TaskSuggestion($"premiera|{film.TmdbId}|{film.Premiere:yyyy-MM-dd}", "", L("Premiéra vybraného filmu: ", "Premiéra vybraného filmu: ", "Premiere of a chosen film: ") + film.Caption,
+                found.Add(new TaskSuggestion($"premiera|{film.TmdbId}|{film.Premiere:yyyy-MM-dd}", "", Loc.T("Premiéra vybraného filmu: ") + film.Caption,
                     $"{film.Premiere:d. M. yyyy}" + (film.PremiereNote.Length > 0 ? " · " + film.PremiereNote : ""), film.Premiere, new AgendaLink(LinkKind.Title, MarkStore.Film(film.TmdbId), film.Caption),
-                    L("Otvoriť v Premiérach", "Otevřít v Premiérách", "Open in Premieres"), () =>
+                    Loc.T("Otvoriť v Premiérach"), () =>
                     {
                         OpenNews(film.Region == NewsRegion.Domestic ? CalendarLayer.FilmsDomestic : CalendarLayer.FilmsWorld, film.Caption);
                         return Task.CompletedTask;
@@ -654,17 +652,17 @@ public sealed class TasksPageViewModel : ObservableObject
 
         foreach (var poster in _services.WaitingPosters.All)
         {
-            found.Add(new TaskSuggestion($"plagat|{poster.Kind}|{poster.TmdbId}", "", L("Plagát čaká na titul: ", "Plakát čeká na titul: ", "A poster waits for: ") + poster.FolderName,
-                L("Pridá sa, keď UNIVERSUM titul spracuje (čaká od ", "Přidá se, když UNIVERSUM titul zpracuje (čeká od ", "It is added when UNIVERSUM processes the title (waiting since ") + $"{poster.Since:d. M. yyyy})",
+            found.Add(new TaskSuggestion($"plagat|{poster.Kind}|{poster.TmdbId}", "", Loc.T("Plagát čaká na titul: ") + poster.FolderName,
+                Loc.T("Pridá sa, keď UNIVERSUM titul spracuje (čaká od ") + $"{poster.Since:d. M. yyyy})",
                 null, null, null, null, this));
         }
 
         foreach (var log in _services.ProcessingLogs.All().Where(l => l.HasProblems && l.FinishedUtc > DateTime.UtcNow.AddDays(-7)))
         {
             var id = log.Id;
-            found.Add(new TaskSuggestion($"zaznam|{id}", "", L("Pozrieť problémy spracovania: ", "Zkontrolovat problémy zpracování: ", "Check the problems of: ") + log.Kind,
+            found.Add(new TaskSuggestion($"zaznam|{id}", "", Loc.T("Pozrieť problémy spracovania: ") + log.Kind,
                 log.FinishedUtc.ToLocalTime().ToString("d. M. yyyy HH:mm", CultureInfo.InvariantCulture) + " · " + log.Summary, today, new AgendaLink(LinkKind.Log, id, log.Kind),
-                L("Pozrieť záznam", "Zobrazit záznam", "Open the log"), () =>
+                Loc.T("Pozrieť záznam"), () =>
                 {
                     OpenLog(id);
                     return Task.CompletedTask;
@@ -682,7 +680,7 @@ public sealed class TasksPageViewModel : ObservableObject
     {
         if (due is not { } day)
         {
-            return L("bez termínu", "bez termínu", "no due day");
+            return Loc.T("bez termínu");
         }
 
         var today = Today;
@@ -690,13 +688,11 @@ public sealed class TasksPageViewModel : ObservableObject
         var days = day.DayNumber - today.DayNumber;
         return days switch
         {
-            0 => L("dnes", "dnes", "today") + at,
-            1 => L("zajtra", "zítra", "tomorrow") + at,
-            -1 => L("včera", "včera", "yesterday") + at,
+            0 => Loc.T("dnes") + at,
+            1 => Loc.T("zajtra") + at,
+            -1 => Loc.T("včera") + at,
             > 1 and < 7 => day.ToString("dddd", CalendarTexts.Culture(Loc.Language)) + " " + day.ToString("d. M.", CultureInfo.InvariantCulture) + at,
             _ => day.ToString("d. M. yyyy", CultureInfo.InvariantCulture) + at,
         };
     }
-
-    private static string L(string sk, string cs, string en) => Loc.Language switch { "cs" => cs, "en" => en, _ => sk };
 }

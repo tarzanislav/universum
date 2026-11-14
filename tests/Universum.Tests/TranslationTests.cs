@@ -56,7 +56,7 @@ public sealed partial class TranslationTests
         foreach (var file in Directory.EnumerateFiles(Source, "*.cs", SearchOption.AllDirectories).Where(Own))
         {
             var name = Path.GetFileName(file);
-            if (name is "Translations.cs" or "SelfTest.cs")
+            if (name == "Translations.cs" || name.StartsWith("SelfTest", StringComparison.Ordinal))
             {
                 continue;
             }

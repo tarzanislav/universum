@@ -62,7 +62,7 @@ public sealed class TmdbTrayChoice : ObservableObject
         {
             if (value is not null)
             {
-                _ = _chosen(value.Entry);
+                BackgroundWork.Run(_chosen(value.Entry));
             }
 
             // owner, 8. 11. 2026: the title chosen stayed in the box over its caption – WPF ignores a change told while it

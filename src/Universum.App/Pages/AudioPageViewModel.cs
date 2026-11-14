@@ -642,7 +642,7 @@ public sealed class AudioPageViewModel : ObservableObject
         Progress = 0;
         OnPropertyChanged(nameof(HasProposal));
         OnPropertyChanged(nameof(References));
-        _ = Player.CloseAsync();
+        BackgroundWork.Run(Player.CloseAsync());
         Changed();
     }
 
@@ -683,9 +683,9 @@ public sealed class AudioPageViewModel : ObservableObject
             return;
         }
 
-        _ = player.SetSoundAsync(_selected is { } row
+        BackgroundWork.Run(player.SetSoundAsync(_selected is { } row
             ? new PlayerSound(row.ExternalPath ?? _file.Path, row.Ordinal, row.Timing.Factor is >= 0.5 and <= 2 ? row.Timing : SubtitleTiming.None, row.KeepPitch)
-            : null);
+            : null));
     }
 
     // the target state of the video: its tracks, a sound written anew in place of its track, the sounds added

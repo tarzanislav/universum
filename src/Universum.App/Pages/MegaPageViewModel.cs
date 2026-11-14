@@ -253,7 +253,7 @@ public sealed class MegaPageViewModel : ObservableObject
             var missed = _services.Mega.Batches.Count(b => b.State == MegaBatchState.Missed);
             foreach (var due in _services.Mega.Due(DateTime.Now))
             {
-                _ = StartAsync(due);
+                BackgroundWork.Run(StartAsync(due));
             }
 
             if (_services.Mega.Batches.Count(b => b.State == MegaBatchState.Missed) != missed)
@@ -311,7 +311,7 @@ public sealed class MegaPageViewModel : ObservableObject
         // the next batch waiting for this one starts – not after a cancelled run
         if (batch.State != MegaBatchState.Cancelled && _services.Mega.Follower(batch) is { } next)
         {
-            _ = StartAsync(next);
+            BackgroundWork.Run(StartAsync(next));
         }
     }
 

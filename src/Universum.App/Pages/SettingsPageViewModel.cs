@@ -727,17 +727,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         RemoveHistraTokenCommand.NotifyCanExecuteChanged();
     }
 
-    private static void OpenInBrowser(Uri page)
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true })?.Dispose();
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            // no browser registered: the address is in the tooltip
-        }
-    }
+    private static void OpenInBrowser(Uri page) => Browser.Open(page);
 
     // ---------------------------------------------------------------- output folders on other disks (owner, 2. 11. 2026)
 

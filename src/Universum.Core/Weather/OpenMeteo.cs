@@ -190,21 +190,8 @@ public sealed class OpenMeteo(HttpClient http)
                 throw new WeatherException("Odpoveď služby počasia je neprimerane veľká.");
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
-            using var buffer = new MemoryStream();
-            var chunk = new byte[16 * 1024];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, limit.Token).ConfigureAwait(false)) > 0)
-            {
-                if (buffer.Length + read > MaxResponseBytes)
-                {
-                    throw new WeatherException("Odpoveď služby počasia je neprimerane veľká.");
-                }
-
-                buffer.Write(chunk, 0, read);
-            }
-
-            body = buffer.ToArray();
+            body = await Universum.Core.IO.HttpBodies.ReadAsync(response.Content, MaxResponseBytes, limit.Token).ConfigureAwait(false)
+                ?? throw new WeatherException("Odpoveď služby počasia je neprimerane veľká.");
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         {

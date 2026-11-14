@@ -442,7 +442,7 @@ public sealed class InterestCard : ObservableObject
             if (!_asked)
             {
                 _asked = true;
-                _ = LoadAsync();
+                BackgroundWork.Run(LoadAsync());
             }
 
             return _image;

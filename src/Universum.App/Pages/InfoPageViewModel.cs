@@ -51,7 +51,7 @@ public sealed class InfoPageViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedKnown, value) && value is not null && !_selecting)
             {
-                _ = LoadAsync(value.Path);
+                BackgroundWork.Run(LoadAsync(value.Path));
             }
         }
     }

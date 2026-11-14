@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using Universum.Core.Text;
@@ -55,16 +54,6 @@ public static class NoteLinks
         });
     }
 
-    /// <summary>Opens a link of a note (only http and https addresses are links).</summary>
-    public static void Open(Uri address)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(address.AbsoluteUri) { UseShellExecute = true })?.Dispose();
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            // no browser – nothing to open
-        }
-    }
+    /// <summary>Opens a link of a note (only http and https addresses are opened).</summary>
+    public static void Open(Uri address) => Browser.Open(address);
 }

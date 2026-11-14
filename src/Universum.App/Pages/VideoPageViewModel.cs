@@ -538,7 +538,7 @@ public sealed class VideoPageViewModel : ObservableObject
         Result = "";
         Status = "";
         Progress = 0;
-        _ = Player.CloseAsync();
+        BackgroundWork.Run(Player.CloseAsync());
         Changed();
     }
 

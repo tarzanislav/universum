@@ -54,7 +54,7 @@ public sealed class PlayerViewModel : ObservableObject
         _seekDelay.Tick += (_, _) =>
         {
             _seekDelay.Stop();
-            _ = SeekAsync(TimeSpan.FromSeconds(_position));
+            BackgroundWork.Run(SeekAsync(TimeSpan.FromSeconds(_position)));
         };
         PlayPauseCommand = new AsyncRelayCommand(PlayPauseAsync, () => IsOpen);
         SeekByCommand = new AsyncRelayCommand<string>(by => double.TryParse(by, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
@@ -123,7 +123,7 @@ public sealed class PlayerViewModel : ObservableObject
         {
             if (value >= 0 && SetProperty(ref _audioTrack, value) && _session is { } session && session.AudioTrack != value)
             {
-                _ = session.SetAudioTrackAsync(value);
+                BackgroundWork.Run(session.SetAudioTrackAsync(value));
             }
         }
     }

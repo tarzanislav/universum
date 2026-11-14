@@ -319,7 +319,7 @@ public sealed class LibraryTargetPicker : ObservableObject
         if (_services.Tmdb is not null)
         {
             Description = Loc.T("Hľadám titul na TMDB…");
-            _ = Tmdb.SearchAsync();
+            BackgroundWork.Run(Tmdb.SearchAsync());
         }
         else
         {

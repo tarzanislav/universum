@@ -527,7 +527,7 @@ public sealed class HeaderEditorPageViewModel : ObservableObject
         var plan = EditPlan.For(target);
         var job = new FileJob($"Úprava hlavičky: {Path.GetFileName(path)}", _services.Processor(installation), plan,
             placement, new OutputOptions(OriginalHandling.Keep));
-        job.Finished += (finished, result) => JobRow.OnUi(() => _ = AfterJobAsync(finished, result, installation));
+        job.Finished += (finished, result) => JobRow.OnUi(() => BackgroundWork.Run(AfterJobAsync(finished, result, installation)));
         _services.Enqueue(job);
         Result = _services.Settings.AutoStartQueue ? Loc.F("Pridané do fronty ako úloha {0}.", job.Id) : Loc.F("Pridané do fronty ako úloha {0} – frontu spustíte na stránke Fronta úloh.", job.Id);
     }

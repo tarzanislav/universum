@@ -166,7 +166,7 @@ public sealed class BatchPageViewModel : ObservableObject
         // owner, 30. 10. 2026: films have the same row as a series – the title, TMDB and the TMDB ID
         FilmTmdb = new TmdbPicker(services, () => MediaKind.Movie,
             () => FilmTitle.Length > 0 ? FilmTitle : FilmFiles.Select(p => _library?.SuggestedTitleFor(p)?.FolderName).FirstOrDefault(t => t is not null) ?? "",
-            film => _ = ApplyFilmAsync(FilmFiles, film));
+            film => BackgroundWork.Run(ApplyFilmAsync(FilmFiles, film)));
         FindMoviesCommand = new AsyncRelayCommand(() => FindMoviesAsync(automatic: false), () => !Busy && _library is { Kind: MediaKind.Movie } or { Mixed: true } && _services.Titles is not null);
         services.TitlesChanged += () =>
         {
@@ -176,7 +176,7 @@ public sealed class BatchPageViewModel : ObservableObject
             // a key or token added: the names of the analysed films are looked up now (no need to analyse again)
             if (FindMoviesCommand.CanExecute(null))
             {
-                _ = FindMoviesAsync(automatic: true);
+                BackgroundWork.Run(FindMoviesAsync(automatic: true));
             }
         };
         services.InputDirectoryChanged += () =>
@@ -1272,7 +1272,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
             if (TitleGuess.ParseTmdb(value) is { } reference)
             {
-                _ = NameFilmsFromTmdbAsync(files, reference);
+                BackgroundWork.Run(NameFilmsFromTmdbAsync(files, reference));
                 return;
             }
 
@@ -1313,7 +1313,7 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 if (TitleGuess.ParseTmdb(value) is { } reference)
                 {
-                    _ = NameFilmsFromTmdbAsync(files, reference);
+                    BackgroundWork.Run(NameFilmsFromTmdbAsync(files, reference));
                 }
                 else
                 {
@@ -1338,7 +1338,7 @@ public sealed class BatchPageViewModel : ObservableObject
             {
                 if (TitleGuess.ParseTmdb(value) is { } reference)
                 {
-                    _ = NameSeriesFromTmdbAsync(reference);
+                    BackgroundWork.Run(NameSeriesFromTmdbAsync(reference));
                 }
                 else
                 {
@@ -1465,7 +1465,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         if (TitleGuess.ParseTmdb(text) is { } reference)
         {
-            _ = NameFilmFromTmdbAsync(path, reference);
+            BackgroundWork.Run(NameFilmFromTmdbAsync(path, reference));
         }
         else
         {
@@ -1484,7 +1484,7 @@ public sealed class BatchPageViewModel : ObservableObject
         // a film's TMDB address or ID: its title from TMDB (the address says film or series)
         if (_library.KindFor(path) == MediaKind.Movie && TitleGuess.ParseTmdb(text) is { } reference)
         {
-            _ = NameFilmFromTmdbAsync(path, reference);
+            BackgroundWork.Run(NameFilmFromTmdbAsync(path, reference));
             return;
         }
 
@@ -1715,7 +1715,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
 
             // owner, 29. 10. 2026: what is already in the library is known at the analysis (in the background)
-            _ = CheckLibraryAsync();
+            BackgroundWork.Run(CheckLibraryAsync());
 
             // owner, 30. 10. 2026: the language of every text subtitle track is read from its text (after the analysis,
             // the page free meanwhile; Spustiť waits for it, Zastaviť stops it)
@@ -1994,7 +1994,7 @@ public sealed class BatchPageViewModel : ObservableObject
 
         if (_fingerprintCancellation is null && !IsAnalyzing && UncheckedOriginals().Count > 0)
         {
-            _ = CheckLibraryAsync();
+            BackgroundWork.Run(CheckLibraryAsync());
         }
         foreach (var row in Groups)
         {
@@ -2223,7 +2223,7 @@ public sealed class BatchPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(CanFindTitles));
         Replan();
-        _ = LoadSeriesSeasonsAsync();
+        BackgroundWork.Run(LoadSeriesSeasonsAsync());
     }
 
     /// <summary>
@@ -2305,7 +2305,7 @@ public sealed class BatchPageViewModel : ObservableObject
         }
 
         _typedTmdb = text;
-        _ = SearchTypedAsync();
+        BackgroundWork.Run(SearchTypedAsync());
     }
 
     private async Task SearchTypedAsync()
@@ -3661,7 +3661,7 @@ public sealed class BatchPageViewModel : ObservableObject
             }
         }
 
-        _ = AnalyzeAsync();
+        BackgroundWork.Run(AnalyzeAsync());
     }
 
     private void SaveReport()

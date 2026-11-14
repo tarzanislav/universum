@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Universum.Core.Library;
@@ -38,7 +37,7 @@ public sealed class PosterThumb : ObservableObject
             if (!_asked)
             {
                 _asked = true;
-                _ = LoadAsync();
+                BackgroundWork.Run(LoadAsync());
             }
 
             return _image;
@@ -67,16 +66,4 @@ public sealed class PosterThumb : ObservableObject
             OnPropertyChanged(nameof(Image));
         }
     }
-}
-
-/// <summary>Opens the pages of titles (TMDB, HISTRA, IMDb, ČSFD) in the user's browser; the self-test only records them.</summary>
-public static class Browser
-{
-    public static Action<Uri> Open { get; set; } = address =>
-    {
-        if (address.Scheme == Uri.UriSchemeHttps)
-        {
-            Process.Start(new ProcessStartInfo(address.AbsoluteUri) { UseShellExecute = true })?.Dispose();
-        }
-    };
 }

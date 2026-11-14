@@ -1475,6 +1475,7 @@ internal static class SelfTest
         await TestCalendarAsync(model, window, services);
         await TestTasksAsync(model, window, services);
         await TestNotesAsync(model, window, services);
+        await TestBackgroundWorkAsync();
         await TestTmdbTrayAsync(model, services);
         await TestReportsAsync(model, services);
         await TestDashboardAgendaAsync(model, window, services);
@@ -1766,6 +1767,62 @@ internal static class SelfTest
     /// it), the address universum:// (only TMDB pages taken), the pinned note, the choice beside a title field, reading the
     /// browser windows (a stand-in, then the real ones – they must only not fail). Invented titles only.
     /// </summary>
+    // 14. 11. 2026 (step 1 of the review of the code): an error of work nobody waits for is written and told, not lost
+    private static async Task TestBackgroundWorkAsync()
+    {
+        var logBefore = BackgroundWork.Log;
+        var folder = Directory.CreateTempSubdirectory("universum-samotest-chyby-").FullName;
+        BackgroundWork.Log = new Core.IO.ErrorLog(Path.Combine(folder, "chyby.log"));
+        var told = new List<string>();
+        void Told(string text)
+        {
+            lock (told)
+            {
+                told.Add(text);
+            }
+        }
+
+        BackgroundWork.Failed += Told;
+        try
+        {
+            static async Task FailingAsync()
+            {
+                await Task.Delay(20);
+                throw new InvalidOperationException("Vymyslená chyba na pozadí");
+            }
+
+            static async Task CancelledAsync()
+            {
+                await Task.Delay(20);
+                throw new OperationCanceledException();
+            }
+
+            BackgroundWork.Run(FailingAsync());
+            BackgroundWork.Run(CancelledAsync());
+            BackgroundWork.Run(Task.CompletedTask);
+            for (var i = 0; i < 50 && told.Count == 0; i++)
+            {
+                await Task.Delay(50);
+            }
+
+            await Task.Delay(200);
+            var log = File.Exists(BackgroundWork.Log.File) ? await File.ReadAllTextAsync(BackgroundWork.Log.File) : "";
+            Check(told.Count == 1 && told[0].Contains("Vymyslená chyba na pozadí", StringComparison.Ordinal) && log.Contains("FailingAsync()", StringComparison.Ordinal) &&
+                  log.Contains("Vymyslená chyba na pozadí", StringComparison.Ordinal) && !log.Contains("OperationCanceledException", StringComparison.Ordinal) &&
+                  TrayToast.Shown.Any(t => t.Contains("Vymyslená chyba na pozadí", StringComparison.Ordinal)),
+                "background: an error written to chyby.log and told, a cancellation not – " + string.Join(" | ", told));
+            Check(Browser.IsWeb(new Uri("https://www.themoviedb.org/movie/111")) && Browser.IsWeb(new Uri("http://127.0.0.1:47219/universum.user.js")) &&
+                  !Browser.IsWeb(new Uri("file:///C:/Windows/System32/vymyslene.exe")) && !Browser.IsWeb(new Uri("ms-settings:display")),
+                "browser: only addresses of the web are opened (no file, no program)");
+        }
+        finally
+        {
+            BackgroundWork.Failed -= Told;
+            BackgroundWork.Log = logBefore;
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private static async Task TestTmdbTrayAsync(MainViewModel model, AppServices services)
     {
         var tray = services.TmdbTray;

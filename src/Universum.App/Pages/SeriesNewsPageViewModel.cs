@@ -99,7 +99,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
                 row.FolderChanged();
             }
         };
-        services.InputDirectoryChanged += () => _ = services.InputWatch.ScanAsync();
+        services.InputDirectoryChanged += () => BackgroundWork.Run(services.InputWatch.ScanAsync());
     }
 
     private const string NoInputFolder = "Najprv nastavte vstupný priečinok – tam UNIVERSUM hľadá epizódy (tlačidlo Zmeniť… hore).";
@@ -176,7 +176,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowAll));
         if (view is NewsView.History or NewsView.All && _history is null)
         {
-            _ = LoadHistoryAsync();
+            BackgroundWork.Run(LoadHistoryAsync());
         }
 
         Build();
@@ -332,7 +332,7 @@ public sealed class SeriesNewsPageViewModel : ObservableObject
     public async void Shown()
     {
         OnPropertyChanged(nameof(HasMyLists));
-        _ = _services.InputWatch.ScanAsync();
+        BackgroundWork.Run(_services.InputWatch.ScanAsync());
         if (!_shownKept && !Busy)
         {
             _shownKept = true;

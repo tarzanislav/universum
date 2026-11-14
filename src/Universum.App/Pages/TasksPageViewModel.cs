@@ -177,7 +177,7 @@ public sealed class TasksPageViewModel : ObservableObject
                 Build();
             }
         };
-        services.InputWatch.Changed += () => _ = SuggestAsync();
+        services.InputWatch.Changed += () => BackgroundWork.Run(SuggestAsync());
         Build();
     }
 

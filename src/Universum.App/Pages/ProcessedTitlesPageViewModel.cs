@@ -57,7 +57,7 @@ public sealed class ProcessedTitlesPageViewModel : ObservableObject
         ImportCommand = new RelayCommand(Import, () => !_busy);
         services.TitleRegister.Changed += () => Application.Current?.Dispatcher.BeginInvoke(Refresh);
         Refresh();
-        _ = services.FillTitleNamesAsync();
+        BackgroundWork.Run(services.FillTitleNamesAsync());
     }
 
     public ObservableCollection<ProcessedTitleRow> Titles { get; } = [];

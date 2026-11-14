@@ -20,7 +20,7 @@ public sealed class GenreCell(AppServices services, SeriesEpisode episode) : Obs
             if (_text.Length == 0 && !_asked)
             {
                 _asked = true;
-                _ = LoadAsync();
+                BackgroundWork.Run(LoadAsync());
             }
 
             return _text;

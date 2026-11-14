@@ -121,7 +121,7 @@ public sealed class MainViewModel : ObservableObject
         _reminderTimer.Tick += (_, _) =>
         {
             CheckReminders();
-            _ = CheckActionsAsync();
+            BackgroundWork.Run(CheckActionsAsync());
             RefreshBadges();
         };
         _reminderTimer.Start();
@@ -193,7 +193,7 @@ public sealed class MainViewModel : ObservableObject
         SetupCommand = new AsyncRelayCommand(SetupAsync);
         OpenMkvToolNixGuiCommand = new RelayCommand(OpenMkvToolNixGui, () => _services.CurrentMkvToolNix?.HasTool(MkvToolNixTool.Gui) == true);
         ShowUpdatesCommand = new AsyncRelayCommand(ShowUpdatesAsync);
-        Settings.ShowUpdatesRequested += () => _ = ShowUpdatesAsync();
+        Settings.ShowUpdatesRequested += () => BackgroundWork.Run(ShowUpdatesAsync());
         Queue.OutputRequested += row =>
         {
             Output.Show(row, follow: false);
@@ -201,23 +201,23 @@ public sealed class MainViewModel : ObservableObject
         };
         _services.Updates.Checked += UpdateBadgeText;
         Info.KnownSource = () => Mux.KnownFiles.Concat(Batch.KnownFiles);
-        Mux.InfoRequested += path => _ = ShowInfoAsync(path);
-        Batch.InfoRequested += path => _ = ShowInfoAsync(path);
+        Mux.InfoRequested += path => BackgroundWork.Run(ShowInfoAsync(path));
+        Batch.InfoRequested += path => BackgroundWork.Run(ShowInfoAsync(path));
         Batch.MegaRequested += () => SelectedTool = Tools.First(t => t.Page == Mega);
-        Batch.StudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Subtitles, fromSingle: false, file, edits, names);
-        Batch.SoundStudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Sound, fromSingle: false, file, edits, names);
-        Batch.PictureStudioRequested += (file, edits) => _ = OpenStudioAsync(StudioPart.Picture, fromSingle: false, file, edits, null);
-        Mega.EditRequested += batch => _ = EditMegaBatchAsync(batch);
+        Batch.StudioRequested += (file, edits, names) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Subtitles, fromSingle: false, file, edits, names));
+        Batch.SoundStudioRequested += (file, edits, names) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Sound, fromSingle: false, file, edits, names));
+        Batch.PictureStudioRequested += (file, edits) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Picture, fromSingle: false, file, edits, null));
+        Mega.EditRequested += batch => BackgroundWork.Run(EditMegaBatchAsync(batch));
         // owner, 2. 11. 2026: a file of Single spracovanie edited there again, back to MEGA spracovanie after Uložiť do dávky
         Mega.EditSingleRequested += (batch, file) =>
         {
             Open(Rules);
-            _ = Rules.EditForMegaAsync(batch, file);
+            BackgroundWork.Run(Rules.EditForMegaAsync(batch, file));
         };
         Rules.BackToMega += () => Open(Mega);
-        Rules.StudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Subtitles, fromSingle: true, file, edits, names);
-        Rules.SoundStudioRequested += (file, edits, names) => _ = OpenStudioAsync(StudioPart.Sound, fromSingle: true, file, edits, names);
-        Rules.PictureStudioRequested += (file, edits) => _ = OpenStudioAsync(StudioPart.Picture, fromSingle: true, file, edits, null);
+        Rules.StudioRequested += (file, edits, names) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Subtitles, fromSingle: true, file, edits, names));
+        Rules.SoundStudioRequested += (file, edits, names) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Sound, fromSingle: true, file, edits, names));
+        Rules.PictureStudioRequested += (file, edits) => BackgroundWork.Run(OpenStudioAsync(StudioPart.Picture, fromSingle: true, file, edits, null));
     }
 
     // the studios of Editácia videostôp for a file of Hromadné (owner, 30. 10. 2026) or Single spracovanie (2. 11. 2026,
@@ -344,11 +344,11 @@ public sealed class MainViewModel : ObservableObject
         await RefreshStatusAsync();
         Dashboard.Shown();
         await handling;
-        _ = DailyUpdateAsync();
+        BackgroundWork.Run(DailyUpdateAsync());
         _services.EnsureSortingFolders();
         // previews of Zlučovanie older than a week (UNIVERSUM's own temporary files)
-        _ = Task.Run(() => _services.ClearOldPreviews());
-        _ = _services.InputWatch.ScanAsync();
+        BackgroundWork.Run(Task.Run(() => _services.ClearOldPreviews()));
+        BackgroundWork.Run(_services.InputWatch.ScanAsync());
 
         try
         {

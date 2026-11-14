@@ -293,7 +293,7 @@ public sealed class PosterPageViewModel : ObservableObject
             if (Card is { } card)
             {
                 card.ChosenPoster = value?.DraftImage;
-                _ = ShowChosenAsync(card, value);
+                BackgroundWork.Run(ShowChosenAsync(card, value));
             }
         }
     }
@@ -465,7 +465,7 @@ public sealed class PosterPageViewModel : ObservableObject
         _title.Dispose();
         _title = new CancellationTokenSource();
         var card = new TitleCardViewModel(_services, kind, id);
-        card.OpenRequested += (k, i) => _ = OpenAsync(k, i);
+        card.OpenRequested += (k, i) => BackgroundWork.Run(OpenAsync(k, i));
         Card = card;
         Recommended = null;
         Selected = null;
@@ -497,7 +497,7 @@ public sealed class PosterPageViewModel : ObservableObject
             Results.Clear();
             foreach (var title in found)
             {
-                Results.Add(new FoundTitleRow(title, new PosterThumb(_services, title.PosterPath, PosterSize.Small), row => _ = OpenAsync(row.Title.Kind, row.Title.Id)));
+                Results.Add(new FoundTitleRow(title, new PosterThumb(_services, title.PosterPath, PosterSize.Small), row => BackgroundWork.Run(OpenAsync(row.Title.Kind, row.Title.Id))));
             }
 
             SearchStatus = found.Count == 0 ? Loc.T("TMDB nič také nenašlo – skúste iný názov, rok alebo TMDB či IMDb ID.") : Loc.F("Nájdené: {0}. Kliknite na titul.", found.Count);

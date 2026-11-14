@@ -127,28 +127,16 @@ public sealed class HistraClient
             throw new HistraException(CoreText.T("Odpoveď HISTRA je neprimerane veľká – nepoužila sa."));
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
-        {
-            if (buffer.Length + read > MaxResponseBytes)
-            {
-                throw new HistraException(CoreText.T("Odpoveď HISTRA je neprimerane veľká – nepoužila sa."));
-            }
-
-            buffer.Write(chunk, 0, read);
-        }
-
-        if (buffer.Length == 0)
+        var body = await Universum.Core.IO.HttpBodies.ReadAsync(response.Content, MaxResponseBytes, cancellationToken).ConfigureAwait(false)
+            ?? throw new HistraException(CoreText.T("Odpoveď HISTRA je neprimerane veľká – nepoužila sa."));
+        if (body.Length == 0)
         {
             return null;
         }
 
         try
         {
-            return JsonDocument.Parse(buffer.ToArray());
+            return JsonDocument.Parse(body);
         }
         catch (JsonException ex)
         {

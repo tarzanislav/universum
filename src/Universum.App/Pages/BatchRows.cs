@@ -587,7 +587,7 @@ public sealed class FileRow : ObservableObject
         {
             if (value is not null)
             {
-                _ = page.ChooseCandidateAsync(Item.File.Path, value);
+                BackgroundWork.Run(page.ChooseCandidateAsync(Item.File.Path, value));
             }
         }
     }

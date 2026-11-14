@@ -362,7 +362,7 @@ public sealed class RulesPageViewModel : ObservableObject
         {
             _file = await WithExternalSubtitlesAsync(await new MkvMergeInspector(installation, _services.Runner).InspectAsync(path));
             Recalculate();
-            _ = ReadSubtitlesAsync(installation, _file);
+            BackgroundWork.Run(ReadSubtitlesAsync(installation, _file));
         }
         catch (Exception ex) when (ex is MkvToolNixException or IOException or ProcessStartException or TimeoutException)
         {
@@ -807,7 +807,7 @@ public sealed class RulesPageViewModel : ObservableObject
         if (_services.Tmdb is not null)
         {
             Target = Loc.T("Hľadám titul na TMDB…");
-            _ = Tmdb.SearchAsync();
+            BackgroundWork.Run(Tmdb.SearchAsync());
         }
         else
         {

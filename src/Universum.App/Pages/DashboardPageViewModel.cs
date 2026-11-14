@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows.Threading;
@@ -73,7 +72,7 @@ public sealed class DashboardPageViewModel : ObservableObject
         Batch = new("", Loc.T("Hromadné spracovanie"), () => _main.Open(_main.Batch));
         Library = new("", Loc.T("Knižnica"), () => _main.Open(_main.Settings));
         Titles = new("", Loc.T("Názvy titulov"), () => _main.Open(_main.Settings));
-        Tools = new("", Loc.T("MKVToolNix a aktualizácie"), () => _ = _main.ShowUpdatesCommand.ExecuteAsync(null));
+        Tools = new("", Loc.T("MKVToolNix a aktualizácie"), () => BackgroundWork.Run(_main.ShowUpdatesCommand.ExecuteAsync(null)));
         Status = [Queue, Mux, Batch, Library, Titles, Tools];
         Week = new WeekOverview(services, () => _main.Open(_main.SeriesNews), () => _main.Open(_main.Premieres), found => _main.ProcessFoundAsync(found));
         Agenda = new AgendaOverview(services, main);
@@ -86,16 +85,16 @@ public sealed class DashboardPageViewModel : ObservableObject
             _weather = null;
             _weatherMessage = "";
             OnWeatherChanged();
-            _ = RefreshWeatherAsync(force: true);
+            BackgroundWork.Run(RefreshWeatherAsync(force: true));
         };
-        services.LibraryChanged += () => _ = CountLibraryAsync();
+        services.LibraryChanged += () => BackgroundWork.Run(CountLibraryAsync());
 
         // the library is counted again when a job ended (job events come from other threads)
         services.Jobs.JobChanged += job =>
         {
             if (job.IsFinished)
             {
-                Jobs.JobRow.OnUi(() => _ = CountLibraryAsync());
+                Jobs.JobRow.OnUi(() => BackgroundWork.Run(CountLibraryAsync()));
             }
         };
 
@@ -235,12 +234,12 @@ public sealed class DashboardPageViewModel : ObservableObject
     /// <summary>The page is shown: the overview now, the weather when it is old, the library counted again.</summary>
     public void Shown()
     {
-        _ = Week.RefreshAsync();
+        BackgroundWork.Run(Week.RefreshAsync());
         Agenda.Shown();
-        _ = _services.InputWatch.ScanAsync();
+        BackgroundWork.Run(_services.InputWatch.ScanAsync());
         RefreshStatus();
-        _ = CountLibraryAsync();
-        _ = RefreshWeatherAsync(force: false);
+        BackgroundWork.Run(CountLibraryAsync());
+        BackgroundWork.Run(RefreshWeatherAsync(force: false));
     }
 
     /// <summary>Reads the weather (when it is older than half an hour, or always with <paramref name="force"/>).</summary>
@@ -337,7 +336,7 @@ public sealed class DashboardPageViewModel : ObservableObject
             OnPropertyChanged(nameof(WeatherDays));
 
             // a new day: the forecast for it, the days of the calendar from it
-            _ = RefreshWeatherAsync(force: true);
+            BackgroundWork.Run(RefreshWeatherAsync(force: true));
             Agenda.Refresh();
         }
 
@@ -349,7 +348,7 @@ public sealed class DashboardPageViewModel : ObservableObject
 
         if (_ticks % 60 == 0)
         {
-            _ = RefreshWeatherAsync(force: false);
+            BackgroundWork.Run(RefreshWeatherAsync(force: false));
         }
     }
 
@@ -436,13 +435,7 @@ public sealed class DashboardPageViewModel : ObservableObject
 
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpper(text[0], Slovak) + text[1..];
 
-    private static void OpenInBrowser(Uri address)
-    {
-        if (address.Scheme == Uri.UriSchemeHttps)
-        {
-            Process.Start(new ProcessStartInfo(address.AbsoluteUri) { UseShellExecute = true })?.Dispose();
-        }
-    }
+    private static void OpenInBrowser(Uri address) => Browser.Open(address);
 }
 
 /// <summary>A line of the week's overview: the day, the title and what comes.</summary>

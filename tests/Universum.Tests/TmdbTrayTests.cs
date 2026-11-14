@@ -46,6 +46,34 @@ public sealed class TmdbTrayTests
     }
 
     [Test]
+    public void SeriesAndFilmsInNotesOfTheirOwn()
+    {
+        // owner, 14. 11. 2026: the one tray kept before – its series move to the note of series, the own lines stay
+        var kept = string.Join('\n', "moja poznámka", "[Vymyslený film (2026)](https://www.themoviedb.org/movie/111)",
+            "[Žltý vymyslený seriál (2020)](https://www.themoviedb.org/tv/222)", "[Antický vymyslený seriál (2021)](https://www.themoviedb.org/tv/333)",
+            "[Antický vymyslený seriál (2021)](https://www.themoviedb.org/tv/333/season/1/episode/3)");
+        var (series, films) = TmdbTray.Split("", kept);
+        Assert.Equal("moja poznámka\n[Vymyslený film (2026)](https://www.themoviedb.org/movie/111)", films, "the films and the own line stay");
+        Assert.Sequence(["Series 333 ", "Series 333 S01E03", "Series 222 "], TmdbTray.Read(series).Select(e => $"{e.Kind} {e.Id} {e.EpisodeTag}"),
+            "the series moved, by the alphabet, the episode beside its series");
+        Assert.True(TmdbTray.Split(series, films) == (series, films), "split once: nothing moves again");
+
+        // a film put in the note of series by hand goes to the films; a title in both notes is kept once
+        var (series2, films2) = TmdbTray.Split(series + "\nhttps://www.themoviedb.org/movie/444", films + "\nhttps://www.themoviedb.org/tv/222");
+        Assert.True(TmdbTray.Read(series2).All(e => e.Kind == MediaKind.Series) && TmdbTray.Read(series2).Count(e => e.Id == 222) == 1 &&
+                    TmdbTray.Read(series2).Single(e => e.Id == 222).Name == "Žltý vymyslený seriál (2020)", "the series once, with its name");
+        Assert.True(TmdbTray.Read(films2) is [{ Id: 111 }, { Id: 444, Name: null }], "the film moved to the films – " + films2);
+
+        // the choice beside a title field: the series by the alphabet, then the films by the alphabet
+        var entries = TmdbTray.Entries(TmdbTray.Add(series, new TmdbTrayEntry(MediaKind.Series, 555, "Hora vymyslená (2022)")),
+            TmdbTray.Add(films, new TmdbTrayEntry(MediaKind.Movie, 666, "Anjel vymyslený (2019)")));
+        Assert.Sequence(["Antický vymyslený seriál (2021)", "Antický vymyslený seriál (2021) · S01E03", "Hora vymyslená (2022)", "Žltý vymyslený seriál (2020)", "Anjel vymyslený (2019)", "Vymyslený film (2026)"],
+            entries.Select(e => e.Display), "series first, then films, each by the Slovak alphabet");
+        Assert.True(TmdbTray.KindOfNote(TmdbTray.SeriesNoteUid) == MediaKind.Series && TmdbTray.KindOfNote(TmdbTray.NoteUid) == MediaKind.Movie &&
+                    TmdbTray.KindOfNote("ina-poznamka") is null && TmdbTray.NoteUidOf(MediaKind.Series) == TmdbTray.SeriesNoteUid, "the notes of the system");
+    }
+
+    [Test]
     public void OnlyTmdbPagesAreTaken()
     {
         var entry = TmdbTray.FromLink("universum://tmdb?u=" + Uri.EscapeDataString("https://www.themoviedb.org/tv/222-vymysleny-serial?language=sk") +
@@ -213,10 +241,15 @@ public sealed class TmdbTrayTests
             var of = posters.Of(MediaKind.Movie, 111);
             Assert.True(of is [{ Source: TrayPosterSource.Tmdb }, { Source: TrayPosterSource.Csfd }] && of[0].Path.EndsWith(".png", StringComparison.Ordinal), "the newest first, per title");
             Assert.Equal(1, posters.Of(MediaKind.Series, 111).Count, "a series apart from a film of the same ID");
-            Assert.True(posters.Clear() && posters.Of(MediaKind.Movie, 111).Count == 0, "emptied");
+            Assert.True(posters.Clear(MediaKind.Movie) && posters.Of(MediaKind.Movie, 111).Count == 0, "emptied");
+            Assert.Equal(1, posters.Of(MediaKind.Series, 111).Count, "emptying the films leaves the posters of series");
             posters.Add(MediaKind.Movie, 222, jpeg, TrayPosterSource.Csfd);
-            posters.Restore();
-            Assert.True(posters.Of(MediaKind.Movie, 111).Count == 2 && posters.Of(MediaKind.Movie, 222).Count == 1, "back, and the one picked since stays");
+            Assert.True(posters.Clear(MediaKind.Series) && posters.Of(MediaKind.Series, 111).Count == 0, "the series emptied apart");
+            posters.Restore(MediaKind.Movie);
+            Assert.True(posters.Of(MediaKind.Movie, 111).Count == 2 && posters.Of(MediaKind.Movie, 222).Count == 1 && posters.Of(MediaKind.Series, 111).Count == 0,
+                "the films back, and the one picked since stays; the series still aside");
+            posters.Restore(MediaKind.Series);
+            Assert.Equal(1, posters.Of(MediaKind.Series, 111).Count, "the series back");
             posters.Remove(posters.Of(MediaKind.Movie, 222)[0]);
             Assert.Equal(0, posters.Of(MediaKind.Movie, 222).Count, "one removed");
         }

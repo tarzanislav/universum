@@ -129,8 +129,18 @@ public sealed class AgendaEditor : ObservableObject
         });
         SaveCommand = new RelayCommand(Save);
         CancelCommand = new RelayCommand(closed);
-        DeleteCommand = new RelayCommand(Delete, () => _item is not null);
+        DeleteCommand = new RelayCommand(Delete, () => CanDelete);
     }
+
+    /// <summary>
+    /// The record is a note of the system – Zásobník seriálov TMDB or Zásobník filmov TMDB (owner, 14. 11. 2026): it stays a
+    /// note and cannot go to the bin (its titles can be emptied).
+    /// </summary>
+    public bool IsSystem => Universum.Core.Library.Tmdb.TmdbTray.IsNote(_item?.Uid);
+
+    public bool CanDelete => _item is not null && !IsSystem;
+
+    public bool CanChangeKind => !IsSystem;
 
     public static IReadOnlyList<VideoChoice<RepeatEvery?>> Repeats { get; } =
         [new(null, Loc.T("neopakuje sa")), new(RepeatEvery.Day, Loc.T("každý deň")), new(RepeatEvery.Week, Loc.T("každý týždeň")), new(RepeatEvery.Month, Loc.T("každý mesiac")), new(RepeatEvery.Year, Loc.T("každý rok"))];
@@ -449,7 +459,7 @@ public sealed class AgendaEditor : ObservableObject
 
     private void Delete()
     {
-        if (_item is not null)
+        if (_item is not null && !IsSystem)
         {
             _store.Delete(_item.Id);
             _closed();

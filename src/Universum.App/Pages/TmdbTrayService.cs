@@ -384,20 +384,12 @@ public sealed class TmdbTrayService : ObservableObject
                 return (new TmdbTrayEntry(byImdb.Kind, byImdb.Id, page.Title?.Display), true);
             }
 
-            if (page.Title is { } title && _services.Titles is { } search)
+            if (page.Title is { } title && _services.Titles is { } search &&
+                (await search.SearchAsync(title.Kind, title.Name, title.Year)).Likeliest(title.Kind, title.Name, title.Year) is { } pick)
             {
-                var found = await search.SearchAsync(title.Kind, title.Name, title.Year);
-                var candidates = found.Titles.Where(t => t.Kind == title.Kind).ToList();
-                var exact = candidates.Where(t => t.Year == title.Year && t.IsNamed(title.Name)).ToList();
-                if (exact.Count == 1)
-                {
-                    return (new TmdbTrayEntry(exact[0].Kind, exact[0].Id, title.Display), true);
-                }
-
-                if (candidates.FirstOrDefault() is { } likeliest)
-                {
-                    return (new TmdbTrayEntry(likeliest.Kind, likeliest.Id, NoteRows.TitleName(likeliest) + " – " + Loc.T("over")), false);
-                }
+                return pick.Sure
+                    ? (new TmdbTrayEntry(pick.Title.Kind, pick.Title.Id, title.Display), true)
+                    : (new TmdbTrayEntry(pick.Title.Kind, pick.Title.Id, NoteRows.TitleName(pick.Title) + " – " + Loc.T("over")), false);
             }
         }
         catch (Exception ex) when (ex is TitleServiceException or System.Net.Http.HttpRequestException or TaskCanceledException or IOException)
@@ -521,21 +513,19 @@ public sealed class TmdbTrayService : ObservableObject
                     continue;
                 }
 
-                var candidates = found.Titles.Where(t => t.Kind == title.Kind).ToList();
-                var exact = candidates.Where(t => t.Year == title.Year && t.IsNamed(title.Name)).ToList();
-                if ((exact.Count == 1 ? exact[0] : candidates.FirstOrDefault()) is not { } pick || !known.Add((pick.Kind, pick.Id)))
+                if (found.Likeliest(title.Kind, title.Name, title.Year) is not { } pick || !known.Add((pick.Title.Kind, pick.Title.Id)))
                 {
                     continue;
                 }
 
-                if (exact.Count == 1)
+                if (pick.Sure)
                 {
-                    Add(new TmdbTrayEntry(pick.Kind, pick.Id, title.Display));
+                    Add(new TmdbTrayEntry(pick.Title.Kind, pick.Title.Id, title.Display));
                 }
                 else
                 {
                     // not clearly this one: the likeliest, marked to be checked (its link shows which it is)
-                    AddUncertain(new TmdbTrayEntry(pick.Kind, pick.Id, NoteRows.TitleName(pick) + " – " + Loc.T("over")));
+                    AddUncertain(new TmdbTrayEntry(pick.Title.Kind, pick.Title.Id, NoteRows.TitleName(pick.Title) + " – " + Loc.T("over")));
                     uncertain++;
                 }
 

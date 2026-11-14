@@ -7,6 +7,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Localization;
 using Universum.Core.Agenda;
+using Universum.Core.Library;
+using Universum.Core.Library.Tmdb;
 using Universum.Core.News;
 using Universum.Core.Reports;
 using Universum.Core.Text;
@@ -58,6 +60,9 @@ public sealed class NoteCard
 
     public bool CanPin => !InBin && Record is not null;
 
+    /// <summary>The card can go to the bin – not in the bin already, and no note of the system (owner, 14. 11. 2026).</summary>
+    public bool CanDelete => !InBin && !IsTray;
+
     /// <summary>The record; null for the note of a title.</summary>
     public AgendaItem? Record { get; init; }
 
@@ -82,7 +87,7 @@ public sealed class NoteCard
 
     public string WidenToolTip { get; init; } = "";
 
-    /// <summary>The card is the Zásobník TMDB (it can be emptied with one click).</summary>
+    /// <summary>The card is a note of the Zásobník TMDB – of series or of films (it can be emptied with one click, not deleted).</summary>
     public bool IsTray { get; init; }
 
     public RelayCommand? ClearTrayCommand { get; init; }
@@ -154,8 +159,8 @@ public sealed class NotesPageViewModel : ObservableObject
     private object? _editor;
     private string _status = "";
     private bool _building;
-    private string? _trayBefore;
-    private bool _editingTray;
+    private (MediaKind Kind, string Before, bool Posters)? _trayUndo;
+    private MediaKind? _editingTray;
 
     /// <summary>The widths of a card: usual, wide, widest.</summary>
     public static readonly double[] CardWidths = [250, 520, 790];
@@ -175,8 +180,14 @@ public sealed class NotesPageViewModel : ObservableObject
         NewCommand = new RelayCommand(() => Edit(null));
         EmptyBinCommand = new RelayCommand(EmptyBin, () => _services.Agenda.Bin.Count > 0);
         WidenEditorCommand = new RelayCommand(WidenEditor);
-        ClearTrayCommand = new RelayCommand(ClearTray);
-        UndoTrayCommand = new RelayCommand(UndoTray, () => _trayBefore is not null);
+        ClearTrayCommand = new RelayCommand(() =>
+        {
+            if (_editingTray is { } kind)
+            {
+                ClearTray(kind);
+            }
+        });
+        UndoTrayCommand = new RelayCommand(UndoTray, () => _trayUndo is not null);
         services.Agenda.Changed += () =>
         {
             if (!_building)
@@ -378,15 +389,24 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public RelayCommand WidenEditorCommand { get; }
 
-    /// <summary>The note opened is the Zásobník TMDB (its button Vyprázdniť is shown).</summary>
-    public bool EditingTray { get => _editingTray; private set => SetProperty(ref _editingTray, value); }
+    /// <summary>The note opened is a note of the Zásobník TMDB (its button Vyprázdniť is shown).</summary>
+    public bool EditingTray => _editingTray is not null;
 
-    /// <summary>Empties the Zásobník TMDB – no title of TMDB stays in it (the own lines do); Vrátiť takes it back.</summary>
+    /// <summary>Empties the note of the Zásobník TMDB opened – no title of TMDB stays in it (the own lines do); Vrátiť takes it back.</summary>
     public RelayCommand ClearTrayCommand { get; }
 
     public RelayCommand UndoTrayCommand { get; }
 
-    public bool CanUndoTray => _trayBefore is not null;
+    public bool CanUndoTray => _trayUndo is not null;
+
+    private void SetEditingTray(MediaKind? kind)
+    {
+        if (_editingTray != kind)
+        {
+            _editingTray = kind;
+            OnPropertyChanged(nameof(EditingTray));
+        }
+    }
 
     private void WidenEditor()
     {
@@ -396,66 +416,68 @@ public sealed class NotesPageViewModel : ObservableObject
         OnPropertyChanged(nameof(EditorWidth));
     }
 
-    private void ClearTray()
+    private void ClearTray(MediaKind kind)
     {
-        if (_services.TmdbTray.Clear() is not { } before)
+        var name = TmdbTrayService.NoteTitle(kind);
+        if (_services.TmdbTray.Clear(kind) is not { } before)
         {
-            Status = L("Zásobník TMDB je prázdny.", "Zásobník TMDB je prázdný.", "The TMDB tray is empty.");
+            Status = L($"{name} je prázdny.", $"{name} je prázdný.", $"{name} is empty.");
             return;
         }
 
-        var count = Core.Library.Tmdb.TmdbTray.Read(before).Count;
-        SetTrayBefore(before);
-        Status = L($"Zásobník TMDB vyprázdnený ({count}).", $"Zásobník TMDB vyprázdněn ({count}).", $"The TMDB tray emptied ({count}).");
+        SetTrayUndo((kind, before, true));
+        var count = TmdbTray.Read(before).Count;
+        Status = L($"{name} vyprázdnený ({count}).", $"{name} vyprázdněn ({count}).", $"{name} emptied ({count}).");
         ReopenTray();
     }
 
     // one title out of the tray (an episode alone; its series stays)
     private void RemoveFromTray(NoteRow row)
     {
-        if (row.Tmdb is not { Kind: { } kind } tmdb || _services.Agenda.Items.FirstOrDefault(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid) is not { } tray)
+        if (row.Tmdb is not { Kind: { } kind } tmdb || _services.TmdbTray.Note(kind) is not { } tray)
         {
             return;
         }
 
-        var episode = kind == Core.Library.MediaKind.Series ? Core.Library.Tmdb.TmdbTray.EpisodeOf(row.Link) : null;
-        var entry = new Core.Library.Tmdb.TmdbTrayEntry(kind, tmdb.Id, row.Name, episode?.Season, episode?.Episode);
+        var episode = kind == MediaKind.Series ? TmdbTray.EpisodeOf(row.Link) : null;
+        var entry = new TmdbTrayEntry(kind, tmdb.Id, row.Name, episode?.Season, episode?.Episode);
         var before = tray.Text;
         _services.TmdbTray.Remove(entry);
-        SetTrayBefore(before);
+        SetTrayUndo((kind, before, false));
         Status = L($"Zo zásobníka odstránený: {entry.Display}.", $"Ze zásobníku odstraněn: {entry.Display}.", $"Removed from the tray: {entry.Display}.");
         ReopenTray();
     }
 
     private void UndoTray()
     {
-        if (_trayBefore is { } before)
+        if (_trayUndo is { } undo)
         {
-            _services.TmdbTray.Restore(before);
-            SetTrayBefore(null);
-            Status = L("Zásobník TMDB vrátený.", "Zásobník TMDB vrácen.", "The TMDB tray taken back.");
+            _services.TmdbTray.Restore(undo.Kind, undo.Before, undo.Posters);
+            SetTrayUndo(null);
+            var name = TmdbTrayService.NoteTitle(undo.Kind);
+            Status = L($"{name} vrátený.", $"{name} vrácen.", $"{name} taken back.");
             ReopenTray();
         }
     }
 
-    private void SetTrayBefore(string? before)
+    private void SetTrayUndo((MediaKind Kind, string Before, bool Posters)? undo)
     {
-        _trayBefore = before;
+        _trayUndo = undo;
         OnPropertyChanged(nameof(CanUndoTray));
         UndoTrayCommand.NotifyCanExecuteChanged();
     }
 
-    // the tray opened shows its new text
+    // the note of the tray opened shows its new text
     private void ReopenTray()
     {
-        if (EditingTray && _services.Agenda.Items.FirstOrDefault(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid) is { } tray)
+        if (_editingTray is { } kind && _services.TmdbTray.Note(kind) is { } tray)
         {
             Edit(tray);
         }
     }
 
     private static int WidthOf(AgendaItem item) =>
-        Math.Clamp(item.Note?.Width ?? (item.Uid == Core.Library.Tmdb.TmdbTray.NoteUid ? 2 : 0), 0, CardWidths.Length - 1);
+        Math.Clamp(item.Note?.Width ?? (TmdbTray.IsNote(item.Uid) ? 2 : 0), 0, CardWidths.Length - 1);
 
     private void Widen(AgendaItem item)
     {
@@ -512,11 +534,11 @@ public sealed class NotesPageViewModel : ObservableObject
 
     public void Edit(AgendaItem? item)
     {
-        EditingTray = item?.Uid == Core.Library.Tmdb.TmdbTray.NoteUid;
+        SetEditingTray(TmdbTray.KindOfNote(item?.Uid));
         Editor = new AgendaEditor(_services.Agenda, item, DateOnly.FromDateTime(DateTime.Now), AgendaKind.Note, () =>
         {
             Editor = null;
-            EditingTray = false;
+            SetEditingTray(null);
         })
         {
             Voice = _services.Voice,
@@ -527,7 +549,7 @@ public sealed class NotesPageViewModel : ObservableObject
     private void EditTitle(string key, string caption)
     {
         var mark = _services.Marks.Get(key);
-        EditingTray = false;
+        SetEditingTray(null);
         Editor = new TitleNoteEditor(caption, mark.Note, text => _services.Marks.Set(key, _services.Marks.Get(key) with { Note = text }), () => Editor = null)
         {
             LinkView = LinkView,
@@ -658,7 +680,14 @@ public sealed class NotesPageViewModel : ObservableObject
             var wanted = Words.Normalize(Filter);
             var shown = cards.Where(c => (Tag == AllTags || c.Card.Record?.Tags.Contains(Tag, StringComparer.CurrentCultureIgnoreCase) == true) &&
                                          (wanted.Length == 0 || Words.Normalize(c.Card.Title + " " + c.Card.Text + " " + c.Card.Tags).Contains(wanted, StringComparison.Ordinal)));
-            var ordered = shown.OrderByDescending(c => c.Card.Pinned);
+            // owner, 14. 11. 2026: the Zásobník seriálov TMDB on top, the Zásobník filmov TMDB under it, then the pinned notes
+            var ordered = shown.OrderBy(c => TmdbTray.KindOfNote(c.Card.IsTray ? c.Card.Record?.Uid : null) switch
+                {
+                    MediaKind.Series => 0,
+                    MediaKind.Movie => 1,
+                    _ => 2,
+                })
+                .ThenByDescending(c => c.Card.Pinned);
             ordered = Sort.Value switch
             {
                 1 => ordered.ThenByDescending(c => c.Created),
@@ -688,7 +717,8 @@ public sealed class NotesPageViewModel : ObservableObject
         var kind = item.Time is not null ? L("udalosť", "událost", "event") : item.Task is not null ? L("úloha", "úkol", "task") : null;
         var width = WidthOf(item);
         var (rows, more) = RowsOf(item.Text, CardRowsAt[width]);
-        var isTray = item.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && !inBin;
+        var trayKind = inBin ? null : TmdbTray.KindOfNote(item.Uid);
+        var isTray = trayKind is not null;
         if (isTray)
         {
             // each title of the tray removed alone with its ×; Vrátiť takes it back
@@ -697,6 +727,7 @@ public sealed class NotesPageViewModel : ObservableObject
                 link.RemoveCommand = new RelayCommand(() => RemoveFromTray(link.Row));
             }
         }
+
         return new NoteCard
         {
             CardWidth = CardWidths[width],
@@ -705,7 +736,7 @@ public sealed class NotesPageViewModel : ObservableObject
                 ? L("Zúžiť kartu", "Zúžit kartu", "Make the card narrow")
                 : L("Rozšíriť kartu (ukáže aj viac riadkov)", "Rozšířit kartu (ukáže i více řádků)", "Make the card wider (it shows more rows too)"),
             IsTray = isTray,
-            ClearTrayCommand = isTray ? ClearTrayCommand : null,
+            ClearTrayCommand = trayKind is null ? null : new RelayCommand(() => ClearTray(trayKind.Value)),
             Title = item.Title.Length > 0 ? item.Title : item.Text.Split('\n')[0],
             Text = item.Text,
             Rows = rows,
@@ -730,6 +761,12 @@ public sealed class NotesPageViewModel : ObservableObject
             PinCommand = new RelayCommand(() => Pin(item)),
             DeleteCommand = new RelayCommand(() =>
             {
+                // the notes of the tray are notes of the system (owner, 14. 11. 2026): emptied, never deleted
+                if (TmdbTray.IsNote(item.Uid))
+                {
+                    return;
+                }
+
                 _services.Agenda.Delete(item.Id);
                 Status = L("Poznámka je v koši – dá sa vrátiť.", "Poznámka je v koši – lze ji vrátit.", "The note is in the bin – it can be taken back.");
             }),

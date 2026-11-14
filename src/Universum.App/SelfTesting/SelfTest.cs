@@ -1878,10 +1878,29 @@ internal static class SelfTest
         await model.HandleAsync(Core.Shell.ShellRequest.Parse(["--tmdb", "universum://tmdb?u=" + Uri.EscapeDataString("https://evil.example/movie/333")]));
         Check(tray.Entries.Any(e => e is { Kind: MediaKind.Series, Id: 222 }) && tray.Entries.All(e => e.Id != 333),
             "tray: the address universum:// – a TMDB series taken, another page not");
-        Check(services.Agenda.Items.Any(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid && i.Note?.Pinned == true), "tray: kept in a pinned note of Poznámky");
-        var trayNames = model.HeaderEditor.Library.Tray.Rows.Select(r => r.Entry.Name).OfType<string>().ToList();
-        Check(trayNames.SequenceEqual(trayNames.Order(StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("sk-SK"), true))),
-            "tray: the choice by the alphabet (owner, 8. 11. 2026) – " + string.Join(" | ", trayNames));
+        // owner, 14. 11. 2026: two notes of the system – the series in Zásobník seriálov TMDB, the films in Zásobník filmov TMDB
+        var seriesNote = tray.Note(MediaKind.Series);
+        var filmsNote = tray.Note(MediaKind.Movie);
+        Check(seriesNote is { Note.Pinned: true } && filmsNote is { Note.Pinned: true } &&
+              seriesNote.Title == TmdbTrayService.NoteTitle(MediaKind.Series) && filmsNote.Title == TmdbTrayService.NoteTitle(MediaKind.Movie) &&
+              Core.Library.Tmdb.TmdbTray.Read(seriesNote.Text).Any(e => e.Id == 222) && Core.Library.Tmdb.TmdbTray.Read(seriesNote.Text).All(e => e.Kind == MediaKind.Series) &&
+              Core.Library.Tmdb.TmdbTray.Read(filmsNote.Text).Any(e => e.Id == 111) && Core.Library.Tmdb.TmdbTray.Read(filmsNote.Text).All(e => e.Kind == MediaKind.Movie),
+            "tray: the series and the films each in a pinned note of their own – " + seriesNote?.Title + " | " + filmsNote?.Title);
+        var trayRows = model.HeaderEditor.Library.Tray.Rows;
+        var slovak = StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("sk-SK"), true);
+        var seriesNames = trayRows.Where(r => r.Entry.Kind == MediaKind.Series).Select(r => r.Entry.Name).OfType<string>().ToList();
+        var filmNames = trayRows.Where(r => r.Entry.Kind == MediaKind.Movie).Select(r => r.Entry.Name).OfType<string>().ToList();
+        Check(trayRows.SkipWhile(r => r.Entry.Kind == MediaKind.Series).All(r => r.Entry.Kind == MediaKind.Movie) &&
+              seriesNames.SequenceEqual(seriesNames.Order(slovak)) && filmNames.SequenceEqual(filmNames.Order(slovak)) && trayRows.Count(r => r.StartsFilms) == 1,
+            "tray: the choice – the series by the alphabet, a line, then the films (owner, 14. 11. 2026) – " + string.Join(" | ", trayRows.Select(r => r.Label)));
+
+        // a series left in the note of films (the one tray before) moves to the note of series at the start
+        filmsNote!.Text += "\nhttps://www.themoviedb.org/tv/777";
+        services.Agenda.Save(filmsNote);
+        tray.EnsureNotes();
+        Check(Core.Library.Tmdb.TmdbTray.Read(tray.Note(MediaKind.Series)?.Text).Any(e => e.Id == 777) && Core.Library.Tmdb.TmdbTray.Read(tray.Note(MediaKind.Movie)?.Text).All(e => e.Id != 777),
+            "tray: a series in the note of films moves to the note of series");
+        tray.Remove(new Core.Library.Tmdb.TmdbTrayEntry(MediaKind.Series, 777));
 
         // one click beside a title field: the address in the field, the kind with it
         var library = model.HeaderEditor.Library;
@@ -1926,27 +1945,37 @@ internal static class SelfTest
         // from inside it, Vrátiť puts it back (owner, 8. 11. 2026)
         var notes = model.AgendaNotes;
         notes.Build();
-        var trayCard = notes.Cards.Single(c => c.IsTray);
-        Check(trayCard.CardWidth == NotesPageViewModel.CardWidths[^1] && trayCard.ClearTrayCommand is not null, "tray: its note is the widest – " + trayCard.CardWidth);
+        var trayCards = notes.Cards.Where(c => c.IsTray).ToList();
+        Check(trayCards.Count == 2 && notes.Cards[0].Record?.Uid == Core.Library.Tmdb.TmdbTray.SeriesNoteUid && notes.Cards[1].Record?.Uid == Core.Library.Tmdb.TmdbTray.NoteUid &&
+              trayCards.All(c => c.CardWidth == NotesPageViewModel.CardWidths[^1] && c.ClearTrayCommand is not null && !c.CanDelete),
+            "tray: the note of series on top, the note of films under it, both the widest, neither can be deleted – " + string.Join(" | ", notes.Cards.Take(3).Select(c => c.Title)));
+        trayCards[1].DeleteCommand.Execute(null);
+        Check(tray.Note(MediaKind.Movie) is not null && services.Agenda.Bin.All(i => !Core.Library.Tmdb.TmdbTray.IsNote(i.Uid)), "tray: a note of the system does not go to the bin");
+
+        // the note of films emptied from its card – the series stay, the posters of the films go aside; Vrátiť puts it back
         var count = tray.Entries.Count;
-        trayCard.ClearTrayCommand!.Execute(null);
-        Check(tray.Entries.Count == 0 && notes.CanUndoTray && notes.Cards.Any(c => c.IsTray) && tray.PostersOf(MediaKind.Movie, 555).Count == 0,
-            "tray: emptied from its card, its posters too – " + notes.Status);
+        var seriesCount = tray.Entries.Count(e => e.Kind == MediaKind.Series);
+        trayCards[1].ClearTrayCommand!.Execute(null);
+        Check(tray.Entries.Count == seriesCount && tray.Entries.All(e => e.Kind == MediaKind.Series) && notes.CanUndoTray && notes.Cards.Count(c => c.IsTray) == 2 &&
+              tray.PostersOf(MediaKind.Movie, 555).Count == 0,
+            "tray: the films emptied from their card, their posters too, the series stay – " + notes.Status);
         notes.UndoTrayCommand.Execute(null);
         Check(tray.Entries.Count == count && !notes.CanUndoTray && tray.PostersOf(MediaKind.Movie, 555).Count == 1, "tray: Vrátiť puts it back, the posters too – " + notes.Status);
 
         // owner, 12. 11. 2026: one title removed with its × on the card – the others stay; Vrátiť brings it back
         notes.Build();
-        var oneOut = notes.Cards.Single(c => c.IsTray).Rows.Select(r => r.Link).OfType<NoteLinkView>().First(l => l.CanRemove);
+        var oneOut = notes.Cards.First(c => c.IsTray && c.Record?.Uid == Core.Library.Tmdb.TmdbTray.NoteUid).Rows.Select(r => r.Link).OfType<NoteLinkView>().First(l => l.CanRemove);
         var before = tray.Entries.Count;
         oneOut.RemoveCommand!.Execute(null);
         Check(tray.Entries.Count == before - 1 && notes.CanUndoTray, $"tray: one title removed with its × – {before} → {tray.Entries.Count} – {notes.Status}");
         notes.UndoTrayCommand.Execute(null);
         Check(tray.Entries.Count == before, "tray: … Vrátiť brings it back");
-        notes.Edit(services.Agenda.Items.Single(i => i.Uid == Core.Library.Tmdb.TmdbTray.NoteUid));
+        notes.Edit(tray.Note(MediaKind.Series));
         notes.ClearTrayCommand.Execute(null);
-        Check(notes.EditingTray && tray.Entries.Count == 0 && notes.Editor is AgendaEditor, "tray: emptied from inside the note – " + notes.Status);
+        Check(notes.EditingTray && tray.Entries.Count == count - seriesCount && tray.Entries.All(e => e.Kind == MediaKind.Movie) && notes.Editor is AgendaEditor { CanDelete: false, CanChangeKind: false },
+            "tray: the series emptied from inside their note, the films stay; no Do koša in it – " + notes.Status);
         notes.UndoTrayCommand.Execute(null);
+        Check(tray.Entries.Count == count, "tray: … the series back");
         var widthBefore = services.Settings.NotesEditorWidth;
         notes.WidenEditorCommand.Execute(null);
         Check(notes.EditorWidth > widthBefore || widthBefore >= 820, $"notes: the note opened wider – {widthBefore} → {notes.EditorWidth}");
@@ -2036,7 +2065,7 @@ internal static class SelfTest
 
         notes.ShowAll = true;
         notes.Cards.First(c => c.Record == idea).PinCommand!.Execute(null);
-        Check(idea.Note!.Pinned && notes.Cards[0].Record == idea, "notes: a pinned note first");
+        Check(idea.Note!.Pinned && notes.Cards.First(c => !c.IsTray).Record == idea, "notes: a pinned note first (after the notes of the Zásobník TMDB)");
         notes.Filter = "pozadie";
         Check(notes.Cards.Count == 1 && notes.Cards[0].Record == idea, "notes: looked for in the text");
         notes.Filter = "";

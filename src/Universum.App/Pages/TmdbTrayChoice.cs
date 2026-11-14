@@ -6,8 +6,11 @@ using Universum.Core.Library.Tmdb;
 
 namespace Universum.App.Pages;
 
-/// <summary>A title of the Zásobník TMDB as a list shows it: "Vymyslený film (2026) · film".</summary>
-public sealed record TmdbTrayRow(TmdbTrayEntry Entry, int Posters = 0)
+/// <summary>
+/// A title of the Zásobník TMDB as a list shows it: "Vymyslený film (2026) · film"; the first film after the series is
+/// set apart by a line (owner, 14. 11. 2026: the series first, then the films).
+/// </summary>
+public sealed record TmdbTrayRow(TmdbTrayEntry Entry, int Posters = 0, bool StartsFilms = false)
 {
     public string Label => Entry.Display + " · " + (Entry.Kind == MediaKind.Series ? Loc.T("seriál") : Loc.T("film")) +
                            (Posters > 0 ? " · " + Loc.F("plagáty: {0}", Posters) : "");
@@ -17,7 +20,7 @@ public sealed record TmdbTrayRow(TmdbTrayEntry Entry, int Posters = 0)
 
 /// <summary>
 /// The choice from the Zásobník TMDB beside a title field (owner, 8. 11. 2026: one click instead of copying the TMDB ID
-/// from the browser): the titles gathered, by the alphabet; a title chosen is handed to the page (which fills its field
+/// from the browser): the titles gathered – the series by the alphabet, then the films; a title chosen is handed to the page (which fills its field
 /// and loads the title), then the choice is empty again. "Z prehliadača" reads the open browser windows.
 /// </summary>
 public sealed class TmdbTrayChoice : ObservableObject
@@ -38,7 +41,16 @@ public sealed class TmdbTrayChoice : ObservableObject
         ReadBrowserCommand = new AsyncRelayCommand(ReadBrowserAsync);
     }
 
-    public IReadOnlyList<TmdbTrayRow> Rows => [.. _services.TmdbTray.Entries.Select(e => new TmdbTrayRow(e, _services.TmdbTray.PostersOf(e.Kind, e.Id).Count))];
+    /// <summary>The series by the alphabet, then the films by the alphabet (owner, 14. 11. 2026).</summary>
+    public IReadOnlyList<TmdbTrayRow> Rows
+    {
+        get
+        {
+            var entries = _services.TmdbTray.Entries;
+            return [.. entries.Select((e, at) => new TmdbTrayRow(e, _services.TmdbTray.PostersOf(e.Kind, e.Id).Count,
+                at > 0 && e.Kind != MediaKind.Series && entries[at - 1].Kind == MediaKind.Series))];
+        }
+    }
 
     public bool HasRows => _services.TmdbTray.Entries.Count > 0;
 

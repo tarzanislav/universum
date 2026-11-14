@@ -39,8 +39,67 @@ public sealed record TmdbTrayEntry(MediaKind Kind, int Id, string? Name = null, 
 /// </summary>
 public static partial class TmdbTray
 {
-    /// <summary>The mark of the note that is the tray (its Uid).</summary>
+    /// <summary>
+    /// The mark (Uid) of the note Zásobník filmov TMDB – the one note of the tray before 14. 11. 2026 (its series move to
+    /// the note of series).
+    /// </summary>
     public const string NoteUid = "universum-zasobnik-tmdb";
+
+    /// <summary>The mark of the note Zásobník seriálov TMDB (owner, 14. 11. 2026: series and films each in a note of its own).</summary>
+    public const string SeriesNoteUid = "universum-zasobnik-tmdb-serialy";
+
+    /// <summary>The mark of the note that keeps the titles of a kind.</summary>
+    public static string NoteUidOf(MediaKind kind) => kind == MediaKind.Series ? SeriesNoteUid : NoteUid;
+
+    /// <summary>The kind a note of the tray keeps; null for any other note.</summary>
+    public static MediaKind? KindOfNote(string? uid) => uid == SeriesNoteUid ? MediaKind.Series : uid == NoteUid ? MediaKind.Movie : null;
+
+    /// <summary>Whether a note is one of the tray (a note of the system: it cannot go to the bin).</summary>
+    public static bool IsNote(string? uid) => KindOfNote(uid) is not null;
+
+    /// <summary>
+    /// The titles of both notes as the choice beside a title field shows them (owner, 14. 11. 2026): the series by the
+    /// alphabet, then the films by the alphabet; each title once.
+    /// </summary>
+    public static IReadOnlyList<TmdbTrayEntry> Entries(string? seriesNote, string? filmsNote)
+    {
+        var all = new List<TmdbTrayEntry>();
+        foreach (var entry in Read(seriesNote).Concat(Read(filmsNote)))
+        {
+            if (!all.Any(e => e.SameAs(entry)))
+            {
+                all.Add(entry);
+            }
+        }
+
+        return [.. all.OrderBy(e => e.Kind == MediaKind.Series ? 0 : 1).ThenBy(e => e, Order)];
+    }
+
+    /// <summary>
+    /// Both notes with each title in the note of its kind (the one tray kept before, or a link put in the other note by
+    /// hand): a series moves to the note of series, a film to the note of films, each in the order of the tray; the own
+    /// lines stay where they were.
+    /// </summary>
+    public static (string Series, string Films) Split(string? seriesNote, string? filmsNote)
+    {
+        var series = Lines(seriesNote);
+        var films = Lines(filmsNote);
+        var toFilms = series.Select(l => (Line: l, Entries: Read(l))).Where(l => l.Entries.Count > 0 && l.Entries[0].Kind != MediaKind.Series).ToList();
+        var toSeries = films.Select(l => (Line: l, Entries: Read(l))).Where(l => l.Entries.Count > 0 && l.Entries[0].Kind == MediaKind.Series).ToList();
+        var seriesText = Sorted([.. series.Where(l => !toFilms.Any(m => m.Line == l))]);
+        var filmsText = Sorted([.. films.Where(l => !toSeries.Any(m => m.Line == l))]);
+        foreach (var (_, entries) in toSeries)
+        {
+            seriesText = Add(seriesText, entries[0]);
+        }
+
+        foreach (var (_, entries) in toFilms)
+        {
+            filmsText = Add(filmsText, entries[0]);
+        }
+
+        return (seriesText, filmsText);
+    }
 
     /// <summary>The page of an episode on TMDB.</summary>
     public static Uri EpisodeAddress(int id, int season, int episode) =>
@@ -132,19 +191,22 @@ public static partial class TmdbTray
 
     // owner, 8. 11. 2026 ("zoradené podľa abecedy, lebo sa v tom zle orientuje"): the own lines first as they were, then the
     // titles by their names in the Slovak alphabet (an episode right after its series); titles without a name yet at the end
-    /// <summary>The note in the order of the tray (its own lines first, the titles by the alphabet).</summary>
-    public static string Sort(string? note) => Sorted(Lines(note));
-
     private static string Sorted(List<string> lines)
     {
-        var own = lines.Where(l => Read(l).Count == 0);
-        var titles = lines.Select(l => (Line: l, Entry: Read(l).FirstOrDefault())).Where(t => t.Entry is not null)
-            .OrderBy(t => t.Entry!.Name is null ? 1 : 0)
-            .ThenBy(t => t.Entry!.Name ?? t.Entry.Address.AbsoluteUri, Comparer<string>.Create((a, b) => Slovak.Compare(a, b, CompareOptions.IgnoreCase)))
-            .ThenBy(t => t.Entry!.Season ?? -1).ThenBy(t => t.Entry!.Episode ?? -1)
-            .Select(t => t.Line);
+        var read = lines.Select(l => (Line: l, Entry: Read(l).FirstOrDefault())).ToList();
+        var own = read.Where(t => t.Entry is null).Select(t => t.Line);
+        var titles = read.Where(t => t.Entry is not null).OrderBy(t => t.Entry!, Order).Select(t => t.Line);
         return string.Join('\n', own.Concat(titles));
     }
+
+    // the titles with a name by the Slovak alphabet, those without one after them; an episode right after its series
+    private static readonly IComparer<TmdbTrayEntry> Order = Comparer<TmdbTrayEntry>.Create((a, b) =>
+    {
+        var order = (a.Name is null).CompareTo(b.Name is null);
+        order = order != 0 ? order : Slovak.Compare(a.Name ?? a.Address.AbsoluteUri, b.Name ?? b.Address.AbsoluteUri, CompareOptions.IgnoreCase);
+        order = order != 0 ? order : (a.Season ?? -1).CompareTo(b.Season ?? -1);
+        return order != 0 ? order : (a.Episode ?? -1).CompareTo(b.Episode ?? -1);
+    });
 
     private static List<string> Lines(string? note) =>
         [.. (note ?? "").Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Where(l => l.Trim().Length > 0)];

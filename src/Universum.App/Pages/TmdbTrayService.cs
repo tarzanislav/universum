@@ -15,7 +15,9 @@ namespace Universum.App.Pages;
 /// Zásobník TMDB (owner, 8. 11. 2026): the films and series picked in the browser – sent by UNIVERSUM's script (by itself
 /// on every TMDB page opened, or by its button), by the address universum:// (the bookmark "Do UNIVERSUM"), or read from
 /// the open browser windows – kept in a pinned note of Poznámky, named by TMDB as the library names them; Hromadné, Single,
-/// Zlučovanie and Editácia hlavičky take a title from it with one click.
+/// Zlučovanie and Editácia hlavičky take a title from it with one click. Since 14. 11. 2026 (owner) two notes of the system:
+/// Zásobník seriálov TMDB above Zásobník filmov TMDB – neither can go to the bin; the choice beside a title field shows the
+/// series by the alphabet, then the films.
 /// </summary>
 public sealed class TmdbTrayService : ObservableObject
 {
@@ -60,8 +62,27 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Raised when the titles change (on the thread of the change – the UI's).</summary>
     public event Action? Changed;
 
-    /// <summary>The titles by the alphabet (owner, 8. 11. 2026).</summary>
-    public IReadOnlyList<TmdbTrayEntry> Entries => TmdbTray.Read(TmdbTray.Sort(Note()?.Text));
+    /// <summary>The series by the alphabet, then the films by the alphabet (owner, 14. 11. 2026).</summary>
+    public IReadOnlyList<TmdbTrayEntry> Entries
+    {
+        get
+        {
+            // read again only when a note changed (the pages ask for the titles often)
+            var series = Note(MediaKind.Series)?.Text;
+            var films = Note(MediaKind.Movie)?.Text;
+            if (_entries is not { } kept || !ReferenceEquals(kept.Series, series) || !ReferenceEquals(kept.Films, films))
+            {
+                _entries = kept = (series, films, TmdbTray.Entries(series, films));
+            }
+
+            return kept.List;
+        }
+    }
+
+    private (string? Series, string? Films, IReadOnlyList<TmdbTrayEntry> List)? _entries;
+
+    /// <summary>The name of the note of a kind: "Zásobník seriálov TMDB", "Zásobník filmov TMDB".</summary>
+    public static string NoteTitle(MediaKind kind) => kind == MediaKind.Series ? Loc.T("Zásobník seriálov TMDB") : Loc.T("Zásobník filmov TMDB");
 
     /// <summary>"Prijíma na 127.0.0.1:47219", why not, or "vypnuté".</summary>
     public string Status { get; private set; } = "";
@@ -91,7 +112,64 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>The script itself (to copy it into the extension by hand).</summary>
     public string Script => TmdbUserScript.Text(Port, Key);
 
-    private AgendaItem? Note() => _services.Agenda.Items.FirstOrDefault(i => i.Uid == TmdbTray.NoteUid);
+    /// <summary>The note of the tray that keeps the titles of a kind (null before it is made).</summary>
+    public AgendaItem? Note(MediaKind kind)
+    {
+        var uid = TmdbTray.NoteUidOf(kind);
+        return _services.Agenda.Items.FirstOrDefault(i => i.Uid == uid);
+    }
+
+    // the note of a kind, made when there is none yet (pinned, the widest card)
+    private AgendaItem NoteFor(MediaKind kind) => Note(kind) ?? new AgendaItem
+    {
+        Uid = TmdbTray.NoteUidOf(kind),
+        Title = NoteTitle(kind),
+        Tags = ["TMDB"],
+        Note = new AgendaNote { Pinned = true, Width = 2 },
+    };
+
+    /// <summary>
+    /// Both notes of the tray there, named as the system names them (owner, 14. 11. 2026), each title in the note of its
+    /// kind – the series of the one tray kept before move to the note of series; the titles by the alphabet. A note found
+    /// in the bin comes back (they cannot be deleted since). At the start of UNIVERSUM.
+    /// </summary>
+    public void EnsureNotes()
+    {
+        var series = Living(MediaKind.Series);
+        var films = Living(MediaKind.Movie);
+        var (seriesText, filmsText) = TmdbTray.Split(series?.Text, films?.Text);
+        Keep(series, MediaKind.Series, seriesText);
+        Keep(films, MediaKind.Movie, filmsText);
+    }
+
+    // the note of a kind, back from the bin when it is there
+    private AgendaItem? Living(MediaKind kind)
+    {
+        if (Note(kind) is { } note)
+        {
+            return note;
+        }
+
+        var uid = TmdbTray.NoteUidOf(kind);
+        if (_services.Agenda.Bin.FirstOrDefault(i => i.Uid == uid) is { } binned)
+        {
+            _services.Agenda.Restore(binned.Id);
+        }
+
+        return Note(kind);
+    }
+
+    private void Keep(AgendaItem? note, MediaKind kind, string text)
+    {
+        var item = note ?? NoteFor(kind);
+        var title = NoteTitle(kind);
+        if (note is null || item.Title != title || item.Text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim() != text)
+        {
+            item.Title = title;
+            item.Text = text;
+            _services.Agenda.Save(item);
+        }
+    }
 
     /// <summary>Adds a title (at the top; one already there moves up) and asks TMDB for its name as the library names it.</summary>
     public void Add(TmdbTrayEntry entry, bool fromBrowser = false, bool byItself = false)
@@ -107,13 +185,7 @@ public sealed class TmdbTrayService : ObservableObject
             return;
         }
 
-        var note = Note() ?? new AgendaItem
-        {
-            Uid = TmdbTray.NoteUid,
-            Title = Loc.T("Zásobník TMDB"),
-            Tags = ["TMDB"],
-            Note = new AgendaNote { Pinned = true, Width = 2 },
-        };
+        var note = NoteFor(entry.Kind);
         note.Text = TmdbTray.Add(note.Text, entry);
         _services.Agenda.Save(note);
         if (fromBrowser)
@@ -126,12 +198,12 @@ public sealed class TmdbTrayService : ObservableObject
     }
 
     /// <summary>
-    /// Empties the tray (owner, 8. 11. 2026: "reštart – nebude tam žiaden údaj z TMDB"); the owner's own lines stay. The
-    /// text before, to take it back; null when there was nothing to empty.
+    /// Empties a note of the tray (owner, 8. 11. 2026: "reštart – nebude tam žiaden údaj z TMDB"); the owner's own lines
+    /// stay. The text before, to take it back; null when there was nothing to empty.
     /// </summary>
-    public string? Clear()
+    public string? Clear(MediaKind kind)
     {
-        if (Note() is not { } note || TmdbTray.Read(note.Text).Count == 0)
+        if (Note(kind) is not { } note || TmdbTray.Read(note.Text).Count == 0)
         {
             return null;
         }
@@ -142,7 +214,7 @@ public sealed class TmdbTrayService : ObservableObject
         try
         {
             // the posters picked go aside with the titles
-            Posters.Clear();
+            Posters.Clear(kind);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -152,15 +224,21 @@ public sealed class TmdbTrayService : ObservableObject
         return before;
     }
 
-    /// <summary>The tray as it was before <see cref="Clear"/> (titles added since stay at the top).</summary>
-    public void Restore(string before)
+    /// <summary>
+    /// A note of the tray as it was before <see cref="Clear"/> or <see cref="Remove"/> (titles added since stay too); the
+    /// posters put aside by emptying come back with it.
+    /// </summary>
+    public void Restore(MediaKind kind, string before, bool posters)
     {
-        if (Note() is { } note)
+        if (Note(kind) is { } note)
         {
             var added = TmdbTray.Read(note.Text);
             try
             {
-                Posters.Restore();
+                if (posters)
+                {
+                    Posters.Restore(kind);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -355,9 +433,10 @@ public sealed class TmdbTrayService : ObservableObject
         return copy.ToArray();
     }
 
+    /// <summary>One title out of the tray (an episode alone; its series stays).</summary>
     public void Remove(TmdbTrayEntry entry)
     {
-        if (Note() is { } note)
+        if (Note(entry.Kind) is { } note)
         {
             note.Text = TmdbTray.Remove(note.Text, entry);
             _services.Agenda.Save(note);
@@ -374,7 +453,7 @@ public sealed class TmdbTrayService : ObservableObject
 
         try
         {
-            if (await tmdb.GetAsync(entry.Kind, entry.Id) is { } title && Note() is { } note)
+            if (await tmdb.GetAsync(entry.Kind, entry.Id) is { } title && Note(entry.Kind) is { } note)
             {
                 var name = NoteRows.TitleName(title);
                 var named = TmdbTray.Name(note.Text, entry.Kind, entry.Id, name);
@@ -394,13 +473,7 @@ public sealed class TmdbTrayService : ObservableObject
     /// <summary>Starts the receiver on 127.0.0.1 when it is switched on (at the start of UNIVERSUM and when switched on).</summary>
     public void StartReceiving()
     {
-        // a tray kept before it was sorted: by the alphabet now (owner, 8. 11. 2026)
-        if (Note() is { } kept && TmdbTray.Read(kept.Text).Count > 0 && TmdbTray.Sort(kept.Text) is var sorted && sorted != kept.Text.Replace("\r\n", "\n", StringComparison.Ordinal).Trim())
-        {
-            kept.Text = sorted;
-            _services.Agenda.Save(kept);
-        }
-
+        EnsureNotes();
         StopReceiving();
         if (!_services.Settings.TmdbTrayReceive)
         {
@@ -497,7 +570,7 @@ public sealed class TmdbTrayService : ObservableObject
     // a title not clearly found: kept with its mark (TMDB's name would hide that it is to be checked)
     private void AddUncertain(TmdbTrayEntry entry)
     {
-        var note = Note() ?? new AgendaItem { Uid = TmdbTray.NoteUid, Title = Loc.T("Zásobník TMDB"), Tags = ["TMDB"], Note = new AgendaNote { Pinned = true } };
+        var note = NoteFor(entry.Kind);
         note.Text = TmdbTray.Add(note.Text, entry);
         _services.Agenda.Save(note);
     }

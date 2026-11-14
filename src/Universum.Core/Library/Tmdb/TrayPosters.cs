@@ -43,8 +43,10 @@ public sealed partial class TrayPosters(string folder)
 
     public string Folder { get; } = folder;
 
-    // the posters put aside by emptying the tray (Vrátiť brings them back; the next emptying deletes them)
-    private string Aside => Folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + "-vyprazdnene";
+    // the posters put aside by emptying a note of the tray (Vrátiť brings them back; the next emptying deletes them): the
+    // films where all posters went before the tray was split (14. 11. 2026), the series beside them
+    private string Aside(MediaKind kind) =>
+        Folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + (kind == MediaKind.Series ? "-vyprazdnene-serialy" : "-vyprazdnene");
 
     /// <summary>".jpg", ".png" or ".webp" by the first bytes of a picture; null for anything else.</summary>
     public static string? Extension(ReadOnlySpan<byte> picture) =>
@@ -107,34 +109,47 @@ public sealed partial class TrayPosters(string folder)
         }
     }
 
-    /// <summary>All posters put aside (the tray emptied); those put aside before go for good. Whether there were any.</summary>
-    public bool Clear()
+    /// <summary>
+    /// The posters of a kind put aside (its note of the tray emptied); those of the kind put aside before go for good.
+    /// Whether there were any.
+    /// </summary>
+    public bool Clear(MediaKind kind)
     {
-        if (!Directory.Exists(Folder) || !Directory.EnumerateFiles(Folder, "*", SearchOption.AllDirectories).Any())
+        var titles = Directory.Exists(Folder)
+            ? Directory.EnumerateDirectories(Folder, Prefix(kind) + "*").Where(d => Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories).Any()).ToList()
+            : [];
+        if (titles.Count == 0)
         {
             return false;
         }
 
-        if (Directory.Exists(Aside))
+        var aside = Aside(kind);
+        if (Directory.Exists(aside))
         {
-            Directory.Delete(Aside, recursive: true);
+            Directory.Delete(aside, recursive: true);
         }
 
-        Directory.Move(Folder, Aside);
+        Directory.CreateDirectory(aside);
+        foreach (var title in titles)
+        {
+            Directory.Move(title, Path.Combine(aside, Path.GetFileName(title)));
+        }
+
         return true;
     }
 
-    /// <summary>The posters put aside back (those picked since stay too).</summary>
-    public void Restore()
+    /// <summary>The posters of a kind put aside back (those picked since stay too).</summary>
+    public void Restore(MediaKind kind)
     {
-        if (!Directory.Exists(Aside))
+        var aside = Aside(kind);
+        if (!Directory.Exists(aside))
         {
             return;
         }
 
-        foreach (var file in Directory.EnumerateFiles(Aside, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(aside, "*", SearchOption.AllDirectories))
         {
-            var target = Path.Combine(Folder, Path.GetRelativePath(Aside, file));
+            var target = Path.Combine(Folder, Path.GetRelativePath(aside, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             if (!File.Exists(target))
             {
@@ -142,11 +157,13 @@ public sealed partial class TrayPosters(string folder)
             }
         }
 
-        Directory.Delete(Aside, recursive: true);
+        Directory.Delete(aside, recursive: true);
     }
 
+    private static string Prefix(MediaKind kind) => kind == MediaKind.Series ? "tv-" : "movie-";
+
     private static string TitleFolder(string root, MediaKind kind, int id) =>
-        Path.Combine(root, (kind == MediaKind.Series ? "tv-" : "movie-") + id.ToString(CultureInfo.InvariantCulture));
+        Path.Combine(root, Prefix(kind) + id.ToString(CultureInfo.InvariantCulture));
 
     [GeneratedRegex(@"^(?<at>\d{17})-(?<source>csfd|tmdb)-[0-9a-f]{12}\.(jpg|png|webp)$", RegexOptions.CultureInvariant)]
     private static partial Regex FileName();

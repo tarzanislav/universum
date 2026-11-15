@@ -1,0 +1,126 @@
+[
+  {
+    "Id": "92c88cbd-727b-4e65-9720-6be0cf48bde6",
+    "Title": "Z\u00E1sobn\u00EDk seri\u00E1lov TMDB",
+    "Text": "https://www.themoviedb.org/tv/222\nhttps://www.themoviedb.org/tv/222/season/1/episode/3\nhttps://www.themoviedb.org/tv/333\nhttps://www.themoviedb.org/tv/444",
+    "Color": null,
+    "Tags": [
+      "TMDB"
+    ],
+    "Links": [],
+    "Created": "2026-11-15T21:56:17.5082676+00:00",
+    "Modified": "2026-11-15T21:56:18.460614+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": null,
+    "Note": {
+      "Pinned": true,
+      "Recording": null,
+      "Width": 2
+    },
+    "Action": null,
+    "Uid": "universum-zasobnik-tmdb-serialy"
+  },
+  {
+    "Id": "df42472a-1376-45ce-bfb2-989efc7efe49",
+    "Title": "Z\u00E1sobn\u00EDk filmov TMDB",
+    "Text": "[Vymyslen\u00FD film z \u010CSFD (2026)](https://www.themoviedb.org/movie/555)\n[Vymyslen\u00FD film zo skriptu (2026)](https://www.themoviedb.org/movie/111)\n[Vymyslen\u00FD film zo skriptu (2026)](https://www.themoviedb.org/movie/114)\nhttps://www.themoviedb.org/movie/444",
+    "Color": null,
+    "Tags": [
+      "TMDB"
+    ],
+    "Links": [],
+    "Created": "2026-11-15T21:56:17.5104144+00:00",
+    "Modified": "2026-11-15T21:56:18.4587615+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": null,
+    "Note": {
+      "Pinned": true,
+      "Recording": null,
+      "Width": 2
+    },
+    "Action": null,
+    "Uid": "universum-zasobnik-tmdb"
+  },
+  {
+    "Id": "57a8d0a1-b3d0-4f3c-b548-8f8a284f6615",
+    "Title": "Kino \u2013 vymyslen\u00FD \u010F\u00E1belsk\u00FD film",
+    "Text": "",
+    "Color": null,
+    "Tags": [
+      "kino"
+    ],
+    "Links": [],
+    "Created": "2026-11-15T21:56:18.468799+00:00",
+    "Modified": "2026-11-15T21:56:18.4688331+00:00",
+    "Deleted": null,
+    "Time": {
+      "Start": "2026-11-15",
+      "StartTime": "20:00:00",
+      "End": null,
+      "EndTime": null,
+      "Repeat": {
+        "Every": "Week",
+        "Interval": 1,
+        "Days": [],
+        "Until": null,
+        "Count": 3
+      },
+      "ReminderMinutes": 60,
+      "Skipped": []
+    },
+    "Task": null,
+    "Note": null,
+    "Action": null,
+    "Uid": null
+  },
+  {
+    "Id": "07a1dc85-8086-4229-8625-0ed673094706",
+    "Title": "Spracova\u0165 vymyslen\u00FD seri\u00E1l",
+    "Text": "",
+    "Color": null,
+    "Tags": [],
+    "Links": [],
+    "Created": "2026-11-15T21:56:18.4696412+00:00",
+    "Modified": "2026-11-15T21:56:18.4696444+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": {
+      "Due": "2026-11-15",
+      "DueTime": null,
+      "State": "Open",
+      "Finished": null,
+      "Priority": 1,
+      "Checklist": [
+        {
+          "Text": "\u0165a\u017Ek\u00FD krok",
+          "Done": true
+        }
+      ]
+    },
+    "Note": null,
+    "Action": null,
+    "Uid": null
+  },
+  {
+    "Id": "d2a3f3bb-1a50-4394-b732-561be2bcdbfd",
+    "Title": "Vymyslen\u00E1 pozn\u00E1mka",
+    "Text": "\u017Dlt\u00FD k\u00F4\u0148 \u00FApel \u010F\u00E1belsk\u00E9 \u00F3dy.",
+    "Color": null,
+    "Tags": [],
+    "Links": [],
+    "Created": "2026-11-15T21:56:18.4703785+00:00",
+    "Modified": "2026-11-15T21:56:18.4703792+00:00",
+    "Deleted": null,
+    "Time": null,
+    "Task": null,
+    "Note": {
+      "Pinned": false,
+      "Recording": null,
+      "Width": null
+    },
+    "Action": null,
+    "Uid": null
+  }
+]

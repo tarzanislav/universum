@@ -70,6 +70,7 @@ public sealed class SlotRow : ObservableObject
         Track = track;
         _changed = changed;
         _move = move;
+        _toSrtCandidates = new(() => group.ToSrtCandidates(key));
         MoveUpCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, -1), () => !_removedByLanguage);
         MoveDownCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, 1), () => !_removedByLanguage);
         Refresh();
@@ -128,16 +129,40 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    /// <summary>Text subtitles of another format than SRT: they can be written as SRT.</summary>
-    public bool CanConvertToSrt => Core.Subtitles.SrtConversion.Offers(Track);
+    /// <summary>
+    /// Text subtitles of another format than SRT at this place of any file of the group (not only of the first – 15. 11.
+    /// 2026): they can be written as SRT; the files with SRT there already stay as they are.
+    /// </summary>
+    public bool CanConvertToSrt => _toSrtCandidates.Value.Count > 0;
 
-    /// <summary>What the conversion means for the track ("WebVTT → SRT"; styled subtitles lose their look).</summary>
-    public string ToSrtHint => Track is { ExternalFile: { } file, IsTextSubtitles: true } && !file.EndsWith(".srt", StringComparison.OrdinalIgnoreCase)
-            ? Loc.T("externé titulky sa vždy zapíšu ako SRT")
-        : !CanConvertToSrt ? ""
-        : Core.Subtitles.SrtConversion.IsStyled(Track)
-            ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(Track))
-            : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(Track));
+    private readonly Lazy<IReadOnlyList<MediaTrack>> _toSrtCandidates;
+
+    /// <summary>
+    /// What the conversion means for the track ("WebVTT → SRT"; styled subtitles lose their look); how many files of the
+    /// group it is when not all of them.
+    /// </summary>
+    public string ToSrtHint
+    {
+        get
+        {
+            if (Track is { ExternalFile: { } file, IsTextSubtitles: true } && !file.EndsWith(".srt", StringComparison.OrdinalIgnoreCase))
+            {
+                return Loc.T("externé titulky sa vždy zapíšu ako SRT");
+            }
+
+            var candidates = _toSrtCandidates.Value;
+            if (candidates.Count == 0)
+            {
+                return "";
+            }
+
+            var shown = candidates[0];
+            var what = Core.Subtitles.SrtConversion.IsStyled(shown)
+                ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(shown))
+                : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(shown));
+            return candidates.Count < Group.Files.Count ? what + " " + Loc.F("({0} z {1} súborov skupiny)", candidates.Count, Group.Files.Count) : what;
+        }
+    }
 
     /// <summary>Subtitles out of the language list: the user may keep them.</summary>
     public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);

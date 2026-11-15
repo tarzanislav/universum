@@ -18,6 +18,14 @@ public sealed class BatchGroup(string signature, int index)
     public GroupDecisions Decisions { get; } = new();
 
     /// <summary>
+    /// The tracks at a place of the files of the group that can be written as SRT (ASS, SSA, WebVTT …). The group is made by
+    /// the languages of the tracks, not by their formats (owner, 15. 11. 2026: one film of a group kept its ASS because the
+    /// first film had SRT at that place and Previesť na SRT was not offered) – so every file is asked, not the first only.
+    /// </summary>
+    public IReadOnlyList<MediaTrack> ToSrtCandidates(SlotKey key) =>
+        [.. Files.Select(f => SlotKey.Of(f).FirstOrDefault(x => x.Key == key).Track).OfType<MediaTrack>().Where(Subtitles.SrtConversion.Offers)];
+
+    /// <summary>
     /// The languages UNIVERSUM read from the text of the subtitles of the group's first file (owner, 30. 10. 2026), applied
     /// to the whole group as its suggestion; a choice of the user wins.
     /// </summary>

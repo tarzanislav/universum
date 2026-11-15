@@ -3465,6 +3465,7 @@ internal static class Translations
         ["hotová s problémami"] = "hotová s problémy",
         ["zrušená"] = "zrušená",
         ["zmeškaná – UNIVERSUM vtedy nebežal"] = "zmeškaná – UNIVERSUM tehdy neběžel",
+        ["({0} z {1} súborov skupiny)"] = "({0} z {1} souborů skupiny)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6926,5 +6927,6 @@ internal static class Translations
         ["hotová s problémami"] = "done with problems",
         ["zrušená"] = "cancelled",
         ["zmeškaná – UNIVERSUM vtedy nebežal"] = "missed – UNIVERSUM was not running",
+        ["({0} z {1} súborov skupiny)"] = "({0} of the {1} files of the group)",
     };
 }

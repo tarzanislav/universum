@@ -1155,6 +1155,41 @@ public sealed class BatchTests
         Assert.True(item.Target.For(3) is { Role: TrackRole.Main, Name: null, Flags.Forced: false }, "the user's choice wins");
     }
 
+    // owner, 15. 11. 2026: a group is made by the languages of the tracks, not by their formats – one film kept its ASS
+    // because the first film of its group had SRT at that place and Previesť na SRT was not offered
+    [Test]
+    public void ToSrtIsOfferedWhenAnyFileOfTheGroupHasAnotherFormat()
+    {
+        static MediaFile Film(string path, string forcedCodec) => new()
+        {
+            Path = path,
+            ContainerType = "Matroska",
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Video, CodecId = "V_MPEG4/ISO/AVC" },
+                new MediaTrack { Id = 1, Type = TrackType.Audio, CodecId = "A_AC3", Language = new LanguageTag("cze", "cs") },
+                new MediaTrack { Id = 2, Type = TrackType.Subtitles, IsTextSubtitles = true, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", Language = new LanguageTag("cze", "cs"), Flags = new TrackFlags(Forced: true) },
+                new MediaTrack { Id = 3, Type = TrackType.Subtitles, IsTextSubtitles = true, CodecId = forcedCodec, Codec = forcedCodec == "S_TEXT/ASS" ? "SubStationAlpha" : "SubRip/SRT", Language = new LanguageTag("cze", "cs"), Flags = new TrackFlags(Forced: true) },
+                new MediaTrack { Id = 4, Type = TrackType.Subtitles, IsTextSubtitles = true, CodecId = "S_TEXT/UTF8", Codec = "SubRip/SRT", Language = new LanguageTag("cze", "cs") },
+            ],
+        };
+
+        var first = Film("/vstup/Prvy vymysleny film (2020).mkv", "S_TEXT/UTF8");
+        var second = Film("/vstup/Druhy vymysleny film (2021).mkv", "S_TEXT/ASS");
+        Assert.Equal(StructureSignature.Of(first), StructureSignature.Of(second), "the same group: the formats are not part of the structure");
+        var group = new BatchGroup(StructureSignature.Of(first), 0);
+        group.Files.AddRange([first, second]);
+        var place = new SlotKey(TrackType.Subtitles, 1);
+        Assert.True(group.ToSrtCandidates(place) is [{ CodecId: "S_TEXT/ASS" }] && group.ToSrtCandidates(new SlotKey(TrackType.Subtitles, 0)).Count == 0,
+            "the ASS of the second film is found although the first has SRT there");
+
+        group.Decisions.ToSrt.Add(place);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        Assert.True(items.Single(i => i.File == first).Target.Tracks.All(t => !t.ToSrt), "the first film: SRT already, nothing to write");
+        Assert.True(items.Single(i => i.File == second).Target.For(3).ToSrt, "the second film: its ASS written as SRT");
+    }
+
     [Test]
     public void TemplateJsonRoundTrip()
     {

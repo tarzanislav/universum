@@ -39,11 +39,11 @@ public static partial class SceneName
     {
         var name = Path.GetFileNameWithoutExtension(target.Source.Path);
         var group = Group(name);
-        var original = Marked(Tokens(group is null ? name : name[..^(group.Length + 1)]));
+        var (named, original) = Marked(Tokens(group is null ? name : name[..^(group.Length + 1)]));
         var video = target.Tracks.FirstOrDefault(t => t.Type == TrackType.Video)?.Source;
         var encoded = video?.VideoEncode is not null;
         var parts = new List<string>();
-        parts.AddRange(Edition(original));
+        parts.AddRange(Edition([.. named, .. original]));
         parts.Add(Resolution(video));
         parts.Add(Source(original, encoded));
         if (!encoded)
@@ -276,10 +276,11 @@ public static partial class SceneName
     // EXTENDED, DIRECTORS.CUT, UNRATED, REMASTERED …; PROPER, REPACK, INTERNAL – from the original's name, in this order
     private static IEnumerable<string> Edition(IReadOnlyList<string> original)
     {
+        // in capitals only, as the scene writes them: "Vymysleny.serial.S02E05.Extended.Family.1080p" has no edition
         string[] single = ["EXTENDED", "UNRATED", "UNCUT", "REMASTERED", "THEATRICAL", "IMAX", "CRITERION"];
         foreach (var name in single)
         {
-            if (original.Any(t => t.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            if (original.Any(t => t.Equals(name, StringComparison.Ordinal)))
             {
                 yield return name;
             }
@@ -296,7 +297,7 @@ public static partial class SceneName
 
         foreach (var name in new[] { "PROPER", "REPACK", "INTERNAL" })
         {
-            if (original.Any(t => t.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            if (original.Any(t => t.Equals(name, StringComparison.Ordinal)))
             {
                 yield return name;
             }
@@ -325,18 +326,23 @@ public static partial class SceneName
 
     private static bool Sure(string token) => SureMarks.Contains(token) || EpisodeMark().IsMatch(token);
 
-    // the part of a name after the title: from the year before the first sure mark ("Film.2021.EXTENDED.1080p…" → EXTENDED,
-    // 1080p …); nothing when the name has no sure mark (a name of the user's own: its words are a title, not marks)
-    private static List<string> Marked(List<string> tokens)
+    // The parts of a name after the title (owner, 17. 11. 2026: think well about the episodes). A name of the scene is
+    // "Nazov.Rok|SxxEyy[.Nazov.epizody][.EDICIA].Rozlisenie.Zdroj.Kodek…": the words between the year or the episode and the
+    // first technical mark (1080p, x264, BluRay, WEB-DL, REMUX …) may be the title of an episode ("Web.of.Lies",
+    // "Extended.Family") – only an edition in capitals is read from them; the source, HDR, the codec and Atmos only from the
+    // technical part. A name without a technical mark (the user's own) gives nothing.
+    private static (List<string> Named, List<string> Technical) Marked(List<string> tokens)
     {
-        var first = tokens.FindIndex(Sure);
-        if (first < 0)
+        var technical = tokens.FindIndex(SureMarks.Contains);
+        if (technical < 0)
         {
-            return [];
+            return ([], []);
         }
 
-        var year = tokens.FindLastIndex(first, t => YearMark().IsMatch(t));
-        return tokens[(year >= 0 ? year + 1 : first)..];
+        var episode = tokens.FindLastIndex(technical, t => EpisodeMark().IsMatch(t));
+        var year = tokens.FindLastIndex(technical, t => YearMark().IsMatch(t));
+        var start = Math.Max(episode, year) + 1;
+        return (tokens[start..technical], tokens[technical..]);
     }
 
     // the parts of a name split at dots, spaces and underscores ("WEB-DL", "DTS-HD" and "H.264" stay readable by pairs)
@@ -349,7 +355,8 @@ public static partial class SceneName
     [GeneratedRegex(@"-([A-Za-z0-9]{2,20})$", RegexOptions.CultureInvariant)]
     private static partial Regex GroupAtEnd();
 
-    [GeneratedRegex(@"^S\d{1,2}(E\d{1,3})?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // "S01E04", "S01E01-E02", "S01E01E02", "S01" (a season)
+    [GeneratedRegex(@"^S\d{1,2}(E\d{1,3}(-?E\d{1,3})*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EpisodeMark();
 
     [GeneratedRegex(@"^(19|20)\d{2}$", RegexOptions.CultureInvariant)]

@@ -64,6 +64,39 @@ public sealed class SceneNameTests
         Assert.Equal("Lode.and.Strom", SceneName.Dots("Lóde & Strom"), "&");
     }
 
+    // owner, 17. 11. 2026: "Premysli dobre, ako budeš spracovávať epizódy seriálov"
+    [Test]
+    public void EpisodesOfASeries()
+    {
+        var series = new TitleInfo(MediaKind.Series, "Vymyslený seriál", 2019);
+        var layout = new LibraryLayout("lib");
+        string Name(string original, EpisodeNumber episode, params MediaTrack[] tracks) =>
+            layout.Place(Target(original, tracks), series, episode, Scene).FileName(1);
+
+        // the title of an episode is no mark: "Web.of.Lies" gives no WEB, "Extended.Family" no EXTENDED
+        Assert.Equal("Vymysleny.serial.S01E03.720p.HDTV.x264.DD5.1.CZ-Skupina.mkv",
+            Name("Vymysleny.Serial.S01E03.Web.of.Lies.720p.HDTV.x264-Skupina.mkv", new EpisodeNumber(1, 3), Video("1280x720"), Audio("cs")),
+            "the source from the technical part only");
+        Assert.Equal("Vymysleny.serial.S02E05.1080p.WEB.H264.DDP5.1.EN.CZ.Sub-Skupina.mkv",
+            Name("Vymysleny.Serial.S02E05.Extended.Family.1080p.WEB.h264-Skupina.mkv", new EpisodeNumber(2, 5), Video(), Audio("en", "A_EAC3", "E-AC-3"), Subtitles("cs")),
+            "an edition only in capitals");
+        Assert.Equal("Vymysleny.serial.S02E06.PROPER.1080p.WEB.H264.DDP5.1.CZ-Skupina.mkv",
+            Name("Vymysleny.Serial.S02E06.PROPER.1080p.WEB.h264-Skupina.mkv", new EpisodeNumber(2, 6), Video(), Audio("cs", "A_EAC3", "E-AC-3")),
+            "a fix of the scene in capitals is kept");
+
+        // two episodes in one file, a special, a name of the user's own, a year in the name of the series
+        Assert.Equal("Vymysleny.serial.S01E01-E02.1080p.WEB-DL.H264.DD5.1.CZ-Skupina.mkv",
+            Name("Vymysleny.Serial.S01E01-E02.1080p.WEB-DL.H264-Skupina.mkv", new EpisodeNumber(1, 1, 2), Video(), Audio("cs")), "two episodes");
+        Assert.Equal("Vymysleny.serial.S00E01.576p.H264.DD2.0.CZ.mkv",
+            Name("Vymyslený seriál - špeciál 1.mkv", new EpisodeNumber(0, 1), Video("720x576"), Audio("cs", channels: 2)), "a special, a name without marks");
+        Assert.Equal("Vymysleny.serial.S03E01.2160p.WEB-DL.DV.HEVC.DDP5.1.Atmos.CZ.EN-Skupina.mkv",
+            Name("Vymysleny.Serial.2019.S03E01.2160p.WEB-DL.DV.HEVC.DDP5.1.Atmos-Skupina.mkv", new EpisodeNumber(3, 1),
+                Video("3840x2160", "V_MPEGH/ISO/HEVC"), Audio("cs", "A_EAC3", "E-AC-3"), Audio("en", "A_EAC3", "E-AC-3")),
+            "the year of the series in the original, Atmos of the original for E-AC-3");
+        Assert.Equal(Path.Combine("lib", "TVSHOWS", "Vymyslený seriál (2019)", "Season 03"),
+            layout.Place(Target("x.mkv", Video()), series, new EpisodeNumber(3, 1), Scene).Directory, "the folders as in č. 1");
+    }
+
     [Test]
     public void TheClassicNamesStayAsTheyWere()
     {

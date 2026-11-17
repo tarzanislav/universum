@@ -33,6 +33,14 @@ internal static partial class SelfTest
         services.WeatherForSelfTest = new Universum.Core.Weather.OpenMeteo(new System.Net.Http.HttpClient(weather));
         await Screenshot(window, "dashboard-no-town.png");
 
+        // owner, 17. 11. 2026: názvoslovie č. 2 switched in Nastavenia, saved with the profile, and back
+        model.Settings.SceneNaming = true;
+        model.Settings.SaveCommand.Execute(null);
+        Check(services.Profile.Library.Naming == Core.Library.NamingStyle.Scene && !model.Settings.ClassicNaming, "settings: naming no. 2 saved – " + model.Settings.Message);
+        model.Settings.ClassicNaming = true;
+        model.Settings.SaveCommand.Execute(null);
+        Check(services.Profile.Library.Naming == Core.Library.NamingStyle.Classic && !model.Settings.SceneNaming, "settings: naming no. 1 back");
+
         model.Settings.WeatherTownInput = "Nikde";
         weather.Found = false;
         await model.Settings.FindWeatherTownCommand.ExecuteAsync(null);

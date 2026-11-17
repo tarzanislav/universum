@@ -798,6 +798,19 @@ internal static partial class SelfTest
             // owner, 7. 11. 2026: Spracované tituly – the film written into the library is registered, with its name and year
             Check(services.TitleRegister.Titles.Any(t => t is { Name: "Vymyslený samostatný film", Year: 2026, Kind: MediaKind.Movie }),
                 "titles: the film written into the library is in Spracované tituly – " + string.Join(" | ", services.TitleRegister.Titles.Select(t => t.Display)));
+
+            // owner, 17. 11. 2026: názvoslovie č. 2 – the name of the scene, the folder as in č. 1
+            var sceneOriginal = Path.Combine(folder, "Vymysleny.Scenovy.Film.2026.EXTENDED.1080p.BluRay.x264-Skupina.mkv");
+            File.Copy(Path.Combine(Environment.GetEnvironmentVariable("UNIVERSUM_TESTDATA")!, "media", "cz-only.mkv"), sceneOriginal);
+            var scenePlan = Core.Planning.EditPlan.For(Core.Rules.UniversumRules.Apply(await inspector.InspectAsync(sceneOriginal)) with { NewTitle = "Vymyslený scénový film" });
+            var sceneProfile = Core.Rules.RuleProfile.Default with { Library = Core.Rules.RuleProfile.Default.Library with { Naming = Core.Library.NamingStyle.Scene } };
+            var scenePlace = library.Place(scenePlan.Target, new Core.Library.TitleInfo(MediaKind.Movie, "Vymyslený scénový film", 2026), null, sceneProfile);
+            var sceneResult = await processor.ProcessAsync(scenePlan, scenePlace, Core.Execution.OriginalsModes.Output(Core.Execution.OriginalsMode.Keep));
+            var sceneName = Path.GetFileName(sceneResult.OutputPath ?? "");
+            Check(sceneResult.Status == Core.Execution.ProcessingStatus.Done && sceneName.StartsWith("Vymysleny.scenovy.film.2026.EXTENDED.", StringComparison.Ordinal) &&
+                  sceneName.Contains(".BluRay.", StringComparison.Ordinal) && sceneName.EndsWith(".CZ-Skupina.mkv", StringComparison.Ordinal) &&
+                  Path.GetFileName(Path.GetDirectoryName(sceneResult.OutputPath)) == "Vymyslený scénový film (2026)",
+                "naming no. 2: the name of the scene in the folder of no. 1 – " + sceneResult.OutputPath + " " + string.Join("; ", sceneResult.Messages));
             var problems = await processor.UndoAsync(moved.UndoRecordPath!);
             Check(problems.Count == 0 && File.Exists(single) && !File.Exists(moved.OutputPath!), "superfast: Vrátiť originály puts it back – " + string.Join("; ", problems));
 

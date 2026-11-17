@@ -1004,6 +1004,14 @@
                             <Button Content="{loc:T 'Záznamy MP4…'}" Command="{Binding OpenMp4RecordsCommand}" Padding="10,3"
                                     ToolTip="{loc:T 'Priečinok so záznamami MP4 – keď sa hlavička MP4 nepodarí upraviť, zapíše sa tu jej stavba bez mien súborov; súbor môžete poslať vývojárovi'}" />
                         </WrapPanel>
+                        <!-- owner, 17. 11. 2026: two názvoslovia of the files; the folders stay "Názov (rok)" -->
+                        <TextBlock Text="{loc:T 'Názvoslovie súborov v knižnici (priečinky ostávajú „Názov (rok)“)'}" FontWeight="SemiBold" Margin="0,14,0,0" />
+                        <RadioButton GroupName="Naming" IsChecked="{Binding ClassicNaming}" Margin="0,4,0,0"
+                                     Content="{loc:T 'Č. 1 – Jellyfin: Vymyslený film (2021) - CZ EN FHD H264 BIG.mkv'}"
+                                     ToolTip="{loc:T 'Viac verzií jedného filmu Jellyfin spojí do jedného titulu (názov začína názvom priečinka a „ - “).'}" />
+                        <RadioButton GroupName="Naming" IsChecked="{Binding SceneNaming}" Margin="0,4,0,0"
+                                     Content="{loc:T 'Č. 2 – scéna: Vymysleny.film.2021.1080p.BluRay.x264.DD5.1.CZ.EN-Skupina.mkv'}"
+                                     ToolTip="{loc:T 'Zdroj, HDR, edíciu a skupinu prevezme z pôvodného názvu, keď tam sú; rozlíšenie, kodek, prvý zvuk a jazyky zistí zo súboru. Súbory už v knižnici sa nepremenujú. Viac verzií jedného filmu v jednom priečinku Jellyfin nespojí do jedného titulu.'}" />
                         <TextBlock Text="{loc:T 'Veľkosť v názve: hranice SMALL; BIG; BluRay v GB (nad poslednou BluRay BIG)'}" FontWeight="SemiBold" Margin="0,14,0,0" />
                         <WrapPanel Margin="0,4,0,0">
                             <TextBlock Text="{loc:T 'filmy:'}" VerticalAlignment="Center" Margin="0,0,8,0" />

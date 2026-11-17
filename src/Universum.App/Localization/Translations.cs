@@ -3466,6 +3466,11 @@ internal static class Translations
         ["zrušená"] = "zrušená",
         ["zmeškaná – UNIVERSUM vtedy nebežal"] = "zmeškaná – UNIVERSUM tehdy neběžel",
         ["({0} z {1} súborov skupiny)"] = "({0} z {1} souborů skupiny)",
+        ["Názvoslovie súborov v knižnici (priečinky ostávajú „Názov (rok)“)"] = "Názvosloví souborů v knihovně (složky zůstávají „Název (rok)“)",
+        ["Č. 1 – Jellyfin: Vymyslený film (2021) - CZ EN FHD H264 BIG.mkv"] = "Č. 1 – Jellyfin: Vymyšlený film (2021) - CZ EN FHD H264 BIG.mkv",
+        ["Viac verzií jedného filmu Jellyfin spojí do jedného titulu (názov začína názvom priečinka a „ - “)."] = "Více verzí jednoho filmu Jellyfin spojí do jednoho titulu (název začíná názvem složky a „ - “).",
+        ["Č. 2 – scéna: Vymysleny.film.2021.1080p.BluRay.x264.DD5.1.CZ.EN-Skupina.mkv"] = "Č. 2 – scéna: Vymysleny.film.2021.1080p.BluRay.x264.DD5.1.CZ.EN-Skupina.mkv",
+        ["Zdroj, HDR, edíciu a skupinu prevezme z pôvodného názvu, keď tam sú; rozlíšenie, kodek, prvý zvuk a jazyky zistí zo súboru. Súbory už v knižnici sa nepremenujú. Viac verzií jedného filmu v jednom priečinku Jellyfin nespojí do jedného titulu."] = "Zdroj, HDR, edici a skupinu převezme z původního názvu, když tam jsou; rozlišení, kodek, první zvuk a jazyky zjistí ze souboru. Soubory už v knihovně se nepřejmenují. Více verzí jednoho filmu v jedné složce Jellyfin nespojí do jednoho titulu.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6928,5 +6933,10 @@ internal static class Translations
         ["zrušená"] = "cancelled",
         ["zmeškaná – UNIVERSUM vtedy nebežal"] = "missed – UNIVERSUM was not running",
         ["({0} z {1} súborov skupiny)"] = "({0} of the {1} files of the group)",
+        ["Názvoslovie súborov v knižnici (priečinky ostávajú „Názov (rok)“)"] = "Naming of the files in the library (the folders stay “Title (year)”)",
+        ["Č. 1 – Jellyfin: Vymyslený film (2021) - CZ EN FHD H264 BIG.mkv"] = "No. 1 – Jellyfin: Invented film (2021) - CZ EN FHD H264 BIG.mkv",
+        ["Viac verzií jedného filmu Jellyfin spojí do jedného titulu (názov začína názvom priečinka a „ - “)."] = "Jellyfin joins several versions of a film into one title (the name starts with the folder name and “ - ”).",
+        ["Č. 2 – scéna: Vymysleny.film.2021.1080p.BluRay.x264.DD5.1.CZ.EN-Skupina.mkv"] = "No. 2 – scene: Invented.film.2021.1080p.BluRay.x264.DD5.1.CZ.EN-Group.mkv",
+        ["Zdroj, HDR, edíciu a skupinu prevezme z pôvodného názvu, keď tam sú; rozlíšenie, kodek, prvý zvuk a jazyky zistí zo súboru. Súbory už v knižnici sa nepremenujú. Viac verzií jedného filmu v jednom priečinku Jellyfin nespojí do jedného titulu."] = "The source, HDR, edition and group are taken from the original name when they are in it; the resolution, codec, first sound and languages are read from the file. Files already in the library are not renamed. Jellyfin does not join several versions of a film in one folder into one title.",
     };
 }

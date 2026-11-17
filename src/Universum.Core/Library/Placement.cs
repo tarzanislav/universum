@@ -24,6 +24,15 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     public TitleInfo? Title { get; init; }
 
     /// <summary>
+    /// Názvoslovie č. 1 "{Prefix} - {Stem} {size}{n}.mkv" or č. 2 "{Prefix}.{Stem}[.n].mkv" – no size class in it, so the name
+    /// is known before writing (owner, 17. 11. 2026).
+    /// </summary>
+    public NamingStyle Style { get; init; }
+
+    /// <summary>The start of a name of this title in the other názvoslovie: its results are still the library's (the style switched).</summary>
+    public string? OtherPrefix { get; init; }
+
+    /// <summary>
     /// The file at <paramref name="path"/> is edited where it is and keeps its name. Internal: originals are never
     /// edited (owner's decision); kept for tests and a possible later, explicitly agreed use.
     /// </summary>
@@ -54,18 +63,29 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
     /// " - " as the version's name). A text that cannot be used (<see cref="LibraryNames.Addition"/>) is left out.
     /// </summary>
     public Placement WithAddition(string? text) =>
-        FixedName is null && LibraryNames.Addition(text).Addition is { } addition ? this with { Stem = Stem.Length > 0 ? Stem + " " + addition : addition } : this;
+        FixedName is null && LibraryNames.Addition(text).Addition is { } addition
+            ? Style == NamingStyle.Scene
+                ? this with { Stem = Stem.Length > 0 ? SceneName.Dots(addition) + "." + Stem : SceneName.Dots(addition) }
+                : this with { Stem = Stem.Length > 0 ? Stem + " " + addition : addition }
+            : this;
 
     public string FileName(long size, int number = 1) =>
         FixedName is not null
             ? number <= 1 ? FixedName : $"{Prefix} ({number.ToString(CultureInfo.InvariantCulture)}){Extension}"
-            : Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "") + Sizes.Label(size) +
-              (number > 1 ? number.ToString(CultureInfo.InvariantCulture) : "") + Extension;
+            : Style == NamingStyle.Scene
+                ? VersionStart + (number > 1 ? "." + number.ToString(CultureInfo.InvariantCulture) : "") + Extension
+                : Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "") + Sizes.Label(size) +
+                  (number > 1 ? number.ToString(CultureInfo.InvariantCulture) : "") + Extension;
 
     public string PathFor(long size, int number = 1) => Path.Combine(Directory, FileName(size, number));
 
-    /// <summary>Start shared by every version of this stream: "Creep (2004) - CZ EN FHD H264 ".</summary>
-    public string VersionStart => Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "");
+    /// <summary>
+    /// Start shared by every version of this stream: "Creep (2004) - CZ EN FHD H264 "; in názvoslovie č. 2 the whole name
+    /// without a number and the extension: "Creep.2004.1080p.BluRay.x264.DD5.1.CZ.EN-Skupina".
+    /// </summary>
+    public string VersionStart => Style == NamingStyle.Scene
+        ? Prefix + (Stem.Length > 0 ? "." + Stem : "")
+        : Prefix + " - " + (Stem.Length > 0 ? Stem + " " : "");
 
     /// <summary>
     /// True when <paramref name="fileName"/> is a name this placement gives (any size class, any number); used to
@@ -79,12 +99,18 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
         }
 
         if (!fileName.StartsWith(VersionStart, StringComparison.OrdinalIgnoreCase) ||
-            !fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
+            !fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase) || fileName.Length < VersionStart.Length + Extension.Length)
         {
             return false;
         }
 
         var rest = fileName[VersionStart.Length..^Extension.Length];
+        if (Style == NamingStyle.Scene)
+        {
+            // "….mkv" or "….2.mkv", "….3.mkv" …
+            return rest.Length == 0 || (rest.Length > 1 && rest[0] == '.' && rest[1..].All(char.IsAsciiDigit) && rest[1] != '0' && rest != ".1");
+        }
+
         foreach (var label in SizeClasses.AllLabels)
         {
             if (rest.StartsWith(label, StringComparison.OrdinalIgnoreCase))
@@ -109,9 +135,26 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
             return string.Equals(fileName, FixedName, Paths.Comparison);
         }
 
-        var start = Prefix + " - ";
-        if (fileName.Length < start.Length + Extension.Length ||
-            !fileName.StartsWith(start, StringComparison.OrdinalIgnoreCase) || !fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
+        // a result named by either názvoslovie is the library's (the style may have been switched since)
+        var other = Style == NamingStyle.Scene ? NamingStyle.Classic : NamingStyle.Scene;
+        return IsNamed(fileName, Prefix, Style) || (OtherPrefix is { } prefix && IsNamed(fileName, prefix, other));
+    }
+
+    private bool IsNamed(string fileName, string prefix, NamingStyle style)
+    {
+        if (!fileName.EndsWith(Extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (style == NamingStyle.Scene)
+        {
+            // "{prefix}.….mkv" – after the name of the title (and its year or episode) the marks of the stream
+            return fileName.Length > prefix.Length + 1 + Extension.Length && fileName.StartsWith(prefix + ".", StringComparison.OrdinalIgnoreCase);
+        }
+
+        var start = prefix + " - ";
+        if (fileName.Length < start.Length + Extension.Length || !fileName.StartsWith(start, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -134,8 +177,9 @@ public sealed record Placement(string Directory, string Prefix, string Stem, Siz
             return false;
         }
 
-        if (FixedName is not null)
+        if (FixedName is not null || Style == NamingStyle.Scene)
         {
+            // názvoslovie č. 2 has no size class in the name
             return true;
         }
 
@@ -178,26 +222,26 @@ public sealed record LibraryLayout(string Root)
     /// <summary>Place of a result: films in their title folder, episodes in the season folder.</summary>
     public Placement Place(TargetState target, TitleInfo title, EpisodeNumber? episode, RuleProfile profile)
     {
-        var stem = StreamLabel.Stem(target, profile);
+        var scene = profile.Library.Naming == NamingStyle.Scene;
+        var stem = scene ? SceneName.Stem(target, profile) : StreamLabel.Stem(target, profile);
         var sizes = profile.Library.SizesFor(title.Kind);
         // an MP4 that stays MP4 (Ponechať MP4) keeps its extension (.mp4, .m4v, .mov)
         var extension = target.StaysMp4 ? Path.GetExtension(target.Source.Path).ToLowerInvariant() : ".mkv";
-        if (title.Kind == MediaKind.Movie)
-        {
-            return new Placement(TitleDirectory(title), title.FolderName, stem, sizes, extension) { Title = title };
-        }
-
-        if (episode is null)
+        if (title.Kind != MediaKind.Movie && episode is null)
         {
             throw new ArgumentException("A series file needs an episode number.", nameof(episode));
         }
 
-        return new Placement(
-            Path.Combine(TitleDirectory(title), LibraryNames.SeasonFolder(episode.Season)),
-            title.CleanName + " " + episode.Tag,
-            stem,
-            sizes,
-            extension) { Title = title };
+        // názvoslovie č. 1: "Creep (2004)", "Nine Puzzles S01E04"; č. 2: "Creep.2004", "Nine.Puzzles.S01E04" – the folders stay
+        var classic = title.Kind == MediaKind.Movie ? title.FolderName : title.CleanName + " " + episode!.Tag;
+        var sceneStart = SceneName.Prefix(title, title.Kind == MediaKind.Movie ? null : episode);
+        var directory = title.Kind == MediaKind.Movie ? TitleDirectory(title) : Path.Combine(TitleDirectory(title), LibraryNames.SeasonFolder(episode!.Season));
+        return new Placement(directory, scene ? sceneStart : classic, stem, sizes, extension)
+        {
+            Title = title,
+            Style = profile.Library.Naming,
+            OtherPrefix = scene ? classic : sceneStart,
+        };
     }
 
     /// <summary>

@@ -555,6 +555,26 @@ public sealed class SettingsPageViewModel : ObservableObject
     /// <summary>Upper limits of SMALL, BIG and BluRay for films in GB, e.g. "2; 14; 30".</summary>
     public string MovieSizes { get => _movieSizes; set => SetProperty(ref _movieSizes, value); }
 
+    /// <summary>
+    /// Názvoslovie č. 2 – the names of the scene with dots (owner, 17. 11. 2026); off: názvoslovie č. 1. Saved with Uložiť,
+    /// as the other rules of naming.
+    /// </summary>
+    public bool SceneNaming
+    {
+        get => _sceneNaming;
+        set
+        {
+            if (SetProperty(ref _sceneNaming, value))
+            {
+                OnPropertyChanged(nameof(ClassicNaming));
+            }
+        }
+    }
+
+    public bool ClassicNaming { get => !_sceneNaming; set => SceneNaming = !value; }
+
+    private bool _sceneNaming;
+
     public string SeriesSizes { get => _seriesSizes; set => SetProperty(ref _seriesSizes, value); }
 
     public RelayCommand SaveCommand { get; }
@@ -654,6 +674,7 @@ public sealed class SettingsPageViewModel : ObservableObject
         VideoNameLength = profile.VideoNameLength;
         MovieSizes = Sizes(profile.Library.Movies);
         SeriesSizes = Sizes(profile.Library.Series);
+        SceneNaming = profile.Library.Naming == Core.Library.NamingStyle.Scene;
         Message = "";
     }
 
@@ -952,7 +973,10 @@ public sealed class SettingsPageViewModel : ObservableObject
 
         var profile = RuleProfile.Default with
         {
-            Library = RuleProfile.Default.Library with { Movies = movieSizes, Series = seriesSizes },
+            Library = RuleProfile.Default.Library with
+            {
+                Movies = movieSizes, Series = seriesSizes, Naming = SceneNaming ? Core.Library.NamingStyle.Scene : Core.Library.NamingStyle.Classic,
+            },
             Name = "Vlastný profil",
             PreferredLanguages = languages,
             SubtitleLanguages = List(SubtitleLanguages).Select(code => Languages.Find(code)?.Ietf ?? code.ToLowerInvariant()).Distinct().ToList(),
@@ -989,7 +1013,7 @@ public sealed class SettingsPageViewModel : ObservableObject
                profile.ForcedKeywords.SequenceEqual(d.ForcedKeywords) &&
                profile.HearingImpairedKeywords.SequenceEqual(d.HearingImpairedKeywords) && profile.CommentaryKeywords.SequenceEqual(d.CommentaryKeywords) &&
                profile.RemoveTags == d.RemoveTags && profile.RepairIndex == d.RepairIndex && profile.VideoNameLength == d.VideoNameLength &&
-               profile.Library.Movies == d.Library.Movies && profile.Library.Series == d.Library.Series;
+               profile.Library.Movies == d.Library.Movies && profile.Library.Series == d.Library.Series && profile.Library.Naming == d.Library.Naming;
     }
 
     private static List<string> List(string text) =>

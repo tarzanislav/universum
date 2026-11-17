@@ -33,6 +33,9 @@ public sealed record LibraryProfile
     /// <summary>Word after the language code when only subtitles are in a preferred language ("CZ titulky").</summary>
     public string SubtitlesWord { get; init; } = "titulky";
 
+    /// <summary>Názvoslovie č. 1 (Jellyfin) or č. 2 (the scene) for the names of the files (owner, 17. 11. 2026).</summary>
+    public NamingStyle Naming { get; init; } = NamingStyle.Classic;
+
     public SizeClasses SizesFor(MediaKind kind) => kind == MediaKind.Movie ? Movies : Series;
 }
 

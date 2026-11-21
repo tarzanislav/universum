@@ -444,7 +444,8 @@ public sealed partial class BatchPageViewModel : ObservableObject
 
     private void NotifyTitleShown()
     {
-        foreach (var name in new[] { nameof(HasVariantChips), nameof(ShowsVariants), nameof(FilesHeader), nameof(TracksHeader), nameof(SelectedSeriesGroup), nameof(SelectedFilmGroup) })
+        foreach (var name in new[] { nameof(HasVariantChips), nameof(ShowsVariants), nameof(FilesHeader), nameof(TracksHeader), nameof(SelectedSeriesGroup), nameof(SelectedFilmGroup),
+                                   nameof(KeepAllSubtitles), nameof(CanKeepAllSubtitles) })
         {
             OnPropertyChanged(name);
         }

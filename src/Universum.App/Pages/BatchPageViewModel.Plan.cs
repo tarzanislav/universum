@@ -109,7 +109,40 @@ public sealed partial class BatchPageViewModel
         OnPropertyChanged(nameof(IsMovies));
         OnPropertyChanged(nameof(IsSeries));
         OnPropertyChanged(nameof(CanFindTitles));
+        OnPropertyChanged(nameof(KeepAllSubtitles));
+        OnPropertyChanged(nameof(CanKeepAllSubtitles));
         RefreshCommands();
+    }
+
+    /// <summary>Subtitles out of the language list are shown (the check box „ponechať všetky titulky“ is offered).</summary>
+    public bool CanKeepAllSubtitles => SlotRows.Any(s => s.CanKeep);
+
+    /// <summary>
+    /// „Ponechať všetky titulky“ (owner, 21. 11. 2026): every subtitle track out of the language list of the title (or the
+    /// group) shown is kept; off = they are left out as before.
+    /// </summary>
+    public bool KeepAllSubtitles
+    {
+        get => SlotRows.Where(s => s.CanKeep).ToList() is { Count: > 0 } keepable && keepable.All(s => s.Kept);
+        set
+        {
+            foreach (var slot in SlotRows.Where(s => s.CanKeep).ToList())
+            {
+                foreach (var (group, key) in slot.Places)
+                {
+                    if (value)
+                    {
+                        group.Decisions.Kept.Add(key);
+                    }
+                    else
+                    {
+                        group.Decisions.Kept.Remove(key);
+                    }
+                }
+            }
+
+            ReplanAtTrack();
+        }
     }
 
     /// <summary>

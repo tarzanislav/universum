@@ -234,6 +234,15 @@ internal static partial class SelfTest
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 2 && batch.Groups[0].Count == 3, $"batch: 2 groups, the series first ({batch.Summary})");
         Check(batch.IsSeries, "batch: series recognised from the episode numbers");
+        // owner, 21. 11. 2026: one row for the series – its two groups are variants of one title, shown together
+        Check(batch.SeriesGroups.Count == 1 && batch.SeriesGroups[0] is { HasVariants: true, TitleCount: 4 } && batch.ShowsVariants &&
+              batch.VariantChips.Count == 3 && batch.FileRows.Count == 4 && batch.SlotRows.Any(s => s.CoverageWarning) && batch.SlotRows.Any(s => !s.CoverageWarning),
+            $"batch: the series in one row with its variants – {string.Join(" | ", batch.VariantChips.Select(c => c.Text))} | " +
+            string.Join(", ", batch.SlotRows.Select(s => $"{s.Slot} {s.Coverage} {s.CoverageNote}")));
+        await Screenshot(window, "batch-title-variants.png");
+        batch.ChooseVariant(batch.Groups[0]);
+        Check(!batch.ShowsVariants && batch.FileRows.Count == 3 && batch.SelectedSeriesGroup == batch.SeriesGroups[0] && batch.VariantChips.Count(c => c.IsSelected) == 1,
+            "batch: a variant chosen – its own files and tracks, the title stays selected");
         Check(batch.SeriesSuggestion.Contains("Seriál", StringComparison.Ordinal), "batch: series title suggested – " + batch.SeriesSuggestion);
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 4, "batch: everything waits for the title and the subtitle language");
         Check(batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Audio, 1)) is { IsNamedInTrack: true } named && named.ChosenLanguage == Languages.Czech,

@@ -56,7 +56,7 @@ public sealed partial class BatchPageViewModel
             return;
         }
 
-        var groups = again && SelectedGroup?.Group is { } selected ? [selected] : (only ?? analysis.Groups).ToList();
+        var groups = again && ShownGroups.Count > 0 ? [.. ShownGroups] : (only ?? analysis.Groups).ToList();
         groups = groups.Where(g => g.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles)).ToList();
         if (groups.Count == 0)
         {
@@ -185,7 +185,7 @@ public sealed partial class BatchPageViewModel
         var (targets, known) = scope switch
         {
             SpeechScope.Selected => SpeechTargets.ForFiles(_selectedFiles.Select(f => (f.Item.Group, f.Item.File))),
-            SpeechScope.Group when SelectedGroup?.Group is { } group => SpeechTargets.ForGroups([group], series),
+            SpeechScope.Group when ShownGroups.Count > 0 => SpeechTargets.ForGroups(ShownGroups, series),
             SpeechScope.All => SpeechTargets.ForGroups(only ?? _analysis.Groups, series),
             _ => (Array.Empty<SpeechTarget>(), 0),
         };

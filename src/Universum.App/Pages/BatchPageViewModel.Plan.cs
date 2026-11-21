@@ -50,7 +50,18 @@ public sealed partial class BatchPageViewModel
             var items = _items.Where(i => i.Group == row.Group).ToList();
             var review = items.Count(i => i.Status == BatchStatus.NeedsReview);
             row.State = review == 0 ? Loc.T("pripravené") : Loc.F("na kontrolu: {0}", review);
+            row.Review = review;
             row.Title = GroupTitle(row.Group);
+        }
+
+        foreach (var (lead, title) in _titleOf)
+        {
+            if (title.HasVariants)
+            {
+                lead.Title = TitleOfFiles([.. title.Files]);
+            }
+
+            lead.RefreshTitle();
         }
 
         foreach (var slot in SlotRows)
@@ -105,11 +116,14 @@ public sealed partial class BatchPageViewModel
     /// The titles of the group's files without year and ID (decided, suggested, or guessed from the names), the first
     /// with the number of the others: "Zlatý kapor", "Zlatý kapor + 1 ďalší", "+ 2 ďalšie", "+ 5 ďalších".
     /// </summary>
-    public string GroupTitle(BatchGroup group)
+    public string GroupTitle(BatchGroup group) => TitleOfFiles(group.Files);
+
+    // the title of files (a group, or all variants of a title – owner, 21. 11. 2026), with the disks they lie on
+    private string TitleOfFiles(IReadOnlyList<MediaFile> files)
     {
         string? first = null;
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in group.Files)
+        foreach (var file in files)
         {
             var title = (_library?.TitleFor(file.Path) ?? _library?.SuggestedTitleFor(file.Path))?.CleanName ?? NameOf(file.Path);
             if (title.Length > 0 && seen.Add(Words.Normalize(title)))
@@ -128,10 +142,10 @@ public sealed partial class BatchPageViewModel
                 _ => Loc.F("{0} + {1} ďalších", first, others),
             };
 
-        // several disks analysed: the disk of the group too (owner, 9. 11. 2026)
-        if (caption.Length > 0 && _analysis is { Folders.Count: > 1 } && group.Files.FirstOrDefault() is { } any)
+        // several disks analysed: the disk of the group too (owner, 9. 11. 2026); a title on two disks names both
+        if (caption.Length > 0 && _analysis is { Folders.Count: > 1 } && files.Count > 0)
         {
-            caption += " · " + Disk(any.Path);
+            caption += " · " + string.Join(" + ", files.Select(f => Disk(f.Path)).Distinct(StringComparer.OrdinalIgnoreCase));
         }
 
         return caption;
@@ -165,7 +179,7 @@ public sealed partial class BatchPageViewModel
     /// <summary>Puts a dragged track at the place of another track of the same type.</summary>
     public void MoveSlotTo(SlotRow row, SlotRow target)
     {
-        if (row == target || row.Key.Type != target.Key.Type || row.Group != target.Group || row.IsRemovedByLanguage || target.IsRemovedByLanguage)
+        if (row == target || row.Key.Type != target.Key.Type || (!ShowsVariants && row.Group != target.Group) || row.IsRemovedByLanguage || target.IsRemovedByLanguage)
         {
             return;
         }
@@ -174,8 +188,14 @@ public sealed partial class BatchPageViewModel
         var down = order.IndexOf(row) < order.IndexOf(target);
         order.Remove(row);
         order.Insert(order.IndexOf(target) + (down ? 1 : 0), row);
-        row.Group.Decisions.Order.Clear();
-        row.Group.Decisions.Order.AddRange(order.Select(s => s.Key));
+
+        // owner, 21. 11. 2026: the order of the title's tracks – each variant gets it for the tracks it carries
+        foreach (var group in order.SelectMany(s => s.Places.Select(p => p.Group)).Distinct())
+        {
+            group.Decisions.Order.Clear();
+            group.Decisions.Order.AddRange(order.Select(s => s.Places.FirstOrDefault(p => p.Group == group)).Where(p => p.Group is not null).Select(p => p.Key));
+        }
+
         Replan();
     }
 
@@ -194,12 +214,13 @@ public sealed partial class BatchPageViewModel
         }
     }
 
-    private void ArrangeSlots(bool move = true)
+    // what the rules do with the tracks of one group (of its first file): the result's order, the tracks left out by their
+    // language, the names the rules give
+    private (List<SlotKey> Order, HashSet<SlotKey> Removed, Dictionary<SlotKey, string?> Names)? ResultOf(BatchGroup group)
     {
-        if (SlotRows.Count == 0 || SlotRows[0].Group is not { } group ||
-            _items.FirstOrDefault(i => i.Group == group && Paths.Same(i.File.Path, group.Representative.Path)) is not { } item)
+        if (_items.FirstOrDefault(i => i.Group == group && Paths.Same(i.File.Path, group.Representative.Path)) is not { } item)
         {
-            return;
+            return null;
         }
 
         var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
@@ -216,11 +237,32 @@ public sealed partial class BatchPageViewModel
         var order = item.Target.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).Select(t => keyOf[t.TrackId]).ToList();
         // the names the rules give (no name written – by the group or in the studio): what a written name is compared with
         var rules = UniversumRules.Apply(item.File, _services.Profile, item.Decisions with { Names = new Dictionary<int, string>() });
-        var names = rules.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).GroupBy(t => keyOf[t.TrackId]).ToDictionary(g => g.Key, g => g.Last().Name);
+        var names = rules.Tracks.Where(t => keyOf.ContainsKey(t.TrackId)).GroupBy(t => keyOf[t.TrackId]).ToDictionary(g => g.Key, g => (string?)g.Last().Name);
+        return (order, removed, names);
+    }
+
+    private void ArrangeSlots(bool move = true)
+    {
+        if (SlotRows.Count == 0 || SlotRows[0].Group is not { } main)
+        {
+            return;
+        }
+
+        // each group the rows show (the main variant first; with „Všetky“ also the tracks only other variants carry)
+        var results = SlotRows.Select(s => s.Group).Distinct().Select(g => (Group: g, Result: ResultOf(g)))
+            .Where(x => x.Result is not null).ToDictionary(x => x.Group, x => x.Result!.Value);
+        if (!results.TryGetValue(main, out var first))
+        {
+            return;
+        }
+
         foreach (var slot in SlotRows)
         {
-            slot.SetRemovedByLanguage(removed.Contains(slot.Key));
-            slot.SetResultName(names.GetValueOrDefault(slot.Key));
+            if (results.TryGetValue(slot.Group, out var result))
+            {
+                slot.SetRemovedByLanguage(result.Removed.Contains(slot.Key));
+                slot.SetResultName(result.Names.GetValueOrDefault(slot.Key));
+            }
         }
 
         if (!move)
@@ -228,8 +270,16 @@ public sealed partial class BatchPageViewModel
             return;
         }
 
-        var wanted = SlotRows.OrderBy(s => order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
+        int At(SlotRow s) => results.TryGetValue(s.Group, out var r) && r.Order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue;
+        var wanted = SlotRows.Where(s => s.Group == main).OrderBy(s => first.Order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
             .ThenBy(s => s.Key.Type).ThenBy(s => s.Key.Ordinal).ToList();
+        // the tracks only other variants carry: after the main variant's tracks of their type
+        foreach (var extra in SlotRows.Where(s => s.Group != main).OrderBy(s => s.Group.Label, StringComparer.Ordinal).ThenBy(At).ThenBy(s => s.Key.Ordinal))
+        {
+            var last = wanted.FindLastIndex(w => w.Key.Type == extra.Key.Type);
+            wanted.Insert(last < 0 ? wanted.Count : last + 1, extra);
+        }
+
         for (var i = 0; i < wanted.Count; i++)
         {
             var from = SlotRows.IndexOf(wanted[i]);
@@ -240,29 +290,64 @@ public sealed partial class BatchPageViewModel
         }
     }
 
+    /// <summary>
+    /// The tracks and the files of the selected title (owner, 21. 11. 2026): with „Všetky“ the tracks of all its variants
+    /// together – each track once, with how many files carry it – and the files of all of them; a variant chosen above the
+    /// files shows its own group as before.
+    /// </summary>
     private void ShowGroup()
     {
         SlotRows.Clear();
         FileRows.Clear();
+        VariantChips.Clear();
+        ShowsVariants = false;
 
         // a group still being read has no decisions yet: it is shown once the whole folder is read
         if (SelectedGroup?.Group is not { } group || IsAnalyzing)
         {
+            NotifyTitleShown();
             return;
         }
 
-        foreach (var (key, track) in SlotKey.Of(group.Representative))
+        var lead = LeadOf(SelectedGroup);
+        var title = _titleOf.GetValueOrDefault(lead);
+        ShowsVariants = _wholeTitle && title is { HasVariants: true };
+        if (ShowsVariants)
         {
-            SlotRows.Add(new SlotRow(group, key, track, ReplanAtTrack, MoveSlot, _services.Profile));
+            var total = title!.FileCount;
+            foreach (var slot in BatchTitles.Slots(title))
+            {
+                var places = slot.Places.Select(p => p.Group).ToList();
+                var missing = title.Variants.Where(v => !places.Contains(v)).ToList();
+                var note = missing.Count == 0 ? ""
+                    : places.Count <= missing.Count ? Loc.F("len {0}", string.Join(", ", places.Select(g => g.Label)))
+                    : Loc.F("chýba v {0}", string.Join(", ", missing.Select(g => g.Label)));
+                SlotRows.Add(new SlotRow(slot.Group, slot.Key, slot.Track, ReplanAtTrack, MoveSlot, _services.Profile, slot.Peers,
+                    $"{slot.FileCount}/{total}", note, missing.Count > 0));
+            }
+        }
+        else
+        {
+            foreach (var (key, track) in SlotKey.Of(group.Representative))
+            {
+                SlotRows.Add(new SlotRow(group, key, track, ReplanAtTrack, MoveSlot, _services.Profile));
+            }
         }
 
         ArrangeSlots();
 
-        foreach (var item in _items.Where(i => i.Group == group))
+        IReadOnlyList<BatchGroup> shown = ShowsVariants ? title!.Variants : [group];
+        foreach (var item in _items.Where(i => shown.Contains(i.Group)))
         {
             FileRows.Add(new FileRow(item, _ => Replan(), this));
         }
 
+        if (title is { HasVariants: true })
+        {
+            AddVariantChips(lead, title);
+        }
+
+        NotifyTitleShown();
         RefreshCommands();
     }
 

@@ -54,7 +54,8 @@ public sealed partial class BatchPageViewModel
     public string KindLabel => IsMixed ? Loc.T("Obsah skupiny:") : Loc.T("Obsah:");
 
     // the files of the selected group
-    private IReadOnlyList<string> SelectedFiles => SelectedGroup?.Group.Files.Select(f => f.Path).ToList() ?? [];
+    // the files of the title shown (owner, 21. 11. 2026: all its variants with „Všetky“), or of the variant chosen
+    private IReadOnlyList<string> SelectedFiles => [.. ShownGroups.SelectMany(g => g.Files).Select(f => f.Path)];
 
     private string? SelectedFirst => SelectedGroup?.Group.Files.FirstOrDefault()?.Path;
 

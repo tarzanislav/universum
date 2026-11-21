@@ -234,6 +234,15 @@ internal static partial class SelfTest
         await batch.AnalyzeAsync();
         Check(batch.Groups.Count == 2 && batch.Groups[0].Count == 3, $"batch: 2 groups, the series first ({batch.Summary})");
         Check(batch.IsSeries, "batch: series recognised from the episode numbers");
+        // owner, 21. 11. 2026: one row for the series – its two groups are variants of one title, shown together
+        Check(batch.SeriesGroups.Count == 1 && batch.SeriesGroups[0] is { HasVariants: true, TitleCount: 4 } && batch.ShowsVariants &&
+              batch.VariantChips.Count == 3 && batch.FileRows.Count == 4 && batch.SlotRows.Any(s => s.CoverageWarning) && batch.SlotRows.Any(s => !s.CoverageWarning),
+            $"batch: the series in one row with its variants – {string.Join(" | ", batch.VariantChips.Select(c => c.Text))} | " +
+            string.Join(", ", batch.SlotRows.Select(s => $"{s.Slot} {s.Coverage} {s.CoverageNote}")));
+        await Screenshot(window, "batch-title-variants.png");
+        batch.ChooseVariant(batch.Groups[0]);
+        Check(!batch.ShowsVariants && batch.FileRows.Count == 3 && batch.SelectedSeriesGroup == batch.SeriesGroups[0] && batch.VariantChips.Count(c => c.IsSelected) == 1,
+            "batch: a variant chosen – its own files and tracks, the title stays selected");
         Check(batch.SeriesSuggestion.Contains("Seriál", StringComparison.Ordinal), "batch: series title suggested – " + batch.SeriesSuggestion);
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.NeedsReview) == 4, "batch: everything waits for the title and the subtitle language");
         Check(batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Audio, 1)) is { IsNamedInTrack: true } named && named.ChosenLanguage == Languages.Czech,
@@ -280,6 +289,21 @@ internal static partial class SelfTest
         Check(!forcedSlot.Group.Decisions.Names.ContainsKey(forcedSlot.Key) && batch.Items.Where(i => i.Group == forcedSlot.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Subtitles && t.Name == "Forced")),
             "batch: the rules' name again needs no decision");
         Check(!forcedSlot.Group.Decisions.Languages.ContainsKey(written.Key), "batch: the file's own language again needs no decision");
+
+        // owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio)
+        if (batch.SlotRows.FirstOrDefault(s => s.CanCopyName) is { } copied)
+        {
+            var nameBefore = copied.TrackName;
+            copied.CopyNameCommand.Execute(null);
+            Check(copied.TrackName == copied.Name && batch.Items.Where(i => i.Group == copied.Group).All(i => i.Target.Tracks.Any(t => t.Name == copied.Name)),
+                $"batch: Názov v súbore copied to Názov stopy – „{copied.TrackName}“");
+            copied.TrackName = nameBefore;
+            Check(!copied.Group.Decisions.Names.ContainsKey(copied.Key), "batch: the copied name taken back");
+        }
+        else
+        {
+            Write("batch: no track with a name in the file – copying the name not tried");
+        }
 
         batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";

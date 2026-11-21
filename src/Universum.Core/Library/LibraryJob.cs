@@ -67,6 +67,23 @@ public sealed class LibraryJob(LibraryLayout layout)
     public string UnitOf(string path) =>
         Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer))?.Folder ?? Root ?? "";
 
+    /// <summary>
+    /// The title a file belongs to, to show the groups of one title together (owner, 21. 11. 2026 – one row for a series or
+    /// a film): in a folder sorted into MOVIES and TVSHOWS its title by the name its folder (or file) gives – the same name
+    /// on two disks is one title; in a folder of one series that series; null for a file of a folder of films (its group
+    /// holds several films).
+    /// </summary>
+    public string? TitleKeyOf(string path)
+    {
+        var kind = KindFor(path) == MediaKind.Series ? "S|" : "F|";
+        if (Units?.FirstOrDefault(u => u.Files.Contains(path, Paths.Comparer)) is { } unit)
+        {
+            return kind + (unit.Name is { } name ? Words.Normalize(name.Name) + "|" + name.Year : unit.Folder);
+        }
+
+        return !Mixed && KindFor(path) == MediaKind.Series ? kind + (SeriesOfFile.GetValueOrDefault(path)?.FolderName ?? "") : null;
+    }
+
     /// <summary>Films or a series; setting it confirms it.</summary>
     public MediaKind Kind
     {

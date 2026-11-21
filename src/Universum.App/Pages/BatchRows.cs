@@ -37,7 +37,17 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
 
     public string Signature => Group.Signature;
 
-    public string State { get => _state; set => SetProperty(ref _state, value); }
+    public string State
+    {
+        get => _state;
+        set
+        {
+            if (SetProperty(ref _state, value))
+            {
+                OnPropertyChanged(nameof(TitleState));
+            }
+        }
+    }
 
     /// <summary>
     /// Holds files the analysis before did not have (owner, 31. 10. 2026: new folders and files put into the input folder –
@@ -48,7 +58,79 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     private bool _isNew;
 
     /// <summary>A file was added while the folder is read.</summary>
-    public void Refresh() => OnPropertyChanged(nameof(Count));
+    public void Refresh()
+    {
+        OnPropertyChanged(nameof(Count));
+        OnPropertyChanged(nameof(TitleCount));
+    }
+
+    /// <summary>
+    /// The groups of its title (owner, 21. 11. 2026 – one row for a series or a film): set on the title's first group, the
+    /// row the lists show; the group alone when the title has no other.
+    /// </summary>
+    public IReadOnlyList<GroupRow> Variants => _variants ?? [this];
+
+    private IReadOnlyList<GroupRow>? _variants;
+
+    /// <summary>The title's files and groups changed (after an analysis, a new group, a change of the kind).</summary>
+    public void SetVariants(IReadOnlyList<GroupRow> variants)
+    {
+        _variants = variants.Count > 1 ? variants : null;
+        foreach (var name in new[] { nameof(Variants), nameof(TitleCount), nameof(VariantsText), nameof(HasVariants), nameof(TitleState), nameof(TitleDetails) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    public bool HasVariants => Variants.Count > 1;
+
+    /// <summary>The files of the whole title (the column Súbory).</summary>
+    public int TitleCount => Variants.Sum(v => v.Count);
+
+    /// <summary>"1", or "3 ⚠" – the title's files carry different tracks (the column Varianty).</summary>
+    public string VariantsText => HasVariants ? Variants.Count + " ⚠" : "1";
+
+    /// <summary>The state of the whole title: ready, or how many of its files wait for a check.</summary>
+    public string TitleState => HasVariants ? (Variants.Sum(v => v.Review) is var review and > 0 ? Loc.F("na kontrolu: {0}", review) : Loc.T("pripravené")) : State;
+
+    /// <summary>What the row's details say: the tracks of the group, or that the title has variants.</summary>
+    public string TitleDetails => HasVariants
+        ? Loc.F("{0} varianty stôp – vyberte ich nad zoznamom súborov; „Všetky“ ukáže spoločné stopy", Variants.Count)
+        : Signature;
+
+    /// <summary>The group's files waiting for a check (set with <see cref="State"/>).</summary>
+    public int Review
+    {
+        get => _review;
+        set
+        {
+            _review = value;
+            OnPropertyChanged(nameof(TitleState));
+        }
+    }
+
+    private int _review;
+
+    /// <summary>The title's state again (a group of it was planned anew).</summary>
+    public void RefreshTitle() => OnPropertyChanged(nameof(TitleState));
+}
+
+/// <summary>
+/// A variant of a title above the files (owner, 21. 11. 2026): „Všetky (44)“ or „C · 2 – zvuk bez jazyka, chýba
+/// slovenčina“; a click shows it.
+/// </summary>
+public sealed class VariantChip(string text, string toolTip, bool isSelected, bool isWarning, Action choose)
+{
+    public string Text { get; } = text;
+
+    public string ToolTip { get; } = toolTip;
+
+    public bool IsSelected { get; } = isSelected;
+
+    /// <summary>The variant lacks a track the main one has, or carries a track without a language.</summary>
+    public bool IsWarning { get; } = isWarning;
+
+    public CommunityToolkit.Mvvm.Input.RelayCommand ChooseCommand { get; } = new(choose);
 }
 
 /// <summary>One audio or subtitle position of a group: language and forced decisions for all its files.</summary>
@@ -62,7 +144,8 @@ public sealed class SlotRow : ObservableObject
     private bool _removedByLanguage;
     private string? _rulesName;
 
-    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null, RuleProfile? profile = null)
+    public SlotRow(BatchGroup group, SlotKey key, MediaTrack track, Action changed, Action<SlotRow, int>? move = null, RuleProfile? profile = null,
+                   IReadOnlyList<(BatchGroup Group, SlotKey Key)>? peers = null, string coverage = "", string coverageNote = "", bool coverageWarning = false)
     {
         _profile = profile ?? RuleProfile.Default;
         Group = group;
@@ -70,10 +153,41 @@ public sealed class SlotRow : ObservableObject
         Track = track;
         _changed = changed;
         _move = move;
-        _toSrtCandidates = new(() => group.ToSrtCandidates(key));
+        Peers = peers ?? [];
+        Coverage = coverage;
+        CoverageNote = coverageNote;
+        CoverageWarning = coverageWarning;
+        _toSrtCandidates = new(() => [.. Places.SelectMany(p => p.Group.ToSrtCandidates(p.Key))]);
         MoveUpCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, -1), () => !_removedByLanguage);
         MoveDownCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => _move?.Invoke(this, 1), () => !_removedByLanguage);
         Refresh();
+    }
+
+    /// <summary>
+    /// The same track in the other variants of the title (owner, 21. 11. 2026 – "Všetky"): every decision made here is
+    /// written to each of them; empty for a track of one group.
+    /// </summary>
+    public IReadOnlyList<(BatchGroup Group, SlotKey Key)> Peers { get; }
+
+    /// <summary>Every group carrying the track, with its place there.</summary>
+    public IEnumerable<(BatchGroup Group, SlotKey Key)> Places => [(Group, Key), .. Peers];
+
+    /// <summary>"42/44" – how many files of the title carry the track (empty for one group).</summary>
+    public string Coverage { get; }
+
+    /// <summary>"chýba vo C", "len B" – the variants the track is missing in or only in.</summary>
+    public string CoverageNote { get; }
+
+    /// <summary>Not every file of the title carries the track.</summary>
+    public bool CoverageWarning { get; }
+
+    // each group carrying the track gets the decision
+    private void ForEachPlace(Action<GroupDecisions, SlotKey> decide)
+    {
+        foreach (var (group, key) in Places)
+        {
+            decide(group.Decisions, key);
+        }
     }
 
     /// <summary>Moves the track one place up among the tracks of its type (owner, 29. 10. 2026).</summary>
@@ -92,14 +206,17 @@ public sealed class SlotRow : ObservableObject
         get => Group.Decisions.Kept.Contains(Key);
         set
         {
-            if (value)
+            ForEachPlace((decisions, key) =>
             {
-                Group.Decisions.Kept.Add(Key);
-            }
-            else
-            {
-                Group.Decisions.Kept.Remove(Key);
-            }
+                if (value)
+                {
+                    decisions.Kept.Add(key);
+                }
+                else
+                {
+                    decisions.Kept.Remove(key);
+                }
+            });
 
             OnPropertyChanged();
             _changed();
@@ -115,14 +232,17 @@ public sealed class SlotRow : ObservableObject
         get => Group.Decisions.ToSrt.Contains(Key);
         set
         {
-            if (value)
+            ForEachPlace((decisions, key) =>
             {
-                Group.Decisions.ToSrt.Add(Key);
-            }
-            else
-            {
-                Group.Decisions.ToSrt.Remove(Key);
-            }
+                if (value)
+                {
+                    decisions.ToSrt.Add(key);
+                }
+                else
+                {
+                    decisions.ToSrt.Remove(key);
+                }
+            });
 
             OnPropertyChanged();
             _changed();
@@ -160,7 +280,8 @@ public sealed class SlotRow : ObservableObject
             var what = Core.Subtitles.SrtConversion.IsStyled(shown)
                 ? Loc.F("{0} → SRT: titulky stratia farby, písma a umiestnenie na obraze", Core.Subtitles.SrtConversion.FormatName(shown))
                 : Loc.F("{0} → SRT vo vnútri výsledku; pôvodný formát v ňom nebude", Core.Subtitles.SrtConversion.FormatName(shown));
-            return candidates.Count < Group.Files.Count ? what + " " + Loc.F("({0} z {1} súborov skupiny)", candidates.Count, Group.Files.Count) : what;
+            var files = Places.Sum(p => p.Group.Files.Count);
+            return candidates.Count < files ? what + " " + Loc.F("({0} z {1} súborov skupiny)", candidates.Count, files) : what;
         }
     }
 
@@ -174,6 +295,14 @@ public sealed class SlotRow : ObservableObject
 
     /// <summary>An audio or subtitle track: its name can be written for the whole group (owner, 30. 10. 2026).</summary>
     public bool CanName => Key.Type is TrackType.Audio or TrackType.Subtitles;
+
+    /// <summary>The name in the file can be taken as the track name (owner, 21. 11. 2026: the year of a dub, its studio).</summary>
+    public bool CanCopyName => CanName && Name.Length > 0;
+
+    /// <summary>Názov v súbore → Názov stopy (then it can be shortened or added to).</summary>
+    public CommunityToolkit.Mvvm.Input.RelayCommand CopyNameCommand => _copyName ??= new(() => TrackName = Name, () => CanCopyName);
+
+    private CommunityToolkit.Mvvm.Input.RelayCommand? _copyName;
 
     /// <summary>
     /// Track name: the name the result gets – the rules' one, or the one written here for the whole group (it wins over
@@ -190,14 +319,18 @@ public sealed class SlotRow : ObservableObject
                 return;
             }
 
-            if (value == (_rulesName ?? ""))
+            var written = value;
+            ForEachPlace((decisions, key) =>
             {
-                Group.Decisions.Names.Remove(Key);
-            }
-            else
-            {
-                Group.Decisions.Names[Key] = value;
-            }
+                if (written == (_rulesName ?? ""))
+                {
+                    decisions.Names.Remove(key);
+                }
+                else
+                {
+                    decisions.Names[key] = written;
+                }
+            });
 
             OnPropertyChanged();
             _changed();
@@ -261,14 +394,18 @@ public sealed class SlotRow : ObservableObject
         set
         {
             // the file's own language again: no decision is needed
-            if (value is null || (!NeedsLanguage && string.Equals(LanguageTag.FromCode(value.Ietf).Primary, Track.Language.Primary, StringComparison.OrdinalIgnoreCase)))
+            var own = value is null || (!NeedsLanguage && string.Equals(LanguageTag.FromCode(value.Ietf).Primary, Track.Language.Primary, StringComparison.OrdinalIgnoreCase));
+            ForEachPlace((decisions, key) =>
             {
-                Group.Decisions.Languages.Remove(Key);
-            }
-            else
-            {
-                Group.Decisions.Languages[Key] = LanguageTag.FromCode(value.Ietf);
-            }
+                if (own)
+                {
+                    decisions.Languages.Remove(key);
+                }
+                else
+                {
+                    decisions.Languages[key] = LanguageTag.FromCode(value!.Ietf);
+                }
+            });
 
             OnPropertyChanged();
             _changed();
@@ -286,8 +423,8 @@ public sealed class SlotRow : ObservableObject
             : Texts.Evidence(_evidence);
 
     // the files' own suggestions for this track, by language: "angličtina 20×, čeština 2×"
-    private string FileSuggestions => string.Join(", ", Group.FileSuggestions.Values
-        .Select(s => s.TryGetValue(Key, out var suggestion) ? suggestion : null).OfType<LanguageEvidence>()
+    private string FileSuggestions => string.Join(", ", Places.SelectMany(p => p.Group.FileSuggestions.Values
+            .Select(s => s.TryGetValue(p.Key, out var suggestion) ? suggestion : null)).OfType<LanguageEvidence>()
         .GroupBy(s => s.Language.Primary).OrderByDescending(g => g.Count())
         .Select(g => $"{Texts.Language(g.First().Language)} {g.Count()}×"));
 
@@ -310,14 +447,17 @@ public sealed class SlotRow : ObservableObject
         get => Group.Decisions.Forced.TryGetValue(Key, out var forced) ? forced : null;
         set
         {
-            if (value is null)
+            ForEachPlace((decisions, key) =>
             {
-                Group.Decisions.Forced.Remove(Key);
-            }
-            else
-            {
-                Group.Decisions.Forced[Key] = value.Value;
-            }
+                if (value is null)
+                {
+                    decisions.Forced.Remove(key);
+                }
+                else
+                {
+                    decisions.Forced[key] = value.Value;
+                }
+            });
 
             OnPropertyChanged();
             _changed();
@@ -334,14 +474,18 @@ public sealed class SlotRow : ObservableObject
         : ForcedSubtitles.ByAmount(Group.Representative, Track) is { } amount ? Loc.F("NÁVRH UNIVERSUM: forced – {0}", amount)
         : "";
 
-    /// <summary>Accepts the language suggestion as the group's decision.</summary>
+    /// <summary>Accepts the language suggestion as the group's decision – in each group carrying the track, its own suggestion.</summary>
     public bool ConfirmSuggestion()
     {
         var changed = false;
-        if (_evidence is { Confidence: Confidence.Medium, NeedsOwnConfirmation: false } suggestion)
+        foreach (var (group, key) in Places)
         {
-            Group.Decisions.Languages[Key] = suggestion.Language;
-            changed = true;
+            if (SlotKey.Of(group.Representative).FirstOrDefault(x => x.Key == key).Track is { } track && !group.Decisions.Languages.ContainsKey(key) &&
+                BatchPlanner.Evidence(track, key, group) is { Confidence: Confidence.Medium, NeedsOwnConfirmation: false } suggestion)
+            {
+                group.Decisions.Languages[key] = suggestion.Language;
+                changed = true;
+            }
         }
 
         return changed;
@@ -535,6 +679,9 @@ public sealed class FileRow : ObservableObject
     public IReadOnlyList<FileSlotRow> AudioSlots { get; }
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
+
+    /// <summary>The letter of the file's group (owner, 21. 11. 2026 – the variant of its title, shown with „Všetky“).</summary>
+    public string Variant => Item.Group.Label;
 
     /// <summary>Film title ("Creep (2004)") or episode ("S01E04") by the file's own kind, editable; empty while undecided.</summary>
     public string Naming

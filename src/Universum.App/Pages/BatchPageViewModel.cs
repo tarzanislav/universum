@@ -48,6 +48,12 @@ public sealed partial class BatchPageViewModel : ObservableObject
     private string? _typedTmdb;
     private IReadOnlyList<ProcessingResult> _results = [];
     private GroupRow? _selectedGroup;
+
+    // owner, 21. 11. 2026 – one row for a title: the row of each group's title, the titles by their rows, and whether the
+    // whole title is shown („Všetky“) or one variant of it
+    private readonly Dictionary<GroupRow, GroupRow> _leadOf = [];
+    private readonly Dictionary<GroupRow, BatchTitle> _titleOf = [];
+    private bool _wholeTitle = true;
     private FileRow? _selectedFile;
     private readonly Dictionary<string, string> _unverifiedNotes = new(Universum.Core.IO.Paths.Comparer);
     private string _seriesNote = "";
@@ -72,7 +78,7 @@ public sealed partial class BatchPageViewModel : ObservableObject
         ConfirmSuggestionsCommand = new RelayCommand(ConfirmSuggestions,
             () => !Busy && (SlotRows.Any(s => s.HasSuggestion) || FileRows.Any(f => f.AudioSlots.Any(s => s.HasOwnSuggestion))));
         DetectSubtitlesCommand = new AsyncRelayCommand(() => ReadSubtitlesAsync(again: true),
-            () => !Busy && _subtitleReading is null && SelectedGroup?.Group.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles) == true);
+            () => !Busy && _subtitleReading is null && ShownGroups.Any(g => g.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles)));
         DetectAudioCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Group), () => !Busy && SelectedGroup is not null);
         DetectAudioSelectedCommand = new AsyncRelayCommand(() => DetectAudioAsync(SpeechScope.Selected), () => !Busy && _selectedFiles.Count > 0);
         UndoMovedCommand = new AsyncRelayCommand(UndoMovedAsync, () => !Busy && !_running && MovedOriginals().Count > 0);
@@ -353,29 +359,128 @@ public sealed partial class BatchPageViewModel : ObservableObject
 
     public ObservableCollection<GroupRow> FilmGroups { get; } = [];
 
-    /// <summary>The selected group when it is a series (the upper list); choosing in it selects the group.</summary>
+    /// <summary>
+    /// The selected title when it is a series (the upper list – one row for a title, owner, 21. 11. 2026); choosing in it
+    /// shows the whole title.
+    /// </summary>
     public GroupRow? SelectedSeriesGroup
     {
-        get => SelectedGroup is { } row && SeriesGroups.Contains(row) ? row : null;
+        get => SelectedGroup is { } row && LeadOf(row) is var lead && SeriesGroups.Contains(lead) ? lead : null;
         set
         {
             if (value is not null)
             {
-                SelectedGroup = value;
+                SelectTitle(value);
             }
         }
     }
 
-    /// <summary>The selected group when it is a film (the lower list).</summary>
+    /// <summary>The selected title when it is a film (the lower list).</summary>
     public GroupRow? SelectedFilmGroup
     {
-        get => SelectedGroup is { } row && FilmGroups.Contains(row) ? row : null;
+        get => SelectedGroup is { } row && LeadOf(row) is var lead && FilmGroups.Contains(lead) ? lead : null;
         set
         {
             if (value is not null)
             {
-                SelectedGroup = value;
+                SelectTitle(value);
             }
+        }
+    }
+
+    /// <summary>The row of the title a group belongs to (the group's own row when its title has no other group).</summary>
+    public GroupRow LeadOf(GroupRow row) => _leadOf.GetValueOrDefault(row) ?? row;
+
+    // a title chosen in a list: all its variants together
+    private void SelectTitle(GroupRow row)
+    {
+        var lead = LeadOf(row);
+        var again = ReferenceEquals(_selectedGroup, lead) && !_wholeTitle;
+        _wholeTitle = true;
+        SelectedGroup = lead;
+        if (again)
+        {
+            ShowGroup();
+        }
+    }
+
+    /// <summary>
+    /// A variant of the selected title chosen above the files (null = „Všetky“): only its files and tracks are shown and
+    /// decided, as a group before.
+    /// </summary>
+    public void ChooseVariant(GroupRow? variant)
+    {
+        if (SelectedGroup is not { } shown)
+        {
+            return;
+        }
+
+        var lead = LeadOf(shown);
+        var wanted = variant ?? lead;
+        var changed = !ReferenceEquals(_selectedGroup, wanted);
+        _wholeTitle = variant is null;
+        SelectedGroup = wanted;
+        if (!changed)
+        {
+            ShowGroup();
+        }
+    }
+
+    /// <summary>„Všetky (44)“, „A · 20“, „C · 2 – zvuk bez jazyka, chýba slovenčina“ – the variants of the selected title.</summary>
+    public ObservableCollection<VariantChip> VariantChips { get; } = [];
+
+    public bool HasVariantChips => VariantChips.Count > 0;
+
+    /// <summary>The tracks and files of all variants of the title are shown together (the columns V súboroch and Var.).</summary>
+    public bool ShowsVariants { get; private set; }
+
+    public string FilesHeader => ShowsVariants ? Loc.T("Súbory titulu – výsledok simulácie") : Loc.T("Súbory skupiny – výsledok simulácie");
+
+    public string TracksHeader => ShowsVariants ? Loc.T("Stopy titulu – všetky varianty naraz") : Loc.T("Stopy skupiny");
+
+    // the groups the page shows: the whole title, or the variant chosen
+    private IReadOnlyList<BatchGroup> ShownGroups => SelectedGroup is not { } row ? []
+        : _wholeTitle ? [.. LeadOf(row).Variants.Select(v => v.Group)] : [row.Group];
+
+    private void NotifyTitleShown()
+    {
+        foreach (var name in new[] { nameof(HasVariantChips), nameof(ShowsVariants), nameof(FilesHeader), nameof(TracksHeader), nameof(SelectedSeriesGroup), nameof(SelectedFilmGroup) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
+
+    // the chips of the variants: what each one lacks or has more than the main one (the one with the most files)
+    private void AddVariantChips(GroupRow lead, BatchTitle title)
+    {
+        var slots = BatchTitles.Slots(title);
+        VariantChips.Add(new VariantChip(Loc.F("Všetky ({0})", title.FileCount), Loc.T("Celý titul – spoločné stopy všetkých variantov, rozhodnutie platí pre každý z nich"),
+            ShowsVariants, false, () => ChooseVariant(null)));
+        foreach (var row in lead.Variants)
+        {
+            var group = row.Group;
+            var differences = new List<string>();
+            if (!ReferenceEquals(group, title.Main))
+            {
+                foreach (var slot in slots)
+                {
+                    var places = slot.Places.Select(p => p.Group).ToList();
+                    if (places.Contains(title.Main) && !places.Contains(group))
+                    {
+                        differences.Add(Loc.F("chýba {0}", Texts.Language(slot.Track.Language)));
+                    }
+                    else if (!places.Contains(title.Main) && places.Contains(group))
+                    {
+                        differences.Add(slot.Track.Language.IsUndetermined
+                            ? Loc.F("{0} bez jazyka", Texts.Type(slot.Key.Type).ToLowerInvariant())
+                            : Loc.F("+ {0} {1}", Texts.Type(slot.Key.Type).ToLowerInvariant(), Texts.Language(slot.Track.Language)));
+                    }
+                }
+            }
+
+            var text = $"{group.Label} · {group.Files.Count}" + (differences.Count > 0 ? " – " + string.Join(", ", differences) : "");
+            VariantChips.Add(new VariantChip(text, row.Signature, !ShowsVariants && ReferenceEquals(SelectedGroup, row),
+                differences.Any(d => !d.StartsWith('+')), () => ChooseVariant(row)));
         }
     }
 
@@ -383,11 +488,35 @@ public sealed partial class BatchPageViewModel : ObservableObject
     private bool IsSeriesGroup(GroupRow row) => _library is { } library &&
         (row.Group.Files.Count > 0 ? library.KindFor(row.Group.Files[0].Path) : library.Kind) == MediaKind.Series;
 
-    /// <summary>Sorts the groups into the two lists again (after an analysis, a change of the kind, a new group).</summary>
+    /// <summary>
+    /// Sorts the titles into the two lists again (after an analysis, a change of the kind, a new group). Owner, 21. 11.
+    /// 2026: one row for a title – the groups of one series or film (its variants: files with other tracks, the same title
+    /// on two disks) under the row of its first group.
+    /// </summary>
     private void SortGroups()
     {
-        var series = Groups.Where(IsSeriesGroup).ToList();
-        var films = Groups.Where(g => !series.Contains(g)).ToList();
+        var rowOf = Groups.ToDictionary(r => r.Group);
+        var titles = BatchTitles.Of(Groups.Select(r => r.Group),
+            g => g.Files.Count > 0 && _library is { } library ? library.TitleKeyOf(g.Files[0].Path) : null);
+        _leadOf.Clear();
+        _titleOf.Clear();
+        var leads = new List<GroupRow>();
+        foreach (var title in titles)
+        {
+            var rows = title.Variants.Select(g => rowOf[g]).ToList();
+            var lead = rows[0];
+            foreach (var row in rows)
+            {
+                _leadOf[row] = lead;
+                row.SetVariants(row == lead ? rows : [row]);
+            }
+
+            _titleOf[lead] = title;
+            leads.Add(lead);
+        }
+
+        var series = leads.Where(IsSeriesGroup).ToList();
+        var films = leads.Where(g => !series.Contains(g)).ToList();
         var changed = Sync(SeriesGroups, series) | Sync(FilmGroups, films);
         if (changed)
         {
@@ -690,6 +819,12 @@ public sealed partial class BatchPageViewModel : ObservableObject
         get => _selectedGroup;
         set
         {
+            // another title: shown whole again
+            if (value is not null && (_selectedGroup is null || LeadOf(value) != LeadOf(_selectedGroup)))
+            {
+                _wholeTitle = true;
+            }
+
             if (SetProperty(ref _selectedGroup, value))
             {
                 ShowGroup();

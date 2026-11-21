@@ -56,7 +56,14 @@ public static partial class TitleUnits
         {
             var kind = title.First().Place!.Value.Kind;
             var titleFiles = title.Select(p => p.File).ToList();
-            units.Add(kind == MediaKind.Series ? Series(title.Key, titleFiles, root) : Film(title.Key, titleFiles));
+            if (kind == MediaKind.Series)
+            {
+                units.Add(Series(title.Key, titleFiles, root));
+            }
+            else
+            {
+                units.AddRange(Films(title.Key, titleFiles));
+            }
         }
 
         // outside MOVIES and TVSHOWS: guessed from the name, the user sorts the file
@@ -119,6 +126,37 @@ public static partial class TitleUnits
             .SelectMany(g => Sequence(g.ToList()))
             .ToDictionary(x => x.Key, x => x.Value, Paths.Comparer);
         return new TitleUnit(unit, MediaKind.Series, files, name, numbers);
+    }
+
+    /// <summary>
+    /// The films of a folder below MOVIES (owner, 21. 11. 2026: a folder holding a collection of different films – a title
+    /// written for one must not name the others): files whose names give different films (<see cref="TitleGuess.SameFilm"/>)
+    /// are titles of their own, each named by its file (the first of its versions); files of one film stay together as its
+    /// versions, named by the folder as before. A number alone never makes another film ("Film 1", "Film 2" – owner, 29. 10.).
+    /// </summary>
+    private static IEnumerable<TitleUnit> Films(string unit, List<string> files)
+    {
+        if (files.Count < 2)
+        {
+            return [Film(unit, files)];
+        }
+
+        var films = new List<List<string>>();
+        foreach (var file in files.Order(NaturalComparer.Instance))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            var same = films.Where(f => f.All(other => TitleGuess.SameFilm(Path.GetFileNameWithoutExtension(other), name))).ToList();
+            if (same.Count == 1)
+            {
+                same[0].Add(file);
+            }
+            else
+            {
+                films.Add([file]);
+            }
+        }
+
+        return films.Count == 1 ? [Film(unit, files)] : films.Select(f => Film(f[0], f));
     }
 
     private static TitleUnit Film(string unit, List<string> files) =>

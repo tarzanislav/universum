@@ -128,7 +128,15 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel>
-                                            <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <!-- owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio) -->
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Command="{Binding CopyNameCommand}" Padding="4,1" Margin="4,0,0,2" MinWidth="0"
+                                                        Visibility="{Binding CanCopyName, Converter={StaticResource BoolToVisibility}}"
+                                                        ToolTip="{loc:T 'Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE74B;" FontSize="10" />
+                                                </Button>
+                                                <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding NameBefore}" />
+                                            </DockPanel>
                                             <TextBlock Text="{Binding NameAfter}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                        Visibility="{Binding CanName, Converter={StaticResource InverseBoolToVisibility}}" />
                                             <!-- owner, 30. 10. 2026: Track name – the name can be written or added to -->
@@ -1178,6 +1186,10 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type pages:BatchPageViewModel}">
                 <Grid Margin="24,12,24,12">
+                    <Grid.Resources>
+                        <!-- the page for the columns of the variants of a title (columns are not in the visual tree) -->
+                        <pages:BindingProxy x:Key="BatchPage" Data="{Binding}" />
+                    </Grid.Resources>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1303,12 +1315,26 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Count}" />
-                                    <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding State}" />
+                                    <!-- owner, 21. 11. 2026: one row for a title – its files, its variants (other tracks), its state -->
+                                    <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding TitleCount}" />
+                                    <DataGridTextColumn Header="{loc:T 'Varianty'}" Binding="{Binding VariantsText}">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="ToolTip" Value="{loc:T 'Koľko rôznych zložení stôp majú súbory titulu – vyberiete ich nad zoznamom súborov'}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasVariants}" Value="True">
+                                                        <Setter Property="Foreground" Value="#B35C00" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding TitleState}" />
                                 </DataGrid.Columns>
                                 <DataGrid.RowDetailsTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Signature}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
+                                        <TextBlock Text="{Binding TitleDetails}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
@@ -1339,12 +1365,26 @@
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding Count}" />
-                                    <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding State}" />
+                                    <!-- owner, 21. 11. 2026: one row for a title – its files, its variants (other tracks), its state -->
+                                    <DataGridTextColumn Header="{loc:T 'Súbory'}" Binding="{Binding TitleCount}" />
+                                    <DataGridTextColumn Header="{loc:T 'Varianty'}" Binding="{Binding VariantsText}">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="ToolTip" Value="{loc:T 'Koľko rôznych zložení stôp majú súbory titulu – vyberiete ich nad zoznamom súborov'}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasVariants}" Value="True">
+                                                        <Setter Property="Foreground" Value="#B35C00" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="{loc:T 'Stav'}" Binding="{Binding TitleState}" />
                                 </DataGrid.Columns>
                                 <DataGrid.RowDetailsTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Signature}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
+                                        <TextBlock Text="{Binding TitleDetails}" TextWrapping="Wrap" Margin="8,0,8,6" FontSize="11.5"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
@@ -1361,7 +1401,8 @@
                                 <RowDefinition Height="10" />
                                 <RowDefinition Height="*" MinHeight="140" />
                             </Grid.RowDefinitions>
-                            <DockPanel Margin="0,0,0,6">
+                            <StackPanel Margin="0,0,0,6">
+                            <DockPanel>
                                 <Button DockPanel.Dock="Right" Content="{loc:T 'Informácie'}" Command="{Binding ShowInfoCommand}" Padding="10,3"
                                         ToolTip="{loc:T 'Zobrazí vybraný súbor na stránke Informácie'}" ToolTipService.ShowOnDisabled="True" />
                                 <Button DockPanel.Dock="Right" Content="{loc:T 'Obraz v štúdiu'}" Command="{Binding EditPictureInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
@@ -1370,8 +1411,41 @@
                                         ToolTip="{loc:T 'Úprava audiostopy: dabing, posun, PAL 25 ↔ 23,976, kodek, hlasitosť – zmeny sa uložia do úlohy (Hromadné aj MEGA)'}" ToolTipService.ShowOnDisabled="True" />
                                 <Button DockPanel.Dock="Right" Content="{loc:T 'Titulky v štúdiu'}" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="{loc:T 'Úprava titulkostopy: film s titulkami, časy, porovnanie – zmeny sa uložia do úlohy (Hromadné aj MEGA)'}" ToolTipService.ShowOnDisabled="True" />
-                                <TextBlock Text="{loc:T 'Súbory skupiny – výsledok simulácie'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding FilesHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </DockPanel>
+                            <!-- owner, 21. 11. 2026: the variants of the title – Všetky, or one of them (its files and tracks only) -->
+                            <DockPanel Margin="0,6,0,0" Visibility="{Binding HasVariantChips, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Varianty stôp:'}" VerticalAlignment="Center" Margin="0,0,8,4" />
+                                <ItemsControl ItemsSource="{Binding VariantChips}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Text}" Command="{Binding ChooseCommand}" ToolTip="{Binding ToolTip}" Padding="10,2" Margin="0,0,6,4">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                                <Setter Property="BorderBrush" Value="#E09A4A" />
+                                                                <Setter Property="Foreground" Value="#B35C00" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                                <Setter Property="Foreground" Value="White" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DockPanel>
+                            </StackPanel>
                             <DataGrid Grid.Row="1" MinHeight="110" ItemsSource="{Binding FileRows}" SelectedItem="{Binding SelectedFile}" SelectionMode="Extended" AutoGenerateColumns="False" IsReadOnly="True"
                                       HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False" SelectionChanged="OnBatchFilesSelected">
                                 <DataGrid.ContextMenu>
@@ -1385,6 +1459,8 @@
                                     </ContextMenu>
                                 </DataGrid.ContextMenu>
                                 <DataGrid.Columns>
+                                    <DataGridTextColumn Header="{loc:T 'Var.'}" Binding="{Binding Variant}" FontWeight="SemiBold"
+                                                        Visibility="{Binding Data.ShowsVariants, Source={StaticResource BatchPage}, Converter={StaticResource BoolToVisibility}}" />
                                     <DataGridTextColumn Header="{loc:T 'Súbor'}" Binding="{Binding FileName}" Width="*" MinWidth="110" />
                                     <DataGridTemplateColumn Header="{loc:T 'Film / epizóda'}" Width="150">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -1485,7 +1561,7 @@
                                 </Grid.RowDefinitions>
                                 <!-- the buttons wrap under the title when the pane is narrow -->
                                 <DockPanel Grid.Row="0" Margin="0,4,0,0">
-                                    <TextBlock DockPanel.Dock="Left" Text="{loc:T 'Stopy skupiny'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding TracksHeader}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
                                                ToolTip="{loc:T 'Rozhodnutie platí pre všetky súbory skupiny'}" />
                                     <WrapPanel HorizontalAlignment="Right">
                                         <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
@@ -1539,7 +1615,21 @@
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="{loc:T 'Stopa'}" Binding="{Binding Slot}" />
                                         <DataGridTextColumn Header="{loc:T 'Kodek'}" Binding="{Binding Codec}" Width="70" />
-                                        <DataGridTextColumn Header="{loc:T 'Názov v súbore'}" Binding="{Binding Name}" Width="*" MinWidth="80" />
+                                        <!-- owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio) -->
+                                        <DataGridTemplateColumn Header="{loc:T 'Názov v súbore'}" Width="*" MinWidth="80">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel VerticalAlignment="Center">
+                                                        <Button DockPanel.Dock="Right" Command="{Binding CopyNameCommand}" Padding="4,1" Margin="4,0,0,0" MinWidth="0" VerticalAlignment="Top"
+                                                                Visibility="{Binding CanCopyName, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTip="{loc:T 'Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať'}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" FontSize="10" />
+                                                        </Button>
+                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" ToolTip="{Binding Name}" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <!-- owner, 30. 10. 2026: Track name – written for the whole group, it wins over the rules' name -->
                                         <DataGridTemplateColumn Header="{loc:T 'Názov stopy'}" Width="*" MinWidth="110">
                                             <DataGridTemplateColumn.CellTemplate>
@@ -1556,6 +1646,29 @@
                                                     <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Name"
                                                               SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
                                                               ToolTip="{loc:T 'Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk'}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <!-- owner, 21. 11. 2026: how many files of the title carry the track (Všetky) -->
+                                        <DataGridTemplateColumn Header="{loc:T 'V súboroch'}" Width="110"
+                                                                Visibility="{Binding Data.ShowsVariants, Source={StaticResource BatchPage}, Converter={StaticResource BoolToVisibility}}">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel VerticalAlignment="Center" ToolTip="{loc:T 'Koľko súborov titulu má túto stopu – rozhodnutie platí pre všetky varianty, ktoré ju majú'}">
+                                                        <TextBlock Text="{Binding Coverage}" FontWeight="SemiBold">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#2B7A2B" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding CoverageWarning}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#B35C00" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding CoverageNote}" FontSize="11.5" Foreground="#B35C00" TextWrapping="Wrap" />
+                                                    </StackPanel>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>

@@ -39,11 +39,11 @@ public sealed partial class BatchPageViewModel
     // the files the row Seriál: names in a sorted folder: of all the series groups marked (when the group shown is one of
     // them), otherwise of the group shown
     private IReadOnlyList<string> SeriesFiles =>
-        _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(shown)
-            ? _selectedSeriesGroups.SelectMany(g => g.Group.Files).Select(f => f.Path).ToList()
+        _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(LeadOf(shown))
+            ? _selectedSeriesGroups.SelectMany(g => g.Variants).SelectMany(v => v.Group.Files).Select(f => f.Path).ToList()
             : SelectedFiles;
 
-    private int SeriesGroupsNamed => _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(shown) ? _selectedSeriesGroups.Count : 1;
+    private int SeriesGroupsNamed => _selectedSeriesGroups.Count > 1 && SelectedGroup is { } shown && _selectedSeriesGroups.Contains(LeadOf(shown)) ? _selectedSeriesGroups.Count : 1;
 
     /// <summary>"pre 5 označených skupín" when the row Seriál: names several groups at once.</summary>
     public string SeriesTargetNote => _library is { Mixed: true } && SeriesGroupsNamed > 1

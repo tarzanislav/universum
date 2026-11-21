@@ -3525,6 +3525,13 @@ internal static class Translations
         ["Vybraným"] = "Vybraným",
         ["Zrušiť pridané"] = "Zrušit přidané",
         ["Doplniť kapitoly"] = "Doplnit kapitoly",
+        ["na disku výstupného priečinka takmer nie je miesto – hlavička sa na mieste neupravila"] = "na disku výstupní složky téměř není místo – hlavička se na místě neupravila",
+        ["Na disku nemusí byť dosť miesta – spustiť aj tak?"] = "Na disku nemusí být dost místa – spustit i tak?",
+        ["{0} voľných {1}, spracovanie potrebuje asi {2} (s rezervou {3} pre Windows a ostatné programy)"] = "{0} volných {1}, zpracování potřebuje asi {2} (s rezervou {3} pro Windows a ostatní programy)",
+        ["Superrýchle: súbory s inou len hlavičkou sa len presunú – miesto nepotrebujú; ostatné sa zapíšu nanovo."] = "Superrychle: soubory s jinou jen hlavičkou se jen přesunou – místo nepotřebují; ostatní se zapíší nanovo.",
+        ["Originály v Koši miesto na disku neuvoľnia. Superrýchle (Originál) potrebuje pri súboroch s inou len hlavičkou takmer žiadne miesto."] = "Originály v Koši místo na disku neuvolní. Superrychle (Originál) potřebuje u souborů s jinou jen hlavičkou téměř žádné místo.",
+        ["Súbor, ktorý sa nezmestí, sa nezapíše (originál ostane) a spracovanie pokračuje ďalším."] = "Soubor, který se nevejde, se nezapíše (originál zůstane) a zpracování pokračuje dalším.",
+        ["Spracovanie nespustené – uvoľnite miesto na disku alebo zvoľte iný výstupný priečinok."] = "Zpracování nespuštěno – uvolněte místo na disku nebo zvolte jinou výstupní složku.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7046,5 +7053,12 @@ internal static class Translations
         ["Vybraným"] = "Selected",
         ["Zrušiť pridané"] = "Undo added",
         ["Doplniť kapitoly"] = "Add chapters",
+        ["na disku výstupného priečinka takmer nie je miesto – hlavička sa na mieste neupravila"] = "the disk of the output folder is almost full – the header was not edited in place",
+        ["Na disku nemusí byť dosť miesta – spustiť aj tak?"] = "There may not be enough room on the disk – start anyway?",
+        ["{0} voľných {1}, spracovanie potrebuje asi {2} (s rezervou {3} pre Windows a ostatné programy)"] = "{0}: {1} free, the run needs about {2} (with a reserve of {3} for Windows and other programs)",
+        ["Superrýchle: súbory s inou len hlavičkou sa len presunú – miesto nepotrebujú; ostatné sa zapíšu nanovo."] = "Super fast: files with another header only are just moved – they need no room; the others are written anew.",
+        ["Originály v Koši miesto na disku neuvoľnia. Superrýchle (Originál) potrebuje pri súboroch s inou len hlavičkou takmer žiadne miesto."] = "Originals in the Recycle Bin free no room on the disk. Super fast (Original) needs almost no room for files with another header only.",
+        ["Súbor, ktorý sa nezmestí, sa nezapíše (originál ostane) a spracovanie pokračuje ďalším."] = "A file that does not fit is not written (the original stays) and the run goes on with the next.",
+        ["Spracovanie nespustené – uvoľnite miesto na disku alebo zvoľte iný výstupný priečinok."] = "Not started – free some room on the disk or choose another output folder.",
     };
 }

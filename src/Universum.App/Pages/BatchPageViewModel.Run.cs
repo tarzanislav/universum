@@ -102,6 +102,22 @@ public sealed partial class BatchPageViewModel
         }
 
         var output = originals.Output();
+
+        // owner, 21. 11. 2026: the room on the disks is checked before the run (Superrýchle needs almost none); a file that
+        // does not fit is not written – the run goes on with the others and a disk running almost full stops the tool
+        if (BatchSpace.Shortages(_items, output) is { Count: > 0 } shortages &&
+            !Confirm(Loc.T("Na disku nemusí byť dosť miesta – spustiť aj tak?") + "\n\n" +
+                     string.Join("\n", shortages.Select(s => Loc.F("{0} voľných {1}, spracovanie potrebuje asi {2} (s rezervou {3} pre Windows a ostatné programy)",
+                         s.Root, Texts.Size(s.Free), Texts.Size(s.Needed), Texts.Size(DiskSpace.Reserve)))) + "\n\n" +
+                     (originals == OriginalsMode.MoveIntoLibrary
+                         ? Loc.T("Superrýchle: súbory s inou len hlavičkou sa len presunú – miesto nepotrebujú; ostatné sa zapíšu nanovo.")
+                         : Loc.T("Originály v Koši miesto na disku neuvoľnia. Superrýchle (Originál) potrebuje pri súboroch s inou len hlavičkou takmer žiadne miesto.")) + "\n\n" +
+                     Loc.T("Súbor, ktorý sa nezmestí, sa nezapíše (originál ostane) a spracovanie pokračuje ďalším.")))
+        {
+            RunState = Loc.T("Spracovanie nespustené – uvoľnite miesto na disku alebo zvoľte iný výstupný priečinok.");
+            return;
+        }
+
         RememberSeries(_items.Where(i => i.NeedsWork));
 
         Busy = true;

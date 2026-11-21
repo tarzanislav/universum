@@ -126,6 +126,12 @@ public sealed class FileProcessor(
         }
 
         string? temporary = null;
+        // owner, 21. 11. 2026: a disk written to that runs almost full (another program fills it meanwhile) stops the work –
+        // the unfinished file is deleted, the original stays, nothing gets stuck
+        // (the temporary folder too when sounds or the picture are written anew there)
+        using var guard = new DiskGuard(
+            plan.Target.Tracks.Any(t => t.IsAdded && (t.Source.Encode is not null || t.Source.VideoEncode is not null)) ? [placement.Directory, Path.GetTempPath()] : [placement.Directory],
+            cancellationToken);
         try
         {
             if (!File.Exists(source))
@@ -186,6 +192,8 @@ public sealed class FileProcessor(
                 notMoved = !Paths.SameVolume(source, placement.Directory) ? NotMovedOtherDisk
                     : Links(source) != 1 ? NotMovedHardLink
                     : !CanEditInPlace(source) ? NotMovedInUse
+                    // the header grows at the end of the file: with the disk almost full it is not edited in place
+                    : DiskSpace.Free(placement.Directory) is { } free && free < DiskSpace.InPlace + (DiskSpace.Reserve / 2) ? NotMovedNoSpace
                     : null;
                 if (notMoved is null)
                 {
@@ -198,7 +206,7 @@ public sealed class FileProcessor(
             if (inLibrary)
             {
                 temporary = TemporaryPath(placement.Directory, source);
-                result = await ReworkInLibraryAsync(plan, placement, temporary, progress, cancellationToken);
+                result = await ReworkInLibraryAsync(plan, placement, temporary, progress, guard.Token);
             }
             else if (moved is not null)
             {
@@ -207,7 +215,7 @@ public sealed class FileProcessor(
             else
             {
                 temporary = TemporaryPath(placement.Directory, source);
-                result = await WriteIntoLibraryAsync(plan, placement, output, temporary, progress, cancellationToken);
+                result = await WriteIntoLibraryAsync(plan, placement, output, temporary, progress, guard.Token);
                 if (notMoved is not null)
                 {
                     result = result with { Messages = [NotMovedPrefix + notMoved, .. result.Messages] };
@@ -247,6 +255,11 @@ public sealed class FileProcessor(
 
             return result;
         }
+        catch (OperationCanceledException) when (guard.FullDisk is not null && !cancellationToken.IsCancellationRequested)
+        {
+            TryDelete(temporary);
+            return Result(plan, ProcessingStatus.Failed, null, null, [guard.Message]);
+        }
         catch (OperationCanceledException)
         {
             TryDelete(temporary);
@@ -255,7 +268,8 @@ public sealed class FileProcessor(
         catch (Exception ex) when (IsFileError(ex))
         {
             TryDelete(temporary);
-            return Result(plan, ProcessingStatus.Failed, null, null, [ex.Message]);
+            // a tool that failed because the guard stopped it (or the disk ran full): said as a full disk
+            return Result(plan, ProcessingStatus.Failed, null, null, [guard.FullDisk is not null ? guard.Message : ex.Message]);
         }
     }
 
@@ -647,6 +661,8 @@ public sealed class FileProcessor(
     public const string NotMovedInUse = "the file is read-only or open in another program";
 
     public const string NotMovedRename = "the file cannot be moved (open in another program)";
+
+    public const string NotMovedNoSpace = "the disk of the output folder is almost full";
 
     /// <summary>Start of the message of an original that was to be deleted but stays.</summary>
     public const string OriginalKeptPrefix = "the original stays in place: ";
@@ -1412,11 +1428,12 @@ public sealed class FileProcessor(
                 return;
             }
 
-            var needed = (new FileInfo(source).Length * times) + (64L << 20);
+            // owner, 21. 11. 2026: the file and a reserve for Windows and the other programs
+            var needed = (new FileInfo(source).Length * times) + DiskSpace.Reserve;
             var free = new DriveInfo(root).AvailableFreeSpace;
             if (free < needed)
             {
-                throw new IOException($"not enough free space on {root}: {free >> 20} MB free, {needed >> 20} MB needed");
+                throw new IOException(DiskSpace.NotEnough(root, free, needed));
             }
         }
         catch (ArgumentException)

@@ -1179,7 +1179,7 @@
                 </Grid>
             </DataTemplate>
             <DataTemplate DataType="{x:Type pages:BatchPageViewModel}">
-                <Grid Margin="24,20,24,12">
+                <Grid Margin="24,12,24,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -1187,6 +1187,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
+                    <!-- owner, 21. 11. 2026: the head of the page in one row – the title, Zásobník TMDB, the input and Analyzovať; more room for the tracks -->
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                             <CheckBox Content="{loc:T 'aj podpriečinky'}" IsChecked="{Binding Recursive}" VerticalAlignment="Center" Margin="0,0,12,0" />
@@ -1194,27 +1195,27 @@
                                       ToolTip="{loc:T 'Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva'}" />
                             <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseFolderCommand}" Margin="0,0,8,0" Padding="12,5" />
                             <Button Content="{loc:T 'Analyzovať'}" Command="{Binding AnalyzeCommand}" Padding="16,5" />
-                            <Button Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0"
-                                    ToolTip="{loc:T 'Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)'}" />
                         </StackPanel>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" />
-                                <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
+                                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" Margin="0" VerticalAlignment="Center" />
+                                <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                                <!-- owner, 9. 11. 2026: all input folders at once (one on each disk), one of them, or a folder chosen -->
+                                <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding FolderChoice}" DisplayMemberPath="Label" MinWidth="220" MaxWidth="520"
+                                          VerticalAlignment="Center" FontWeight="SemiBold" Margin="12,0,12,0"
+                                          ToolTip="{loc:T 'Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…'}" />
                             </StackPanel>
-                            <!-- owner, 9. 11. 2026: all input folders at once (one on each disk), one of them, or a folder chosen -->
-                            <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding FolderChoice}" DisplayMemberPath="Label" MinWidth="320" MaxWidth="700"
-                                      HorizontalAlignment="Left" FontWeight="SemiBold" Margin="0,2,0,0"
-                                      ToolTip="{loc:T 'Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…'}" />
-                            <TextBlock Text="{Binding DiskHint}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left"
+                            <TextBlock Text="{Binding DiskHint}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left" Margin="0,2,0,0"
                                        Visibility="{Binding HasDiskHint, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                     </DockPanel>
-                    <DockPanel Grid.Row="1" Margin="0,6,0,8">
-                        <ToggleButton DockPanel.Dock="Right" Content="{Binding PanelsText}" IsChecked="{Binding ShowPanels}" Padding="10,3" Margin="8,0,0,0"
+                    <DockPanel Grid.Row="1" Margin="0,4,0,6">
+                        <ToggleButton DockPanel.Dock="Right" Content="{Binding PanelsText}" IsChecked="{Binding ShowPanels}" Padding="10,3" Margin="0"
                                       ToolTip="{loc:T 'Šablónu, originály a názov pod tabuľkami skryje – tabuľky dostanú celé okno (koniec spracovania sa ukáže vždy)'}" />
-                        <Button DockPanel.Dock="Right" Content="{loc:T 'Upratať zvyšky'}" Command="{Binding CleanupCommand}" Padding="10,3"
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Upratať zvyšky'}" Command="{Binding CleanupCommand}" Padding="10,3" Margin="0,0,8,0"
                                 ToolTip="{loc:T 'Dočasné súbory po prerušenom spracovaní presunie do Koša'}" />
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="10,3" Margin="0,0,8,0"
+                                ToolTip="{loc:T 'Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)'}" />
                         <Button DockPanel.Dock="Right" Content="{Binding StopText}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
                                 Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
@@ -2400,6 +2401,36 @@
 
         <DockPanel Background="{DynamicResource LayerFillColorDefaultBrush}">
             <TextBlock DockPanel.Dock="Top" Text="{loc:T 'UNIVERSUM'}" FontSize="20" FontWeight="SemiBold" Margin="20,20,20,16" />
+            <!-- owner, 31. 10. 2026: new films and episodes in the input folder – told, sent to Hromadné spracovanie on a click;
+                 owner, 21. 11. 2026: a small card in the left column instead of a row over the whole page -->
+            <Border DockPanel.Dock="Top" Margin="8,0,8,10" CornerRadius="8" Padding="10,6,6,8" BorderThickness="1"
+                    BorderBrush="{DynamicResource AccentFillColorDefaultBrush}" Background="#336FA8E8" ToolTip="{Binding ArrivalsText}"
+                    Visibility="{Binding HasArrivals, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding DismissArrivalsCommand}" Padding="5,2" VerticalAlignment="Top"
+                                ToolTip="{loc:T 'Skryť (súbory ostanú na vstupe)'}">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="10" />
+                        </Button>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE8B5;" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center">
+                            <TextBlock.Triggers>
+                                <!-- the new files are noticed: the arrow blinks a few times -->
+                                <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.2" Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="5x" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </TextBlock.Triggers>
+                        </TextBlock>
+                        <TextBlock Text="{Binding ArrivalsShort}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <Button Content="{loc:T 'Do Hromadného'}" Command="{Binding ArrivalsToBatchCommand}" Padding="8,3" Margin="0,6,0,0"
+                            HorizontalAlignment="Stretch" FontWeight="SemiBold" Style="{DynamicResource AccentButtonStyle}"
+                            ToolTip="{loc:T 'Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)'}" />
+                </StackPanel>
+            </Border>
             <!-- Dashboard on its own, then the groups: framed, each with its own tint and a heading in its colour -->
             <ListBox ItemsSource="{Binding ToolsView}" SelectedItem="{Binding SelectedTool}" IsSynchronizedWithCurrentItem="False"
                      BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -2487,20 +2518,6 @@
         </DockPanel>
 
         <DockPanel Grid.Column="1">
-            <!-- owner, 31. 10. 2026: new films and episodes in the input folder – told, sent to Hromadné spracovanie on a click -->
-            <Border DockPanel.Dock="Top" Margin="16,10,16,0" CornerRadius="8" Padding="14,8" Background="#336FA8E8"
-                    Visibility="{Binding HasArrivals, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="{loc:T 'Do Hromadného spracovania'}" Command="{Binding ArrivalsToBatchCommand}" Padding="12,4" Margin="8,0,8,0" FontWeight="SemiBold" />
-                        <Button Command="{Binding DismissArrivalsCommand}" Padding="8,4" ToolTip="{loc:T 'Skryť (súbory ostanú na vstupe)'}">
-                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="12" />
-                        </Button>
-                    </StackPanel>
-                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE8B5;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding ArrivalsText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ArrivalsText}" />
-                </DockPanel>
-            </Border>
             <!-- owner, 31. 10. 2026: a reminder of the calendar -->
             <Border DockPanel.Dock="Top" Margin="16,10,16,0" CornerRadius="8" Padding="14,8" Background="#33D46A8C"
                     Visibility="{Binding HasReminder, Converter={StaticResource BoolToVisibility}}">

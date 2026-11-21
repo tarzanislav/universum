@@ -179,7 +179,7 @@ internal static partial class SelfTest
             "tray: the choice beside a title tells the posters – " + string.Join(" | ", model.HeaderEditor.Library.Tray.Rows.Select(r => r.Label)));
         tray.Download = downloadBefore;
         tray.FindCsfd = findBefore;
-        Check(services.Settings.TmdbTrayAuto && model.TrayService.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB zbiera"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TrayService.SwitchText);
+        Check(services.Settings.TmdbTrayAuto && model.TrayService.Automatic && model.TrayService.SwitchText.StartsWith(Localization.Loc.T("Zásobník TMDB"), StringComparison.Ordinal), "tray: gathering switched on – " + model.TrayService.SwitchText);
         using (var script = await http.GetAsync(tray.ScriptAddress))
         {
             var text = await script.Content.ReadAsStringAsync();

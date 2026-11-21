@@ -3258,7 +3258,6 @@ internal static class Translations
         ["Vyprázdniť zásobník"] = "Vyprázdnit zásobník",
         ["Vyprázdniť tento zásobník – nezostane v ňom žiaden titul z TMDB, vlastné riadky ostanú (dá sa vrátiť)"] = "Vyprázdnit tento zásobník – nezůstane v něm žádný titul z TMDB, vlastní řádky zůstanou (lze vrátit)",
         ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "Zapnuto: každý film a seriál, který otevřete na TMDB, se sám uloží do Zásobníku TMDB (potřebuje skript UNIVERSUM v prohlížeči – Nastavení). Vypnuto: jen tlačítkem Do UNIVERSUM na stránce.",
-        ["Zásobník TMDB zbiera"] = "Zásobník TMDB sbírá",
         ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "Širší poznámka (další klik ještě širší, pak zase užší)",
         ["Zo zásobníka"] = "Ze zásobníku",
         ["Vybraný je plagát, ktorý ste si poslali z prehliadača ({0}). Odporúčaný z TMDB je v ponuke nižšie."] = "Vybraný je plakát, který jste si poslali z prohlížeče ({0}). Doporučený z TMDB je v nabídce níže.",
@@ -3473,6 +3472,9 @@ internal static class Translations
         ["Návrhy prijaté (jazykov: {0})."] = "Návrhy přijaty (jazyků: {0}).",
         ["Na vás ostali: {0}."] = "Na vás zůstaly: {0}.",
         ["Súborov na posúdenie: {0}."] = "Souborů k posouzení: {0}.",
+        ["Nové na vstupe: {0}"] = "Nové na vstupu: {0}",
+        ["Do Hromadného"] = "Do Hromadného zpracování",
+        ["Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)"] = "Nové soubory pošle do Hromadného zpracování (tam se analyzují, samo se nic nespustí)",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6727,7 +6729,6 @@ internal static class Translations
         ["Vyprázdniť zásobník"] = "Empty the tray",
         ["Vyprázdniť tento zásobník – nezostane v ňom žiaden titul z TMDB, vlastné riadky ostanú (dá sa vrátiť)"] = "Empty this tray – no TMDB title stays in it, your own lines do (it can be taken back)",
         ["Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke."] = "On: every film and series you open on TMDB goes into the TMDB tray by itself (needs the UNIVERSUM script in the browser – Settings). Off: only by the Do UNIVERSUM button on the page.",
-        ["Zásobník TMDB zbiera"] = "TMDB tray collecting",
         ["Širšia poznámka (ďalší klik ešte širšia, potom zas užšia)"] = "A wider note (the next click wider still, then narrow again)",
         ["Zo zásobníka"] = "From the tray",
         ["Vybraný je plagát, ktorý ste si poslali z prehliadača ({0}). Odporúčaný z TMDB je v ponuke nižšie."] = "The poster you sent from the browser is chosen ({0}). The one TMDB recommends is in the offer below.",
@@ -6942,5 +6943,8 @@ internal static class Translations
         ["Návrhy prijaté (jazykov: {0})."] = "Suggestions accepted (languages: {0}).",
         ["Na vás ostali: {0}."] = "Left to you: {0}.",
         ["Súborov na posúdenie: {0}."] = "Files to review: {0}.",
+        ["Nové na vstupe: {0}"] = "New in the input: {0}",
+        ["Do Hromadného"] = "To Batch processing",
+        ["Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)"] = "Sends the new files to Batch processing (analysed there; nothing starts by itself)",
     };
 }

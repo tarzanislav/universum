@@ -100,6 +100,7 @@ public sealed class MainViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(HasArrivals));
             OnPropertyChanged(nameof(ArrivalsText));
+            OnPropertyChanged(nameof(ArrivalsShort));
         };
         services.RestartWatch();
 
@@ -557,6 +558,9 @@ public sealed class MainViewModel : ObservableObject
     public string ArrivalsText =>
         Loc.F("Na vstupe pribudli nové súbory ({0}): ", _services.Arrivals.Count) +
         string.Join(", ", _services.Arrivals.Take(3).Select(System.IO.Path.GetFileName)) + (_services.Arrivals.Count > 3 ? " …" : "");
+
+    /// <summary>"Nové na vstupe: 3" – the card in the left column (owner, 21. 11. 2026); the names are in its tooltip.</summary>
+    public string ArrivalsShort => Loc.F("Nové na vstupe: {0}", _services.Arrivals.Count);
 
     public AsyncRelayCommand ArrivalsToBatchCommand { get; }
 

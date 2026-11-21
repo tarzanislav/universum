@@ -3522,9 +3522,9 @@ internal static class Translations
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování bez kapitol i s jedinou kapitolou na celý film – Kapitola 01, 02 … po celé délce; soubor s více kapitolami zůstane, jak je",
         ["aj epizódam"] = "i epizodám",
         ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Doplnit i epizodám seriálů bez kapitol (výchozí jen filmům); vybraným souborům se kapitoly doplní vždy",
-        ["Filmom bez kapitol"] = "Filmům bez kapitol",
         ["Vybraným"] = "Vybraným",
         ["Zrušiť pridané"] = "Zrušit přidané",
+        ["Doplniť kapitoly"] = "Doplnit kapitoly",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7043,8 +7043,8 @@ internal static class Translations
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "To every file of Batch processing without chapters or with a single chapter for the whole film – Kapitola 01, 02 … over the whole length; a file with more chapters stays as it is",
         ["aj epizódam"] = "episodes too",
         ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Add them to episodes of series without chapters too (by default films only); the files selected always get them",
-        ["Filmom bez kapitol"] = "Films without chapters",
         ["Vybraným"] = "Selected",
         ["Zrušiť pridané"] = "Undo added",
+        ["Doplniť kapitoly"] = "Add chapters",
     };
 }

@@ -1563,6 +1563,10 @@
                                 <DockPanel Grid.Row="0" Margin="0,4,0,0">
                                     <TextBlock DockPanel.Dock="Left" Text="{Binding TracksHeader}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,4"
                                                ToolTip="{loc:T 'Rozhodnutie platí pre všetky súbory skupiny'}" />
+                                    <!-- owner, 21. 11. 2026: every subtitle track out of the language list kept at once (off by default) -->
+                                    <CheckBox DockPanel.Dock="Left" Content="{loc:T 'ponechať všetky titulky'}" IsChecked="{Binding KeepAllSubtitles}" VerticalAlignment="Center" Margin="0,0,12,4" MinWidth="0"
+                                              Visibility="{Binding CanKeepAllSubtitles, Converter={StaticResource BoolToVisibility}}"
+                                              ToolTip="{loc:T 'Titulky v jazykoch mimo zoznamu (Nastavenia) sa neodstránia – všetky naraz; jednotlivo ich ponecháte pri stope'}" />
                                     <WrapPanel HorizontalAlignment="Right">
                                         <!-- owner, 28. 10.: everything, the group, or only chosen films (a menu opened by the button) -->
                                         <Button Content="{loc:T 'Rozpoznať jazyk audiostôp ▾'}" Click="OnSpeechMenu" Margin="0,0,8,4" Padding="10,3"

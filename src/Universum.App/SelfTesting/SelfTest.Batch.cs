@@ -305,6 +305,21 @@ internal static partial class SelfTest
             Write("batch: no track with a name in the file – copying the name not tried");
         }
 
+        // owner, 21. 11. 2026: all subtitles out of the language list kept at once, and left out again
+        if (batch.CanKeepAllSubtitles)
+        {
+            var removedBefore = batch.SlotRows.Count(s => s.IsRemovedByLanguage);
+            batch.KeepAllSubtitles = true;
+            Check(batch.KeepAllSubtitles && batch.SlotRows.All(s => !s.IsRemovedByLanguage), $"batch: ponechať všetky titulky – none left out (before {removedBefore})");
+            batch.KeepAllSubtitles = false;
+            Check(!batch.KeepAllSubtitles && batch.SlotRows.Count(s => s.IsRemovedByLanguage) == removedBefore && batch.SlotRows.All(s => !s.Kept),
+                "batch: ponechať všetky titulky off – left out as before");
+        }
+        else
+        {
+            Write("batch: no subtitles out of the language list – ponechať všetky titulky not tried");
+        }
+
         batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");

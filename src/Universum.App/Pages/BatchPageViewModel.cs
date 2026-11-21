@@ -140,8 +140,7 @@ public sealed partial class BatchPageViewModel : ObservableObject
             }
         }, () => !Busy && !IsRunning && _selectedFile is not null);
         ChooseOutputDirectoryCommand = new RelayCommand(ChooseOutputDirectory, () => !Busy);
-        ConfirmTitlesCommand = new RelayCommand(ConfirmTitles, () => !Busy && _library is not null &&
-            (!_library.KindConfirmed || _items.Any(i => i.Reasons.Any(r => r.Kind is ReviewReasonKind.MissingTitle or ReviewReasonKind.MissingEpisode))));
+        AcceptSuggestionsCommand = new RelayCommand(AcceptSuggestions, () => !Busy && !IsRunning && _library is not null && _analysis is not null);
         ConfirmKindCommand = new RelayCommand(ConfirmKind, () => !Busy && _library is { KindConfirmed: false });
         ConfirmSeriesCommand = new RelayCommand(() =>
         {
@@ -159,7 +158,6 @@ public sealed partial class BatchPageViewModel : ObservableObject
 
             OnLibraryChanged();
         }, () => !Busy && SeriesNeedsConfirmation);
-        AcceptGroupCommand = new RelayCommand(AcceptGroup, () => !Busy && !IsRunning && _library is not null && SelectedGroup is not null);
         AnswerSpecialsCommand = new RelayCommand(AnswerSpecials, () => !Busy && HasSpecialsQuestions);
         Tmdb = new TmdbPicker(services, () => MediaKind.Series,
             () => _typedTmdb ?? (SeriesTitle.Length > 0 ? SeriesTitle : SuggestedSeries?.FolderName ?? ""), ChooseTmdbSeries);
@@ -219,7 +217,10 @@ public sealed partial class BatchPageViewModel : ObservableObject
     public RelayCommand ChooseOutputDirectoryCommand { get; }
 
     /// <summary>Accepts the kind, titles and episode numbers guessed from the names.</summary>
-    public RelayCommand ConfirmTitlesCommand { get; }
+    /// <summary>
+    /// "Prijať návrhy" (owner, 21. 11. 2026: one button instead of Prijať návrhy názvov and Prijať všetko v skupine).
+    /// </summary>
+    public RelayCommand AcceptSuggestionsCommand { get; }
 
     /// <summary>Accepts the proposed kind (films or a series) as it is.</summary>
     public RelayCommand ConfirmKindCommand { get; }
@@ -703,7 +704,7 @@ public sealed partial class BatchPageViewModel : ObservableObject
                     ConfirmSeriesCommand?.NotifyCanExecuteChanged();
                 }
 
-                AcceptGroupCommand?.NotifyCanExecuteChanged();
+                AcceptSuggestionsCommand?.NotifyCanExecuteChanged();
             }
         }
     }
@@ -740,8 +741,8 @@ public sealed partial class BatchPageViewModel : ObservableObject
                      ChooseFolderCommand, ClearCommand, AnalyzeCommand, ConfirmSuggestionsCommand, DetectSubtitlesCommand, DetectAudioCommand, DetectAudioSelectedCommand,
                      DetectAudioAllCommand, EditTemplateCommand, EditInStudioCommand, EditSoundInStudioCommand, EditPictureInStudioCommand, UndoMovedCommand,
                      TemplateFromGroupCommand, LoadTemplateCommand, SaveTemplateCommand, RulesOnlyCommand, RunCommand, PauseCommand,
-                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, ConfirmTitlesCommand, FindMoviesCommand, ConfirmKindCommand,
-                     AnswerSpecialsCommand, ConfirmSeriesCommand, AcceptGroupCommand, SendToMegaCommand, DeleteOriginalsCommand,
+                     StopCommand, CleanupCommand, SaveReportCommand, ChooseOutputDirectoryCommand, AcceptSuggestionsCommand, FindMoviesCommand, ConfirmKindCommand,
+                     AnswerSpecialsCommand, ConfirmSeriesCommand, SendToMegaCommand, DeleteOriginalsCommand,
                  })
         {
             command.NotifyCanExecuteChanged();

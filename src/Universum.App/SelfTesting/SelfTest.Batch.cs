@@ -281,7 +281,7 @@ internal static partial class SelfTest
             "batch: the rules' name again needs no decision");
         Check(!forcedSlot.Group.Decisions.Languages.ContainsKey(written.Key), "batch: the file's own language again needs no decision");
 
-        batch.ConfirmTitlesCommand.Execute(null);
+        batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Place) == 1, "batch: clean file only goes into the library (suggested episode 1)");
@@ -311,7 +311,7 @@ internal static partial class SelfTest
         // owner, 29. 10. 2026: the originals already written are known at the next analysis ("už v knižnici")
         await batch.AnalyzeAsync();
         batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 0)).ChosenLanguage = Languages.Czech;
-        batch.ConfirmTitlesCommand.Execute(null);
+        batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         for (var wait = 0; wait < 100 && batch.Items.Count(i => i.AlreadyInLibraryAt is not null) < 3; wait++)
         {
@@ -412,11 +412,11 @@ internal static partial class SelfTest
         Check(batch.IsSeries && !batch.CanChooseKind && batch.SeriesSuggestion.StartsWith("návrh: Vymyslený seriál (2024)", StringComparison.Ordinal) &&
               batch.FileRows.All(f => f.NamingSuggestion.StartsWith("návrh: S01E0", StringComparison.Ordinal)),
             $"batch: TVSHOWS – a series named by its folder, episodes by the numbers – {batch.SeriesSuggestion} | {string.Join(", ", batch.FileRows.Select(f => f.NamingSuggestion))}");
-        batch.AcceptGroupCommand.Execute(null);
+        batch.AcceptSuggestionsCommand.Execute(null);
         Check(batch.SeriesTitle == "Vymyslený seriál (2024)" && batch.FileRows.Select(f => f.Naming).Order().SequenceEqual(["S01E01", "S01E02"]) &&
               batch.Items.Where(i => i.File.Path.StartsWith(show, StringComparison.Ordinal))
                   .All(i => i.PlannedPath?.Contains(Path.Combine("TVSHOWS", "Vymyslený seriál (2024)", "Season 01"), StringComparison.Ordinal) == true),
-            "batch: Prijať všetko v skupine – the series and its episodes accepted – " + batch.RunState);
+            "batch: Prijať návrhy – the series and its episodes accepted – " + batch.RunState);
         await Screenshot(window, "batch-sorted-series.png");
         batch.SelectedGroup = batch.Groups.First(g => g.Group.Files.Any(f => f.Path.Contains("MOVIES", StringComparison.Ordinal)));
         Check(batch.IsMovies && batch.FileRows.All(f => f.IsFilm) && batch.Items.Where(i => i.File.Path.StartsWith(film, StringComparison.Ordinal))

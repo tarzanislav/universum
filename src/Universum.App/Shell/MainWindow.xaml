@@ -1699,10 +1699,9 @@
                                     <TextBlock Text="{Binding FilmSuggestion}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="420" />
                                     <TextBlock Text="{Binding FilmHint}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" MaxWidth="360" />
                                 </StackPanel>
-                                <Button Content="{loc:T 'Prijať návrhy názvov'}" Command="{Binding ConfirmTitlesCommand}" Padding="10,3"
-                                        ToolTip="{loc:T 'Druh, názvy a čísla epizód odhadnuté z mien súborov a priečinkov (nie otázky Season 00 / Season 01)'}" />
-                                <Button Content="{loc:T 'Prijať všetko v skupine'}" Command="{Binding AcceptGroupCommand}" Padding="10,3" Margin="6,0,0,0" FontWeight="SemiBold"
-                                        ToolTip="{loc:T 'Pre vybranú skupinu naraz: druh, názov seriálu alebo filmu, čísla epizód aj jazyky stôp podľa návrhov (nie otázky Season 00 / bežná sezóna a návrhy s upozornením)'}" />
+                                <!-- owner, 21. 11. 2026: one button instead of Prijať návrhy názvov and Prijať všetko v skupine -->
+                                <Button Content="{loc:T 'Prijať návrhy'}" Command="{Binding AcceptSuggestionsCommand}" Padding="10,3" FontWeight="SemiBold"
+                                        ToolTip="{loc:T 'Pre všetky skupiny naraz: druh, názvy filmov a seriálov, čísla epizód aj jazyky stôp podľa návrhov. Na vás ostanú názvy, ktoré HISTRA nepotvrdila, návrhy s upozornením a otázky Season 00 / bežná sezóna.'}" />
                                 <Button Content="{loc:T 'Špeciály do Season 00'}" Command="{Binding AnswerSpecialsCommand}" Padding="10,3" Margin="6,0,0,0"
                                         Visibility="{Binding HasSpecialsQuestions, Converter={StaticResource BoolToVisibility}}"
                                         ToolTip="{loc:T 'Odpoveď na otázku Season 00 alebo bežná sezóna: súbory z priečinka špeciálov (alebo s S00 v mene) idú do Season 00. Inak zadajte číslo epizódy pri súbore.'}" />

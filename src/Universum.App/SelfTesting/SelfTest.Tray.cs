@@ -199,6 +199,9 @@ internal static partial class SelfTest
               Core.Library.Tmdb.TmdbTray.Read(seriesNote.Text).Any(e => e.Id == 222) && Core.Library.Tmdb.TmdbTray.Read(seriesNote.Text).All(e => e.Kind == MediaKind.Series) &&
               Core.Library.Tmdb.TmdbTray.Read(filmsNote.Text).Any(e => e.Id == 111) && Core.Library.Tmdb.TmdbTray.Read(filmsNote.Text).All(e => e.Kind == MediaKind.Movie),
             "tray: the series and the films each in a pinned note of their own – " + seriesNote?.Title + " | " + filmsNote?.Title);
+        // owner, 21. 11. 2026: the button Z prehliadača nowhere (the reading of the browser stays in the program)
+        Check(!model.Batch.Tray.ShowsBrowser && !model.Rules.Tray.ShowsBrowser && !model.HeaderEditor.Library.Tray.ShowsBrowser && model.Batch.Tray.ReadBrowserCommand is not null,
+            "tray: Z prehliadača shown nowhere, its reading kept");
         var trayRows = model.HeaderEditor.Library.Tray.Rows;
         var slovak = StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("sk-SK"), true);
         var seriesNames = trayRows.Where(r => r.Entry.Kind == MediaKind.Series).Select(r => r.Entry.Name).OfType<string>().ToList();

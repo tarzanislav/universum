@@ -3508,7 +3508,6 @@ internal static class Translations
         ["Kapitoly každých"] = "Kapitoly každých",
         ["min:"] = "min:",
         ["Doplniť súborom bez kapitol"] = "Doplnit souborům bez kapitol",
-        ["Všetkým súborom Hromadného spracovania, ktoré nemajú kapitoly – Kapitola 01, 02 … po celej dĺžke; súbor s kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování, které nemají kapitoly – Kapitola 01, 02 … po celé délce; soubor s kapitolami zůstane, jak je",
         ["Vybraným súborom"] = "Vybraným souborům",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "Souborům označeným v seznamu (Ctrl / Shift) – i těm, které kapitoly mají (nahradí se)",
         ["Bez pridaných kapitol"] = "Bez přidaných kapitol",
@@ -3521,6 +3520,8 @@ internal static class Translations
         ["pridajú sa {0}"] = "přidají se {0}",
         ["bez kapitol"] = "bez kapitol",
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} kapitol, průměrně každých {1:0} min",
+        ["len jedna kapitola {0}"] = "jen jedna kapitola {0}",
+        ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování bez kapitol i s jedinou kapitolou na celý film – Kapitola 01, 02 … po celé délce; soubor s více kapitolami zůstane, jak je",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7025,7 +7026,6 @@ internal static class Translations
         ["Kapitoly každých"] = "Chapters every",
         ["min:"] = "min:",
         ["Doplniť súborom bez kapitol"] = "Add to files without chapters",
-        ["Všetkým súborom Hromadného spracovania, ktoré nemajú kapitoly – Kapitola 01, 02 … po celej dĺžke; súbor s kapitolami ostane, ako je"] = "To every file of Batch processing without chapters – Kapitola 01, 02 … over the whole length; a file with chapters stays as it is",
         ["Vybraným súborom"] = "To the selected files",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "To the files selected in the list (Ctrl / Shift) – also those with chapters (they are replaced)",
         ["Bez pridaných kapitol"] = "Without added chapters",
@@ -7038,5 +7038,7 @@ internal static class Translations
         ["pridajú sa {0}"] = "to be added {0}",
         ["bez kapitol"] = "no chapters",
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} chapters, on average every {1:0} min",
+        ["len jedna kapitola {0}"] = "a single chapter {0}",
+        ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "To every file of Batch processing without chapters or with a single chapter for the whole film – Kapitola 01, 02 … over the whole length; a file with more chapters stays as it is",
     };
 }

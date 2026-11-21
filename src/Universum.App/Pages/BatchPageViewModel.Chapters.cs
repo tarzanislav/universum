@@ -29,9 +29,12 @@ public sealed partial class BatchPageViewModel
         int.TryParse(_chapterMinutes.Trim(), NumberStyles.None, CultureInfo.CurrentCulture, out var minutes) && minutes is >= 1 and <= 240
             ? TimeSpan.FromMinutes(minutes) : null;
 
-    /// <summary>Doplniť súborom bez kapitol: every file of the batch without chapters gets them.</summary>
+    /// <summary>
+    /// Doplniť súborom bez kapitol: every file of the batch without chapters gets them – also a file with a single chapter
+    /// over the whole film (owner, 21. 11. 2026: it is replaced by chapters every so long).
+    /// </summary>
     public RelayCommand AddChaptersCommand => _addChapters ??= new(
-        () => AddChapters(_analysis?.Groups.SelectMany(g => g.Files.Where(f => !f.HasChapters).Select(f => (g, f.Path))) ?? []),
+        () => AddChapters(_analysis?.Groups.SelectMany(g => g.Files.Where(f => f.ChapterEntries <= 1).Select(f => (g, f.Path))) ?? []),
         () => !Busy && !IsRunning && _analysis is not null && ChapterInterval is not null);
 
     private RelayCommand? _addChapters;
@@ -72,9 +75,11 @@ public sealed partial class BatchPageViewModel
             }
 
             var files = _analysis.Groups.SelectMany(g => g.Files).ToList();
-            var with = files.Where(f => f.HasChapters).ToList();
+            var with = files.Where(f => f.ChapterEntries > 1).ToList();
+            var single = files.Count(f => f.ChapterEntries == 1);
             var added = _analysis.Groups.Sum(g => g.Decisions.ChaptersEvery.Count);
-            var note = Loc.F("s kapitolami {0} (spolu {1}) · bez kapitol {2}", with.Count, with.Sum(f => f.ChapterEntries), files.Count - with.Count) +
+            var note = Loc.F("s kapitolami {0} (spolu {1}) · bez kapitol {2}", with.Count, with.Sum(f => f.ChapterEntries), files.Count - with.Count - single) +
+                       (single > 0 ? " · " + Loc.F("len jedna kapitola {0}", single) : "") +
                        (added > 0 ? " · " + Loc.F("pridajú sa {0}", added) : "");
             if (SelectedFile?.Item is { } item)
             {

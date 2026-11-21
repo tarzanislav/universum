@@ -3509,7 +3509,6 @@ internal static class Translations
         ["min:"] = "min:",
         ["Vybraným súborom"] = "Vybraným souborům",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "Souborům označeným v seznamu (Ctrl / Shift) – i těm, které kapitoly mají (nahradí se)",
-        ["Bez pridaných kapitol"] = "Bez přidaných kapitol",
         ["Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami"] = "Přidané kapitoly zruší – soubory zůstanou se svými kapitolami",
         ["Pridané kapitoly zrušené – súbory ostanú so svojimi kapitolami."] = "Přidané kapitoly zrušeny – soubory zůstanou se svými kapitolami.",
         ["Kapitoly sa pridajú súborom: {0}."] = "Kapitoly se přidají souborům: {0}.",
@@ -3521,9 +3520,11 @@ internal static class Translations
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} kapitol, průměrně každých {1:0} min",
         ["len jedna kapitola {0}"] = "jen jedna kapitola {0}",
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování bez kapitol i s jedinou kapitolou na celý film – Kapitola 01, 02 … po celé délce; soubor s více kapitolami zůstane, jak je",
-        ["Doplniť filmom bez kapitol"] = "Doplnit filmům bez kapitol",
         ["aj epizódam"] = "i epizodám",
         ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Doplnit i epizodám seriálů bez kapitol (výchozí jen filmům); vybraným souborům se kapitoly doplní vždy",
+        ["Filmom bez kapitol"] = "Filmům bez kapitol",
+        ["Vybraným"] = "Vybraným",
+        ["Zrušiť pridané"] = "Zrušit přidané",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7029,7 +7030,6 @@ internal static class Translations
         ["min:"] = "min:",
         ["Vybraným súborom"] = "To the selected files",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "To the files selected in the list (Ctrl / Shift) – also those with chapters (they are replaced)",
-        ["Bez pridaných kapitol"] = "Without added chapters",
         ["Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami"] = "Takes the added chapters back – the files keep their own",
         ["Pridané kapitoly zrušené – súbory ostanú so svojimi kapitolami."] = "Added chapters taken back – the files keep their own.",
         ["Kapitoly sa pridajú súborom: {0}."] = "Chapters will be added to files: {0}.",
@@ -7041,8 +7041,10 @@ internal static class Translations
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} chapters, on average every {1:0} min",
         ["len jedna kapitola {0}"] = "a single chapter {0}",
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "To every file of Batch processing without chapters or with a single chapter for the whole film – Kapitola 01, 02 … over the whole length; a file with more chapters stays as it is",
-        ["Doplniť filmom bez kapitol"] = "Add to films without chapters",
         ["aj epizódam"] = "episodes too",
         ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Add them to episodes of series without chapters too (by default films only); the files selected always get them",
+        ["Filmom bez kapitol"] = "Films without chapters",
+        ["Vybraným"] = "Selected",
+        ["Zrušiť pridané"] = "Undo added",
     };
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using CommunityToolkit.Mvvm.Input;
 using Universum.App.Localization;
 
@@ -57,9 +58,37 @@ public sealed partial class BatchPageViewModel
 
     private RelayCommand? _clearChapters;
 
-    /// <summary>"Kapitoly sa pridajú 12 súborom." – how many files get chapters.</summary>
-    public string ChaptersNote => (_analysis?.Groups.Sum(g => g.Decisions.ChaptersEvery.Count) ?? 0) is var count and > 0
-        ? Loc.F("Kapitoly sa pridajú súborom: {0}.", count) : "";
+    /// <summary>
+    /// What the batch knows of chapters (owner, 21. 11. 2026): „s kapitolami 30 (spolu 412) · bez kapitol 12 · pridajú sa 12“,
+    /// and of the file selected in the list – its chapters and how far apart they are.
+    /// </summary>
+    public string ChaptersNote
+    {
+        get
+        {
+            if (_analysis is null)
+            {
+                return "";
+            }
+
+            var files = _analysis.Groups.SelectMany(g => g.Files).ToList();
+            var with = files.Where(f => f.HasChapters).ToList();
+            var added = _analysis.Groups.Sum(g => g.Decisions.ChaptersEvery.Count);
+            var note = Loc.F("s kapitolami {0} (spolu {1}) · bez kapitol {2}", with.Count, with.Sum(f => f.ChapterEntries), files.Count - with.Count) +
+                       (added > 0 ? " · " + Loc.F("pridajú sa {0}", added) : "");
+            if (SelectedFile?.Item is { } item)
+            {
+                var file = item.File;
+                var chapters = item.Target.NewChapters?.Count ?? file.ChapterEntries;
+                note += " · " + Path.GetFileName(file.Path) + ": " + (chapters == 0 ? Loc.T("bez kapitol")
+                    : file.Duration is { } length && length > TimeSpan.Zero
+                        ? Loc.F("{0} kapitol, priemerne každých {1:0} min", chapters, length.TotalMinutes / chapters)
+                        : Loc.F("{0} kapitol", chapters));
+            }
+
+            return note;
+        }
+    }
 
     private void AddChapters(IEnumerable<(Core.Batch.BatchGroup Group, string Path)> files)
     {

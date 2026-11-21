@@ -568,6 +568,7 @@ public sealed partial class BatchPageViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedFile, value))
             {
+                OnPropertyChanged(nameof(ChaptersNote));
                 ShowInfoCommand.NotifyCanExecuteChanged();
                 EditInStudioCommand.NotifyCanExecuteChanged();
                 EditSoundInStudioCommand.NotifyCanExecuteChanged();

@@ -3517,6 +3517,10 @@ internal static class Translations
         ["Kapitoly sa pridajú súborom: {0}."] = "Kapitoly se přidají souborům: {0}.",
         ["Žiadny súbor bez kapitol – nič sa nepridá."] = "Žádný soubor bez kapitol – nic se nepřidá.",
         ["Kapitoly každých {0} min sa pridajú súborom: {1} (stĺpec Kapitoly)."] = "Kapitoly každých {0} min se přidají souborům: {1} (sloupec Kapitoly).",
+        ["s kapitolami {0} (spolu {1}) · bez kapitol {2}"] = "s kapitolami {0} (celkem {1}) · bez kapitol {2}",
+        ["pridajú sa {0}"] = "přidají se {0}",
+        ["bez kapitol"] = "bez kapitol",
+        ["{0} kapitol, priemerne každých {1:0} min"] = "{0} kapitol, průměrně každých {1:0} min",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7030,5 +7034,9 @@ internal static class Translations
         ["Kapitoly sa pridajú súborom: {0}."] = "Chapters will be added to files: {0}.",
         ["Žiadny súbor bez kapitol – nič sa nepridá."] = "No file without chapters – nothing is added.",
         ["Kapitoly každých {0} min sa pridajú súborom: {1} (stĺpec Kapitoly)."] = "Chapters every {0} min will be added to files: {1} (column Chapters).",
+        ["s kapitolami {0} (spolu {1}) · bez kapitol {2}"] = "with chapters {0} ({1} in all) · without chapters {2}",
+        ["pridajú sa {0}"] = "to be added {0}",
+        ["bez kapitol"] = "no chapters",
+        ["{0} kapitol, priemerne každých {1:0} min"] = "{0} chapters, on average every {1:0} min",
     };
 }

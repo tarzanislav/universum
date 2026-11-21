@@ -1803,7 +1803,7 @@
                                         ToolTip="{loc:T 'Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)'}" />
                                 <Button Content="{loc:T 'Bez pridaných kapitol'}" Command="{Binding ClearChaptersCommand}" Padding="10,3" Margin="0,0,8,0"
                                         ToolTip="{loc:T 'Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami'}" />
-                                <TextBlock Text="{Binding ChaptersNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding ChaptersNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="760" ToolTip="{Binding ChaptersNote}" />
                             </WrapPanel>
                             <WrapPanel Margin="0,6,0,0">
                                 <TextBlock Text="{Binding KindLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />

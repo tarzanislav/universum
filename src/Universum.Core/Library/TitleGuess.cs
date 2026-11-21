@@ -166,6 +166,9 @@ public static partial class TitleGuess
             return null;
         }
 
+        // owner, 21. 11. 2026: "Film (r.2006)", "(r. 2006)", "(rok 2006)" – the year as Czech and Slovak names write it
+        name = WordYear().Replace(name, m => "(" + m.Groups["year"].Value + ")");
+
         int? tmdbId = null;
         if (IdTag().Match(name) is { Success: true } idMatch)
         {
@@ -255,6 +258,43 @@ public static partial class TitleGuess
         return result.Length == 0 ? null : new NameGuess(result, year, tmdbId);
     }
 
+    /// <summary>
+    /// What tells films of one folder apart (owner, 21. 11. 2026: a folder of a collection – each film has its own title):
+    /// the words of a file name without brackets, years, resolutions, release words and a number at the end; versions of
+    /// one film give the same key ("Film 1080p", "Film.720p.WEB-DL", "Film 2" → "film"). Normalised (no diacritics).
+    /// </summary>
+    public static string FilmKey(string name)
+    {
+        var words = Words.Normalize(Brackets().Replace(WordYear().Replace(name, m => " " + m.Groups["year"].Value + " "), " "))
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        words.RemoveAll(w => Year().IsMatch(w) || Resolution().IsMatch(w) || KeyStopWords.Contains(w));
+        while (words.Count > 1 && Number().IsMatch(words[^1]))
+        {
+            words.RemoveAt(words.Count - 1);
+        }
+
+        return string.Join(' ', words);
+    }
+
+    /// <summary>
+    /// Two files of one folder are one film (its versions) by their names (<see cref="FilmKey"/>): the same key, or one
+    /// key the beginning of the other ("Film" and "Film Directors Cut"); not when both names carry different years.
+    /// </summary>
+    public static bool SameFilm(string a, string b)
+    {
+        var (keyA, keyB) = (FilmKey(a), FilmKey(b));
+        if (FromName(a, MediaKind.Movie)?.Year is { } yearA && FromName(b, MediaKind.Movie)?.Year is { } yearB && yearA != yearB)
+        {
+            return false;
+        }
+
+        return keyA == keyB || (keyA.Length > 0 && keyB.Length > 0 && (keyA.StartsWith(keyB + " ", StringComparison.Ordinal) || keyB.StartsWith(keyA + " ", StringComparison.Ordinal)));
+    }
+
+    // the release words as single normalised words ("web-dl" → "web", "dl")
+    private static readonly HashSet<string> KeyStopWords = StopWords.Where(w => w != "-")
+        .SelectMany(w => Words.Normalize(w).Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToHashSet(StringComparer.Ordinal);
+
     // a word with dots or underscores is split when a part after the first is a year, a resolution or a release word
     // ("Rybka.2021.WEB-DL"); "Mr." or "H.264" stay whole
     private static IEnumerable<string> ReleaseWords(string token)
@@ -318,6 +358,10 @@ public static partial class TitleGuess
 
     [GeneratedRegex(@"\(\s*(?<year>(?:18|19|20|21)\d\d)\s*\)", RegexOptions.CultureInvariant)]
     private static partial Regex ParenthesizedYear();
+
+    // "(r.2006)", "(r. 2006)", "(rok 2006)"
+    [GeneratedRegex(@"\(\s*(?:r|rok)\s*\.?\s*(?<year>(?:18|19|20|21)\d\d)\s*\)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex WordYear();
 
     [GeneratedRegex(@"^(?:s\d{1,3}(?:[._-]?e\d{1,4}.*)?|e\d{1,4}|ep\d{1,4}|\d{1,2}x\d{2})$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EpisodeToken();

@@ -420,6 +420,82 @@ public sealed class BatchTests
     }
 
     [Test]
+    public void FilmsOfACollectionFolderAreTitlesOfTheirOwn()
+    {
+        // owner, 21. 11. 2026: seven films in one folder below MOVIES were one film with seven versions – the title written
+        // for one named all of them; versions of one film stay together (all names invented)
+        Assert.Equal(new NameGuess("Vymyslená zbierka - Malé tanečnice", 2006, null), TitleGuess.FromName("Vymyslená zbierka - Malé tanečnice (r.2006)", MediaKind.Movie));
+        Assert.Equal(new NameGuess("Vymyslený film", 2008, null), TitleGuess.FromName("Vymyslený film (rok 2008)", MediaKind.Movie));
+        Assert.True(TitleGuess.SameFilm("Vymysleny.Film.2020.1080p.WEB-DL", "Vymysleny Film (2020) 720p") && TitleGuess.SameFilm("Hranicny film 1", "Hranicny film 2") &&
+                    TitleGuess.SameFilm("Vymyslený film", "Vymyslený film Directors Cut"), "versions of one film");
+        Assert.True(!TitleGuess.SameFilm("Zbierka - Malé tanečnice (r.2006)", "Zbierka - Pohádková říše (r.2008)") &&
+                    !TitleGuess.SameFilm("Zbierka - Malé tanečnice", "Zbierka - Pohádková říše") && !TitleGuess.SameFilm("Vymyslený film (1990)", "Vymyslený film (2019)"),
+            "different films: other words or other years");
+
+        using var work = new Work();
+        var root = Path.Combine(work.Path, "Vstup");
+        string P(params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        var collection = new[]
+        {
+            P("MOVIES", "Vymyslená zbierka", "Zbierka - Malé tanečnice (r.2006).avi"), P("MOVIES", "Vymyslená zbierka", "Zbierka - Pohádková říše (r.2008).avi"),
+            P("MOVIES", "Vymyslená zbierka", "Zbierka - Sladkých šestnáct (r.2007).avi"),
+        };
+        var versions = new[] { P("MOVIES", "Iný film (2015)", "Iny.Film.2015.1080p.mkv"), P("MOVIES", "Iný film (2015)", "Iny.Film.2015.720p.mkv") };
+        var job = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), Synthetic(root, [.. collection, .. versions]));
+        Assert.Equal(4, job.Units!.Count, "three films of the collection, one film with two versions");
+        Assert.Equal(3, collection.Select(job.UnitOf).Distinct().Count(), "each film of the collection its own title");
+        Assert.Equal(job.UnitOf(versions[0]), job.UnitOf(versions[1]), "the versions together");
+        Assert.Equal("Zbierka - Pohádková říše (2008)", job.SuggestedTitleFor(collection[1])?.FolderName, "named by its own file");
+        Assert.True(collection.All(f => job.KindFor(f) == MediaKind.Movie && job.KindConfirmedFor(f)), "films for certain – they lie in MOVIES");
+        Assert.True(job.TitleKeyOf(collection[0]) != job.TitleKeyOf(collection[1]) && job.TitleKeyOf(versions[0]) == job.TitleKeyOf(versions[1]),
+            "one title for the versions, one for each film");
+    }
+
+    [Test]
+    public void VariantsOfATitleShareTheirTracks()
+    {
+        // owner, 21. 11. 2026: one series in three groups – the same tracks shown once, with how many files carry them
+        MediaFile File(string path, params (TrackType Type, string Language, bool Forced)[] tracks) => new()
+        {
+            Path = path,
+            Tracks = [new MediaTrack { Id = 0, Type = TrackType.Video }, .. tracks.Select((t, i) => new MediaTrack
+            {
+                Id = i + 1, Type = t.Type, Language = t.Language == "und" ? LanguageTag.Undetermined : LanguageTag.FromCode(t.Language), Flags = new TrackFlags(Forced: t.Forced),
+            })],
+        };
+        BatchGroup Group(int index, int count, params (TrackType, string, bool)[] tracks)
+        {
+            var group = new BatchGroup("x" + index, index);
+            group.Files.AddRange(Enumerable.Range(0, count).Select(i => File($"/s/{index}/{i}.mkv", tracks)));
+            return group;
+        }
+
+        const TrackType A = TrackType.Audio, S = TrackType.Subtitles;
+        var main = Group(0, 20, (A, "cs", false), (A, "sk", false), (A, "en", false), (S, "cs", true), (S, "cs", false));
+        var more = Group(1, 20, (A, "cs", false), (A, "sk", false), (A, "en", false), (S, "cs", true), (S, "cs", false), (S, "en", false));
+        var odd = Group(2, 2, (A, "cs", false), (A, "und", false), (A, "en", false), (S, "cs", true), (S, "cs", false));
+        var other = Group(3, 5, (A, "en", false));
+        var titles = BatchTitles.Of([main, more, odd, other], g => g == other ? null : "S|serial");
+        Assert.Equal(2, titles.Count, "the three groups of the series are one title");
+        var title = titles[0];
+        Assert.True(title.HasVariants && title.Main == main && title.FileCount == 42, "the main variant has the most files");
+
+        var slots = BatchTitles.Slots(title);
+        string Of(TitleSlot s) => $"{s.Key}:{s.Track.Language.Primary}{(s.Track.Flags.Forced ? "F" : "")}={s.FileCount}";
+        Assert.Equal("Audio 1:cs=42, Audio 2:sk=40, Audio 3:en=42, Subtitles 1:csF=42, Subtitles 2:cs=42, Subtitles 3:en=20, Audio 2:und=2",
+            string.Join(", ", slots.Select(Of)), "the same track once; English subtitles only in one variant; a sound without a language is never paired");
+        Assert.True(slots.Single(s => s.Track.Language.IsUndetermined).Group == odd && slots[2].Places.Any(p => p.Group == odd && p.Key == new SlotKey(TrackType.Audio, 2)),
+            "the English sound of the odd variant is its third");
+    }
+
+    [Test]
     public void FolderSortedIntoMoviesAndShowsIsSplit()
     {
         // owner, 29. 10. 2026: the user sorts films into MOVIES and series into TVSHOWS (each series in its own folder,

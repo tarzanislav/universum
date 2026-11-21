@@ -591,7 +591,7 @@
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <!-- owner, 14. 11. 2026: the series first, a line, then the films -->
-                            <Border BorderBrush="{DynamicResource TextFillColorSecondaryBrush}">
+                            <Border x:Name="Row" BorderBrush="{DynamicResource TextFillColorSecondaryBrush}">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderThickness" Value="0" />
@@ -606,21 +606,18 @@
                                 </Border.Style>
                                 <TextBlock Text="{Binding Label}" ToolTip="{Binding ToolTip}" />
                             </Border>
+                            <!-- owner, 21. 11. 2026: the closed box always says Zásobník TMDB – a title chosen is never shown in it
+                                 (the box itself has no ComboBoxItem around the template, the list has) -->
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}}" Value="{x:Null}">
+                                    <Setter TargetName="Row" Property="Visibility" Value="Hidden" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
                 <TextBlock Text="{loc:T 'Zásobník TMDB'}" IsHitTestVisible="False" VerticalAlignment="Center" Margin="10,0,30,0"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Hidden" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding SelectedIndex, ElementName=TrayBox}" Value="-1">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
                 </TextBlock>
             </Grid>
             <Button Content="{loc:T 'Z prehliadača'}" Command="{Binding ReadBrowserCommand}" Padding="8,3"

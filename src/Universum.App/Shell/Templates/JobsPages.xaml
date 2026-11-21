@@ -10,7 +10,7 @@
         <ResourceDictionary Source="pack://application:,,,/Universum;component/Shell/Templates/Shared.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <DataTemplate DataType="{x:Type jobs:JobQueuePageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -78,7 +78,7 @@
         </Grid>
     </DataTemplate>
     <DataTemplate DataType="{x:Type jobs:JobOutputPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -129,7 +129,7 @@
     <!-- Záznamy spracovania (owner, 31. 10. 2026): every run in words; ticked ones or all can be deleted -->
     <!-- owner, 7. 11. 2026: Spracované tituly – the films and series written into the libraries, export and import -->
     <DataTemplate DataType="{x:Type pages:ProcessedTitlesPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -170,7 +170,7 @@
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type jobs:ProcessingLogsPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />

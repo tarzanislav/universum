@@ -3475,6 +3475,15 @@ internal static class Translations
         ["Nové na vstupe: {0}"] = "Nové na vstupu: {0}",
         ["Do Hromadného"] = "Do Hromadného zpracování",
         ["Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)"] = "Nové soubory pošle do Hromadného zpracování (tam se analyzují, samo se nic nespustí)",
+        ["skupine"] = "skupině",
+        ["skupinách"] = "skupinách",
+        ["Nové súbory už v Hromadnom spracovaní sú."] = "Nové soubory už v Hromadném zpracování jsou.",
+        ["Nové súbory sa nepodarilo pridať: "] = "Nové soubory se nepodařilo přidat: ",
+        ["Pridávam nové súbory {0} / {1}…"] = "Přidávám nové soubory {0} / {1}…",
+        ["Spolu {0} súborov v {1} skupinách."] = "Celkem {0} souborů v {1} skupinách.",
+        ["Pridávanie nových súborov bolo zastavené – v dávke sa nič nezmenilo."] = "Přidávání nových souborů bylo zastaveno – v dávce se nic nezměnilo.",
+        ["Pridané nové súbory: {0} v {1} – sú navrchu, farebne označené; čo ste už nastavili, ostalo."] = "Přidány nové soubory: {0} v {1} – jsou nahoře, barevně označené; co jste už nastavili, zůstalo.",
+        [" {0} sa nedalo prečítať ({1})."] = " {0} se nedalo přečíst ({1}).",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6946,5 +6955,14 @@ internal static class Translations
         ["Nové na vstupe: {0}"] = "New in the input: {0}",
         ["Do Hromadného"] = "To Batch processing",
         ["Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)"] = "Sends the new files to Batch processing (analysed there; nothing starts by itself)",
+        ["skupine"] = "group",
+        ["skupinách"] = "groups",
+        ["Nové súbory už v Hromadnom spracovaní sú."] = "The new files are already in Batch processing.",
+        ["Nové súbory sa nepodarilo pridať: "] = "The new files could not be added: ",
+        ["Pridávam nové súbory {0} / {1}…"] = "Adding new files {0} / {1}…",
+        ["Spolu {0} súborov v {1} skupinách."] = "In all {0} files in {1} groups.",
+        ["Pridávanie nových súborov bolo zastavené – v dávke sa nič nezmenilo."] = "Adding the new files was stopped – nothing changed in the batch.",
+        ["Pridané nové súbory: {0} v {1} – sú navrchu, farebne označené; čo ste už nastavili, ostalo."] = "New files added: {0} in {1} – they are on top, marked in colour; what you set before stays.",
+        [" {0} sa nedalo prečítať ({1})."] = " {0} could not be read ({1}).",
     };
 }

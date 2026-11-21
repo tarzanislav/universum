@@ -43,11 +43,11 @@
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0" VerticalAlignment="Center"
                                 ToolTip="{loc:T 'Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)'}" />
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,5" VerticalAlignment="Center" />
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel>
                             <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" Margin="0" VerticalAlignment="Center" />
                             <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
-                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" MaxWidth="700" />
-                        </StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
                     </DockPanel>
                     <StackPanel Grid.Row="1" Margin="0,4,0,6">
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
@@ -705,7 +705,7 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type pages:SubtitlesPageViewModel}">
                 <!-- owner, 30. 10. 2026: Úprava titulkostopy – the film plays with the subtitles being edited, other subtitles to compare -->
-                <Grid Margin="24,16,24,12">
+                <Grid Margin="24,12,24,10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -719,15 +719,16 @@
                                     ToolTip="{loc:T 'Súbory titulkov (SRT, ASS/SSA, WebVTT, TTML, SAMI, SubViewer, MicroDVD, MPL2, TMPlayer) – uložia sa ako nové SRT'}" />
                         </StackPanel>
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" />
-                                <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                            </StackPanel>
-                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                            <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the file in one row -->
+                            <DockPanel>
+                                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava titulkostopy'}" Margin="0" VerticalAlignment="Center" />
+                                <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                                <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
                             <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                         </StackPanel>
                     </DockPanel>
-                    <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid Grid.Row="1" Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" MinWidth="420" />
                             <ColumnDefinition Width="12" />
@@ -1184,24 +1185,22 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <!-- owner, 21. 11. 2026: the head of the page in one row – the title, Zásobník TMDB, the input and Analyzovať; more room for the tracks -->
+                    <!-- owner, 21. 11. 2026: the head of the page in one row – the title, Zásobník TMDB, the input and Analyzovať; the options
+                         of the analysis in the row below (the window of 1280 points has room for both rows) -->
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                            <CheckBox Content="{loc:T 'aj podpriečinky'}" IsChecked="{Binding Recursive}" VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <CheckBox Content="{loc:T 'rozpoznať jazyk zvuku'}" IsChecked="{Binding DetectAudioAfterAnalysis}" VerticalAlignment="Center" Margin="0,0,12,0"
-                                      ToolTip="{loc:T 'Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva'}" />
                             <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseFolderCommand}" Margin="0,0,8,0" Padding="12,5" />
                             <Button Content="{loc:T 'Analyzovať'}" Command="{Binding AnalyzeCommand}" Padding="16,5" />
                         </StackPanel>
                         <StackPanel>
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel>
                                 <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Hromadné spracovanie'}" Margin="0" VerticalAlignment="Center" />
                                 <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
                                 <!-- owner, 9. 11. 2026: all input folders at once (one on each disk), one of them, or a folder chosen -->
-                                <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding FolderChoice}" DisplayMemberPath="Label" MinWidth="220" MaxWidth="520"
-                                          VerticalAlignment="Center" FontWeight="SemiBold" Margin="12,0,12,0"
+                                <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding FolderChoice}" DisplayMemberPath="Label" MinWidth="140" MaxWidth="520"
+                                          HorizontalAlignment="Left" VerticalAlignment="Center" FontWeight="SemiBold" Margin="12,0,12,0"
                                           ToolTip="{loc:T 'Čo sa analyzuje: všetky vstupné priečinky naraz (každý súbor pôjde do výstupu na svojom disku), vstup jedného disku, alebo priečinok vybraný tlačidlom Priečinok…'}" />
-                            </StackPanel>
+                            </DockPanel>
                             <TextBlock Text="{Binding DiskHint}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left" Margin="0,2,0,0"
                                        Visibility="{Binding HasDiskHint, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
@@ -1213,6 +1212,11 @@
                                 ToolTip="{loc:T 'Dočasné súbory po prerušenom spracovaní presunie do Koša'}" />
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="10,3" Margin="0,0,8,0"
                                 ToolTip="{loc:T 'Zabudne analyzované, ešte nespracované súbory – aj poslané z Noviniek (na disku sa nič nezmení)'}" />
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                            <CheckBox Content="{loc:T 'aj podpriečinky'}" IsChecked="{Binding Recursive}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <CheckBox Content="{loc:T 'rozpoznať jazyk zvuku'}" IsChecked="{Binding DetectAudioAfterAnalysis}" VerticalAlignment="Center" Margin="0,0,12,0"
+                                      ToolTip="{loc:T 'Hneď po analýze vypočuje audiostopy bez jazyka (seriál cez jednu epizódu); ručné Rozpoznať jazyk audiostôp ostáva'}" />
+                        </StackPanel>
                         <Button DockPanel.Dock="Right" Content="{Binding StopText}" Command="{Binding StopCommand}" Padding="10,3" Margin="0,0,8,0"
                                 Visibility="{Binding ShowsProgress, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
@@ -1599,7 +1603,7 @@
                         </Grid>
                     </Grid>
 
-                    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="12,8"
+                    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,6,0,0" Padding="12,6"
                             Visibility="{Binding ShowPanels, Converter={StaticResource BoolToVisibility}}">
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -1623,7 +1627,7 @@
                         <Button DockPanel.Dock="Right" Content="{loc:T 'Zobraziť'}" Command="{Binding ShowPanelsCommand}" Padding="10,2" Margin="8,0,0,0" />
                         <TextBlock Text="{Binding HiddenPanelsNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </DockPanel>
-                    <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,8,0,0" Padding="12,8"
+                    <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,6,0,0" Padding="12,6"
                             Visibility="{Binding ShowPanels, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <WrapPanel>
@@ -1740,7 +1744,7 @@
                 </Grid>
             </DataTemplate>
             <DataTemplate DataType="{x:Type pages:SeriesNewsPageViewModel}">
-                <DockPanel Margin="24,20,24,12">
+                <DockPanel Margin="24,12,24,10">
                     <DockPanel.Resources>
                         <Style x:Key="NewsRow" TargetType="DataGridRow" BasedOn="{StaticResource NewsRowBase}">
                             <Style.Triggers>
@@ -2196,7 +2200,7 @@
                 </StackPanel>
             </DataTemplate>
             <DataTemplate DataType="{x:Type pages:HistraListsPageViewModel}">
-                <DockPanel Margin="24,20,24,12">
+                <DockPanel Margin="24,12,24,10">
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Listy z HISTRA'}" />
                         <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,10"
@@ -2397,7 +2401,7 @@
         </Grid.RowDefinitions>
 
         <DockPanel Background="{DynamicResource LayerFillColorDefaultBrush}">
-            <TextBlock DockPanel.Dock="Top" Text="{loc:T 'UNIVERSUM'}" FontSize="20" FontWeight="SemiBold" Margin="20,20,20,16" />
+            <TextBlock DockPanel.Dock="Top" Text="{loc:T 'UNIVERSUM'}" FontSize="20" FontWeight="SemiBold" Margin="20,14,20,10" />
             <!-- owner, 31. 10. 2026: new films and episodes in the input folder – told, sent to Hromadné spracovanie on a click;
                  owner, 21. 11. 2026: a small card in the left column instead of a row over the whole page -->
             <Border DockPanel.Dock="Top" Margin="8,0,8,10" CornerRadius="8" Padding="10,6,6,8" BorderThickness="1"
@@ -2426,6 +2430,20 @@
                     <Button Content="{loc:T 'Do Hromadného'}" Command="{Binding ArrivalsToBatchCommand}" Padding="8,3" Margin="0,6,0,0"
                             HorizontalAlignment="Stretch" FontWeight="SemiBold" Style="{DynamicResource AccentButtonStyle}"
                             ToolTip="{loc:T 'Nové súbory pošle do Hromadného spracovania (tam sa analyzujú, samo sa nič nespustí)'}" />
+                </StackPanel>
+            </Border>
+            <!-- owner, 31. 10. 2026: a reminder of the calendar; owner, 21. 11. 2026: a card in the left column, not a row over the page -->
+            <Border DockPanel.Dock="Top" Margin="8,0,8,10" CornerRadius="8" Padding="10,6,6,8" BorderThickness="1" BorderBrush="#D46A8C" Background="#33D46A8C"
+                    ToolTip="{Binding ReminderText}" Visibility="{Binding HasReminder, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding DismissReminderCommand}" Padding="5,2" VerticalAlignment="Top" ToolTip="{loc:T 'Skryť pripomienku'}">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="10" />
+                        </Button>
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xEA8F;" FontSize="15" Margin="0,1,6,0" VerticalAlignment="Top" />
+                        <TextBlock Text="{Binding ReminderText}" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="60" />
+                    </DockPanel>
+                    <Button Content="{loc:T 'Otvoriť v kalendári'}" Command="{Binding OpenReminderCommand}" Padding="8,3" Margin="0,6,0,0" HorizontalAlignment="Stretch" FontWeight="SemiBold" />
                 </StackPanel>
             </Border>
             <!-- Dashboard on its own, then the groups: framed, each with its own tint and a heading in its colour -->
@@ -2515,20 +2533,6 @@
         </DockPanel>
 
         <DockPanel Grid.Column="1">
-            <!-- owner, 31. 10. 2026: a reminder of the calendar -->
-            <Border DockPanel.Dock="Top" Margin="16,10,16,0" CornerRadius="8" Padding="14,8" Background="#33D46A8C"
-                    Visibility="{Binding HasReminder, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="{loc:T 'Otvoriť v kalendári'}" Command="{Binding OpenReminderCommand}" Padding="12,4" Margin="8,0,8,0" FontWeight="SemiBold" />
-                        <Button Command="{Binding DismissReminderCommand}" Padding="8,4" ToolTip="{loc:T 'Skryť pripomienku'}">
-                            <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="12" />
-                        </Button>
-                    </StackPanel>
-                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xEA8F;" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding ReminderText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ReminderText}" FontWeight="SemiBold" />
-                </DockPanel>
-            </Border>
             <ContentControl Content="{Binding SelectedTool.Page}" />
         </DockPanel>
 

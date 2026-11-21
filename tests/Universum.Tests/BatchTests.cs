@@ -376,6 +376,50 @@ public sealed class BatchTests
     }
 
     [Test]
+    public void FilesAddedToABatchOfTitles()
+    {
+        // owner, 21. 11. 2026: Do Hromadného – new files join the batch; what was decided for its files stays (all names invented)
+        using var work = new Work();
+        var root = Path.Combine(work.Path, "Vstup");
+        string P(params string[] parts)
+        {
+            var path = Path.GetFullPath(Path.Combine([root, .. parts]));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, []);
+            return path;
+        }
+
+        var film = P("MOVIES", "Vymyslený film (2020)", "Vymysleny film.mkv");
+        var episode = P("TVSHOWS", "Vymyslený seriál (2024)", "Vymysleny serial S01E01.mkv");
+        var analysis = Synthetic(root, film, episode);
+        var output = Path.Combine(work.Path, "OUTPUT");
+        var job = LibraryJob.Guess(new LibraryLayout(output), analysis);
+        job.Movies[film] = new TitleInfo(MediaKind.Movie, "Potvrdený film", 2020);
+        analysis.Groups[0].Decisions.Languages[new SlotKey(TrackType.Audio, 0)] = LanguageTag.FromCode("cs");
+
+        var newFilm = P("MOVIES", "Nový film (2025)", "Novy film.mkv");
+        var newEpisode = P("TVSHOWS", "Vymyslený seriál (2024)", "Vymysleny serial S01E02.mkv");
+        var loose = P("Volny film 2023.mkv");
+        var part = Synthetic(root, newFilm, newEpisode, loose);
+        Assert.True(!LibraryJob.Guess(new LibraryLayout(output), Synthetic(root, loose)).Mixed, "a loose file alone is one title");
+        var guess = LibraryJob.Guess(new LibraryLayout(output), part, alwaysSplit: true);
+        Assert.True(guess.Mixed && LibraryJob.Guess(new LibraryLayout(output), Synthetic(root, loose), alwaysSplit: true).Mixed, "added files are split into titles");
+        job.Add(guess);
+        var joined = analysis.Joined(part.SplitBy(guess.UnitOf));
+
+        Assert.Equal("Potvrdený film", job.Movies[film].Name, "the title decided before stays");
+        Assert.True(job.KindFor(newFilm) == MediaKind.Movie && job.KindFor(newEpisode) == MediaKind.Series && job.KindFor(episode) == MediaKind.Series,
+            "each file of its own kind");
+        Assert.Equal("Vymyslený seriál (2024)", job.SuggestedTitleFor(newEpisode)?.FolderName, "the series named by its folder");
+        Assert.True(job.Unsorted.Contains(loose) && !job.Unsorted.Contains(film), "a file outside MOVIES and TVSHOWS waits to be sorted");
+        Assert.True(joined.Groups.Count == 4 && ReferenceEquals(joined.Groups[^1], analysis.Groups[0]) && joined.Groups.Take(3).All(g => g.Files.All(f => f.Path != film)),
+            $"the new groups first, the group of the batch last ({joined.Groups.Count})");
+        Assert.Equal("cs", joined.Groups[^1].Decisions.Languages[new SlotKey(TrackType.Audio, 0)].Primary, "its decisions stay");
+        Assert.Equal(joined.Groups.Count, joined.Groups.Select(g => g.Label).Distinct().Count(), "every group has its own letter");
+        Assert.Equal(5, joined.FileCount);
+    }
+
+    [Test]
     public void FolderSortedIntoMoviesAndShowsIsSplit()
     {
         // owner, 29. 10. 2026: the user sorts films into MOVIES and series into TVSHOWS (each series in its own folder,

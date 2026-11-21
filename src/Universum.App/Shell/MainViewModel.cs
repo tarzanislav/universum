@@ -576,14 +576,16 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        // owner, 21. 11. 2026: added to the batch shown – what is set there stays, the new files come first
         Open(Batch);
-        if (await Batch.AnalyzeChosenAsync(files))
+        switch (await Batch.AddChosenAsync(files))
         {
-            _services.Arrivals.Clear();
-        }
-        else
-        {
-            System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení."), "UNIVERSUM");
+            case true:
+                _services.Arrivals.Clear();
+                break;
+            case null:
+                System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení."), "UNIVERSUM");
+                break;
         }
     }
 

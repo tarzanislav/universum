@@ -11,7 +11,7 @@
     </ResourceDictionary.MergedDictionaries>
     <!-- MEGA spracovanie (owner, 29. 10. 2026): batches written later, each with its start -->
     <DataTemplate DataType="{x:Type pages:MegaPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -27,7 +27,7 @@
                 <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
             </StackPanel>
-            <WrapPanel Grid.Row="1" Margin="0,10,0,10">
+            <WrapPanel Grid.Row="1" Margin="0,6,0,6">
                 <Button Content="{loc:T 'Spustiť teraz'}" Command="{Binding StartCommand}" Padding="14,4" Margin="0,0,8,0" ToolTip="{loc:T 'Pridá vybranú dávku do Fronty úloh a spustí ju'}" />
                 <Button Content="{loc:T 'Upraviť v Hromadnom spracovaní'}" Command="{Binding EditCommand}" Padding="12,4" Margin="0,0,8,0"
                         ToolTip="{loc:T 'Otvorí dávku so všetkými rozhodnutiami v Hromadnom spracovaní – opravíte ju a dáte Uložiť do dávky'}" />
@@ -129,7 +129,7 @@
     </DataTemplate>
 
     <DataTemplate DataType="{x:Type pages:InfoPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -160,12 +160,13 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
+                <!-- owner, 21. 11. 2026: the title and the file in one row -->
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
-                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Informácie o súbore'}" />
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,5" VerticalAlignment="Center" />
+                    <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Informácie o súbore'}" Margin="0" VerticalAlignment="Center" />
+                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
                 </DockPanel>
-                <TextBlock Grid.Row="1" FontWeight="SemiBold" Text="{Binding FileName}" Margin="0,8,0,0" />
-                <StackPanel Grid.Row="2" Margin="0,4,0,12">
+                <StackPanel Grid.Row="2" Margin="0,4,0,6">
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                     <TextBlock Text="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
                 </StackPanel>
@@ -236,7 +237,7 @@
         </Grid>
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:ChaptersPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -246,15 +247,16 @@
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" VerticalAlignment="Top" />
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kapitoly'}" />
-                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                    </StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                    <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the file in one row -->
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kapitoly'}" Margin="0" VerticalAlignment="Center" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                 </StackPanel>
             </DockPanel>
-            <WrapPanel Grid.Row="1" Margin="0,10,0,10">
+            <WrapPanel Grid.Row="1" Margin="0,6,0,6">
                 <Button Content="{loc:T 'Pridať'}" Command="{Binding AddCommand}" Padding="12,4" Margin="0,0,8,0" ToolTip="{loc:T 'Nová kapitola za vybranou (o minútu neskôr)'}" />
                 <Button Content="{loc:T 'Odstrániť'}" Command="{Binding RemoveCommand}" Padding="12,4" Margin="0,0,8,0" />
                 <Button Content="{loc:T 'Zoradiť podľa času'}" Command="{Binding SortCommand}" Padding="12,4" Margin="0,0,16,0" />
@@ -348,7 +350,7 @@
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:AudioPageViewModel}">
         <!-- owner, 30. 10. 2026: Úprava audiostopy – the sounds play with the film; a dub fitted, PAL 25 ↔ 23,976, codec, loudness -->
-        <Grid Margin="24,16,24,12">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -362,15 +364,16 @@
                             ToolTip="{loc:T 'Zvukové súbory (MKA, AC-3, E-AC-3, DTS, AAC, MP3, FLAC, Opus, WAV) alebo iný film, z ktorého sa zoberie zvuk (napr. CZ dabing z iného vydania)'}" />
                 </StackPanel>
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" />
-                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                    </StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                    <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the file in one row -->
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava audiostopy'}" Margin="0" VerticalAlignment="Center" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                 </StackPanel>
             </DockPanel>
-            <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid Grid.Row="1" Margin="0,6,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="420" />
                     <ColumnDefinition Width="12" />
@@ -596,7 +599,7 @@
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:VideoPageViewModel}">
         <!-- owner, 30. 10. 2026: Úprava videostopy – parts of the film kept, proportions, turned, another height or codec -->
-        <Grid Margin="24,16,24,12">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -608,15 +611,16 @@
                     <Button Content="{loc:T 'Otvoriť video…'}" Command="{Binding OpenVideoCommand}" Padding="16,6" />
                 </StackPanel>
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava videostopy'}" />
-                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                    </StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                    <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the file in one row -->
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava videostopy'}" Margin="0" VerticalAlignment="Center" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" TextWrapping="Wrap" />
                 </StackPanel>
             </DockPanel>
-            <Grid Grid.Row="1" Margin="0,10,0,0">
+            <Grid Grid.Row="1" Margin="0,6,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" MinWidth="420" />
                     <ColumnDefinition Width="12" />
@@ -750,7 +754,7 @@
         </Grid>
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:HeaderEditorPageViewModel}">
-        <Grid Margin="32,24,32,16">
+        <Grid Margin="24,12,24,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -760,15 +764,16 @@
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava hlavičky'}" />
-                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                    </StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                    <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the file in one row -->
+                    <DockPanel>
+                        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Úprava hlavičky'}" Margin="0" VerticalAlignment="Center" />
+                        <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
                     <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                 </StackPanel>
             </DockPanel>
-            <WrapPanel Grid.Row="1" Margin="0,10,0,10">
+            <WrapPanel Grid.Row="1" Margin="0,6,0,6">
                 <TextBlock Text="{loc:T 'Názov (title):'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
                 <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" Width="380" Margin="0,0,20,0"
                          ToolTip="{loc:T 'Názov celého súboru, ktorý ukazujú prehrávače; prázdny ho odstráni'}" />

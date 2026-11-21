@@ -25,6 +25,22 @@ public sealed record BatchAnalysis(
     public BatchGroup? GroupOf(string path) => Groups.FirstOrDefault(g => g.Files.Any(f => f.Path == path));
 
     /// <summary>
+    /// Files added to the batch (owner, 21. 11. 2026 – Do Hromadného): the groups of <paramref name="part"/> (an analysis of
+    /// the new files only) come first, labelled on after the groups of this analysis; those stay as they are, with their
+    /// decisions. The files the part could not read are added to the failed ones.
+    /// </summary>
+    public BatchAnalysis Joined(BatchAnalysis part)
+    {
+        var added = part.Groups.Select((g, i) =>
+        {
+            var group = new BatchGroup(g.Signature, Groups.Count + i);
+            group.Files.AddRange(g.Files);
+            return group;
+        }).ToList();
+        return this with { Groups = [.. added, .. Groups], Failed = [.. Failed, .. part.Failed] };
+    }
+
+    /// <summary>
     /// The groups split by title (owner, 29. 10. 2026: a folder of several titles – each group holds the files of one
     /// title only, so a group's decisions and "accept all" concern one series or film): files of the same structure and
     /// the same title stay together, in the order of the groups. Only right after the analysis (no decisions are carried).

@@ -10,7 +10,7 @@
         <ResourceDictionary Source="pack://application:,,,/Universum;component/Shell/Templates/Shared.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <DataTemplate DataType="{x:Type pages:CalendarPageViewModel}">
-        <DockPanel Margin="24,20,24,12">
+        <DockPanel Margin="24,12,24,10">
             <StackPanel DockPanel.Dock="Top">
                 <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Kalendár'}" />
                 <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
@@ -419,7 +419,7 @@
         </DockPanel>
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:TasksPageViewModel}">
-        <DockPanel Margin="24,20,24,12">
+        <DockPanel Margin="24,12,24,10">
             <StackPanel DockPanel.Dock="Top">
                 <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Plánované úlohy'}" />
                 <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,8" TextWrapping="Wrap"
@@ -668,7 +668,7 @@
         </StackPanel>
     </DataTemplate>
     <DataTemplate DataType="{x:Type pages:NotesPageViewModel}">
-        <DockPanel Margin="24,20,24,12">
+        <DockPanel Margin="24,12,24,10">
             <StackPanel DockPanel.Dock="Top">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Poznámky'}" />

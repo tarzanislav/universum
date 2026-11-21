@@ -34,10 +34,18 @@ public sealed partial class BatchPageViewModel
     /// over the whole film (owner, 21. 11. 2026: it is replaced by chapters every so long).
     /// </summary>
     public RelayCommand AddChaptersCommand => _addChapters ??= new(
-        () => AddChapters(_analysis?.Groups.SelectMany(g => g.Files.Where(f => f.ChapterEntries <= 1).Select(f => (g, f.Path))) ?? []),
+        () => AddChapters(_analysis?.Groups.SelectMany(g => g.Files.Where(f => f.ChapterEntries <= 1 && (ChaptersForEpisodes || !IsEpisode(f.Path))).Select(f => (g, f.Path))) ?? []),
         () => !Busy && !IsRunning && _analysis is not null && ChapterInterval is not null);
 
     private RelayCommand? _addChapters;
+
+    /// <summary>
+    /// „aj epizódam“ (owner, 21. 11. 2026): Doplniť súborom bez kapitol gives them to the episodes of series too; off by
+    /// default – then only films get them (an episode chosen in the list gets them with Vybraným súborom).
+    /// </summary>
+    public bool ChaptersForEpisodes { get; set; }
+
+    private bool IsEpisode(string path) => _library?.KindFor(path) == Core.Library.MediaKind.Series;
 
     /// <summary>Vybraným súborom: the files selected in the list get them (their own chapters are replaced).</summary>
     public RelayCommand AddChaptersSelectedCommand => _addChaptersSelected ??= new(

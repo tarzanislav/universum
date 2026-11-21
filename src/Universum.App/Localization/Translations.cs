@@ -3507,7 +3507,6 @@ internal static class Translations
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete v riadku Kapitoly každých … nižšie alebo na stránke Kapitoly."] = "Počet kapitol v souboru – jen informace, zůstanou ve výsledku. Přidat je můžete v řádku Kapitoly každých … níže nebo na stránce Kapitoly.",
         ["Kapitoly každých"] = "Kapitoly každých",
         ["min:"] = "min:",
-        ["Doplniť súborom bez kapitol"] = "Doplnit souborům bez kapitol",
         ["Vybraným súborom"] = "Vybraným souborům",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "Souborům označeným v seznamu (Ctrl / Shift) – i těm, které kapitoly mají (nahradí se)",
         ["Bez pridaných kapitol"] = "Bez přidaných kapitol",
@@ -3522,6 +3521,9 @@ internal static class Translations
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} kapitol, průměrně každých {1:0} min",
         ["len jedna kapitola {0}"] = "jen jedna kapitola {0}",
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování bez kapitol i s jedinou kapitolou na celý film – Kapitola 01, 02 … po celé délce; soubor s více kapitolami zůstane, jak je",
+        ["Doplniť filmom bez kapitol"] = "Doplnit filmům bez kapitol",
+        ["aj epizódam"] = "i epizodám",
+        ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Doplnit i epizodám seriálů bez kapitol (výchozí jen filmům); vybraným souborům se kapitoly doplní vždy",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7025,7 +7027,6 @@ internal static class Translations
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete v riadku Kapitoly každých … nižšie alebo na stránke Kapitoly."] = "The number of chapters in the file – information only, they stay in the result. Add them in the row Chapters every … below or on the page Chapters.",
         ["Kapitoly každých"] = "Chapters every",
         ["min:"] = "min:",
-        ["Doplniť súborom bez kapitol"] = "Add to files without chapters",
         ["Vybraným súborom"] = "To the selected files",
         ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "To the files selected in the list (Ctrl / Shift) – also those with chapters (they are replaced)",
         ["Bez pridaných kapitol"] = "Without added chapters",
@@ -7040,5 +7041,8 @@ internal static class Translations
         ["{0} kapitol, priemerne každých {1:0} min"] = "{0} chapters, on average every {1:0} min",
         ["len jedna kapitola {0}"] = "a single chapter {0}",
         ["Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je"] = "To every file of Batch processing without chapters or with a single chapter for the whole film – Kapitola 01, 02 … over the whole length; a file with more chapters stays as it is",
+        ["Doplniť filmom bez kapitol"] = "Add to films without chapters",
+        ["aj epizódam"] = "episodes too",
+        ["Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy"] = "Add them to episodes of series without chapters too (by default films only); the files selected always get them",
     };
 }

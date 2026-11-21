@@ -334,6 +334,7 @@ internal static partial class SelfTest
 
         // owner, 21. 11. 2026: chapters every 5 minutes (the default) for the files without chapters, then taken back
         batch.ChapterMinutes = "5";
+        batch.ChaptersForEpisodes = true;
         batch.AddChaptersCommand.Execute(null);
         var withoutChapters = batch.Items.Count(i => i.File.ChapterEntries <= 1);
         Check(batch.Items.Count(i => i.Target.NewChapters is { Count: > 0 }) == withoutChapters &&
@@ -341,6 +342,11 @@ internal static partial class SelfTest
             $"batch: chapters added to the {withoutChapters} files without chapters – {batch.RunState}");
         batch.ClearChaptersCommand.Execute(null);
         Check(batch.Items.All(i => i.Target.NewChapters is null), "batch: the chapters added taken back");
+        batch.ChaptersForEpisodes = false;
+        batch.AddChaptersCommand.Execute(null);
+        Check(batch.Items.Where(i => batch.Library?.KindFor(i.File.Path) == Core.Library.MediaKind.Series).All(i => i.Target.NewChapters is null),
+            "batch: without „aj epizódam“ the episodes get no chapters – " + batch.RunState);
+        batch.ClearChaptersCommand.Execute(null);
 
         batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";

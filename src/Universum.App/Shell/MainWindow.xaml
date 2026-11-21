@@ -1797,8 +1797,10 @@
                                 <TextBlock Text="{loc:T 'Kapitoly každých'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBox Text="{Binding ChapterMinutes, UpdateSourceTrigger=PropertyChanged}" Width="50" VerticalAlignment="Center" Margin="0,0,4,0" />
                                 <TextBlock Text="{loc:T 'min:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Button Content="{loc:T 'Doplniť súborom bez kapitol'}" Command="{Binding AddChaptersCommand}" Padding="10,3" Margin="0,0,6,0"
+                                <Button Content="{loc:T 'Doplniť filmom bez kapitol'}" Command="{Binding AddChaptersCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="{loc:T 'Všetkým súborom Hromadného spracovania bez kapitol aj s jedinou kapitolou na celý film – Kapitola 01, 02 … po celej dĺžke; súbor s viacerými kapitolami ostane, ako je'}" />
+                                <CheckBox Content="{loc:T 'aj epizódam'}" IsChecked="{Binding ChaptersForEpisodes}" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="0"
+                                          ToolTip="{loc:T 'Doplniť aj epizódam seriálov bez kapitol (predvolene len filmom); vybraným súborom sa kapitoly doplnia vždy'}" />
                                 <Button Content="{loc:T 'Vybraným súborom'}" Command="{Binding AddChaptersSelectedCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="{loc:T 'Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)'}" />
                                 <Button Content="{loc:T 'Bez pridaných kapitol'}" Command="{Binding ClearChaptersCommand}" Padding="10,3" Margin="0,0,8,0"

@@ -37,7 +37,17 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
 
     public string Signature => Group.Signature;
 
-    public string State { get => _state; set => SetProperty(ref _state, value); }
+    public string State
+    {
+        get => _state;
+        set
+        {
+            if (SetProperty(ref _state, value))
+            {
+                OnPropertyChanged(nameof(TitleState));
+            }
+        }
+    }
 
     /// <summary>
     /// Holds files the analysis before did not have (owner, 31. 10. 2026: new folders and files put into the input folder –
@@ -48,7 +58,11 @@ public sealed class GroupRow(BatchGroup group) : ObservableObject
     private bool _isNew;
 
     /// <summary>A file was added while the folder is read.</summary>
-    public void Refresh() => OnPropertyChanged(nameof(Count));
+    public void Refresh()
+    {
+        OnPropertyChanged(nameof(Count));
+        OnPropertyChanged(nameof(TitleCount));
+    }
 
     /// <summary>
     /// The groups of its title (owner, 21. 11. 2026 – one row for a series or a film): set on the title's first group, the

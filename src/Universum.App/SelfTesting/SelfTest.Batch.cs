@@ -433,6 +433,21 @@ internal static partial class SelfTest
             "batch: the film typed in the row Film: names all its versions – " + string.Join(" | ", batch.Items.Select(i => i.PlannedPath)));
         await Screenshot(window, "batch-film-row.png");
 
+        // owner, 21. 11. 2026: Do Hromadného – a new film joins the batch on top (only it is read); the film named before keeps its name
+        var addedFilm = Path.Combine(sorted, "MOVIES", "Vymyslený nový film (2025)", "Vymysleny novy film.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(addedFilm)!);
+        File.Copy(Path.Combine(media, "cz-only.mkv"), addedFilm, overwrite: true);
+        var groupsBefore = batch.Groups.Count;
+        var addedToBatch = await batch.AddChosenAsync([addedFilm]);
+        Check(addedToBatch == true && batch.Groups.Count == groupsBefore + 1 && batch.Groups[0].IsNew && batch.Groups.Skip(1).All(g => !g.IsNew) &&
+              batch.Groups[0].Group.Files.Any(f => Core.IO.Paths.Same(f.Path, addedFilm)) && batch.FilmGroups.FirstOrDefault() == batch.Groups[0] &&
+              batch.Items.Where(i => versions.Contains(i.File.Path)).All(i => i.PlannedPath?.Contains(Path.Combine("MOVIES", "Vymyslený film na skúšku (2020)"), StringComparison.Ordinal) == true) &&
+              batch.Groups[0].Title.StartsWith("Vymyslený nový film", StringComparison.Ordinal),
+            "batch: Do Hromadného – the new film on top, marked; the film named before keeps its name – " + batch.Summary + " | " +
+            string.Join(" | ", batch.Groups.Select(g => $"{g.Title} {(g.IsNew ? "NEW" : "")}")));
+        Check(await batch.AddChosenAsync([addedFilm]) == true && batch.Groups.Count == groupsBefore + 1, "batch: a file in the batch is not added twice – " + batch.RunState);
+        await Screenshot(window, "batch-added.png");
+
         // owner, 29. 10. 2026: MEGA spracovanie – the prepared files go into a batch written later, shown "v dávke" here
         var batches = model.Mega.Rows.Count;
         var ready = batch.Items.Where(i => i.NeedsWork).Select(i => i.File.Path).ToList();

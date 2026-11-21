@@ -32,11 +32,14 @@ public static partial class TitleUnits
     /// <summary>The folder of series in the input folder.</summary>
     public const string ShowsFolder = "TVSHOWS";
 
-    /// <summary>The titles of the folder; null when nothing lies in MOVIES or TVSHOWS (the folder is one title).</summary>
-    public static IReadOnlyList<TitleUnit>? Split(string root, IReadOnlyList<string> files)
+    /// <summary>
+    /// The titles of the folder; null when nothing lies in MOVIES or TVSHOWS (the folder is one title) – unless
+    /// <paramref name="always"/>: then files outside them are titles of their own too (files added to a batch of titles).
+    /// </summary>
+    public static IReadOnlyList<TitleUnit>? Split(string root, IReadOnlyList<string> files, bool always = false)
     {
         var placed = files.Select(f => (File: f, Place: PlaceOf(root, f))).ToList();
-        if (placed.All(p => p.Place is null))
+        if (!always && placed.All(p => p.Place is null))
         {
             return null;
         }

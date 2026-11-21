@@ -292,11 +292,19 @@
          open browser windows -->
     <!-- the switch of the automatic gathering of the Zásobník TMDB at the top of the pages (owner, 8. 11. 2026) -->
     <DataTemplate x:Key="TrayAutoSwitch" DataType="{x:Type pages:TmdbTrayService}">
-        <ToggleButton IsChecked="{Binding Automatic}" Padding="10,4" ToolTip="{Binding SwitchToolTip}">
+        <!-- owner, 21. 11. 2026: switched on it is blue – the text white so it can be read -->
+        <ToggleButton x:Name="Switch" IsChecked="{Binding Automatic}" Padding="10,4" ToolTip="{Binding SwitchToolTip}">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Style="{StaticResource Icon}" Text="&#xE896;" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding SwitchText}" VerticalAlignment="Center" />
+                <TextBlock x:Name="SwitchIcon" Style="{StaticResource Icon}" Text="&#xE896;" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBlock x:Name="SwitchLabel" Text="{Binding SwitchText}" VerticalAlignment="Center" />
             </StackPanel>
         </ToggleButton>
+        <DataTemplate.Triggers>
+            <DataTrigger Binding="{Binding Automatic}" Value="True">
+                <Setter TargetName="SwitchIcon" Property="Foreground" Value="White" />
+                <Setter TargetName="SwitchLabel" Property="Foreground" Value="White" />
+                <Setter TargetName="SwitchLabel" Property="FontWeight" Value="SemiBold" />
+            </DataTrigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 </ResourceDictionary>

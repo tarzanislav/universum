@@ -153,7 +153,8 @@ public sealed class LibraryJob(LibraryLayout layout)
     /// A folder of several titles is split into them (<see cref="TitleUnits"/>); false for files sent as episodes of
     /// known series (Novinky).
     /// </param>
-    public static LibraryJob Guess(LibraryLayout layout, BatchAnalysis analysis, bool splitTitles = true)
+    /// <param name="alwaysSplit">The files are split into titles also when none lies in MOVIES or TVSHOWS (files added to a batch of titles, <see cref="Add"/>).</param>
+    public static LibraryJob Guess(LibraryLayout layout, BatchAnalysis analysis, bool splitTitles = true, bool alwaysSplit = false)
     {
         var job = new LibraryJob(layout) { Root = analysis.Folder, Roots = analysis.Folders };
         var root = analysis.Folder;
@@ -257,7 +258,7 @@ public sealed class LibraryJob(LibraryLayout layout)
         if (splitTitles)
         {
             // each input folder split into its titles; together the titles of all disks
-            var units = roots.Select(r => TitleUnits.Split(r, [.. files.Where(f => Paths.Same(rootOf(f), r))])).ToList();
+            var units = roots.Select(r => TitleUnits.Split(r, [.. files.Where(f => Paths.Same(rootOf(f), r))], alwaysSplit)).ToList();
             job.ApplyUnits(single ? units[0] : units.All(u => u is null) ? null : [.. units.SelectMany(u => u ?? [])]);
         }
 
@@ -352,6 +353,43 @@ public sealed class LibraryJob(LibraryLayout layout)
 
         // the kind of the folder is the kind of most files (what the radio buttons show before a group is chosen)
         _kind = KindOfFile.Values.Count(k => k == MediaKind.Series) * 2 > KindOfFile.Count ? MediaKind.Series : MediaKind.Movie;
+    }
+
+    /// <summary>
+    /// Files added to the batch (owner, 21. 11. 2026 – Do Hromadného: new files of the input folders join the batch, nothing
+    /// decided or guessed before is read or guessed again): the guesses of <paramref name="part"/> – a job of the new files
+    /// only, guessed with the same analysed folders and split into titles – join this job; what this job knows of its own
+    /// files stays as it is. Both jobs have to be split into titles (<see cref="Mixed"/>), each file has its own kind and title.
+    /// </summary>
+    public void Add(LibraryJob part)
+    {
+        if (Units is not { } units || part.Units is not { } added)
+        {
+            throw new InvalidOperationException("Only a batch split into titles takes further files.");
+        }
+
+        Units = [.. units, .. added];
+        static void Join<T>(Dictionary<string, T> from, Dictionary<string, T> to)
+        {
+            foreach (var (path, value) in from)
+            {
+                to.TryAdd(path, value);
+            }
+        }
+
+        Join(part.KindOfFile, KindOfFile);
+        Join(part.SeriesSuggestionOfFile, SeriesSuggestionOfFile);
+        Join(part.SeriesOfFile, SeriesOfFile);
+        Join(part.Movies, Movies);
+        Join(part.MovieSuggestions, MovieSuggestions);
+        Join(part.NameGuesses, NameGuesses);
+        Join(part.Episodes, Episodes);
+        Join(part.EpisodeSuggestions, EpisodeSuggestions);
+        ConfirmedKinds.UnionWith(part.ConfirmedKinds);
+        Unsorted.UnionWith(part.Unsorted);
+        SeasonQuestions.UnionWith(part.SeasonQuestions);
+        ChosenTitles.UnionWith(part.ChosenTitles);
+        UnverifiedTitles.UnionWith(part.UnverifiedTitles);
     }
 
     /// <summary>

@@ -54,8 +54,8 @@ public sealed class TmdbTrayService : ObservableObject
         }
     }
 
-    /// <summary>"Zásobník TMDB zbiera · 3" or "Zásobník TMDB · 3" – the switch at the top of the pages.</summary>
-    public string SwitchText => (Automatic ? Loc.T("Zásobník TMDB zbiera") : Loc.T("Zásobník TMDB")) + " · " + Entries.Count;
+    /// <summary>"Zásobník TMDB · 3" – the switch at the top of the pages (owner, 21. 11. 2026: one name; on = blue).</summary>
+    public string SwitchText => Loc.T("Zásobník TMDB") + " · " + Entries.Count;
 
     public string SwitchToolTip => Loc.T("Zapnuté: každý film a seriál, ktorý otvoríte na TMDB, sa sám uloží do Zásobníka TMDB (potrebuje skript UNIVERSUM v prehliadači – Nastavenia). Vypnuté: len tlačidlom Do UNIVERSUM na stránke.");
 

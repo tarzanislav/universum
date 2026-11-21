@@ -746,7 +746,8 @@ public sealed partial class BatchPageViewModel
     /// one request at a time (TMDB at most 4 per second, HISTRA 2, see RequestPacer); the same name and year is asked
     /// only once (cache). Stop cancels; titles found so far stay.
     /// </summary>
-    private async Task FindMoviesAsync(bool automatic)
+    // onlyFiles: the files added to the batch (Do Hromadného) – the titles of the others are not looked up again
+    private async Task FindMoviesAsync(bool automatic, IReadOnlySet<string>? onlyFiles = null)
     {
         if (_library is null || _analysis is null || _services.Titles is not { } titles)
         {
@@ -759,11 +760,14 @@ public sealed partial class BatchPageViewModel
         // a second run would otherwise confirm a title the name never matched)
         var pending = _analysis.Groups.SelectMany(g => g.Files)
             .Where(f => _library.KindFor(f.Path) == MediaKind.Movie && !_library.Unsorted.Contains(f.Path) &&
-                        !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path))
+                        !_library.Movies.ContainsKey(f.Path) && _library.MovieSuggestions.ContainsKey(f.Path) && !_library.ChosenTitles.Contains(f.Path) &&
+                        (onlyFiles is null || onlyFiles.Contains(f.Path)))
             .Select(f => (f.Path, Guess: _library.NameGuesses.GetValueOrDefault(f.Path) ?? _library.MovieSuggestions[f.Path]))
             .ToList();
         var questions = pending.Select(p => (p.Guess.Name.ToLowerInvariant(), p.Guess.Year)).Distinct().Count();
-        if (automatic && pending.Count == 0 && !(_library.Units?.Any(u => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } && !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? false))
+        bool Unnamed(TitleUnit u) => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } && !u.Files.All(_library.SeriesOfFile.ContainsKey) &&
+                                     (onlyFiles is null || u.Files.Any(onlyFiles.Contains));
+        if (automatic && pending.Count == 0 && !(_library.Units?.Any(Unnamed) ?? false))
         {
             // after the analysis: nothing to look up, the summary of the analysis stays
             return;
@@ -854,8 +858,7 @@ public sealed partial class BatchPageViewModel
             // a sorted folder (owner, 29. 10. 2026): each series of TVSHOWS by its folder's name, as a series on TMDB
             var seriesFound = 0;
             var seriesAsked = 0;
-            foreach (var unit in _library.Units?.Where(u => u is { Kind: MediaKind.Series, Sorted: true, Name: not null } &&
-                                                            !u.Files.All(_library.SeriesOfFile.ContainsKey)) ?? [])
+            foreach (var unit in _library.Units?.Where(Unnamed).ToList() ?? [])
             {
                 seriesAsked++;
                 RunState = Loc.F("{0}: seriál {1}…", service, unit.Name!.Name);

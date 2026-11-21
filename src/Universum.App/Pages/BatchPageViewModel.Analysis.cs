@@ -269,13 +269,22 @@ public sealed partial class BatchPageViewModel
             Busy = false;
         }
 
+        await RunAutoStepsAsync(readSubtitles, only: null);
+    }
+
+    // the steps after the analysis: the subtitles read, the names of films looked up, the speech heard – for every group,
+    // or only for the groups added to the batch (Do Hromadného)
+    private async Task RunAutoStepsAsync(bool readSubtitles, IReadOnlyList<BatchGroup>? only)
+    {
+        var onlyFiles = only?.SelectMany(g => g.Files).Select(f => f.Path).ToHashSet(Paths.Comparer);
+
         // owner, 7. 11. 2026: while the steps after the analysis run, a blinking line says so – nothing to do yet
         try
         {
             if (readSubtitles)
             {
                 AutoStep = Loc.T("Čítame jazyk titulkov – počkajte, ešte nič nemeňte…");
-                await ReadSubtitlesAsync(again: false);
+                await ReadSubtitlesAsync(again: false, only);
             }
 
             // owner, 7. 11. 2026: the names of films are looked up on TMDB (and HISTRA) by themselves – no button; Zastaviť
@@ -283,14 +292,14 @@ public sealed partial class BatchPageViewModel
             if (_analysis is not null && !_stoppedAfterAnalysis && FindMoviesCommand.CanExecute(null))
             {
                 AutoStep = Loc.T("Hľadáme názvy filmov na TMDB – počkajte, ešte nič nemeňte…");
-                await FindMoviesAsync(automatic: true);
+                await FindMoviesAsync(automatic: true, onlyFiles);
             }
 
             // owner, 7. 11. 2026: the audio tracks without a language are heard at once (the hand choice stays)
             if (_analysis is { Groups.Count: > 0 } && !_stoppedAfterAnalysis && DetectAudioAfterAnalysis && !Busy)
             {
                 AutoStep = Loc.T("Analyzujeme jazykovo nenaznačené stopy – počkajte, ešte nič nemeňte…");
-                await DetectAudioAsync(SpeechScope.All, automatic: true);
+                await DetectAudioAsync(SpeechScope.All, automatic: true, only);
             }
         }
         finally
@@ -400,6 +409,142 @@ public sealed partial class BatchPageViewModel
         _only = files;
         _sentSeries = null;
         await AnalyzeAsync();
+        return true;
+    }
+
+    /// <summary>
+    /// Do Hromadného (owner, 21. 11. 2026): the new files of the input folders join the batch shown – only they are read
+    /// (the tracks of the files already in the batch are not read again and nothing decided or suggested for them is lost);
+    /// their groups come first, in the series as in the films, marked as new, and only for them the subtitles are read, the
+    /// titles looked up and the speech heard. A batch that is not split into titles (one folder of one title, episodes sent
+    /// from Novinky), a MEGA batch being corrected, files outside the batch's folders or no batch at all: the files are
+    /// analysed on their own, as before. Null while the page is busy; false when the adding was stopped (nothing changed).
+    /// </summary>
+    public async Task<bool?> AddChosenAsync(IReadOnlyList<string> files)
+    {
+        if (Busy || IsRunning || IsAutoStep || IsReadingSubtitles)
+        {
+            return null;
+        }
+
+        var installation = _services.CurrentMkvToolNix ?? await _services.FindMkvToolNixAsync();
+        if (files.Count == 0 || installation is null || _analysis is not { } analysis || _library is not { Mixed: true } library || _editing is not null ||
+            _needsAnalysis || !files.All(f => analysis.Folders.Any(r => Paths.IsUnder(Path.GetFullPath(f), r))))
+        {
+            return await AnalyzeChosenAsync(files) ? true : null;
+        }
+
+        var known = analysis.Groups.SelectMany(g => g.Files).Select(f => Path.GetFullPath(f.Path)).ToHashSet(Paths.Comparer);
+        var fresh = files.Select(Path.GetFullPath).Distinct(Paths.Comparer).Where(f => !known.Contains(f)).ToList();
+        if (fresh.Count == 0)
+        {
+            RunState = Loc.T("Nové súbory už v Hromadnom spracovaní sú.");
+            return true;
+        }
+
+        _stoppedAfterAnalysis = false;
+        Busy = true;
+        using var cancellation = new CancellationTokenSource();
+        _analysisCancellation = cancellation;
+        var summaryBefore = Summary;
+        var warningBefore = SummaryIsWarning;
+        Summary = Loc.F("Pridávam nové súbory {0} / {1}…", 0, fresh.Count);
+        Progress = 0;
+        OnPropertyChanged(nameof(IsAnalyzing));
+        OnPropertyChanged(nameof(ShowsProgress));
+        OnPropertyChanged(nameof(StopText));
+        RefreshCommands();
+        List<BatchGroup> added;
+        try
+        {
+            var inspector = _services.Inspector(installation);
+            var part = await BatchAnalyzer.AnalyzeAsync(analysis.Folder, recursive: true, inspector,
+                progress: new Progress<(int Done, int Total)>(p =>
+                {
+                    if (ReferenceEquals(_analysisCancellation, cancellation))
+                    {
+                        Summary = Loc.F("Pridávam nové súbory {0} / {1}…", p.Done, p.Total);
+                        Progress = p.Total == 0 ? 0 : (double)p.Done / p.Total;
+                    }
+                }),
+                cancellationToken: cancellation.Token, only: fresh, alsoFolders: [.. analysis.Folders.Skip(1)]);
+
+            // the new files guessed alone, each title on its own (as the files of the batch are), then joined: the groups of
+            // the batch and everything decided for them stay as they are
+            var guess = LibraryJob.Guess(library.Layout, part, alwaysSplit: true);
+            if (guess.Mixed)
+            {
+                part = part.SplitBy(guess.UnitOf);
+                library.Add(guess);
+            }
+
+            _analysis = analysis.Joined(part);
+            added = [.. _analysis.Groups.Take(part.Groups.Count)];
+            var hint = "";
+            if (library.ApplyMemory(_services.SeriesMemory, [.. added.SelectMany(g => g.Files).Select(f => f.Path)]) is { Count: > 0 } given)
+            {
+                hint = Loc.F(" Napovedkyňa: {0} – titul, ktorý už poznáte, názov bez hľadania (zmeniť ho môžete).", string.Join(", ", given.Select(t => t.FolderName).Distinct(StringComparer.Ordinal)));
+            }
+
+            if (_only is not null)
+            {
+                // Analyzovať again reads the added files too
+                _only = [.. _only, .. added.SelectMany(g => g.Files).Select(f => f.Path)];
+            }
+
+            TrySave(inspector);
+            _analysisCancellation = null;
+            OnPropertyChanged(nameof(IsAnalyzing));
+
+            // the new groups first, marked; the place of each group is remembered for the next analysis
+            for (var i = 0; i < added.Count; i++)
+            {
+                Groups.Insert(i, new GroupRow(added[i]) { Title = GroupTitle(added[i]), IsNew = true });
+            }
+
+            _groupRanks.Clear();
+            for (var i = 0; i < Groups.Count; i++)
+            {
+                foreach (var file in Groups[i].Group.Files)
+                {
+                    _knownFiles.Add(file.Path);
+                    _groupRanks[file.Path] = i;
+                }
+            }
+
+            Summary = Loc.F("Pridané nové súbory: {0} v {1} – sú navrchu, farebne označené; čo ste už nastavili, ostalo.", part.FileCount,
+                          Texts.Count(added.Count, Loc.T("skupine"), Loc.T("skupinách"), Loc.T("skupinách"))) +
+                      (part.Failed.Count > 0 ? Loc.F(" {0} sa nedalo prečítať ({1}).", part.Failed.Count, string.Join(", ", part.Failed.Select(f => Path.GetFileName(f.Path)))) : "") +
+                      " " + Loc.F("Spolu {0} súborov v {1} skupinách.", _analysis.FileCount, _analysis.Groups.Count) + hint;
+            SummaryIsWarning = part.Failed.Count > 0;
+            OnLibraryChanged();
+            ShowGroup();
+            SelectedGroup ??= Groups.FirstOrDefault();
+            BackgroundWork.Run(CheckLibraryAsync());
+        }
+        catch (OperationCanceledException)
+        {
+            Summary = Loc.T("Pridávanie nových súborov bolo zastavené – v dávke sa nič nezmenilo.") + " · " + summaryBefore;
+            SummaryIsWarning = warningBefore;
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Summary = Loc.T("Nové súbory sa nepodarilo pridať: ") + ex.Message + " · " + summaryBefore;
+            SummaryIsWarning = true;
+            return false;
+        }
+        finally
+        {
+            _analysisCancellation = null;
+            Progress = 0;
+            OnPropertyChanged(nameof(IsAnalyzing));
+            OnPropertyChanged(nameof(ShowsProgress));
+            OnPropertyChanged(nameof(StopText));
+            Busy = false;
+        }
+
+        await RunAutoStepsAsync(readSubtitles: true, added);
         return true;
     }
 

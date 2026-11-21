@@ -100,6 +100,7 @@ public sealed class MainViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(HasArrivals));
             OnPropertyChanged(nameof(ArrivalsText));
+            OnPropertyChanged(nameof(ArrivalsShort));
         };
         services.RestartWatch();
 
@@ -558,6 +559,9 @@ public sealed class MainViewModel : ObservableObject
         Loc.F("Na vstupe pribudli nové súbory ({0}): ", _services.Arrivals.Count) +
         string.Join(", ", _services.Arrivals.Take(3).Select(System.IO.Path.GetFileName)) + (_services.Arrivals.Count > 3 ? " …" : "");
 
+    /// <summary>"Nové na vstupe: 3" – the card in the left column (owner, 21. 11. 2026); the names are in its tooltip.</summary>
+    public string ArrivalsShort => Loc.F("Nové na vstupe: {0}", _services.Arrivals.Count);
+
     public AsyncRelayCommand ArrivalsToBatchCommand { get; }
 
     public RelayCommand DismissArrivalsCommand { get; }
@@ -572,14 +576,16 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        // owner, 21. 11. 2026: added to the batch shown – what is set there stays, the new files come first
         Open(Batch);
-        if (await Batch.AnalyzeChosenAsync(files))
+        switch (await Batch.AddChosenAsync(files))
         {
-            _services.Arrivals.Clear();
-        }
-        else
-        {
-            System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení."), "UNIVERSUM");
+            case true:
+                _services.Arrivals.Clear();
+                break;
+            case null:
+                System.Windows.MessageBox.Show(Loc.T("Hromadné spracovanie práve pracuje – nové súbory pošlite po jeho skončení."), "UNIVERSUM");
+                break;
         }
     }
 

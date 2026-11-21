@@ -48,14 +48,15 @@ public sealed partial class BatchPageViewModel
     /// found is applied to the group as UNIVERSUM's suggestion (Czech and Slovak by their letters and words).
     /// <paramref name="again"/>: the selected group is read once more (Prečítať titulky znova).
     /// </summary>
-    private async Task ReadSubtitlesAsync(bool again)
+    // only: the groups added to the batch (Do Hromadného) – the others keep what was read for them
+    private async Task ReadSubtitlesAsync(bool again, IReadOnlyList<BatchGroup>? only = null)
     {
         if (_analysis is not { } analysis || _subtitleReading is not null || _services.CurrentMkvToolNix is not { } installation)
         {
             return;
         }
 
-        var groups = again && SelectedGroup?.Group is { } selected ? [selected] : analysis.Groups.ToList();
+        var groups = again && SelectedGroup?.Group is { } selected ? [selected] : (only ?? analysis.Groups).ToList();
         groups = groups.Where(g => g.Representative.Tracks.Any(t => t.Type == TrackType.Subtitles && t.IsTextSubtitles)).ToList();
         if (groups.Count == 0)
         {
@@ -172,7 +173,8 @@ public sealed partial class BatchPageViewModel
 
     // the speech of the audio tracks without a language: pieces from several places of each film vote; every result is
     // a suggestion with what to check (owner, 28. 10.: the films of a group each on their own, or only chosen films)
-    private async Task DetectAudioAsync(SpeechScope scope, bool automatic = false)
+    // only: the groups added to the batch (Do Hromadného) – the tracks of the others are not heard again
+    private async Task DetectAudioAsync(SpeechScope scope, bool automatic = false, IReadOnlyList<BatchGroup>? only = null)
     {
         if (_analysis is null)
         {
@@ -184,7 +186,7 @@ public sealed partial class BatchPageViewModel
         {
             SpeechScope.Selected => SpeechTargets.ForFiles(_selectedFiles.Select(f => (f.Item.Group, f.Item.File))),
             SpeechScope.Group when SelectedGroup?.Group is { } group => SpeechTargets.ForGroups([group], series),
-            SpeechScope.All => SpeechTargets.ForGroups(_analysis.Groups, series),
+            SpeechScope.All => SpeechTargets.ForGroups(only ?? _analysis.Groups, series),
             _ => (Array.Empty<SpeechTarget>(), 0),
         };
         if (automatic && targets.Count == 0)

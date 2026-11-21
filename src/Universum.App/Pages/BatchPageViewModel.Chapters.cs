@@ -8,7 +8,7 @@ namespace Universum.App.Pages;
 // BatchPageViewModel: chapters added every so long (owner, 21. 11. 2026 – to the files without chapters, or to the files selected)
 public sealed partial class BatchPageViewModel
 {
-    private string _chapterMinutes = "10";
+    private string _chapterMinutes = "5";
 
     /// <summary>How long a chapter is, in minutes (1–240).</summary>
     public string ChapterMinutes

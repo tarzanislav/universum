@@ -332,8 +332,8 @@ internal static partial class SelfTest
                 "batch: Odstrániť taken back");
         }
 
-        // owner, 21. 11. 2026: chapters every 10 minutes for the files without chapters, then taken back
-        batch.ChapterMinutes = "10";
+        // owner, 21. 11. 2026: chapters every 5 minutes (the default) for the files without chapters, then taken back
+        batch.ChapterMinutes = "5";
         batch.AddChaptersCommand.Execute(null);
         var withoutChapters = batch.Items.Count(i => i.File.ChapterEntries <= 1);
         Check(batch.Items.Count(i => i.Target.NewChapters is { Count: > 0 }) == withoutChapters &&

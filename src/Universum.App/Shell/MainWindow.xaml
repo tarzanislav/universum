@@ -1531,7 +1531,7 @@
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
                                                 <Setter Property="HorizontalAlignment" Value="Center" />
-                                                <Setter Property="ToolTip" Value="{loc:T 'Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete na stránke Kapitoly (napr. každých 10 minút).'}" />
+                                                <Setter Property="ToolTip" Value="{loc:T 'Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete v riadku Kapitoly každých … nižšie alebo na stránke Kapitoly.'}" />
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>

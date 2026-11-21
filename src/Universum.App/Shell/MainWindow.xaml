@@ -31,7 +31,8 @@
                 </Style.Triggers>
             </Style>
             <DataTemplate DataType="{x:Type pages:RulesPageViewModel}">
-                <Grid Margin="32,24,32,16">
+                <!-- owner, 21. 11. 2026: the head and the card below in fewer rows – more room for the tracks -->
+                <Grid Margin="24,12,24,10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -39,18 +40,16 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,6" Margin="8,0,0,0"
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Vymazať frontu'}" Command="{Binding ClearCommand}" Padding="12,5" Margin="8,0,0,0" VerticalAlignment="Center"
                                 ToolTip="{loc:T 'Zabudne otvorený, ešte nespracovaný súbor (na disku sa nič nezmení)'}" />
-                        <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,6" />
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" />
-                                <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,4" />
-                            </StackPanel>
-                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" />
+                        <Button DockPanel.Dock="Right" Content="{loc:T 'Otvoriť súbor…'}" Command="{Binding OpenCommand}" Padding="16,5" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Single spracovanie'}" Margin="0" VerticalAlignment="Center" />
+                            <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="16,0,0,0" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding FileName}" ToolTip="{Binding FileName}" VerticalAlignment="Center" Margin="16,0,12,0" TextTrimming="CharacterEllipsis" MaxWidth="700" />
                         </StackPanel>
                     </DockPanel>
-                    <StackPanel Grid.Row="1" Margin="0,8,0,12">
+                    <StackPanel Grid.Row="1" Margin="0,4,0,6">
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding Summary}" />
                         <TextBlock Text="{Binding Issues}" Foreground="{DynamicResource SystemFillColorCautionBrush}" TextWrapping="Wrap" FontWeight="SemiBold" />
                     </StackPanel>
@@ -175,19 +174,9 @@
                             <DataGridTextColumn Header="{loc:T 'Rola'}" Binding="{Binding Role}" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,8,0,0">
                         <StackPanel>
                             <WrapPanel>
-                                <TextBlock Text="{loc:T 'Originál:'}" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
-                                <RadioButton Content="{loc:T 'zachovať'}" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
-                                <RadioButton Content="{loc:T 'vymazať (zatiaľ vypnuté)'}" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
-                                             ToolTip="{loc:T 'Single spracovanie originály vždy zachová – mazanie originálov je len v Hromadnom spracovaní.'}" ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
-                                <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
-                                    <Run Text="{loc:T 'Knižnica:'}" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
-                                </TextBlock>
-                                <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,4" />
-                            </WrapPanel>
-                            <WrapPanel Margin="0,8,0,0">
                                 <RadioButton Content="{loc:T 'film'}" IsChecked="{Binding IsMovie}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,12,0" />
                                 <RadioButton Content="{loc:T 'seriál'}" IsChecked="{Binding IsSeries}" GroupName="kind" VerticalAlignment="Center" Margin="0,0,20,0" />
                                 <TextBlock Text="{loc:T 'Titul:'}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0" />
@@ -215,12 +204,20 @@
                             <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap">
                                 <Run Text="{Binding Tmdb.Message, Mode=OneWay}" /> <Run Text="{Binding TitleNote, Mode=OneWay}" />
                             </TextBlock>
-                            <!-- owner, 7. 11. 2026: Ponechať MP4 – shown for an MP4; the same switch as in Hromadné and Nastavenia -->
-                            <CheckBox Content="{loc:T 'MP4 ponechať ako MP4 (len hlavička)'}" IsChecked="{Binding KeepMp4}" Margin="0,6,0,0" IsEnabled="{Binding IsIdle}"
-                                      Visibility="{Binding IsMp4, Converter={StaticResource BoolToVisibility}}"
-                                      ToolTip="{loc:T 'Súbor ostane MP4 – UNIVERSUM upraví len jeho hlavičku (jazyky, názvy, predvolené stopy, Forced, titulky pre nepočujúcich, komentár, poradie, názov; odstránené titulky), obraz a zvuk sa nedotknú. Ak treba zmenu, ktorú MP4 neudrží (odstrániť zvuk, pridať stopu…), zapíše sa ako MKV.'}" />
                             <!-- owner, 2. 11. 2026: the file in the studios and back with their edits (also a file of a MEGA batch) -->
-                            <WrapPanel Margin="0,8,0,0">
+                            <WrapPanel Margin="0,6,0,0">
+                                <TextBlock Text="{loc:T 'Originál:'}" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
+                                <RadioButton Content="{loc:T 'zachovať'}" IsChecked="{Binding KeepOriginal}" Margin="0,0,16,0" GroupName="original" />
+                                <RadioButton Content="{loc:T 'vymazať (zatiaľ vypnuté)'}" IsChecked="{Binding DeleteOriginal}" Margin="0,0,24,0" GroupName="original"
+                                             ToolTip="{loc:T 'Single spracovanie originály vždy zachová – mazanie originálov je len v Hromadnom spracovaní.'}" ToolTipService.ShowOnDisabled="True" IsEnabled="False" />
+                                <TextBlock VerticalAlignment="Center" Style="{StaticResource Hint}" Margin="0,0,8,0">
+                                    <Run Text="{loc:T 'Knižnica:'}" /> <Run Text="{Binding OutputDescription, Mode=OneWay}" />
+                                </TextBlock>
+                                <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,4" Margin="0,0,16,0" />
+                                <!-- owner, 7. 11. 2026: Ponechať MP4 – shown for an MP4; the same switch as in Hromadné and Nastavenia -->
+                                <CheckBox Content="{loc:T 'MP4 ponechať ako MP4 (len hlavička)'}" IsChecked="{Binding KeepMp4}" Margin="0,0,16,0" VerticalAlignment="Center" IsEnabled="{Binding IsIdle}"
+                                          Visibility="{Binding IsMp4, Converter={StaticResource BoolToVisibility}}"
+                                          ToolTip="{loc:T 'Súbor ostane MP4 – UNIVERSUM upraví len jeho hlavičku (jazyky, názvy, predvolené stopy, Forced, titulky pre nepočujúcich, komentár, poradie, názov; odstránené titulky), obraz a zvuk sa nedotknú. Ak treba zmenu, ktorú MP4 neudrží (odstrániť zvuk, pridať stopu…), zapíše sa ako MKV.'}" />
                                 <Button Content="{loc:T 'Titulky v štúdiu'}" Command="{Binding EditInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
                                         ToolTip="{loc:T 'Otvorí súbor v Úprave titulkostopy – časy, jazyk, Forced, pridané titulky; Uložiť do úlohy vás vráti sem'}" />
                                 <Button Content="{loc:T 'Zvuk v štúdiu'}" Command="{Binding EditSoundInStudioCommand}" Padding="10,3" Margin="0,0,6,0"
@@ -229,7 +226,7 @@
                                         ToolTip="{loc:T 'Otvorí súbor v Úprave videostopy – strih, pomer strán, otočenie, výška, kodek; Uložiť do úlohy vás vráti sem'}" />
                                 <TextBlock Text="{Binding StudioText}" Style="{StaticResource Hint}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="600" />
                             </WrapPanel>
-                            <DockPanel Margin="0,12,0,0">
+                            <DockPanel Margin="0,8,0,0">
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                     <Button Content="{loc:T 'Vrátiť späť'}" Command="{Binding UndoCommand}" Margin="0,0,8,0" Padding="16,6" />
                                     <Button Content="{loc:T 'Revízia'}" Command="{Binding ReviseCommand}" Margin="0,0,8,0" Padding="16,6"

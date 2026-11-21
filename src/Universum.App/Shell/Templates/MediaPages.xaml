@@ -208,12 +208,14 @@
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
+            <!-- owner, 21. 11. 2026: the title, Zásobník TMDB and the tabs of the settings in one row – more room for the tracks -->
             <DockPanel>
-                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Zlučovanie'}" Margin="0,0,16,4" />
+                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:T 'Zlučovanie'}" Margin="0,0,16,4" VerticalAlignment="Center" />
                 <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="0,0,16,4" />
-                <TextBlock Text="{Binding Message}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Message}" ToolTip="{Binding Message}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextTrimming="CharacterEllipsis"
+                           MaxWidth="420" VerticalAlignment="Center" Margin="12,0,0,4" />
+                <pages:MuxTabStrip VerticalAlignment="Bottom" />
             </DockPanel>
-            <pages:MuxTabStrip Grid.Row="1" Margin="0,4,0,0" />
             <Border Grid.Row="2" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" CornerRadius="0,8,8,8"
                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" Padding="12">
                 <ContentControl Content="{Binding Current}" />

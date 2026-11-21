@@ -204,11 +204,14 @@ public sealed class LibraryJob(LibraryLayout layout)
             job.SeriesSuggestion = Title(MediaKind.Series, job.SeriesNameGuess);
         }
 
-        // films: each file, named by its own folder when it has one with a year, otherwise by the file name
+        // films: each file, named by its own folder when it has one with a year, otherwise by the file name; a folder holding
+        // several different films (a collection – owner, 21. 11. 2026) names none of them
+        var collections = content.GroupBy(f => Path.GetDirectoryName(f)!, Paths.Comparer)
+            .Where(g => g.Count() > 1 && TitleUnits.HoldsSeveralFilms([.. g])).Select(g => g.Key).ToHashSet(Paths.Comparer);
         foreach (var file in content)
         {
             var directory = Path.GetDirectoryName(file)!;
-            var ownFolder = Paths.Same(directory, rootOf(file)) ? null : TitleGuess.FromName(Path.GetFileName(directory), MediaKind.Movie);
+            var ownFolder = Paths.Same(directory, rootOf(file)) || collections.Contains(directory) ? null : TitleGuess.FromName(Path.GetFileName(directory), MediaKind.Movie);
             var guess = ownFolder is { Year: not null } ? ownFolder : TitleGuess.FromName(Path.GetFileNameWithoutExtension(file), MediaKind.Movie) ?? ownFolder;
             if (guess is { TmdbId: not null })
             {

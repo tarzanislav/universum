@@ -456,6 +456,11 @@ public sealed class BatchTests
         Assert.True(collection.All(f => job.KindFor(f) == MediaKind.Movie && job.KindConfirmedFor(f)), "films for certain – they lie in MOVIES");
         Assert.True(job.TitleKeyOf(collection[0]) != job.TitleKeyOf(collection[1]) && job.TitleKeyOf(versions[0]) == job.TitleKeyOf(versions[1]),
             "one title for the versions, one for each film");
+
+        // a collection in a folder with a year: the folder names none of its films
+        var dated = new[] { P("MOVIES", "Zbierka (2006)", "Prvy pribeh.mkv"), P("MOVIES", "Zbierka (2006)", "Druhy pribeh.mkv") };
+        var datedJob = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), Synthetic(root, dated));
+        Assert.Equal("Prvy pribeh|Druhy pribeh", string.Join("|", dated.Select(f => datedJob.SuggestedTitleFor(f)?.Name)), "each film named by its file");
     }
 
     [Test]

@@ -136,11 +136,16 @@ public static partial class TitleUnits
     /// </summary>
     private static IEnumerable<TitleUnit> Films(string unit, List<string> files)
     {
-        if (files.Count < 2)
-        {
-            return [Film(unit, files)];
-        }
+        var films = FilmsOf(files);
+        return films.Count <= 1 ? [Film(unit, files)] : films.Select(f => Film(f[0], f));
+    }
 
+    /// <summary>The files of one folder hold several different films (a collection), not versions of one.</summary>
+    public static bool HoldsSeveralFilms(IReadOnlyList<string> files) => FilmsOf(files).Count > 1;
+
+    // the files of one folder by film: each list one film and its versions
+    private static List<List<string>> FilmsOf(IReadOnlyList<string> files)
+    {
         var films = new List<List<string>>();
         foreach (var file in files.Order(NaturalComparer.Instance))
         {
@@ -156,7 +161,7 @@ public static partial class TitleUnits
             }
         }
 
-        return films.Count == 1 ? [Film(unit, files)] : films.Select(f => Film(f[0], f));
+        return films;
     }
 
     private static TitleUnit Film(string unit, List<string> files) =>

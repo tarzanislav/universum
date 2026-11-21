@@ -297,6 +297,13 @@ public sealed class SlotRow : ObservableObject
         get => Group.Decisions.Removed.Contains(Key);
         set
         {
+            // the last sound of the file stays: the check box does not take it
+            if (value && Key.Type == TrackType.Audio && Group.Decisions.Removed.Count(k => k.Type == TrackType.Audio) + 1 >= AudioCount)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
             ForEachPlace((decisions, key) =>
             {
                 if (value)
@@ -316,8 +323,10 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    /// <summary>An audio or subtitle track: it can be left out of the result.</summary>
-    public bool CanRemove => Key.Type is TrackType.Audio or TrackType.Subtitles;
+    /// <summary>A subtitle track, or a sound of a file with more sounds: it can be left out of the result.</summary>
+    public bool CanRemove => Key.Type == TrackType.Subtitles || (Key.Type == TrackType.Audio && AudioCount > 1);
+
+    private int AudioCount => SlotKey.Of(Group.Representative).Count(x => x.Key.Type == TrackType.Audio);
 
     /// <summary>The track is not in the result: left out by the user or by its language (the row is shown pale).</summary>
     public bool IsLeftOut => Removed || _removedByLanguage;

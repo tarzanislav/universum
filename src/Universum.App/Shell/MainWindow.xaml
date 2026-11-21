@@ -1592,7 +1592,7 @@
                                         <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                             <Setter Property="Background" Value="{Binding Key.Type, Converter={StaticResource TrackTypeBrush}}" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsRemovedByLanguage}" Value="True">
+                                                <DataTrigger Binding="{Binding IsLeftOut}" Value="True">
                                                     <Setter Property="Opacity" Value="0.55" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -1711,6 +1711,16 @@
                                                                   ToolTip="{loc:T 'Titulky sa vo výsledku zapíšu ako SRT; stopa pôvodného formátu v ňom nebude (originál sa nemení)'}" />
                                                         <TextBlock Text="{Binding ToSrtHint}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                                     </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <!-- owner, 21. 11. 2026: any track left out of the result (subtitles, even all of them; never the last sound) -->
+                                        <DataGridTemplateColumn Header="{loc:T 'Odstrániť'}" Width="Auto" MinWidth="70">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding Removed, UpdateSourceTrigger=PropertyChanged}" MinWidth="0" HorizontalAlignment="Center"
+                                                              Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
+                                                              ToolTip="{loc:T 'Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení.'}" />
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>

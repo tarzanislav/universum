@@ -1269,6 +1269,36 @@ public sealed class BatchTests
     }
 
     [Test]
+    public void TracksLeftOutByTheUser()
+    {
+        // owner, 21. 11. 2026: any subtitles can be left out, even all of them; the last sound of a file never
+        var file = new MediaFile
+        {
+            Path = "x.mkv",
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Video },
+                new MediaTrack { Id = 1, Type = TrackType.Audio, Language = new LanguageTag("cze", "cs") },
+                new MediaTrack { Id = 2, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs") },
+                new MediaTrack { Id = 3, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs"), Name = "cz empty" },
+            ],
+        };
+        var group = new BatchGroup(StructureSignature.Of(file), 0);
+        group.Files.Add(file);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Subtitles, 1));
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.Sequence([2], item.Target.Tracks.Where(t => t.Type == TrackType.Subtitles).Select(t => t.TrackId), "the second subtitles left out");
+
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Subtitles, 0));
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Audio, 0));
+        group.Decisions.Kept.Add(new SlotKey(TrackType.Subtitles, 0));
+        item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.True(!item.Target.Tracks.Any(t => t.Type == TrackType.Subtitles) && item.Target.Tracks.Any(t => t.Type == TrackType.Audio),
+            "all subtitles left out (over Kept); the only sound stays");
+    }
+
+    [Test]
     public void ForcedFromSubtitleCountsWithoutConfirmation()
     {
         var file = new MediaFile

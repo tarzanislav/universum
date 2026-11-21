@@ -286,10 +286,45 @@ public sealed class SlotRow : ObservableObject
     }
 
     /// <summary>Subtitles out of the language list: the user may keep them.</summary>
-    public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);
+    public bool CanKeep => IsSubtitles && !Removed && (_removedByLanguage || Kept);
+
+    /// <summary>
+    /// Left out of the result by the user (owner, 21. 11. 2026: any subtitles, even all; a sound too, but never the file's
+    /// last one) – for every group carrying the track.
+    /// </summary>
+    public bool Removed
+    {
+        get => Group.Decisions.Removed.Contains(Key);
+        set
+        {
+            ForEachPlace((decisions, key) =>
+            {
+                if (value)
+                {
+                    decisions.Removed.Add(key);
+                }
+                else
+                {
+                    decisions.Removed.Remove(key);
+                }
+            });
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsLeftOut));
+            OnPropertyChanged(nameof(CanKeep));
+            OnPropertyChanged(nameof(ResultNote));
+            _changed();
+        }
+    }
+
+    /// <summary>An audio or subtitle track: it can be left out of the result.</summary>
+    public bool CanRemove => Key.Type is TrackType.Audio or TrackType.Subtitles;
+
+    /// <summary>The track is not in the result: left out by the user or by its language (the row is shown pale).</summary>
+    public bool IsLeftOut => Removed || _removedByLanguage;
 
     /// <summary>What happens with the track in the result when it is not just kept.</summary>
-    public string ResultNote => _removedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
+    public string ResultNote => Removed ? ""
+        : _removedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
         : Kept ? Loc.T("ponechané – jazyk mimo zoznamu titulkov")
         : "";
 
@@ -356,6 +391,7 @@ public sealed class SlotRow : ObservableObject
     {
         _removedByLanguage = removed;
         OnPropertyChanged(nameof(IsRemovedByLanguage));
+        OnPropertyChanged(nameof(IsLeftOut));
         OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ResultNote));
         MoveUpCommand.NotifyCanExecuteChanged();
@@ -501,6 +537,8 @@ public sealed class SlotRow : ObservableObject
         OnPropertyChanged(nameof(Forced));
         OnPropertyChanged(nameof(ForcedHint));
         OnPropertyChanged(nameof(Kept));
+        OnPropertyChanged(nameof(Removed));
+        OnPropertyChanged(nameof(IsLeftOut));
         OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ResultNote));
     }

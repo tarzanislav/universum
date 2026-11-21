@@ -195,11 +195,19 @@ public static class BatchPlanner
         }
 
         var trackOf = SlotKey.Of(file).ToDictionary(x => x.Key, x => x.Track.Id);
+        // the sounds the user leaves out – never all of the file's sounds (a film without sound is no result)
+        var removed = group.Decisions.Removed.Where(trackOf.ContainsKey).ToList();
+        if (removed.Count(k => k.Type == TrackType.Audio) >= SlotKey.Of(file).Count(x => x.Key.Type == TrackType.Audio))
+        {
+            removed.RemoveAll(k => k.Type == TrackType.Audio);
+        }
+
         var decisions = new TrackDecisions
         {
             Languages = languages,
             Forced = forced,
-            Kept = group.Decisions.Kept.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
+            Removed = removed.Select(k => trackOf[k]).ToHashSet(),
+            Kept = group.Decisions.Kept.Where(k => trackOf.ContainsKey(k) && !group.Decisions.Removed.Contains(k)).Select(k => trackOf[k]).ToHashSet(),
             ToSrt = group.Decisions.ToSrt.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
             Order = group.Decisions.Order.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToList(),
             Names = group.Decisions.Names.Where(n => trackOf.ContainsKey(n.Key) && n.Key.Type is TrackType.Audio or TrackType.Subtitles)

@@ -76,15 +76,15 @@ public sealed class TmdbTrayChoice : ObservableObject
     public AsyncRelayCommand ReadBrowserCommand { get; }
 
     /// <summary>
-    /// The button Z prehliadača is shown (owner, 21. 11. 2026: not in Hromadné spracovanie – it did not prove practical
-    /// there; the reading of the browser stays in the program).
+    /// The button Z prehliadača is shown – nowhere since 21. 11. 2026 (owner: it did not prove practical; the reading of the
+    /// browser stays in the program, to be shown again by this when it is wanted).
     /// </summary>
-    public bool ShowsBrowser { get; init; } = true;
+    public bool ShowsBrowser { get; init; }
 
     /// <summary>What reading the browser found ("3 nové, 1 treba overiť").</summary>
     public string Note { get => _note; private set => SetProperty(ref _note, value); }
 
-    public string ToolTip => Loc.T("Zásobník TMDB – filmy a seriály z prehliadača (skript UNIVERSUM, záložka Do UNIVERSUM alebo Z prehliadača). Výber vyplní titul a načíta ho.");
+    public string ToolTip => Loc.T("Zásobník TMDB – filmy a seriály z prehliadača (skript UNIVERSUM alebo záložka Do UNIVERSUM). Výber vyplní titul a načíta ho.");
 
     private async Task ReadBrowserAsync() => Note = await _services.TmdbTray.ReadBrowserAsync();
 }

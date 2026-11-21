@@ -126,7 +126,7 @@ public sealed partial class BatchPageViewModel : ObservableObject
             }
 
             return Task.CompletedTask;
-        }) { ShowsBrowser = false };
+        });
         SendToMegaCommand = new RelayCommand(SendToMega, () => !Busy && _subtitleReading is null && !_ranSinceAnalysis && !_needsAnalysis && _library is not null &&
                                                              _items.Any(i => i.NeedsWork));
         ShowInfoCommand = new RelayCommand(() => InfoRequested?.Invoke(_selectedFile!.Item.File.Path), () => _selectedFile is not null);

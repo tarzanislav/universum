@@ -1274,6 +1274,44 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task RoomOnTheDiskIsCheckedBeforeTheRun()
+    {
+        // owner, 21. 11. 2026: a run must not stop halfway on a full disk – Superrýchle needs almost no room, a copy its size
+        using var work = new Work();
+        File.Copy(TestData.Media("cz-only.mkv"), Path.Combine(work.Path, "Vymyslený film (2020).mkv"));
+        var analysis = await AnalyzeAsync(work.Path);
+        var library = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), analysis);
+        library.ConfirmSuggestions();
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Where(i => i.NeedsWork).ToList();
+        Assert.Equal(1, items.Count, "the film goes into the library – " + string.Join(", ", BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly, library: library).Select(i => i.Status)));
+        var size = new FileInfo(items[0].File.Path).Length;
+
+        var copy = BatchSpace.Shortages(items, new OutputOptions(OriginalHandling.Keep), _ => DiskSpace.Reserve);
+        Assert.True(copy.Count == 1 && copy[0].Needed == size + DiskSpace.Reserve && copy[0].Free == DiskSpace.Reserve, "a copy needs the file's size and the reserve");
+        if (items[0].Plan.Method != Universum.Core.Planning.WriteMethod.Remux)
+        {
+            Assert.Equal(0, BatchSpace.Shortages(items, new OutputOptions(OriginalHandling.Delete, MoveIntoLibrary: true), _ => DiskSpace.Reserve).Count,
+                "Superrýchle moves the original – only the reserve is needed");
+        }
+
+        Assert.Equal(0, BatchSpace.Shortages(items, new OutputOptions(OriginalHandling.Keep), _ => null).Count, "a disk of unknown room is not refused");
+        Assert.True(DiskSpace.NotEnough("E:\\", 120L << 20, 4200L << 20) == "not enough free space on E:\\: 120 MB free, 4200 MB needed", "the words of the processing log read the message");
+    }
+
+    [Test]
+    public async Task TheGuardStopsWorkOnAFullDisk()
+    {
+        using var guard = new DiskGuard([Path.GetTempPath()], CancellationToken.None, TimeSpan.FromMilliseconds(50));
+        guard.Check();
+        Assert.True(guard.FullDisk is null || DiskSpace.Free(Path.GetTempPath()) < DiskSpace.Reserve / 2, "a disk with room does not stop the work");
+        using var cancelled = new CancellationTokenSource();
+        using var linked = new DiskGuard([Path.GetTempPath()], cancelled.Token);
+        cancelled.Cancel();
+        Assert.True(linked.Token.IsCancellationRequested && linked.FullDisk is null, "the caller's cancel passes through, no full disk said");
+        await Task.CompletedTask;
+    }
+
+    [Test]
     public void ChaptersAddedEverySoLong()
     {
         // owner, 21. 11. 2026: chapters added in Hromadné – a structure without names of its own, every 10 minutes

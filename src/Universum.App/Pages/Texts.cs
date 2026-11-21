@@ -15,6 +15,11 @@ public static class Texts
     public static string Count(int count, string one, string few, string many) =>
         $"{count.ToString("N0", Slovak)} {(count == 1 ? one : count is >= 2 and <= 4 ? few : many)}";
 
+    /// <summary>A size on a disk: "48,3 GB", "740 MB".</summary>
+    public static string Size(long bytes) => bytes >= 1L << 30
+        ? (bytes / (double)(1L << 30)).ToString("N1", Slovak) + " GB"
+        : (bytes >> 20).ToString("N0", Slovak) + " MB";
+
     public static IReadOnlyList<Choice<TrackType>> TrackTypes { get; } =
         [new(TrackType.Audio, Loc.T("Zvuk")), new(TrackType.Subtitles, Loc.T("Titulky"))];
 

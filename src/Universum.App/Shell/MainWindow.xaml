@@ -1525,6 +1525,16 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
+                                    <!-- owner, 21. 11. 2026: the chapters only shown (they stay in the result; added on the page Kapitoly) -->
+                                    <DataGridTextColumn Header="{loc:T 'Kapitoly'}" Binding="{Binding Chapters}" Width="Auto">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                <Setter Property="HorizontalAlignment" Value="Center" />
+                                                <Setter Property="ToolTip" Value="{loc:T 'Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete na stránke Kapitoly (napr. každých 10 minút).'}" />
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
                                     <DataGridTextColumn Header="{loc:T 'Výsledok'}" Binding="{Binding Outcome}" Width="*" MinWidth="90">
                                         <DataGridTextColumn.ElementStyle>
                                             <Style TargetType="TextBlock">

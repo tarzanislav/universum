@@ -718,6 +718,12 @@ public sealed class FileRow : ObservableObject
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
 
+    /// <summary>
+    /// The chapters of the file (owner, 21. 11. 2026: shown only, nothing to do with them here – they stay in the result):
+    /// their count, or "–".
+    /// </summary>
+    public string Chapters => Item.File.HasChapters ? Item.File.ChapterEntries.ToString(System.Globalization.CultureInfo.CurrentCulture) : "–";
+
     /// <summary>The letter of the file's group (owner, 21. 11. 2026 – the variant of its title, shown with „Všetky“).</summary>
     public string Variant => Item.Group.Label;
 

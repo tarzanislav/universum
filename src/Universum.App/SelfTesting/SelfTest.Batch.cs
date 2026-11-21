@@ -290,6 +290,21 @@ internal static partial class SelfTest
             "batch: the rules' name again needs no decision");
         Check(!forcedSlot.Group.Decisions.Languages.ContainsKey(written.Key), "batch: the file's own language again needs no decision");
 
+        // owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio)
+        if (batch.SlotRows.FirstOrDefault(s => s.CanCopyName) is { } copied)
+        {
+            var named = copied.TrackName;
+            copied.CopyNameCommand.Execute(null);
+            Check(copied.TrackName == copied.Name && batch.Items.Where(i => i.Group == copied.Group).All(i => i.Target.Tracks.Any(t => t.Name == copied.Name)),
+                $"batch: Názov v súbore copied to Názov stopy – „{copied.TrackName}“");
+            copied.TrackName = named;
+            Check(!copied.Group.Decisions.Names.ContainsKey(copied.Key), "batch: the copied name taken back");
+        }
+        else
+        {
+            Write("batch: no track with a name in the file – copying the name not tried");
+        }
+
         batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");

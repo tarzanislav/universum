@@ -128,7 +128,15 @@
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel>
-                                            <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <!-- owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio) -->
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Command="{Binding CopyNameCommand}" Padding="4,1" Margin="4,0,0,2" MinWidth="0"
+                                                        Visibility="{Binding CanCopyName, Converter={StaticResource BoolToVisibility}}"
+                                                        ToolTip="{loc:T 'Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať'}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE74B;" FontSize="10" />
+                                                </Button>
+                                                <TextBlock Text="{Binding NameBefore}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding NameBefore}" />
+                                            </DockPanel>
                                             <TextBlock Text="{Binding NameAfter}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                        Visibility="{Binding CanName, Converter={StaticResource InverseBoolToVisibility}}" />
                                             <!-- owner, 30. 10. 2026: Track name – the name can be written or added to -->
@@ -1607,7 +1615,21 @@
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="{loc:T 'Stopa'}" Binding="{Binding Slot}" />
                                         <DataGridTextColumn Header="{loc:T 'Kodek'}" Binding="{Binding Codec}" Width="70" />
-                                        <DataGridTextColumn Header="{loc:T 'Názov v súbore'}" Binding="{Binding Name}" Width="*" MinWidth="80" />
+                                        <!-- owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio) -->
+                                        <DataGridTemplateColumn Header="{loc:T 'Názov v súbore'}" Width="*" MinWidth="80">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel VerticalAlignment="Center">
+                                                        <Button DockPanel.Dock="Right" Command="{Binding CopyNameCommand}" Padding="4,1" Margin="4,0,0,0" MinWidth="0" VerticalAlignment="Top"
+                                                                Visibility="{Binding CanCopyName, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTip="{loc:T 'Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať'}">
+                                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" FontSize="10" />
+                                                        </Button>
+                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" ToolTip="{Binding Name}" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <!-- owner, 30. 10. 2026: Track name – written for the whole group, it wins over the rules' name -->
                                         <DataGridTemplateColumn Header="{loc:T 'Názov stopy'}" Width="*" MinWidth="110">
                                             <DataGridTemplateColumn.CellTemplate>

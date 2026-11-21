@@ -3500,6 +3500,7 @@ internal static class Translations
         ["Koľko rôznych zložení stôp majú súbory titulu – vyberiete ich nad zoznamom súborov"] = "Kolik různých složení stop mají soubory titulu – vyberete je nad seznamem souborů",
         ["{0} varianty stôp – vyberte ich nad zoznamom súborov; „Všetky“ ukáže spoločné stopy"] = "{0} varianty stop – vyberte je nad seznamem souborů; „Všechny“ ukáže společné stopy",
         ["+ {0} {1}"] = "+ {0} {1}",
+        ["Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať"] = "Zkopírovat do Názvu stopy – potom ho můžete zkrátit nebo do něj dopsat",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -6996,5 +6997,6 @@ internal static class Translations
         ["Koľko rôznych zložení stôp majú súbory titulu – vyberiete ich nad zoznamom súborov"] = "How many different sets of tracks the files of the title carry – choose them above the list of files",
         ["{0} varianty stôp – vyberte ich nad zoznamom súborov; „Všetky“ ukáže spoločné stopy"] = "{0} track variants – choose them above the list of files; “All” shows the shared tracks",
         ["+ {0} {1}"] = "+ {0} {1}",
+        ["Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať"] = "Copy to Track name – then you can shorten it or add to it",
     };
 }

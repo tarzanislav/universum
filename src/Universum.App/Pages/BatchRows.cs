@@ -296,6 +296,14 @@ public sealed class SlotRow : ObservableObject
     /// <summary>An audio or subtitle track: its name can be written for the whole group (owner, 30. 10. 2026).</summary>
     public bool CanName => Key.Type is TrackType.Audio or TrackType.Subtitles;
 
+    /// <summary>The name in the file can be taken as the track name (owner, 21. 11. 2026: the year of a dub, its studio).</summary>
+    public bool CanCopyName => CanName && Name.Length > 0;
+
+    /// <summary>Názov v súbore → Názov stopy (then it can be shortened or added to).</summary>
+    public CommunityToolkit.Mvvm.Input.RelayCommand CopyNameCommand => _copyName ??= new(() => TrackName = Name, () => CanCopyName);
+
+    private CommunityToolkit.Mvvm.Input.RelayCommand? _copyName;
+
     /// <summary>
     /// Track name: the name the result gets – the rules' one, or the one written here for the whole group (it wins over
     /// the rules'); empty = no name.

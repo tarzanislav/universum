@@ -205,6 +205,14 @@ public sealed class RuleRow : ObservableObject
     /// <summary>An audio or subtitle track kept: its name can be written (owner, 30. 10. 2026).</summary>
     public bool CanName => Target.Type is TrackType.Audio or TrackType.Subtitles && !IsRemovedByLanguage;
 
+    /// <summary>The name in the file can be taken as the track name (owner, 21. 11. 2026: the year of a dub, its studio).</summary>
+    public bool CanCopyName => CanName && NameBefore.Length > 0;
+
+    /// <summary>The name in the file → the track name (then it can be shortened or added to).</summary>
+    public CommunityToolkit.Mvvm.Input.RelayCommand CopyNameCommand => _copyName ??= new(() => EditedName = NameBefore, () => CanCopyName);
+
+    private CommunityToolkit.Mvvm.Input.RelayCommand? _copyName;
+
     /// <summary>The name the result gets, as the user can change it (empty = no name).</summary>
     public string EditedName
     {

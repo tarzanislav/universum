@@ -304,6 +304,41 @@ public static class BatchPlanner
     }
 
     /// <summary>
+    /// "Prijať návrhy" (owner, 21. 11. 2026 – one button instead of Prijať návrhy názvov and Prijať všetko v skupine): the
+    /// language suggestions of a group become its decisions – of the group's tracks and of each file's own tracks without a
+    /// language; a doubtful suggestion (to be confirmed at the track) and a language chosen already stay. How many were
+    /// accepted.
+    /// </summary>
+    public static int AcceptLanguageSuggestions(BatchGroup group)
+    {
+        var accepted = 0;
+        foreach (var (key, track) in SlotKey.Of(group.Representative))
+        {
+            if (!group.Decisions.Languages.ContainsKey(key) &&
+                Evidence(track, key, group) is { Confidence: Confidence.Medium, NeedsOwnConfirmation: false } suggestion)
+            {
+                group.Decisions.Languages[key] = suggestion.Language;
+                accepted++;
+            }
+        }
+
+        foreach (var file in group.Files)
+        {
+            foreach (var (key, track) in SlotKey.Of(file).Where(x => x.Key.Type == TrackType.Audio && x.Track.Language.IsUndetermined))
+            {
+                if (group.FileSuggestion(file.Path, key) is { NeedsOwnConfirmation: false } &&
+                    Evidence(track, key, group, file.Path) is { Confidence: Confidence.Medium } own)
+                {
+                    group.Decisions.SetFileLanguage(file.Path, key, own.Language);
+                    accepted++;
+                }
+            }
+        }
+
+        return accepted;
+    }
+
+    /// <summary>
     /// Best evidence for a track language: a decision for this file, a decision for the group (owner, 29. 10. 2026: also
     /// over a wrong language written in the file – "EN" that is Czech), the file itself, the original track name, or a
     /// suggestion waiting for confirmation (this file's own first, then the group's).

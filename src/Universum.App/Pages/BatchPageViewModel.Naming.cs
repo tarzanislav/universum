@@ -335,30 +335,47 @@ public sealed partial class BatchPageViewModel
         : _library is { Series: null, SeriesUnverified: true, SeriesSuggestion: not null };
 
     /// <summary>
-    /// "Prijať všetko v skupine" (owner, 29. 10. 2026): the group's kind, title, episode numbers and track languages as
-    /// suggested – except the questions Season 00 or a regular season and the doubtful language suggestions.
+    /// "Prijať návrhy" (owner, 21. 11. 2026 – one button instead of Prijať návrhy názvov and Prijať všetko v skupine): for
+    /// all groups at once the kind, the titles of films and series, the episode numbers and the languages of the tracks as
+    /// suggested. Left to the user: the titles HISTRA did not confirm (confirmed at the file), the suggestions with a
+    /// warning, the questions Season 00 or a regular season – the status line tells what is left.
     /// </summary>
-    public RelayCommand AcceptGroupCommand { get; }
-
-    private void AcceptGroup()
+    private void AcceptSuggestions()
     {
-        if (_library is null || SelectedGroup is null)
+        if (_library is null || _analysis is null)
         {
             return;
         }
 
-        _library.AcceptAll(SelectedFiles);
-        foreach (var path in SelectedFiles)
-        {
-            _unverifiedNotes.Remove(path);
-        }
-
-        // the languages of the group (Potvrdiť návrhy) – it plans again
-        ConfirmSuggestions();
+        _library.ConfirmSuggestions();
+        var languages = _analysis.Groups.Sum(BatchPlanner.AcceptLanguageSuggestions);
         OnPropertyChanged(nameof(SeriesTitle));
         OnPropertyChanged(nameof(SeriesSuggestion));
-        RunState = Loc.F("Skupina {0} ({1}): návrhy prijaté.", SelectedGroup.Label, SelectedGroup.Title) +
-                   (_library.SeasonQuestions.Any(SelectedFiles.Contains) ? Loc.T(" Otázky Season 00 / bežná sezóna ostali na vás.") : "");
+        Replan();
+
+        var left = new List<string>();
+        var unverified = _library.UnverifiedTitles.Count(p => _library.TitleFor(p) is null);
+        if (unverified > 0)
+        {
+            left.Add(Loc.F("názvy, ktoré HISTRA nepotvrdila: {0}", unverified));
+        }
+
+        var doubtful = _analysis.Groups.Sum(g => SlotKey.Of(g.Representative).Count(x =>
+            !g.Decisions.Languages.ContainsKey(x.Key) && BatchPlanner.Evidence(x.Track, x.Key, g) is { NeedsOwnConfirmation: true }));
+        if (doubtful > 0)
+        {
+            left.Add(Loc.F("jazyky s upozornením: {0}", doubtful));
+        }
+
+        if (_library.OpenSeasonQuestions.Any())
+        {
+            left.Add(Loc.T("otázky Season 00 / bežná sezóna"));
+        }
+
+        var waiting = _items.Count(i => i.Reasons.Count > 0);
+        RunState = Loc.F("Návrhy prijaté (jazykov: {0}).", languages) +
+                   (left.Count > 0 ? " " + Loc.F("Na vás ostali: {0}.", string.Join(", ", left)) : "") +
+                   (waiting > 0 ? " " + Loc.F("Súborov na posúdenie: {0}.", waiting) : "");
     }
 
     /// <summary>Confirms the suggested series HISTRA did not confirm.</summary>
@@ -855,12 +872,12 @@ public sealed partial class BatchPageViewModel
                 }
             }
 
-            RunState = (seriesAsked > 0 ? Loc.F("Seriály: nájdené {0} z {1} – návrh potvrďte pri skupine (Potvrdiť seriál alebo Prijať všetko v skupine). ", seriesFound, seriesAsked) : "") +
+            RunState = (seriesAsked > 0 ? Loc.F("Seriály: nájdené {0} z {1} – návrh potvrďte pri skupine (Potvrdiť seriál) alebo dajte Prijať návrhy. ", seriesFound, seriesAsked) : "") +
                        Loc.F("Spresnené názvy ({0}): {1} z {2} navrhnutých", service, found, pending.Count) +
                        (unverified > 0 ? Loc.F(", {0} čaká na potvrdenie (⚠ pri súbore – názov sa líšil od mena súboru alebo HISTRA titul nepotvrdila)", unverified) : "") +
                        (ambiguous > 0 ? Loc.F(", {0} majú viac možných titulov (⚠ pri súbore – vyberte správny)", ambiguous) : "") +
                        (nowhere > 0 ? Loc.F(", {0} sa nenašli nikde (ostáva návrh z mena súboru – potvrďte ho pri súbore)", nowhere) : "") +
-                       Loc.T(" – skontrolujte ich a dajte Prijať návrhy názvov.") + (problem.Length > 0 ? " " + problem : "");
+                       Loc.T(" – skontrolujte ich a dajte Prijať návrhy.") + (problem.Length > 0 ? " " + problem : "");
         }
         catch (OperationCanceledException)
         {
@@ -897,12 +914,6 @@ public sealed partial class BatchPageViewModel
     /// <summary>Why HISTRA did not confirm a file's suggested title; null when it did (or was not asked).</summary>
     public string? UnverifiedNote(string path) =>
         _library?.UnverifiedTitles.Contains(path) == true ? _unverifiedNotes.GetValueOrDefault(path) ?? Loc.T("HISTRA titul nepotvrdila.") : null;
-
-    private void ConfirmTitles()
-    {
-        _library?.ConfirmSuggestions();
-        Replan();
-    }
 
     private void ConfirmSuggestions()
     {

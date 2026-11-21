@@ -1082,6 +1082,28 @@ public sealed class BatchTests
     }
 
     [Test]
+    public async Task AcceptSuggestionsTakesTheLanguageSuggestion()
+    {
+        using var work = new Work();
+        var tagged = Path.Combine(work.Path, "E1.mkv");
+        var untagged = Path.Combine(work.Path, "E2.mkv");
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), tagged);
+        File.Copy(TestData.Media("en-und-cz-forced.mkv"), untagged);
+        await PropEditAsync(tagged, "--edit", "track:a2", "--set", "language=cs", "--delete", "name");
+        await PropEditAsync(untagged, "--edit", "track:a2", "--delete", "name");
+        var analysis = await AnalyzeAsync(work.Path);
+        BatchPlanner.Suggest(analysis);
+        var group = analysis.GroupOf(Path.GetFullPath(untagged))!;
+        var key = new SlotKey(TrackType.Audio, 1);
+
+        Assert.True(BatchPlanner.AcceptLanguageSuggestions(group) >= 1, "the suggestion accepted");
+        Assert.Equal("cs", group.Decisions.Languages[key].Primary);
+        group.Decisions.Languages[key] = LanguageTag.FromCode("sk");
+        BatchPlanner.AcceptLanguageSuggestions(group);
+        Assert.Equal("sk", group.Decisions.Languages[key].Primary, "a language chosen already stays");
+    }
+
+    [Test]
     public async Task TargetFolderInsideIsNotAnalysed()
     {
         using var work = await SeriesFolderAsync();

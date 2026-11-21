@@ -624,6 +624,7 @@
                 </TextBlock>
             </Grid>
             <Button Content="{loc:T 'Z prehliadača'}" Command="{Binding ReadBrowserCommand}" Padding="8,3"
+                    Visibility="{Binding ShowsBrowser, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="{loc:T 'Prečíta filmy a seriály z TMDB otvorené v oknách prehliadača (Chrome, Edge, Firefox…): kartu vpredu presne podľa adresy, ostatné podľa názvu a roka – nejasné označí „over“.'}" />
             <TextBlock Text="{Binding Note}" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="6,0,0,0" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip="{Binding Note}" />
         </StackPanel>

@@ -75,6 +75,12 @@ public sealed class TmdbTrayChoice : ObservableObject
     /// <summary>Reads the films and series open in the browser windows into the tray.</summary>
     public AsyncRelayCommand ReadBrowserCommand { get; }
 
+    /// <summary>
+    /// The button Z prehliadača is shown (owner, 21. 11. 2026: not in Hromadné spracovanie – it did not prove practical
+    /// there; the reading of the browser stays in the program).
+    /// </summary>
+    public bool ShowsBrowser { get; init; } = true;
+
     /// <summary>What reading the browser found ("3 nové, 1 treba overiť").</summary>
     public string Note { get => _note; private set => SetProperty(ref _note, value); }
 

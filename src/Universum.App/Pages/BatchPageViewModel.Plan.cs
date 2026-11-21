@@ -111,6 +111,7 @@ public sealed partial class BatchPageViewModel
         OnPropertyChanged(nameof(CanFindTitles));
         OnPropertyChanged(nameof(KeepAllSubtitles));
         OnPropertyChanged(nameof(CanKeepAllSubtitles));
+        OnPropertyChanged(nameof(ChaptersNote));
         RefreshCommands();
     }
 

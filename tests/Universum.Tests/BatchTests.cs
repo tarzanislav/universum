@@ -456,6 +456,11 @@ public sealed class BatchTests
         Assert.True(collection.All(f => job.KindFor(f) == MediaKind.Movie && job.KindConfirmedFor(f)), "films for certain – they lie in MOVIES");
         Assert.True(job.TitleKeyOf(collection[0]) != job.TitleKeyOf(collection[1]) && job.TitleKeyOf(versions[0]) == job.TitleKeyOf(versions[1]),
             "one title for the versions, one for each film");
+
+        // a collection in a folder with a year: the folder names none of its films
+        var dated = new[] { P("MOVIES", "Zbierka (2006)", "Prvy pribeh.mkv"), P("MOVIES", "Zbierka (2006)", "Druhy pribeh.mkv") };
+        var datedJob = LibraryJob.Guess(new LibraryLayout(Path.Combine(work.Path, "OUTPUT")), Synthetic(root, dated));
+        Assert.Equal("Prvy pribeh|Druhy pribeh", string.Join("|", dated.Select(f => datedJob.SuggestedTitleFor(f)?.Name)), "each film named by its file");
     }
 
     [Test]
@@ -1266,6 +1271,57 @@ public sealed class BatchTests
         first.Decisions.Languages[new SlotKey(TrackType.Audio, 1)] = LanguageTag.FromCode("cs");
         BatchPlanner.Suggest(analysis);
         Assert.Equal("cs", second.Suggestions[new SlotKey(TrackType.Audio, 0)].Language.Primary, "the same dub in the shorter file");
+    }
+
+    [Test]
+    public void ChaptersAddedEverySoLong()
+    {
+        // owner, 21. 11. 2026: chapters added in Hromadné – a structure without names of its own, every 10 minutes
+        var file = new MediaFile
+        {
+            Path = "x.mkv",
+            Duration = TimeSpan.FromMinutes(25),
+            Tracks = [new MediaTrack { Id = 0, Type = TrackType.Video }, new MediaTrack { Id = 1, Type = TrackType.Audio, Language = new LanguageTag("cze", "cs") }],
+        };
+        var group = new BatchGroup(StructureSignature.Of(file), 0);
+        group.Files.Add(file);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        Assert.True(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single().Target.NewChapters is null, "without a choice the file's chapters stay");
+        group.Decisions.ChaptersEvery["x.mkv"] = TimeSpan.FromMinutes(10);
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.Equal("00:00:00.000 Kapitola 01, 00:10:00.000 Kapitola 02, 00:20:00.000 Kapitola 03",
+            string.Join(", ", item.Target.NewChapters!.Select(c => $"{c.Start:hh\\:mm\\:ss\\.fff} {c.Name}")), "three chapters over 25 minutes");
+        Assert.True(item.Plan.Changes.Any(c => c.Kind == Universum.Core.Planning.ChangeKind.Chapters), "planned as a change");
+    }
+
+    [Test]
+    public void TracksLeftOutByTheUser()
+    {
+        // owner, 21. 11. 2026: any subtitles can be left out, even all of them; the last sound of a file never
+        var file = new MediaFile
+        {
+            Path = "x.mkv",
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Video },
+                new MediaTrack { Id = 1, Type = TrackType.Audio, Language = new LanguageTag("cze", "cs") },
+                new MediaTrack { Id = 2, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs") },
+                new MediaTrack { Id = 3, Type = TrackType.Subtitles, Language = new LanguageTag("cze", "cs"), Name = "cz empty" },
+            ],
+        };
+        var group = new BatchGroup(StructureSignature.Of(file), 0);
+        group.Files.Add(file);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Subtitles, 1));
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.Sequence([2], item.Target.Tracks.Where(t => t.Type == TrackType.Subtitles).Select(t => t.TrackId), "the second subtitles left out");
+
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Subtitles, 0));
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Audio, 0));
+        group.Decisions.Kept.Add(new SlotKey(TrackType.Subtitles, 0));
+        item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.True(!item.Target.Tracks.Any(t => t.Type == TrackType.Subtitles) && item.Target.Tracks.Any(t => t.Type == TrackType.Audio),
+            "all subtitles left out (over Kept); the only sound stays");
     }
 
     [Test]

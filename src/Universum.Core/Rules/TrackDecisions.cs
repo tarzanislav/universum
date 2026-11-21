@@ -47,6 +47,12 @@ public sealed record TrackDecisions
     /// </summary>
     public IReadOnlySet<int> ToSrt { get; init; } = new HashSet<int>();
 
+    /// <summary>
+    /// Chapters added every so long over the whole file (owner, 21. 11. 2026 – Hromadné: "Kapitola 01", "Kapitola 02" …,
+    /// a structure players keep to); null = the file's chapters stay as they are.
+    /// </summary>
+    public TimeSpan? ChaptersEvery { get; init; }
+
     /// <summary>The parts of the film kept (Úprava videostopy – owner, 2. 11. 2026: also from Single and Hromadné); null keeps it whole.</summary>
     public IReadOnlyList<Video.CutPart>? Cut { get; init; }
 

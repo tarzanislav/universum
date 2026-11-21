@@ -58,6 +58,7 @@ public sealed partial class BatchPageViewModel
         _selectedFiles = files.ToList();
         DetectAudioSelectedCommand.NotifyCanExecuteChanged();
         UndoMovedCommand.NotifyCanExecuteChanged();
+        AddChaptersSelectedCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(UndoMovedText));
         OnFilmChanged();
     }

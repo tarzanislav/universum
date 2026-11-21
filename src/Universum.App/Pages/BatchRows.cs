@@ -286,10 +286,54 @@ public sealed class SlotRow : ObservableObject
     }
 
     /// <summary>Subtitles out of the language list: the user may keep them.</summary>
-    public bool CanKeep => IsSubtitles && (_removedByLanguage || Kept);
+    public bool CanKeep => IsSubtitles && !Removed && (_removedByLanguage || Kept);
+
+    /// <summary>
+    /// Left out of the result by the user (owner, 21. 11. 2026: any subtitles, even all; a sound too, but never the file's
+    /// last one) – for every group carrying the track.
+    /// </summary>
+    public bool Removed
+    {
+        get => Group.Decisions.Removed.Contains(Key);
+        set
+        {
+            // the last sound of the file stays: the check box does not take it
+            if (value && Key.Type == TrackType.Audio && Group.Decisions.Removed.Count(k => k.Type == TrackType.Audio) + 1 >= AudioCount)
+            {
+                OnPropertyChanged();
+                return;
+            }
+
+            ForEachPlace((decisions, key) =>
+            {
+                if (value)
+                {
+                    decisions.Removed.Add(key);
+                }
+                else
+                {
+                    decisions.Removed.Remove(key);
+                }
+            });
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsLeftOut));
+            OnPropertyChanged(nameof(CanKeep));
+            OnPropertyChanged(nameof(ResultNote));
+            _changed();
+        }
+    }
+
+    /// <summary>A subtitle track, or a sound of a file with more sounds: it can be left out of the result.</summary>
+    public bool CanRemove => Key.Type == TrackType.Subtitles || (Key.Type == TrackType.Audio && AudioCount > 1);
+
+    private int AudioCount => SlotKey.Of(Group.Representative).Count(x => x.Key.Type == TrackType.Audio);
+
+    /// <summary>The track is not in the result: left out by the user or by its language (the row is shown pale).</summary>
+    public bool IsLeftOut => Removed || _removedByLanguage;
 
     /// <summary>What happens with the track in the result when it is not just kept.</summary>
-    public string ResultNote => _removedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
+    public string ResultNote => Removed ? ""
+        : _removedByLanguage ? Loc.T("odstráni sa – jazyk nie je v zozname titulkov (Nastavenia)")
         : Kept ? Loc.T("ponechané – jazyk mimo zoznamu titulkov")
         : "";
 
@@ -356,6 +400,7 @@ public sealed class SlotRow : ObservableObject
     {
         _removedByLanguage = removed;
         OnPropertyChanged(nameof(IsRemovedByLanguage));
+        OnPropertyChanged(nameof(IsLeftOut));
         OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ResultNote));
         MoveUpCommand.NotifyCanExecuteChanged();
@@ -501,6 +546,8 @@ public sealed class SlotRow : ObservableObject
         OnPropertyChanged(nameof(Forced));
         OnPropertyChanged(nameof(ForcedHint));
         OnPropertyChanged(nameof(Kept));
+        OnPropertyChanged(nameof(Removed));
+        OnPropertyChanged(nameof(IsLeftOut));
         OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ResultNote));
     }
@@ -679,6 +726,14 @@ public sealed class FileRow : ObservableObject
     public IReadOnlyList<FileSlotRow> AudioSlots { get; }
 
     public string FileName => System.IO.Path.GetFileName(Item.File.Path);
+
+    /// <summary>
+    /// The chapters of the file (owner, 21. 11. 2026: shown only, nothing to do with them here – they stay in the result):
+    /// their count, or "–".
+    /// </summary>
+    public string Chapters => Item.Target.NewChapters is { } added
+        ? (Item.File.HasChapters ? Item.File.ChapterEntries.ToString(System.Globalization.CultureInfo.CurrentCulture) : "–") + " → " + added.Count
+        : Item.File.HasChapters ? Item.File.ChapterEntries.ToString(System.Globalization.CultureInfo.CurrentCulture) : "–";
 
     /// <summary>The letter of the file's group (owner, 21. 11. 2026 – the variant of its title, shown with „Všetky“).</summary>
     public string Variant => Item.Group.Label;

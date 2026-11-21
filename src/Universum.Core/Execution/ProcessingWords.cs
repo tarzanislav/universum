@@ -157,6 +157,7 @@ public static partial class ProcessingWords
                 FileProcessor.NotMovedHardLink => CoreText.T("súbor má aj iný názov (pevný odkaz – napr. ho ešte zdieľa torrent); úprava na mieste by zmenila aj ten"),
                 FileProcessor.NotMovedInUse => CoreText.T("súbor je len na čítanie alebo ho má otvorený iný program (torrent, prehrávač, mediálny server)"),
                 FileProcessor.NotMovedRename => CoreText.T("súbor sa nedal presunúť – asi ho má otvorený iný program"),
+                FileProcessor.NotMovedNoSpace => CoreText.T("na disku výstupného priečinka takmer nie je miesto – hlavička sa na mieste neupravila"),
                 var other => other,
             };
             return (CoreText.F("Superrýchle sa nedalo: {0}. Súbor sa preto skopíroval celý (pomalšie).", why), null);

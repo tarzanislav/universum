@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using Universum.Core.Execution;
+using Universum.Core.IO;
 using Universum.Core.MkvToolNix;
 using Universum.Core.Processes;
 
@@ -62,6 +63,8 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
         temporary = Path.Combine(Path.GetDirectoryName(output)!,
             Path.GetFileNameWithoutExtension(output) + "." + Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant() + FileProcessor.TemporaryExtension);
         var converted = Path.Combine(Path.GetTempPath(), "UNIVERSUM", "srt-" + Guid.NewGuid().ToString("N"));
+        // owner, 21. 11. 2026: a disk running almost full meanwhile stops mkvmerge – the unfinished file is deleted
+        using var guard = new DiskGuard([output], cancellationToken);
         try
         {
             EnsureFreeSpace(spec, output);
@@ -86,7 +89,7 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
                     {
                         OnOutputLine = progress is null ? null : line => ReportProgress(line, progress),
                     },
-                    cancellationToken);
+                    guard.Token);
             }
 
             var messages = ToolMessages(result).ToList();
@@ -119,6 +122,11 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
             }
 
             return new MuxResult(MuxStatus.Done, output, messages);
+        }
+        catch (OperationCanceledException) when (guard.FullDisk is not null && !cancellationToken.IsCancellationRequested)
+        {
+            TryDelete(temporary);
+            return new MuxResult(MuxStatus.Failed, null, [guard.Message]);
         }
         catch (OperationCanceledException)
         {
@@ -291,11 +299,11 @@ public sealed class Multiplexer(MkvToolNixInstallation installation, IProcessRun
             }
 
             // a preview of parts is a small piece of the film
-            var needed = (spec.PreviewParts is null ? spec.Sources.SelectMany(s => s.AllPaths).Sum(p => new FileInfo(p).Length) : 0) + (64L << 20);
+            var needed = (spec.PreviewParts is null ? spec.Sources.SelectMany(s => s.AllPaths).Sum(p => new FileInfo(p).Length) : 0) + DiskSpace.Reserve;
             var free = new DriveInfo(root).AvailableFreeSpace;
             if (free < needed)
             {
-                throw new IOException($"not enough free space on {root}: {free >> 20} MB free, up to {needed >> 20} MB needed");
+                throw new IOException(DiskSpace.NotEnough(root, free, needed));
             }
         }
         catch (ArgumentException)

@@ -143,6 +143,9 @@ public sealed class MegaFile
     /// <summary>Subtitle tracks written as SRT (by track ID; owner, 1. 11. 2026).</summary>
     public List<int> ToSrt { get; init; } = [];
 
+    /// <summary>Chapters added every so long (owner, 21. 11. 2026); null = the file's own chapters.</summary>
+    public TimeSpan? ChaptersEvery { get; init; }
+
     /// <summary>The parts of the film kept (Úprava videostopy, owner, 2. 11. 2026); null = the whole film.</summary>
     public List<Video.CutPart>? Cut { get; init; }
 
@@ -220,6 +223,7 @@ public sealed class MegaFile
         Timings = Timings,
         Names = Names,
         ToSrt = ToSrt.ToHashSet(),
+        ChaptersEvery = ChaptersEvery,
         Cut = Cut,
         VideoAspect = VideoAspect,
     };
@@ -248,6 +252,7 @@ public sealed class MegaFile
             Timings = decisions.Timings.ToDictionary(),
             Names = decisions.Names.ToDictionary(),
             ToSrt = [.. decisions.ToSrt],
+            ChaptersEvery = decisions.ChaptersEvery,
             Cut = decisions.Cut is { Count: > 0 } cut ? [.. cut] : null,
             VideoAspect = decisions.VideoAspect,
             PlannedPath = plannedPath,
@@ -307,6 +312,7 @@ public sealed class MegaFile
             Timings = item.Decisions.Timings.ToDictionary(),
             Names = item.Decisions.Names.ToDictionary(),
             ToSrt = [.. item.Decisions.ToSrt],
+            ChaptersEvery = item.Decisions.ChaptersEvery,
             Cut = item.Decisions.Cut is { Count: > 0 } cut ? [.. cut] : null,
             VideoAspect = item.Decisions.VideoAspect,
             Studio = item.Group.Decisions.Studio.GetValueOrDefault(item.File.Path),

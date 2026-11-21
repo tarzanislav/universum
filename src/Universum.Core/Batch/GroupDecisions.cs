@@ -58,6 +58,12 @@ public sealed class GroupDecisions
     public HashSet<SlotKey> Removed { get; } = [];
 
     /// <summary>
+    /// Chapters added to files every so long, by the files' paths (owner, 21. 11. 2026: to the films without chapters, or
+    /// to the files chosen).
+    /// </summary>
+    public Dictionary<string, TimeSpan> ChaptersEvery { get; } = new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
+    /// <summary>
     /// The order of slots the user gave (owner, 29. 10. 2026: dragged up or down); the slots not listed follow in the
     /// rules' order.
     /// </summary>

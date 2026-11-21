@@ -107,6 +107,11 @@ public static class UniversumRules
             RepairIndex = missingIndex && profile.RepairIndex,
             KeepMp4 = profile.KeepMp4,
             NewTitle = "",
+            // a film cut in Úprava videostopy keeps its own chapters (the times would not fit the parts kept)
+            NewChapters = decisions.ChaptersEvery is { } every && every > TimeSpan.Zero && decisions.Cut is not { Count: > 0 } &&
+                          file.Duration is { } length && length > TimeSpan.Zero
+                ? Chapters.ChapterChecks.Every(every, length, LanguageTag.Undetermined)
+                : null,
             Cut = decisions.Cut is { Count: > 0 } cut ? cut : null,
         };
     }

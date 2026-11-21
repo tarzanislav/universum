@@ -1269,6 +1269,27 @@ public sealed class BatchTests
     }
 
     [Test]
+    public void ChaptersAddedEverySoLong()
+    {
+        // owner, 21. 11. 2026: chapters added in Hromadné – a structure without names of its own, every 10 minutes
+        var file = new MediaFile
+        {
+            Path = "x.mkv",
+            Duration = TimeSpan.FromMinutes(25),
+            Tracks = [new MediaTrack { Id = 0, Type = TrackType.Video }, new MediaTrack { Id = 1, Type = TrackType.Audio, Language = new LanguageTag("cze", "cs") }],
+        };
+        var group = new BatchGroup(StructureSignature.Of(file), 0);
+        group.Files.Add(file);
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        Assert.True(BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single().Target.NewChapters is null, "without a choice the file's chapters stay");
+        group.Decisions.ChaptersEvery["x.mkv"] = TimeSpan.FromMinutes(10);
+        var item = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly).Single();
+        Assert.Equal("00:00:00.000 Kapitola 01, 00:10:00.000 Kapitola 02, 00:20:00.000 Kapitola 03",
+            string.Join(", ", item.Target.NewChapters!.Select(c => $"{c.Start:hh\\:mm\\:ss\\.fff} {c.Name}")), "three chapters over 25 minutes");
+        Assert.True(item.Plan.Changes.Any(c => c.Kind == Universum.Core.Planning.ChangeKind.Chapters), "planned as a change");
+    }
+
+    [Test]
     public void TracksLeftOutByTheUser()
     {
         // owner, 21. 11. 2026: any subtitles can be left out, even all of them; the last sound of a file never

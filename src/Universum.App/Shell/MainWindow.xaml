@@ -1792,6 +1792,19 @@
                                 </TextBlock>
                                 <Button Content="{loc:T 'Priečinok…'}" Command="{Binding ChooseOutputDirectoryCommand}" Padding="10,3" />
                             </WrapPanel>
+                            <!-- owner, 21. 11. 2026: chapters added every N minutes – to the files without chapters, or to the files selected -->
+                            <WrapPanel Margin="0,6,0,0">
+                                <TextBlock Text="{loc:T 'Kapitoly každých'}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding ChapterMinutes, UpdateSourceTrigger=PropertyChanged}" Width="50" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <TextBlock Text="{loc:T 'min:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Button Content="{loc:T 'Doplniť súborom bez kapitol'}" Command="{Binding AddChaptersCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Všetkým súborom Hromadného spracovania, ktoré nemajú kapitoly – Kapitola 01, 02 … po celej dĺžke; súbor s kapitolami ostane, ako je'}" />
+                                <Button Content="{loc:T 'Vybraným súborom'}" Command="{Binding AddChaptersSelectedCommand}" Padding="10,3" Margin="0,0,6,0"
+                                        ToolTip="{loc:T 'Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)'}" />
+                                <Button Content="{loc:T 'Bez pridaných kapitol'}" Command="{Binding ClearChaptersCommand}" Padding="10,3" Margin="0,0,8,0"
+                                        ToolTip="{loc:T 'Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami'}" />
+                                <TextBlock Text="{Binding ChaptersNote}" Style="{StaticResource Hint}" VerticalAlignment="Center" />
+                            </WrapPanel>
                             <WrapPanel Margin="0,6,0,0">
                                 <TextBlock Text="{Binding KindLabel}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
                                 <RadioButton Content="{loc:T 'filmy'}" IsChecked="{Binding IsMovies}" GroupName="batchKind" VerticalAlignment="Center" Margin="0,0,12,0"

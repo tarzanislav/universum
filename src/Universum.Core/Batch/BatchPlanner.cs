@@ -207,6 +207,7 @@ public static class BatchPlanner
             Languages = languages,
             Forced = forced,
             Removed = removed.Select(k => trackOf[k]).ToHashSet(),
+            ChaptersEvery = group.Decisions.ChaptersEvery.TryGetValue(file.Path, out var every) ? every : null,
             Kept = group.Decisions.Kept.Where(k => trackOf.ContainsKey(k) && !group.Decisions.Removed.Contains(k)).Select(k => trackOf[k]).ToHashSet(),
             ToSrt = group.Decisions.ToSrt.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToHashSet(),
             Order = group.Decisions.Order.Where(trackOf.ContainsKey).Select(k => trackOf[k]).ToList(),

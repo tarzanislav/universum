@@ -332,6 +332,16 @@ internal static partial class SelfTest
                 "batch: Odstrániť taken back");
         }
 
+        // owner, 21. 11. 2026: chapters every 10 minutes for the files without chapters, then taken back
+        batch.ChapterMinutes = "10";
+        batch.AddChaptersCommand.Execute(null);
+        var withoutChapters = batch.Items.Count(i => !i.File.HasChapters);
+        Check(batch.Items.Count(i => i.Target.NewChapters is { Count: > 0 }) == withoutChapters &&
+              batch.FileRows.Where(f => f.Item.Target.NewChapters is not null).All(f => f.Chapters.Contains('→', StringComparison.Ordinal)),
+            $"batch: chapters added to the {withoutChapters} files without chapters – {batch.RunState}");
+        batch.ClearChaptersCommand.Execute(null);
+        Check(batch.Items.All(i => i.Target.NewChapters is null), "batch: the chapters added taken back");
+
         batch.AcceptSuggestionsCommand.Execute(null);
         batch.SeriesTitle = "Seriál (2026)";
         Check(batch.Items.Count(i => i.Status == Core.Batch.BatchStatus.Remux) == 3, "batch: group decision applies to all three episodes");

@@ -3505,6 +3505,18 @@ internal static class Translations
         ["Titulky v jazykoch mimo zoznamu (Nastavenia) sa neodstránia – všetky naraz; jednotlivo ich ponecháte pri stope"] = "Titulky v jazycích mimo seznamu (Nastavení) se neodstraní – všechny najednou; jednotlivě je ponecháte u stopy",
         ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení."] = "Stopa nebude ve výsledku (pro celou skupinu, u Všechny pro všechny varianty); poslední zvuk souboru se neodstraní nikdy. Originál se nemění.",
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete na stránke Kapitoly (napr. každých 10 minút)."] = "Počet kapitol v souboru – jen informace, zůstanou ve výsledku. Přidat je můžete na stránce Kapitoly (např. každých 10 minut).",
+        ["Kapitoly každých"] = "Kapitoly každých",
+        ["min:"] = "min:",
+        ["Doplniť súborom bez kapitol"] = "Doplnit souborům bez kapitol",
+        ["Všetkým súborom Hromadného spracovania, ktoré nemajú kapitoly – Kapitola 01, 02 … po celej dĺžke; súbor s kapitolami ostane, ako je"] = "Všem souborům Hromadného zpracování, které nemají kapitoly – Kapitola 01, 02 … po celé délce; soubor s kapitolami zůstane, jak je",
+        ["Vybraným súborom"] = "Vybraným souborům",
+        ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "Souborům označeným v seznamu (Ctrl / Shift) – i těm, které kapitoly mají (nahradí se)",
+        ["Bez pridaných kapitol"] = "Bez přidaných kapitol",
+        ["Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami"] = "Přidané kapitoly zruší – soubory zůstanou se svými kapitolami",
+        ["Pridané kapitoly zrušené – súbory ostanú so svojimi kapitolami."] = "Přidané kapitoly zrušeny – soubory zůstanou se svými kapitolami.",
+        ["Kapitoly sa pridajú súborom: {0}."] = "Kapitoly se přidají souborům: {0}.",
+        ["Žiadny súbor bez kapitol – nič sa nepridá."] = "Žádný soubor bez kapitol – nic se nepřidá.",
+        ["Kapitoly každých {0} min sa pridajú súborom: {1} (stĺpec Kapitoly)."] = "Kapitoly každých {0} min se přidají souborům: {1} (sloupec Kapitoly).",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7006,5 +7018,17 @@ internal static class Translations
         ["Titulky v jazykoch mimo zoznamu (Nastavenia) sa neodstránia – všetky naraz; jednotlivo ich ponecháte pri stope"] = "Subtitles in languages out of the list (Settings) are not removed – all at once; keep single ones at the track",
         ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení."] = "The track will not be in the result (for the whole group, with All for all variants); the last sound of a file is never removed. The original does not change.",
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete na stránke Kapitoly (napr. každých 10 minút)."] = "The number of chapters in the file – information only, they stay in the result. Add them on the page Chapters (e.g. every 10 minutes).",
+        ["Kapitoly každých"] = "Chapters every",
+        ["min:"] = "min:",
+        ["Doplniť súborom bez kapitol"] = "Add to files without chapters",
+        ["Všetkým súborom Hromadného spracovania, ktoré nemajú kapitoly – Kapitola 01, 02 … po celej dĺžke; súbor s kapitolami ostane, ako je"] = "To every file of Batch processing without chapters – Kapitola 01, 02 … over the whole length; a file with chapters stays as it is",
+        ["Vybraným súborom"] = "To the selected files",
+        ["Súborom označeným v zozname (Ctrl / Shift) – aj tým, ktoré kapitoly majú (nahradia sa)"] = "To the files selected in the list (Ctrl / Shift) – also those with chapters (they are replaced)",
+        ["Bez pridaných kapitol"] = "Without added chapters",
+        ["Pridané kapitoly zruší – súbory ostanú so svojimi kapitolami"] = "Takes the added chapters back – the files keep their own",
+        ["Pridané kapitoly zrušené – súbory ostanú so svojimi kapitolami."] = "Added chapters taken back – the files keep their own.",
+        ["Kapitoly sa pridajú súborom: {0}."] = "Chapters will be added to files: {0}.",
+        ["Žiadny súbor bez kapitol – nič sa nepridá."] = "No file without chapters – nothing is added.",
+        ["Kapitoly každých {0} min sa pridajú súborom: {1} (stĺpec Kapitoly)."] = "Chapters every {0} min will be added to files: {1} (column Chapters).",
     };
 }

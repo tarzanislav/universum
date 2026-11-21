@@ -293,11 +293,11 @@ internal static partial class SelfTest
         // owner, 21. 11. 2026: the name in the file taken as the track name (the year of a dub, its studio)
         if (batch.SlotRows.FirstOrDefault(s => s.CanCopyName) is { } copied)
         {
-            var named = copied.TrackName;
+            var nameBefore = copied.TrackName;
             copied.CopyNameCommand.Execute(null);
             Check(copied.TrackName == copied.Name && batch.Items.Where(i => i.Group == copied.Group).All(i => i.Target.Tracks.Any(t => t.Name == copied.Name)),
                 $"batch: Názov v súbore copied to Názov stopy – „{copied.TrackName}“");
-            copied.TrackName = named;
+            copied.TrackName = nameBefore;
             Check(!copied.Group.Decisions.Names.ContainsKey(copied.Key), "batch: the copied name taken back");
         }
         else

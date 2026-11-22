@@ -259,7 +259,8 @@ internal static partial class SelfTest
         string Subtitles() => string.Join(",", batch.Items.First(i => i.Group == forcedSlot.Group).Target.Tracks
             .Where(t => t.Type == TrackType.Subtitles).Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
         var before = Order();
-        Check(batch.SlotRows[0].Key == new Core.Batch.SlotKey(TrackType.Audio, 1) && Subtitles() == "cs!,cs,en",
+        // the picture first (22. 11. 2026), then the sounds in the order of the result
+        Check(batch.SlotRows[0].IsVideo && batch.SlotRows.First(s => !s.IsVideo).Key == new Core.Batch.SlotKey(TrackType.Audio, 1) && Subtitles() == "cs!,cs,en",
             $"batch: the tracks shown in the order of the result – {before} | {Subtitles()}");
         var english = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 2));
         english.MoveUpCommand.Execute(null);

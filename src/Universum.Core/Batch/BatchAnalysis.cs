@@ -31,12 +31,7 @@ public sealed record BatchAnalysis(
     /// </summary>
     public BatchAnalysis Joined(BatchAnalysis part)
     {
-        var added = part.Groups.Select((g, i) =>
-        {
-            var group = new BatchGroup(g.Signature, Groups.Count + i);
-            group.Files.AddRange(g.Files);
-            return group;
-        }).ToList();
+        var added = part.Groups.Select((g, i) => BatchGroup.Of(g.Signature, Groups.Count + i, g.Files)).ToList();
         return this with { Groups = [.. added, .. Groups], Failed = [.. Failed, .. part.Failed] };
     }
 
@@ -52,9 +47,7 @@ public sealed record BatchAnalysis(
         {
             foreach (var title in group.Files.GroupBy(f => titleOf(f.Path), IO.Paths.Comparer))
             {
-                var part = new BatchGroup(group.Signature, split.Count);
-                part.Files.AddRange(title);
-                split.Add(part);
+                split.Add(BatchGroup.Of(group.Signature, split.Count, title));
             }
         }
 
@@ -320,12 +313,7 @@ public static class BatchAnalyzer
             .Select((signature, position) => (signature, position))
             .OrderByDescending(x => bySignature[x.signature].Count)
             .ThenBy(x => x.position)
-            .Select((x, index) =>
-            {
-                var group = new BatchGroup(x.signature, index);
-                group.Files.AddRange(bySignature[x.signature]);
-                return group;
-            })
+            .Select((x, index) => BatchGroup.Of(x.signature, index, bySignature[x.signature]))
             .ToList();
 
         return new BatchAnalysis(folder, recursive, groups, failed, leftovers) { Folders = roots };

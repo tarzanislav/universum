@@ -74,8 +74,9 @@ public static class BatchTitles
     }
 
     /// <summary>
-    /// The tracks of a title across its variants: the tracks of the main variant in its order, each with the same track of
-    /// the other variants, then the tracks only some variants carry. The same track = the same type, the same language
+    /// The tracks of a title across its variants: its pictures (the n-th video track of each variant together), then the
+    /// tracks of the main variant in its order, each with the same track of the other variants, then the tracks only some
+    /// variants carry. The same track = the same type, the same language
     /// written in the file, the same Forced and kind (inside the file or a file of its own), the n-th such track of the
     /// variant with the n-th of the other (a film with two English sounds – the film and a commentary). A track without a
     /// language is never paired: what it is, is decided for its own variant (nothing is guessed blindly).
@@ -83,6 +84,23 @@ public static class BatchTitles
     public static IReadOnlyList<TitleSlot> Slots(BatchTitle title)
     {
         var main = title.Main;
+        // the pictures first (owner, 22. 11. 2026): the n-th video track of a variant is the n-th of the main one
+        var pictures = SlotKey.Videos(main.Representative).Select(x => new TitleSlot(main, x.Key, x.Track)).ToList();
+        foreach (var variant in title.Variants.Where(v => !ReferenceEquals(v, main)))
+        {
+            foreach (var (key, track) in SlotKey.Videos(variant.Representative))
+            {
+                if (pictures.FirstOrDefault(p => p.Key == key && p.Group != variant && p.Peers.All(x => x.Group != variant)) is { } same)
+                {
+                    same.Peers.Add((variant, key));
+                }
+                else
+                {
+                    pictures.Add(new TitleSlot(variant, key, track));
+                }
+            }
+        }
+
         var slots = SlotKey.Of(main.Representative).Select(x => new TitleSlot(main, x.Key, x.Track)).ToList();
         foreach (var variant in title.Variants.Where(v => !ReferenceEquals(v, main)))
         {
@@ -105,7 +123,7 @@ public static class BatchTitles
             }
         }
 
-        return slots;
+        return [.. pictures, .. slots];
     }
 
     private static bool Pairable(MediaTrack track) => !track.Language.IsUndetermined;

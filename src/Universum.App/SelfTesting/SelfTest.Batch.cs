@@ -259,7 +259,8 @@ internal static partial class SelfTest
         string Subtitles() => string.Join(",", batch.Items.First(i => i.Group == forcedSlot.Group).Target.Tracks
             .Where(t => t.Type == TrackType.Subtitles).Select(t => t.Language.Primary + (t.Flags.Forced ? "!" : "")));
         var before = Order();
-        Check(batch.SlotRows[0].Key == new Core.Batch.SlotKey(TrackType.Audio, 1) && Subtitles() == "cs!,cs,en",
+        // the picture first (22. 11. 2026), then the sounds in the order of the result
+        Check(batch.SlotRows[0].IsVideo && batch.SlotRows.First(s => !s.IsVideo).Key == new Core.Batch.SlotKey(TrackType.Audio, 1) && Subtitles() == "cs!,cs,en",
             $"batch: the tracks shown in the order of the result – {before} | {Subtitles()}");
         var english = batch.SlotRows.First(s => s.Key == new Core.Batch.SlotKey(TrackType.Subtitles, 2));
         english.MoveUpCommand.Execute(null);
@@ -330,6 +331,23 @@ internal static partial class SelfTest
             leftOut.Removed = false;
             Check(!leftOut.IsLeftOut && batch.Items.First(i => i.Group == leftOut.Group).Target.Tracks.Count(t => t.Type == TrackType.Subtitles) == countBefore,
                 "batch: Odstrániť taken back");
+        }
+
+        // owner, 22. 11. 2026: the picture shown first among the tracks; the file's only one is never left out
+        if (batch.SlotRows.FirstOrDefault(s => s.IsVideo) is { } picture)
+        {
+            Check(batch.SlotRows.IndexOf(picture) == 0 && !picture.CanMove && !picture.HasLanguage && !picture.NeedsLanguage,
+                $"batch: the video track shown first – „{picture.Slot}“, {picture.Evidence}");
+            if (!picture.CanRemove)
+            {
+                picture.Removed = true;
+                Check(!picture.Removed && batch.Items.Where(i => i.Group == picture.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Video)),
+                    "batch: the only picture of a file is not left out");
+            }
+        }
+        else
+        {
+            Check(false, "batch: no video track among the tracks of the group");
         }
 
         // owner, 21. 11. 2026: chapters every 5 minutes (the default) for the files without chapters, then taken back

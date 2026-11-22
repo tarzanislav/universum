@@ -194,12 +194,18 @@ public static class BatchPlanner
             }
         }
 
-        var trackOf = SlotKey.Of(file).ToDictionary(x => x.Key, x => x.Track.Id);
+        var trackOf = SlotKey.WithVideos(file).ToDictionary(x => x.Key, x => x.Track.Id);
         // the sounds the user leaves out – never all of the file's sounds (a film without sound is no result)
         var removed = group.Decisions.Removed.Where(trackOf.ContainsKey).ToList();
         if (removed.Count(k => k.Type == TrackType.Audio) >= SlotKey.Of(file).Count(x => x.Key.Type == TrackType.Audio))
         {
             removed.RemoveAll(k => k.Type == TrackType.Audio);
+        }
+
+        // nor all of its pictures (owner, 22. 11. 2026: a cover stored as a second video track is left out, the film stays)
+        if (removed.Count(k => k.Type == TrackType.Video) >= SlotKey.Videos(file).Count())
+        {
+            removed.RemoveAll(k => k.Type == TrackType.Video);
         }
 
         var decisions = new TrackDecisions

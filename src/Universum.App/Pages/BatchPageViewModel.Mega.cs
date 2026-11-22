@@ -251,6 +251,21 @@ public sealed partial class BatchPageViewModel
 
                 group.Decisions.Kept.UnionWith(file.Kept.Where(slots.ContainsKey).Select(id => slots[id]));
                 group.Decisions.Removed.UnionWith(file.Removed.Where(slots.ContainsKey).Select(id => slots[id]));
+                // the pictures as they were left (owner, 22. 11. 2026: a cover suggested to be left out may have been kept)
+                var pictures = SlotKey.Videos(media).ToList();
+                foreach (var (key, track) in pictures)
+                {
+                    // a file's only picture is left out only when it is written anew (the studio's decision, not the group's)
+                    if (file.Removed.Contains(track.Id) && pictures.Count > 1)
+                    {
+                        group.Decisions.Removed.Add(key);
+                    }
+                    else
+                    {
+                        group.Decisions.Removed.Remove(key);
+                    }
+                }
+
                 if (file.ChaptersEvery is { } every)
                 {
                     group.Decisions.ChaptersEvery[path] = every;

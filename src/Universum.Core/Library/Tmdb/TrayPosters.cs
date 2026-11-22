@@ -16,6 +16,48 @@ public sealed record CsfdPage(int CsfdId, string? Imdb, TabTitle? Title)
 {
     /// <summary>"Vymyslený film (2026)" or "ČSFD 12345".</summary>
     public string Display => Title?.Display ?? "ČSFD " + CsfdId.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The original name as the page gives it (owner, 22. 11. 2026: for a title only on ČSFD); null when not sent.</summary>
+    public string? Original { get; init; }
+
+    /// <summary>The genres as the page gives them ("Komedie / Drama").</summary>
+    public string? Genres { get; init; }
+
+    /// <summary>The countries of origin ("Česko, Slovensko").</summary>
+    public string? Countries { get; init; }
+
+    /// <summary>The plot as the page gives it (the first one).</summary>
+    public string? Plot { get; init; }
+
+    /// <summary>The page of the title on ČSFD.</summary>
+    public Uri Link => new($"https://www.csfd.cz/film/{CsfdId.ToString(CultureInfo.InvariantCulture)}/");
+
+    /// <summary>
+    /// The title as a detail for the poster page (owner, 22. 11. 2026: a title not on TMDB, its poster drawn by AI from what
+    /// ČSFD says): no TMDB ID (0); the folder named by the original name when it is in Latin script, else by the name of the
+    /// page. Null without a name and year.
+    /// </summary>
+    public TmdbDetails? AsDetails()
+    {
+        if (Title is not { } title)
+        {
+            return null;
+        }
+
+        var original = Original is { Length: > 0 } o && LibraryNames.IsLatinScript(o) && LibraryNames.Clean(o).Length > 0 ? o : title.Name;
+        return new TmdbDetails
+        {
+            Kind = title.Kind,
+            Id = 0,
+            OriginalTitle = original,
+            EnglishTitle = original,
+            CzechTitle = title.Name,
+            Year = title.Year,
+            Genres = TmdbGenres.Ids(Genres),
+            Overview = Plot ?? "",
+            Imdb = Imdb,
+        };
+    }
 }
 
 /// <summary>

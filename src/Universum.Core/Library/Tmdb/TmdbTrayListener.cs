@@ -131,6 +131,7 @@ public sealed class TmdbTrayListener : IDisposable
         string? title;
         string? imdb;
         string? image;
+        (string? Original, string? Genres, string? Countries, string? Plot) about;
         bool sentByItself;
         try
         {
@@ -140,6 +141,8 @@ public sealed class TmdbTrayListener : IDisposable
             title = Text("t");
             imdb = Text("m");
             image = Text("i");
+            // what a ČSFD page says of its title (owner, 22. 11. 2026: a poster drawn by AI for a title only on ČSFD)
+            about = (Short(Text("o"), 300), Short(Text("g"), 300), Short(Text("c"), 300), Short(Text("p"), 3000));
 
             // "a": sent by itself (true) or by the button (false); a script of 1.0 does not say – it sent by itself
             sentByItself = !(json.RootElement.ValueKind == JsonValueKind.Object && json.RootElement.TryGetProperty("a", out var a) && a.ValueKind == JsonValueKind.False);
@@ -163,10 +166,12 @@ public sealed class TmdbTrayListener : IDisposable
                 return (404, "text/plain", "");
             }
 
-            if (TmdbTray.FromCsfdPage(page, title, imdb) is not { } csfd)
+            if (TmdbTray.FromCsfdPage(page, title, imdb) is not { } found)
             {
                 return (422, "text/plain", "");
             }
+
+            var csfd = found with { Original = about.Original, Genres = about.Genres, Countries = about.Countries, Plot = about.Plot };
 
             return sentByItself && !_automatic() ? (202, "text/plain", "") : Later(() => _csfd(csfd, sentByItself));
         }
@@ -193,6 +198,19 @@ public sealed class TmdbTrayListener : IDisposable
         }
 
         return (204, "text/plain", "");
+    }
+
+    // a text of the page, its spaces joined, at most so long (cut at a word); null when empty
+    private static string? Short(string? text, int most)
+    {
+        var joined = text is null ? "" : string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (joined.Length > most)
+        {
+            var cut = joined.LastIndexOf(' ', most);
+            joined = joined[..(cut > most / 2 ? cut : most)] + "…";
+        }
+
+        return joined.Length > 0 ? joined : null;
     }
 
     // done after the answer (it may ask TMDB and download a picture); what goes wrong is told by UNIVERSUM itself

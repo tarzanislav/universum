@@ -45,6 +45,28 @@ public sealed class TitleCardViewModel : ObservableObject
     private ImageSource? _chosenPoster;
     private string _status = "";
     private bool _loading;
+    private readonly Uri? _csfd;
+
+    /// <summary>
+    /// The card of a title only on ČSFD (owner, 22. 11. 2026): what its page says – names, year, genres, plot – and its link;
+    /// TMDB is not asked.
+    /// </summary>
+    public TitleCardViewModel(AppServices services, TmdbDetails details, Uri csfd, string? countries)
+    {
+        _services = services;
+        _details = details;
+        _csfd = csfd;
+        Countries = countries ?? "";
+        Kind = details.Kind;
+        Poster = new PosterThumb(services, () => Task.FromResult<string?>(null), PosterSize.Large);
+        Loading = LoadAsync();
+    }
+
+    /// <summary>The countries of a title only on ČSFD.</summary>
+    public string Countries { get; } = "";
+
+    /// <summary>The title is only on ČSFD (no TMDB).</summary>
+    public bool OnlyCsfd => _csfd is not null;
 
     public TitleCardViewModel(AppServices services, MediaKind kind, int? tmdbId, TitleSeed? seed = null)
     {
@@ -206,7 +228,7 @@ public sealed class TitleCardViewModel : ObservableObject
     private void Fill()
     {
         var d = _details;
-        var ids = d is null ? _seed?.Ids ?? new TitleIds(Tmdb: TmdbId) : new TitleIds(_seed?.Ids.Histra, d.Id, d.Imdb ?? _seed?.Ids.Imdb, _seed?.Ids.Trakt, d.Tvdb ?? _seed?.Ids.Tvdb);
+        var ids = d is null ? _seed?.Ids ?? new TitleIds(Tmdb: TmdbId) : new TitleIds(_seed?.Ids.Histra, d.Id > 0 ? d.Id : null, d.Imdb ?? _seed?.Ids.Imdb, _seed?.Ids.Trakt, d.Tvdb ?? _seed?.Ids.Tvdb);
         var original = d?.OriginalTitle ?? _seed?.OriginalTitle ?? "";
         var latin = LibraryNames.IsLatinScript(original);
         var searchName = latin ? original : d?.CzechTitle is { Length: > 0 } cz ? cz : d?.EnglishTitle ?? _seed?.LocalTitle ?? original;
@@ -216,7 +238,7 @@ public sealed class TitleCardViewModel : ObservableObject
             ("TMDB", TitleLinks.Tmdb(Kind, ids.Tmdb)),
             ("IMDb", TitleLinks.Imdb(ids.Imdb)),
             ("Trakt", TitleLinks.Trakt(Kind, ids.Tmdb)),
-            (Loc.T("ČSFD (hľadať)"), TitleLinks.CsfdSearch(searchName)),
+            _csfd is null ? (Loc.T("ČSFD (hľadať)"), TitleLinks.CsfdSearch(searchName)) : ("ČSFD", _csfd),
         }.Where(l => l.Item2 is not null).Select(l => new TitleLink(l.Item1, l.Item2!)).ToList();
         Ids = new[]
         {
@@ -235,6 +257,7 @@ public sealed class TitleCardViewModel : ObservableObject
         Facts = string.Join(" · ", new[]
         {
             Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"),
+            Countries.Length > 0 ? Countries : null,
             Kind == MediaKind.Series && d?.Seasons is { } seasons ? Count(seasons, Loc.T("séria"), Loc.T("série"), Loc.T("sérií")) : null,
             Kind == MediaKind.Series && d?.Episodes is { } episodes ? Count(episodes, Loc.T("epizóda"), Loc.T("epizódy"), Loc.T("epizód")) : null,
             runtime is { } minutes ? (Kind == MediaKind.Series ? Loc.T("epizóda ") : "") + Length(minutes) : null,

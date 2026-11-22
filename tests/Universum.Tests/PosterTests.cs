@@ -303,6 +303,85 @@ public sealed class PosterTests
     }
 
     [Test]
+    public async Task APosterOfATitleOnlyOnCsfdDescribedFirst()
+    {
+        // owner, 22. 11. 2026: a title not on TMDB – what its ČSFD page says; AI writes the description first (seen and edited),
+        // with the user's wishes, then draws by it; Cloudflare gets it in English
+        var page = new CsfdPage(4242, null, new TabTitle("Vymyslený kapor", 1987, MediaKind.Movie))
+        {
+            Original = "Vymyšlený kapr", Genres = "Komedie / Drama / Pohádka", Countries = "Československo", Plot = "Kapor sa zamiluje do rybára.",
+        };
+        var details = page.AsDetails()!;
+        Assert.True(details is { Id: 0, OriginalTitle: "Vymyšlený kapr", CzechTitle: "Vymyslený kapor", Year: 1987, Overview: "Kapor sa zamiluje do rybára." } &&
+                    details.Genres.SequenceEqual([35, 18, 10751, 14]) && details.Title is { Name: "Vymyšlený kapr", Year: 1987 } && page.Link.AbsoluteUri == "https://www.csfd.cz/film/4242/",
+            $"the detail of a ČSFD page – {string.Join(",", details.Genres)}");
+        Assert.True(TmdbGenres.Ids("Akčný / Komédia / Životopisný / Neznámy").SequenceEqual([28, 35, 18, 36]), "the genres of csfd.sk");
+
+        var (system, user) = PosterDrafts.DescribePrompt(details, page.Countries, "tmavomodré tóny", "Slovak");
+        Assert.True(system.Contains("Write in Slovak", StringComparison.Ordinal) && system.Contains("never a real or recognizable person", StringComparison.Ordinal) &&
+                    user.Contains("Countries: Československo", StringComparison.Ordinal) && user.Contains("Plot: Kapor sa zamiluje", StringComparison.Ordinal) &&
+                    user.Contains("Wishes for the poster: tmavomodré tóny", StringComparison.Ordinal) && user.Contains("comedy", StringComparison.Ordinal),
+            "what the description is written from – " + user);
+
+        var jpeg = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0 };
+        var server = new Server();
+        server.ByAddress = uri => uri.AbsolutePath.Contains("llama", StringComparison.Ordinal) ? """{ "result": { "response": " \"Modrý kapor pri mesiaci.\" " }, "success": true }"""
+            : uri.Host == "api.openai.com" && uri.AbsolutePath.EndsWith("/chat/completions", StringComparison.Ordinal) ? """{ "choices": [ { "message": { "content": "Kapor v modrom svetle." } } ] }"""
+            : $$"""{ "result": { "image": "{{Convert.ToBase64String(jpeg)}}" }, "data": [ { "b64_json": "{{Convert.ToBase64String(jpeg)}}" } ] }""";
+        var drafts = new PosterDrafts(server.Http);
+        var free = new DraftKeys(new string('a', 32), new string('t', 40), null);
+        var brief = await drafts.DescribeAsync(details, page.Countries, "tmavomodré tóny", "Slovak", free);
+        Assert.True(brief is { Text: "Modrý kapor pri mesiaci.", Service: "Cloudflare" } && server.Requests[^1].EndsWith("/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast", StringComparison.Ordinal) &&
+                    server.Bodies[^1].Contains("tmavomodr", StringComparison.Ordinal), $"the description by Cloudflare – {brief.Text} {brief.Problem}");
+
+        var drawn = await drafts.CreateAsync(details, "Modrý kapor pri mesiaci, ešte viac modrej.", "Slovak", free);
+        Assert.True(drawn is { Picture.Length: 10 } && server.Requests.Count == 3 && server.Bodies[1].Contains("Translate", StringComparison.Ordinal) &&
+                    server.Requests[2].EndsWith("flux-2-klein-4b", StringComparison.Ordinal) && server.Bodies[2].Contains("Poster concept: Modrý kapor pri mesiaci.", StringComparison.Ordinal),
+            "Cloudflare draws by the description put into English – " + server.Bodies[^1]);
+
+        var paid = new DraftKeys(null, null, "sk-" + new string('k', 40));
+        var written = await drafts.DescribeAsync(details, null, null, "Slovak", paid);
+        var painted = await drafts.CreateAsync(details, written.Text!, "Slovak", paid);
+        Assert.True(written is { Text: "Kapor v modrom svetle.", Service: "OpenAI" } && painted is { Picture.Length: 10 } && server.Requests.Count == 5 &&
+                    server.Bodies[^1].Contains("Poster concept: Kapor v modrom svetle.", StringComparison.Ordinal), "OpenAI writes and draws the description as it is");
+
+        server.Status = HttpStatusCode.TooManyRequests;
+        Assert.True((await drafts.DescribeAsync(details, null, null, "Slovak", free)) is { Text: null, Problem: not null }, "a refusal said");
+    }
+
+    [Test]
+    public void TitlesOnlyOnCsfdKept()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "universum-csfd-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new CsfdTitles(Path.Combine(root, "csfd.json"));
+            Assert.True(store.All().Count == 0, "nothing yet");
+            store.Add(new CsfdPage(1, null, new TabTitle("Prvý vymyslený", 2001, MediaKind.Movie)) { Plot = "Dej." });
+            store.Add(new CsfdPage(2, "tt0000002", new TabTitle("Druhý vymyslený", 2002, MediaKind.Series)) { Genres = "Krimi" });
+            store.Add(new CsfdPage(1, null, new TabTitle("Prvý vymyslený", 2001, MediaKind.Movie)) { Plot = "Nový dej." });
+            store.Add(new CsfdPage(3, null, null));
+            var all = store.All();
+            Assert.True(all is [{ CsfdId: 1, Plot: "Nový dej." }, { CsfdId: 2, Imdb: "tt0000002", Genres: "Krimi", Title.Kind: MediaKind.Series }], "the newest first, once each, only with a name");
+            for (var i = 10; i < 10 + CsfdTitles.Most; i++)
+            {
+                store.Add(new CsfdPage(i, null, new TabTitle("Vymyslený " + i, 2000, MediaKind.Movie)));
+            }
+
+            Assert.True(store.All().Count == CsfdTitles.Most && store.All()[0].CsfdId == 9 + CsfdTitles.Most, "at most so many");
+            store.Remove(9 + CsfdTitles.Most);
+            Assert.True(store.All().All(p => p.CsfdId != 9 + CsfdTitles.Most), "forgotten");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
     public void RatingsOfOmdb()
     {
         var ratings = OmdbClient.Parse("""

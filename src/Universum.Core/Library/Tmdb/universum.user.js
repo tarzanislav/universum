@@ -31,9 +31,40 @@
     return id ? id[1] : null;
   }
 
+  // a text of the page, its spaces joined; '' when there is none
+  function text(selector) {
+    const element = document.querySelector(selector);
+    return element ? element.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  // what a page of ČSFD says of its title (owner, 22. 11. 2026: a poster drawn by AI for a title not on TMDB) – the original
+  // name, the genres, the countries and the plot; only to UNIVERSUM on this computer
+  function about(data) {
+    let described = null;
+    document.querySelectorAll('script[type="application/ld+json"]').forEach(function (script) {
+      try {
+        const json = JSON.parse(script.textContent);
+        if (json && (json['@type'] === 'Movie' || json['@type'] === 'TVSeries')) {
+          described = json;
+        }
+      } catch (e) { }
+    });
+    const names = Array.prototype.map.call(document.querySelectorAll('.film-names li'), function (item) {
+      return item.textContent.replace(/\s+/g, ' ').replace(/\((více|viac)\)/g, '').trim();
+    }).filter(function (name) { return name.length > 0; });
+    data.o = names.length > 0 ? names[0] : '';
+    data.g = text('.genres') || (described && described.genre ? [].concat(described.genre).join(' / ') : '');
+    data.c = text('.origin').split(/,\s*\d/)[0].trim();
+    data.p = text('.plot-full p') || text('.plot-full') || text('.plot-preview p') || text('.plot-preview') ||
+      (described && typeof described.description === 'string' ? described.description : '');
+  }
+
   function post(path, data, done) {
     if (CSFD) {
       data.m = imdb();
+      if (path === '/csfd') {
+        about(data);
+      }
     }
 
     GM_xmlhttpRequest({

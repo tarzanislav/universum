@@ -255,6 +255,16 @@ public sealed class TmdbTrayService : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The titles of ČSFD not found on TMDB (owner, 22. 11. 2026): their posters drawn by AI from what their pages say.
+    /// </summary>
+    public CsfdTitles CsfdOnly => _csfdOnly ??= new CsfdTitles(AppSettings.CsfdTitlesFile);
+
+    private CsfdTitles? _csfdOnly;
+
+    /// <summary>A title of ČSFD not on TMDB was kept.</summary>
+    public event Action? CsfdOnlyChanged;
+
     /// <summary>The posters picked into the tray (ČSFD, TMDB), kept per title.</summary>
     public TrayPosters Posters => _posters ??= new TrayPosters(AppSettings.TrayPosterDirectory);
 
@@ -285,9 +295,27 @@ public sealed class TmdbTrayService : ObservableObject
     {
         if (await FindAsync(page) is not { } found)
         {
+            // owner, 22. 11. 2026: a title only on ČSFD – kept with what its page says, for a poster drawn by AI
+            var kept = false;
+            if (page.Title is not null && _services.PosterTmdb is not null)
+            {
+                try
+                {
+                    CsfdOnly.Add(page);
+                    kept = true;
+                    CsfdOnlyChanged?.Invoke();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    kept = false;
+                }
+            }
+
             if (!byItself)
             {
-                TrayToast.Show(Loc.F("{0} z ČSFD sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach alebo pridajte titul cez TMDB.", page.Display));
+                TrayToast.Show(kept
+                    ? Loc.F("{0} nie je na TMDB – je v TMDB poster → Len na ČSFD (plagát cez AI z obsahu ČSFD).", page.Display)
+                    : Loc.F("{0} z ČSFD sa na TMDB nenašiel – zadajte kľúč TMDB v Nastaveniach alebo pridajte titul cez TMDB.", page.Display));
             }
 
             return;

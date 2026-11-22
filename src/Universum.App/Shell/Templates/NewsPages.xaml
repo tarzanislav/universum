@@ -308,6 +308,12 @@
                 <!-- owner, 8. 11. 2026: a title of the Zásobník TMDB with one click – its posters picked on ČSFD or TMDB first -->
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
                     <ContentControl Content="{Binding Tray}" Focusable="False" IsTabStop="False" VerticalAlignment="Center" />
+                    <!-- owner, 22. 11. 2026: the titles of ČSFD not on TMDB – a poster drawn by AI from what ČSFD says -->
+                    <TextBlock Text="{loc:T 'Len na ČSFD:'}" VerticalAlignment="Center" Margin="12,0,6,0"
+                               Visibility="{Binding HasCsfdTitles, Converter={StaticResource BoolToVisibility}}" />
+                    <ComboBox ItemsSource="{Binding CsfdTitles}" SelectedItem="{Binding ChosenCsfd}" DisplayMemberPath="Display" MinWidth="200" MaxWidth="340"
+                              VerticalAlignment="Center" Visibility="{Binding HasCsfdTitles, Converter={StaticResource BoolToVisibility}}"
+                              ToolTip="{loc:T 'Filmy a seriály z ČSFD, ktoré na TMDB nie sú (poslal ich skript z prehliadača). Plagát im nakreslí AI podľa obsahu ČSFD.'}" />
                     <ContentControl Content="{Binding DataContext.TrayService, RelativeSource={RelativeSource AncestorType=Window}}" ContentTemplate="{DynamicResource TrayAutoSwitch}"
                                     Focusable="False" IsTabStop="False" VerticalAlignment="Center" Margin="8,0,0,0" />
                 </StackPanel>
@@ -442,18 +448,28 @@
                         <!-- a draft by AI -->
                         <Border Style="{StaticResource Card}" Margin="0,4,0,10" Padding="14,10">
                             <StackPanel>
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Command="{Binding DraftCommand}" Padding="12,5" VerticalAlignment="Top">
+                                <TextBlock Text="{loc:T 'Návrh plagátu cez AI'}" FontWeight="SemiBold" />
+                                <TextBlock Text="{loc:T 'Keď TMDB plagát nemá (alebo sa žiadny nehodí), aj pre titul len na ČSFD: AI najprv napíše popis plagátu podľa deja, žánru, roku a názvu – upravíte ho – a potom nakreslí plagát 2:3 (1024 × 1536), JPEG.'}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                <!-- owner, 22. 11. 2026: the user's wishes, then the description written by AI – seen and edited before the poster is drawn -->
+                                <TextBlock Text="{loc:T 'Vaše požiadavky na plagát (nepovinné)'}" Margin="0,8,0,2" />
+                                <TextBox Text="{Binding Wishes, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="44" MaxHeight="110" VerticalScrollBarVisibility="Auto"
+                                         ToolTip="{loc:T 'Napr. „v štýle plagátov 70. rokov“, „hlavná postava na koni pri západe slnka“, „tmavomodré tóny“, „bez ľudí, len krajina“. AI ich zapracuje do popisu.'}" />
+                                <DockPanel Margin="0,6,0,2">
+                                    <Button DockPanel.Dock="Right" Command="{Binding DescribeCommand}" Padding="12,5">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE790;" Margin="0,0,8,0" />
-                                            <TextBlock Text="{loc:T 'Navrhnúť plagát cez AI'}" />
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE70F;" Margin="0,0,8,0" />
+                                            <TextBlock Text="{loc:T 'Pripraviť popis'}" />
                                         </StackPanel>
                                     </Button>
-                                    <StackPanel Margin="0,0,12,0">
-                                        <TextBlock Text="{loc:T 'Návrh plagátu cez AI'}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{loc:T 'Keď TMDB plagát nemá (alebo sa žiadny nehodí): podľa deja, žánru, roku a názvu, 2:3 (1024 × 1536), JPEG.'}" Style="{StaticResource Hint}" TextWrapping="Wrap" />
-                                    </StackPanel>
+                                    <TextBlock Text="{loc:T 'Popis plagátu (podľa neho AI kreslí – môžete ho upraviť)'}" VerticalAlignment="Center" />
                                 </DockPanel>
+                                <TextBox Text="{Binding Brief, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="80" MaxHeight="220" VerticalScrollBarVisibility="Auto" />
+                                <Button Command="{Binding DraftCommand}" Padding="12,5" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE790;" Margin="0,0,8,0" />
+                                        <TextBlock Text="{loc:T 'Nakresliť plagát'}" />
+                                    </StackPanel>
+                                </Button>
                                 <TextBlock Text="{Binding DraftHint}" Style="{StaticResource Hint}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" />
                                 <TextBlock Text="{Binding DraftStatus}" TextWrapping="Wrap" Margin="0,4,0,0" />
                             </StackPanel>

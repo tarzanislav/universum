@@ -37,6 +37,9 @@ public sealed partial record DraftKeys(string? CloudflareAccount, string? Cloudf
 /// <summary>A poster drawn by AI: the picture (JPEG or PNG) or why it was not drawn.</summary>
 public sealed record PosterDraft(byte[]? Picture, string Service, string? Problem);
 
+/// <summary>The description of a poster written by AI (shown and edited before it is drawn) or why it was not written.</summary>
+public sealed record PosterBrief(string? Text, string Service, string? Problem);
+
 /// <summary>
 /// A draft of a poster drawn by AI when TMDB has none (owner, 31. 10. 2026): from the plot, the genres, the year and the
 /// title (Czech, else English, written in the picture), in the proportions TMDB asks of posters (2:3, 1024 × 1536 – within
@@ -55,8 +58,137 @@ public sealed class PosterDrafts(HttpClient http)
 
     public const string CloudflareModel = "@cf/black-forest-labs/flux-2-klein-4b";
 
+    /// <summary>The model that writes the description of the poster (OpenAI).</summary>
+    public const string OpenAiTextModel = "gpt-4o-mini";
+
+    /// <summary>The model that writes the description of the poster (Cloudflare Workers AI, free).</summary>
+    public const string CloudflareTextModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+    /// <summary>
+    /// What is asked of the AI that writes the description (owner, 22. 11. 2026: the description seen – and edited – before the
+    /// poster is drawn, with the user's own wishes): the kind, the name, the year, the countries, the genres and the plot
+    /// (the plot of ČSFD in Czech or Slovak too); never actors.
+    /// </summary>
+    public static (string System, string User) DescribePrompt(TmdbDetails details, string? countries, string? wishes, string language)
+    {
+        var plot = (details.EnglishOverview.Length > 0 ? details.EnglishOverview : details.Overview).Trim();
+        if (plot.Length > 1500)
+        {
+            plot = plot[..1500].TrimEnd() + "…";
+        }
+
+        var system = string.Join(" ",
+            "You design posters of films and TV series.",
+            "Write the visual concept of one theatrical poster for the title below: the main motif or scene, the characters (anonymous – never a real or recognizable person, no actor's name or likeness), the setting and era, the colours and light, the mood, the composition and the lettering of the title.",
+            "3 to 5 sentences of plain text – no list, no heading, no introduction.",
+            $"Write in {language}.",
+            "When the user gives wishes for the poster, follow them; they come before your own ideas.");
+        var user = string.Join("\n", new[]
+        {
+            $"Kind: {(details.Kind == MediaKind.Movie ? "film" : "TV series")}",
+            $"Title: {(details.CzechTitle.Length > 0 ? details.CzechTitle : details.EnglishTitle)}" + (details.OriginalTitle.Length > 0 && details.OriginalTitle != details.CzechTitle ? $" (original: {details.OriginalTitle})" : ""),
+            details.Year is { } year ? $"Year: {year}" : "",
+            countries is { Length: > 0 } ? $"Countries: {countries}" : "",
+            TmdbGenres.JoinEnglish(details.Genres) is { Length: > 0 } genres ? $"Genres: {genres}" : "",
+            plot.Length > 0 ? $"Plot: {plot}" : "",
+            wishes?.Trim() is { Length: > 0 } wanted ? $"Wishes for the poster: {wanted}" : "",
+        }.Where(l => l.Length > 0));
+        return (system, user);
+    }
+
+    /// <summary>
+    /// The description of the poster written by AI in <paramref name="language"/> ("Slovak", "Czech", "English") – with the
+    /// service of the keys (OpenAI, else Cloudflare).
+    /// </summary>
+    public async Task<PosterBrief> DescribeAsync(TmdbDetails details, string? countries, string? wishes, string language, DraftKeys keys, CancellationToken cancellationToken = default)
+    {
+        var (system, user) = DescribePrompt(details, countries, wishes, language);
+        var (text, service, problem) = await WriteAsync(system, user, keys, cancellationToken).ConfigureAwait(false);
+        return new PosterBrief(text, service, problem);
+    }
+
+    /// <summary>
+    /// Draws the poster of a description (seen and edited by the user): the free service (Cloudflare) follows English, so a
+    /// description in another language is first put into English by its text model.
+    /// </summary>
+    public async Task<PosterDraft> CreateAsync(TmdbDetails details, string brief, string language, DraftKeys keys, CancellationToken cancellationToken = default)
+    {
+        if (keys.Service == "Cloudflare" && language != "English" && brief.Trim().Length > 0)
+        {
+            var (english, _, problem) = await WriteAsync("Translate the description of a poster into English. Output only the translation.", brief.Trim(), keys, cancellationToken).ConfigureAwait(false);
+            if (english is null)
+            {
+                return new PosterDraft(null, "Cloudflare", problem);
+            }
+
+            brief = english;
+        }
+
+        return await CreateAsync(details, keys, Prompt(details, brief), cancellationToken).ConfigureAwait(false);
+    }
+
+    // a text written by the text model of the service: the text, the service, why there is none
+    private async Task<(string? Text, string Service, string? Problem)> WriteAsync(string system, string user, DraftKeys keys, CancellationToken cancellationToken)
+    {
+        var service = keys.Service;
+        if (service is null)
+        {
+            return (null, "", CoreText.T("Na návrh plagátu cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené)."));
+        }
+
+        try
+        {
+            object[] messages = [new { role = "system", content = system }, new { role = "user", content = user }];
+            using var request = service == "OpenAI"
+                ? new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+                {
+                    Content = JsonContent.Create(new { model = OpenAiTextModel, messages, max_tokens = 700 }),
+                }
+                : new HttpRequestMessage(HttpMethod.Post, $"https://api.cloudflare.com/client/v4/accounts/{keys.CloudflareAccount!.Trim()}/ai/run/{CloudflareTextModel}")
+                {
+                    Content = JsonContent.Create(new { messages, max_tokens = 700 }),
+                };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", service == "OpenAI" ? keys.OpenAiKey!.Trim() : keys.CloudflareToken!.Trim());
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return (null, service, Problem(service, response.StatusCode, body));
+            }
+
+            // OpenAI: { "choices": [ { "message": { "content": "…" } } ] }; Cloudflare: { "result": { "response": "…" } }
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            var text = service == "OpenAI"
+                ? root.TryGetProperty("choices", out var choices) && choices.ValueKind == JsonValueKind.Array && choices.EnumerateArray().FirstOrDefault() is { ValueKind: JsonValueKind.Object } first &&
+                  first.TryGetProperty("message", out var message) && message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String ? content.GetString() : null
+                : root.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object && result.TryGetProperty("response", out var answer) &&
+                  answer.ValueKind == JsonValueKind.String ? answer.GetString() : null;
+            text = text?.Trim().Trim('"').Trim();
+            return text is { Length: > 0 } ? (text.Length > 2000 ? text[..2000] : text, service, null) : (null, service, CoreText.F("{0} nevrátilo text.", service));
+        }
+        catch (HttpRequestException ex)
+        {
+            return (null, service, CoreText.F("{0} nie je dostupné: {1}", service, ex.Message));
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (null, service, CoreText.F("{0} neodpovedá – skúste to neskôr.", service));
+        }
+        catch (JsonException)
+        {
+            return (null, service, CoreText.F("{0} vrátilo nečitateľnú odpoveď.", service));
+        }
+    }
+
     /// <summary>What is asked of the AI (in English, which the models follow best).</summary>
-    public static string Prompt(TmdbDetails details)
+    public static string Prompt(TmdbDetails details) => Prompt(details, null);
+
+    /// <summary>
+    /// What is asked of the AI that draws: the description of the poster (seen by the user) in place of the plot when there
+    /// is one.
+    /// </summary>
+    public static string Prompt(TmdbDetails details, string? brief)
     {
         var posterTitle = details.CzechTitle.Length > 0 ? details.CzechTitle : details.EnglishTitle;
         var plot = (details.EnglishOverview.Length > 0 ? details.EnglishOverview : details.Overview).Trim();
@@ -77,7 +209,7 @@ public sealed class PosterDrafts(HttpClient http)
             $"A professional theatrical {(details.Kind == MediaKind.Movie ? "movie" : "TV series")} poster in vertical 2:3 format.",
             $"The title \"{posterTitle}\" is written clearly in large, well-designed letters as part of the poster.",
             genres.Length > 0 ? $"Genre: {genres}." : "",
-            plot.Length > 0 ? $"Story: {plot}" : "",
+            brief?.Trim() is { Length: > 0 } concept ? $"Poster concept: {concept}" : plot.Length > 0 ? $"Story: {plot}" : "",
             details.Year is { } year ? $"Released in {year}; show the era and setting the story takes place in." : "Show the era and setting the story takes place in.",
             $"Style: {mood}, striking composition with a clear focal point, suitable for presentation.",
             "Do not depict any real, recognizable person; characters are anonymous or seen from a distance. No credits block, no watermark, no logos.",
@@ -85,7 +217,10 @@ public sealed class PosterDrafts(HttpClient http)
     }
 
     /// <summary>Draws a poster with the service of the keys; the picture or the problem in words.</summary>
-    public async Task<PosterDraft> CreateAsync(TmdbDetails details, DraftKeys keys, CancellationToken cancellationToken = default)
+    public Task<PosterDraft> CreateAsync(TmdbDetails details, DraftKeys keys, CancellationToken cancellationToken = default) =>
+        CreateAsync(details, keys, Prompt(details), cancellationToken);
+
+    private async Task<PosterDraft> CreateAsync(TmdbDetails details, DraftKeys keys, string prompt, CancellationToken cancellationToken)
     {
         var service = keys.Service;
         if (service is null)
@@ -96,8 +231,8 @@ public sealed class PosterDrafts(HttpClient http)
         try
         {
             return service == "OpenAI"
-                ? await OpenAiAsync(Prompt(details), keys.OpenAiKey!.Trim(), cancellationToken).ConfigureAwait(false)
-                : await CloudflareAsync(Prompt(details), keys.CloudflareAccount!.Trim(), keys.CloudflareToken!.Trim(), cancellationToken).ConfigureAwait(false);
+                ? await OpenAiAsync(prompt, keys.OpenAiKey!.Trim(), cancellationToken).ConfigureAwait(false)
+                : await CloudflareAsync(prompt, keys.CloudflareAccount!.Trim(), keys.CloudflareToken!.Trim(), cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {

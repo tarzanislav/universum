@@ -4,7 +4,8 @@ using Universum.Core.Text;
 namespace Universum.Core.Library.Tmdb;
 
 /// <summary>
-/// UNIVERSUM's script for the browser (owner, 8. 11. 2026; Tampermonkey or Violentmonkey run it; 1.3 – ČSFD and posters): on a page of a film or
+/// UNIVERSUM's script for the browser (owner, 8. 11. 2026; Tampermonkey or Violentmonkey run it; 1.3 – ČSFD and posters; 1.4 – what a
+/// page of ČSFD says of its title, for a poster drawn by AI when the title is not on TMDB): on a page of a film or
 /// series of TMDB it sends the page to the Zásobník TMDB by itself (UNIVERSUM takes it only while its automatic gathering is
 /// switched on – 1.1), and shows the button "Do UNIVERSUM" (when UNIVERSUM
 /// does not answer, the button starts it by the address universum://). It runs only on TMDB's film and series pages and
@@ -12,7 +13,7 @@ namespace Universum.Core.Library.Tmdb;
 /// </summary>
 public static class TmdbUserScript
 {
-    public const string Version = "1.3";
+    public const string Version = "1.4";
 
     /// <summary>
     /// The script with the port, the key and the words of this installation. Its source is universum.user.js beside this

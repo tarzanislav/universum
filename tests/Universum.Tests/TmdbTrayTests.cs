@@ -341,7 +341,7 @@ public sealed class TmdbTrayTests
             return (await reader.ReadToEndAsync())[..12];
         }
 
-        var film = """{"u":"https://www.csfd.cz/film/12345-vymysleny-film/","t":"Vymyslený film (2026) | ČSFD.cz","m":"tt0000001","a":true}""";
+        var film = """{"u":"https://www.csfd.cz/film/12345-vymysleny-film/","t":"Vymyslený film (2026) | ČSFD.cz","m":"tt0000001","a":true,"o":"Invented  Film","g":"Komedie / Drama","c":"Česko","p":"Vymyslený   dej."}""";
         Assert.Equal("HTTP/1.1 202", await Post("/csfd", film), "by itself while not gathering: answered");
         automatic = true;
         Assert.Equal("HTTP/1.1 202", await Post("/csfd", film), "by itself while gathering");
@@ -357,6 +357,7 @@ public sealed class TmdbTrayTests
         lock (pages)
         {
             Assert.True(pages is [{ Page.CsfdId: 12345, Page.Imdb: "tt0000001", ByItself: true }], "one page taken (the first came while not gathering)");
+            Assert.True(pages[0].Page is { Original: "Invented Film", Genres: "Komedie / Drama", Countries: "Česko", Plot: "Vymyslený dej." }, "what the page says of its title (22. 11. 2026)");
         }
 
         lock (posters)

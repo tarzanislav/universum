@@ -272,8 +272,14 @@ internal static partial class SelfTest
               page.ExtrasSizeText.Contains("1920 × 1080", StringComparison.Ordinal),
             $"posters: Spracovať ďalšie TMDB obrázky – fanart.jpg and clearlogo.png in POSTER – {page.ExtrasResult} | {page.ExtrasText} | {page.ExtrasSizeText}");
 
+        // owner, 22. 11. 2026: AI writes the description first (with the user's wishes), it can be edited, then the poster is drawn by it
+        Check(!page.DraftCommand.CanExecute(null), "posters: nothing drawn without a description");
+        page.Wishes = "tmavomodré tóny";
+        await page.DescribeCommand.ExecuteAsync(null);
+        Check(page.Brief == "Vymyslený plagát v modrom svetle." && page.DraftCommand.CanExecute(null), "posters: the description written by AI – " + page.DraftStatus);
+        page.Brief += " Viac modrej.";
         await page.DraftCommand.ExecuteAsync(null);
-        Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("api.cloudflare.com", StringComparison.Ordinal)),
+        Check(page.Groups[0].Name == "Návrhy AI" && page.Selected?.Draft is not null && fake.Requests.Any(r => r.Contains("flux", StringComparison.Ordinal)),
             "posters: a draft by AI (Cloudflare) – " + page.DraftStatus);
 
         // owner, 8. 11. 2026: a poster picked in the browser (ČSFD) offered first and chosen; processed like any other
@@ -303,6 +309,21 @@ internal static partial class SelfTest
             "posters: Zlúčiť ďalšie obrázky z TMDB s filmom/seriálom – to the film processed – " + page.ExtrasResult);
         page.ExtrasMerge = false;
         page.Extras = false;
+
+        // owner, 22. 11. 2026: a title only on ČSFD – its card from what the page says, a poster by AI from its description, saved in POSTER
+        page.OpenCsfd(new Core.Library.Tmdb.CsfdPage(424242, null, new Core.Library.Tmdb.TabTitle("Vymyslený len na ČSFD", 1987, MediaKind.Movie))
+        {
+            Original = "Vymyšlený jen na ČSFD", Genres = "Komedie / Drama", Countries = "Československo", Plot = "Vymyslený dej pre samotest.",
+        });
+        Check(page.Card is { OnlyCsfd: true, Details.Id: 0, MainName: "Vymyšlený jen na ČSFD (1987)" } && page.Card.Links.Any(l => l.Text == "ČSFD") && page.NoPosters &&
+              page.Card.Genre == "komédia, dráma" && page.Card.Facts.Contains("Československo", StringComparison.Ordinal) && page.Brief.Length == 0,
+            $"posters: the card of a title only on ČSFD – {page.Card?.MainName} | {page.Card?.Facts} | {page.Card?.Genre} | {page.OfferStatus}");
+        await page.DescribeCommand.ExecuteAsync(null);
+        await page.DraftCommand.ExecuteAsync(null);
+        await page.ProcessCommand.ExecuteAsync(null);
+        Check(page.Selected?.Draft is not null && page.Result.Contains("Vymyšlený jen na ČSFD (1987)", StringComparison.Ordinal),
+            "posters: the poster of a title only on ČSFD drawn and saved in POSTER – " + page.Result);
+        await Screenshot(window, "tmdb-poster-csfd.png");
 
         services.PosterTmdbForSelfTest = null;
         services.PostersForSelfTest = null;

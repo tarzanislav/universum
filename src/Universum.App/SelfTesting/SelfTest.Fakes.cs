@@ -300,6 +300,8 @@ internal static partial class SelfTest
 
             var body = uri.Host switch
             {
+                // owner, 22. 11. 2026: the text model writes the description of the poster (and puts it into English)
+                "api.cloudflare.com" when uri.AbsolutePath.Contains("llama", StringComparison.Ordinal) => """{ "result": { "response": "Vymyslený plagát v modrom svetle." }, "success": true }""",
                 "api.cloudflare.com" => $$"""{ "result": { "image": "{{Convert.ToBase64String(_poster)}}" }, "success": true }""",
                 _ => uri.AbsolutePath switch
                 {

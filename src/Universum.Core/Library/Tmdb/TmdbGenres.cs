@@ -39,7 +39,17 @@ public static class TmdbGenres
         ["hudebni"] = "hudobný", ["mysteriozni"] = "mysteriózny", ["romanticky"] = "romantický", ["valecny"] = "vojnový",
         ["zivotopisny"] = "životopisný", ["sportovni"] = "športový", ["psychologicky"] = "psychologický", ["pohadka"] = "rozprávka",
         ["detsky"] = "pre deti", ["reality-show"] = "reality show", ["soutezni"] = "súťažný", ["telenovela"] = "telenovela",
-        ["dramaticky"] = "dráma", ["kriminalni"] = "krimi", ["vedeckofantasticky"] = "sci-fi",
+        ["dramaticky"] = "dráma", ["kriminalni"] = "krimi", ["vedeckofantasticky"] = "sci-fi", ["muzikal"] = "hudobný",
+
+        // Slovak (ČSFD on csfd.sk – owner, 22. 11. 2026)
+        ["akcny"] = "akčný", ["komedia"] = "komédia", ["dokumentarny"] = "dokumentárny", ["hudobny"] = "hudobný", ["mysteriozny"] = "mysteriózny",
+        ["vojnovy"] = "vojnový", ["sportovy"] = "športový", ["rozpravka"] = "rozprávka",
+    };
+
+    // Slovak names that are no genre of TMDB → the nearest of its numbers (a poster drawn for a title of ČSFD)
+    private static readonly Dictionary<string, int[]> Nearest = new(StringComparer.Ordinal)
+    {
+        ["životopisný"] = [18, 36], ["psychologický"] = [18], ["športový"] = [18], ["rozprávka"] = [10751, 14], ["pre deti"] = [10751],
     };
 
     private static readonly Dictionary<int, string> English = new()
@@ -60,6 +70,15 @@ public static class TmdbGenres
     /// <summary>"akčný, sci-fi" from TMDB's genre numbers (each name once, in TMDB's order).</summary>
     public static string Join(IEnumerable<int> ids) =>
         string.Join(", ", ids.Select(Name).OfType<string>().SelectMany(n => n.Split(", ")).Distinct(StringComparer.Ordinal));
+
+    /// <summary>
+    /// TMDB's genre numbers of genres named in words – "Komedie / Drama" on csfd.cz, "Komédia / Dráma" on csfd.sk (owner,
+    /// 22. 11. 2026: a poster drawn by AI for a title only on ČSFD); a genre without a number of TMDB is left out.
+    /// </summary>
+    public static IReadOnlyList<int> Ids(string? genres) =>
+        Translate(genres).Split(", ", StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(n => Names.Where(x => x.Key < 10759 && x.Value == n).Select(x => x.Key).DefaultIfEmpty(-1).Concat(Nearest.GetValueOrDefault(n) ?? []))
+            .Where(id => id > 0).Distinct().ToList();
 
     /// <summary>
     /// "Drama, Science-Fiction" (TVmaze) or "Komedie / Drama" (a Czech page) in Slovak; a name not known stays as it is.

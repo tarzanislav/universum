@@ -321,6 +321,9 @@ public sealed class AppSettings
     /// <summary>The posters picked into the Zásobník TMDB (owner, 8. 11. 2026 – ČSFD and TMDB).</summary>
     public static string TrayPosterDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "zasobnik-plagaty");
 
+    /// <summary>The titles of ČSFD not found on TMDB (a poster drawn by AI from what ČSFD says).</summary>
+    public static string CsfdTitlesFile => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "csfd-tituly.json");
+
     /// <summary>The days read from the sources of news.</summary>
     public static string NewsCacheDirectory => Path.Combine(Path.GetDirectoryName(JournalDirectory)!, "news");
 

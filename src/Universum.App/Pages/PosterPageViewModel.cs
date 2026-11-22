@@ -32,6 +32,16 @@ public sealed class FoundTitleRow
     public RelayCommand OpenCommand { get; }
 }
 
+/// <summary>A title of ČSFD not on TMDB (owner, 22. 11. 2026), offered for a poster drawn by AI.</summary>
+public sealed class CsfdTitleRow(CsfdPage page)
+{
+    public CsfdPage Page { get; } = page;
+
+    public string Display => Page.Title?.Kind == MediaKind.Series ? Page.Display + " · " + Loc.T("seriál") : Page.Display;
+
+    public override string ToString() => Display;
+}
+
 /// <summary>A poster offered: from TMDB (its small copy) or drawn by AI; one of them is chosen with the mouse.</summary>
 public sealed class PosterOptionRow : ObservableObject
 {
@@ -158,6 +168,9 @@ public sealed class PosterPageViewModel : ObservableObject
     private VideoChoice<int> _height;
     private CancellationTokenSource _title = new();
     private TmdbPictures? _pictures;
+    private string _brief = "";
+    private string _wishes = "";
+    private CsfdTitleRow? _chosenCsfd;
 
     public PosterPageViewModel(AppServices services)
     {
@@ -166,7 +179,8 @@ public sealed class PosterPageViewModel : ObservableObject
         _height = Heights.FirstOrDefault(h => h.Value == services.Settings.PosterHeight) ?? Heights[1];
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => Query.Trim().Length > 0 && !_busy);
         ProcessCommand = new AsyncRelayCommand(ProcessAsync, () => !_busy && Selected is not null && _card?.Details is not null);
-        DraftCommand = new AsyncRelayCommand(DrawAsync, () => !_drawing && _card?.Details is not null);
+        DraftCommand = new AsyncRelayCommand(DrawAsync, () => !_drawing && _card?.Details is not null && Brief.Trim().Length > 0);
+        DescribeCommand = new AsyncRelayCommand(DescribeAsync, () => !_drawing && _card?.Details is not null);
         ProcessExtrasCommand = new AsyncRelayCommand(ProcessExtrasAsync, () => !_busy && Extras && _pictures is not null && _card?.Details is not null);
         OpenPosterFolderCommand = new RelayCommand(() =>
         {
@@ -176,6 +190,8 @@ public sealed class PosterPageViewModel : ObservableObject
             }
         });
         Tray = new TmdbTrayChoice(services, entry => OpenAsync(entry.Kind, entry.Id));
+        services.TmdbTray.CsfdOnlyChanged += () => System.Windows.Application.Current?.Dispatcher.InvokeAsync(LoadCsfdTitles);
+        LoadCsfdTitles();
         services.TmdbChanged += () => OnPropertyChanged(nameof(Requirement));
         services.LibraryChanged += () => OnPropertyChanged(nameof(Requirement));
         try
@@ -445,11 +461,139 @@ public sealed class PosterPageViewModel : ObservableObject
 
     public AsyncRelayCommand DraftCommand { get; }
 
+    /// <summary>
+    /// AI writes the description of the poster (owner, 22. 11. 2026: seen and edited before it is drawn, with the user's wishes).
+    /// </summary>
+    public AsyncRelayCommand DescribeCommand { get; }
+
+    /// <summary>The description of the poster drawn – written by AI, edited by the user.</summary>
+    public string Brief
+    {
+        get => _brief;
+        set
+        {
+            if (SetProperty(ref _brief, value))
+            {
+                DraftCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>The user's own wishes for the poster (what AI keeps to when it writes the description).</summary>
+    public string Wishes { get => _wishes; set => SetProperty(ref _wishes, value); }
+
+    /// <summary>The titles of ČSFD not on TMDB, the newest first.</summary>
+    public ObservableCollection<CsfdTitleRow> CsfdTitles { get; } = [];
+
+    public bool HasCsfdTitles => CsfdTitles.Count > 0;
+
+    /// <summary>A title of ČSFD chosen: its card opened (no TMDB) for a poster drawn by AI.</summary>
+    public CsfdTitleRow? ChosenCsfd
+    {
+        get => _chosenCsfd;
+        set
+        {
+            if (SetProperty(ref _chosenCsfd, value) && value is not null)
+            {
+                OpenCsfd(value.Page);
+            }
+        }
+    }
+
+    // the titles of ČSFD not on TMDB as they are kept now
+    private void LoadCsfdTitles()
+    {
+        CsfdTitles.Clear();
+        foreach (var page in _services.TmdbTray.CsfdOnly.All())
+        {
+            CsfdTitles.Add(new CsfdTitleRow(page));
+        }
+
+        OnPropertyChanged(nameof(HasCsfdTitles));
+    }
+
+    /// <summary>
+    /// Shows a title only on ČSFD (owner, 22. 11. 2026; also the self-test): its card from what the page says, no posters of
+    /// TMDB – a poster is drawn by AI from its description.
+    /// </summary>
+    public void OpenCsfd(CsfdPage page)
+    {
+        if (page.AsDetails() is not { } details)
+        {
+            return;
+        }
+
+        _title.Cancel();
+        _title.Dispose();
+        _title = new CancellationTokenSource();
+        Card = new TitleCardViewModel(_services, details, page.Link, page.Countries);
+        Recommended = null;
+        Selected = null;
+        Groups.Clear();
+        Opinion = "";
+        Result = "";
+        DraftStatus = "";
+        Brief = "";
+        NoPosters = true;
+        OnPropertyChanged(nameof(NoPosters));
+        OnPropertyChanged(nameof(DraftHint));
+        OfferStatus = Loc.T("Titul je len na ČSFD – TMDB k nemu nemá plagáty. Dajte AI pripraviť popis plagátu z obsahu ČSFD, upravte ho a nakreslite.");
+        OfferReady = Task.CompletedTask;
+        Refresh();
+    }
+
+    // the language the description is written in: the language of UNIVERSUM
+    private static string BriefLanguage => Loc.Language switch
+    {
+        "cs" => "Czech",
+        "en" => "English",
+        _ => "Slovak",
+    };
+
+    private async Task DescribeAsync()
+    {
+        if (Card?.Details is not { } details)
+        {
+            return;
+        }
+
+        _drawing = true;
+        Refresh();
+        var card = Card;
+        try
+        {
+            DraftStatus = Loc.T("AI píše popis plagátu…");
+            var brief = await _services.Drafts.DescribeAsync(details, card.Countries, Wishes, BriefLanguage, _services.DraftKeys, _title.Token);
+            if (!ReferenceEquals(card, Card))
+            {
+                return;
+            }
+
+            if (brief.Text is not { } text)
+            {
+                DraftStatus = brief.Problem ?? Loc.T("Popis sa nepodaril.");
+                return;
+            }
+
+            Brief = text;
+            DraftStatus = Loc.F("Popis napísalo {0}. Upravte ho podľa seba a dajte Nakresliť plagát.", brief.Service);
+        }
+        catch (OperationCanceledException)
+        {
+            DraftStatus = "";
+        }
+        finally
+        {
+            _drawing = false;
+            Refresh();
+        }
+    }
+
     public string DraftStatus { get => _draftStatus; private set => SetProperty(ref _draftStatus, value); }
 
     /// <summary>Which service draws and what is sent to it.</summary>
     public string DraftHint => _services.DraftKeys.Service is { } service
-        ? Loc.F("Kreslí {0}{1}. Pošle sa len názov, rok, žánre a dej – nie herci ani iné údaje. Návrh je len pre vašu knižnicu – do TMDB sa nahrávať nesmie.", service, service == "OpenAI" ? Loc.T(" (platené, ~0,04 $ za návrh)") : Loc.T(" (zadarmo, denný limit)"))
+        ? Loc.F("Píše a kreslí {0}{1}. Pošle sa len názov, rok, krajiny, žánre, dej a vaše požiadavky – nie herci ani iné údaje. Návrh je len pre vašu knižnicu – do TMDB sa nahrávať nesmie.", service, service == "OpenAI" ? Loc.T(" (platené, ~0,04 $ za návrh)") : Loc.T(" (zadarmo, denný limit)"))
         : Loc.T("Na návrh cez AI nastavte v Nastaveniach účet Cloudflare (zadarmo) alebo kľúč OpenAI (platené).");
 
     /// <summary>A title of the Zásobník TMDB opened with one click (its posters picked in the browser offered first).</summary>
@@ -473,6 +617,7 @@ public sealed class PosterPageViewModel : ObservableObject
         Opinion = "";
         Result = "";
         DraftStatus = "";
+        Brief = "";
         NoPosters = false;
         OnPropertyChanged(nameof(NoPosters));
         OnPropertyChanged(nameof(DraftHint));
@@ -719,6 +864,14 @@ public sealed class PosterPageViewModel : ObservableObject
             if (found is { } processed)
             {
                 Result = Done(PosterPlaces.Save(processed, jpeg), processed, size);
+                return;
+            }
+
+            if (details.Id <= 0)
+            {
+                // a title only on ČSFD has no TMDB ID to wait by
+                Result = Loc.F("{0} sa vo výstupe ({1}, {2}) nenašiel. Nič sa nezapísalo – vypnite Zlúčiť poster s filmom/seriálom a plagát sa uloží do POSTER.",
+                         details.Kind == MediaKind.Movie ? Loc.T("Film") : Loc.T("Seriál"), LibraryNames.MoviesFolder, LibraryNames.ShowsFolder);
                 return;
             }
 
@@ -1021,7 +1174,7 @@ public sealed class PosterPageViewModel : ObservableObject
         try
         {
             DraftStatus = Loc.T("AI kreslí návrh plagátu (môže to trvať do minúty)…");
-            var draft = await _services.Drafts.CreateAsync(details, _services.DraftKeys, _title.Token);
+            var draft = await _services.Drafts.CreateAsync(details, Brief, BriefLanguage, _services.DraftKeys, _title.Token);
             if (!ReferenceEquals(card, Card))
             {
                 // another title opened meanwhile: this draft is not its poster
@@ -1066,6 +1219,7 @@ public sealed class PosterPageViewModel : ObservableObject
         SearchCommand?.NotifyCanExecuteChanged();
         ProcessCommand?.NotifyCanExecuteChanged();
         DraftCommand?.NotifyCanExecuteChanged();
+        DescribeCommand?.NotifyCanExecuteChanged();
         ProcessExtrasCommand?.NotifyCanExecuteChanged();
     }
 }

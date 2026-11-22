@@ -18,6 +18,29 @@ public sealed class BatchGroup(string signature, int index)
     public GroupDecisions Decisions { get; } = new();
 
     /// <summary>
+    /// A new group of the files (an analysis, its split by title, files added to a batch): a cover stored as a video track
+    /// is suggested to be left out at once (owner, 22. 11. 2026 – the check box Odstrániť ticked, the user may untick it) when
+    /// it is a picture in every file of the group and the group has a film beside it; the film itself is never ticked.
+    /// </summary>
+    public static BatchGroup Of(string signature, int index, IEnumerable<MediaFile> files)
+    {
+        var group = new BatchGroup(signature, index);
+        group.Files.AddRange(files);
+        if (group.Files.Count > 0)
+        {
+            var videos = SlotKey.Videos(group.Representative).ToList();
+            var covers = videos.Where(v => group.Files.All(f => SlotKey.Videos(f).FirstOrDefault(x => x.Key == v.Key).Track is { IsStillPicture: true }))
+                .Select(v => v.Key).ToList();
+            if (covers.Count > 0 && covers.Count < videos.Count)
+            {
+                group.Decisions.Removed.UnionWith(covers);
+            }
+        }
+
+        return group;
+    }
+
+    /// <summary>
     /// The tracks at a place of the files of the group that can be written as SRT (ASS, SSA, WebVTT …). The group is made by
     /// the languages of the tracks, not by their formats (owner, 15. 11. 2026: one film of a group kept its ASS because the
     /// first film had SRT at that place and Previesť na SRT was not offered) – so every file is asked, not the first only.

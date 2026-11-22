@@ -45,6 +45,16 @@ public sealed record MediaTrack
             ? (double)width / height
             : null;
 
+    /// <summary>
+    /// A video track that is one picture – a cover or a poster stored as a track (owner, 22. 11. 2026): the codec of a
+    /// picture (JPEG, PNG, BMP, GIF, WebP) with no more than a few frames, or one frame by the statistics.
+    /// </summary>
+    public bool IsStillPicture => Type == TrackType.Video &&
+                                  (StatisticsFrames == 1 || (StatisticsFrames is null or <= 10 && PictureCodecs.Any(c => Codec.Contains(c, StringComparison.OrdinalIgnoreCase) ||
+                                                                                                                       CodecId?.Contains(c, StringComparison.OrdinalIgnoreCase) == true)));
+
+    private static readonly string[] PictureCodecs = ["JPEG", "MJPG", "PNG", "BMP", "GIF", "WEBP"];
+
     public bool IsTextSubtitles { get; init; }
 
     /// <summary>Number of frames from the track statistics tags, when present.</summary>

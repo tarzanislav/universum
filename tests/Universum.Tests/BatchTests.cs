@@ -494,9 +494,9 @@ public sealed class BatchTests
 
         var slots = BatchTitles.Slots(title);
         string Of(TitleSlot s) => $"{s.Key}:{s.Track.Language.Primary}{(s.Track.Flags.Forced ? "F" : "")}={s.FileCount}";
-        Assert.Equal("Audio 1:cs=42, Audio 2:sk=40, Audio 3:en=42, Subtitles 1:csF=42, Subtitles 2:cs=42, Subtitles 3:en=20, Audio 2:und=2",
-            string.Join(", ", slots.Select(Of)), "the same track once; English subtitles only in one variant; a sound without a language is never paired");
-        Assert.True(slots.Single(s => s.Track.Language.IsUndetermined).Group == odd && slots[2].Places.Any(p => p.Group == odd && p.Key == new SlotKey(TrackType.Audio, 2)),
+        Assert.Equal("Video 1:und=42, Audio 1:cs=42, Audio 2:sk=40, Audio 3:en=42, Subtitles 1:csF=42, Subtitles 2:cs=42, Subtitles 3:en=20, Audio 2:und=2",
+            string.Join(", ", slots.Select(Of)), "the picture first; the same track once; English subtitles only in one variant; a sound without a language is never paired");
+        Assert.True(slots.Single(s => s.Track.Language.IsUndetermined && s.Key.Type == TrackType.Audio).Group == odd && slots[3].Places.Any(p => p.Group == odd && p.Key == new SlotKey(TrackType.Audio, 2)),
             "the English sound of the odd variant is its third");
     }
 
@@ -1330,6 +1330,57 @@ public sealed class BatchTests
         Assert.Equal("00:00:00.000 Kapitola 01, 00:10:00.000 Kapitola 02, 00:20:00.000 Kapitola 03",
             string.Join(", ", item.Target.NewChapters!.Select(c => $"{c.Start:hh\\:mm\\:ss\\.fff} {c.Name}")), "three chapters over 25 minutes");
         Assert.True(item.Plan.Changes.Any(c => c.Kind == Universum.Core.Planning.ChangeKind.Chapters), "planned as a change");
+    }
+
+    [Test]
+    public void ACoverStoredAsAVideoTrackIsLeftOut()
+    {
+        // owner, 22. 11. 2026: a film stopped by a second video track – a cover; it is suggested to be left out (the check
+        // box Odstrániť ticked), a second picture of a film waits for the user, and the last picture stays always
+        MediaFile Film(string path, string second, long? frames) => new()
+        {
+            Path = path,
+            Tracks =
+            [
+                new MediaTrack { Id = 0, Type = TrackType.Video, Codec = "HEVC/H.265/MPEG-H", PixelDimensions = "1920x1080", StatisticsFrames = 150000 },
+                new MediaTrack { Id = 1, Type = TrackType.Video, Codec = second, PixelDimensions = "600x900", StatisticsFrames = frames },
+                new MediaTrack { Id = 2, Type = TrackType.Audio, Language = new LanguageTag("slo", "sk") },
+                new MediaTrack { Id = 3, Type = TrackType.Audio, Language = new LanguageTag("ita", "it") },
+            ],
+        };
+
+        var covered = new[] { Film("/f/a.mkv", "MJPEG", 1), Film("/f/b.mkv", "MJPEG", null) };
+        var group = BatchGroup.Of(StructureSignature.Of(covered[0]), 0, covered);
+        Assert.True(group.Decisions.Removed.SetEquals([new SlotKey(TrackType.Video, 1)]), "the cover suggested to be left out, the film not");
+        var analysis = new BatchAnalysis("/", false, [group], [], []);
+        var items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        Assert.True(items.All(i => i.Status != BatchStatus.NeedsReview && i.Target.Tracks.Count(t => t.Type == TrackType.Video) == 1 &&
+                                   i.Target.RemovedFromFile.Single().Id == 1),
+            "one picture left: the files need no check");
+        Assert.Sequence(["--video-tracks", "0"], MkvToolNixArguments.Remux(items[0].Target, "a.mkv", "o.mkv").SkipWhile(a => a != "--video-tracks").Take(2),
+            "only the film's picture is written");
+
+        group.Decisions.Removed.Add(new SlotKey(TrackType.Video, 0));
+        items = BatchPlanner.Plan(analysis, BatchTemplate.RulesOnly);
+        Assert.True(items.All(i => i.Target.Tracks.Count(t => t.Type == TrackType.Video) == 2 && i.Reasons.Any(r => r.Kind == ReviewReasonKind.MultipleVideoTracks)),
+            "never all pictures left out – the file waits for a check");
+
+        var twoFilms = new[] { Film("/g/a.mkv", "AVC/H.264/MPEG-4p10", 140000) };
+        Assert.True(BatchGroup.Of(StructureSignature.Of(twoFilms[0]), 0, twoFilms).Decisions.Removed.Count == 0, "two pictures of a film: nothing suggested");
+        var oneCover = new[] { Film("/h/a.mkv", "MJPEG", 1), Film("/h/b.mkv", "AVC/H.264/MPEG-4p10", 140000) };
+        Assert.True(BatchGroup.Of(StructureSignature.Of(oneCover[0]), 0, oneCover).Decisions.Removed.Count == 0, "a picture only in some files of the group: nothing suggested");
+
+        Assert.True(new MediaTrack { Id = 0, Type = TrackType.Video, CodecId = "V_MJPEG" }.IsStillPicture && new MediaTrack { Id = 0, Type = TrackType.Video, Codec = "PNG" }.IsStillPicture &&
+                    !new MediaTrack { Id = 0, Type = TrackType.Video, Codec = "MJPEG", StatisticsFrames = 5000 }.IsStillPicture &&
+                    !new MediaTrack { Id = 0, Type = TrackType.Video, Codec = "AVC/H.264/MPEG-4p10" }.IsStillPicture &&
+                    !new MediaTrack { Id = 0, Type = TrackType.Audio, Codec = "PNG" }.IsStillPicture,
+            "a picture is known by its codec and its frames");
+
+        // a title in two variants – one with the cover: the pictures shown first, the cover only in its variant
+        var plain = BatchGroup.Of("p", 0, [new MediaFile { Path = "/t/1.mkv", Tracks = [covered[0].Tracks[0], covered[0].Tracks[2], covered[0].Tracks[3]] }]);
+        var title = BatchTitles.Of([plain, group], _ => "F|film").Single();
+        Assert.Equal("Video 1=3, Video 2=2, Audio 1=3, Audio 2=3",
+            string.Join(", ", BatchTitles.Slots(title).Select(s => $"{s.Key}={s.FileCount}")), "the n-th picture of each variant together");
     }
 
     [Test]

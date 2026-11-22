@@ -297,8 +297,9 @@ public sealed class SlotRow : ObservableObject
         get => Group.Decisions.Removed.Contains(Key);
         set
         {
-            // the last sound of the file stays: the check box does not take it
-            if (value && Key.Type == TrackType.Audio && Group.Decisions.Removed.Count(k => k.Type == TrackType.Audio) + 1 >= AudioCount)
+            // the last sound of the file stays, and its last picture: the check box does not take them
+            if (value && ((Key.Type == TrackType.Audio && Group.Decisions.Removed.Count(k => k.Type == TrackType.Audio) + 1 >= AudioCount) ||
+                          (IsVideo && RemovedVideos + 1 >= VideoCount)))
             {
                 OnPropertyChanged();
                 return;
@@ -323,10 +324,61 @@ public sealed class SlotRow : ObservableObject
         }
     }
 
-    /// <summary>A subtitle track, or a sound of a file with more sounds: it can be left out of the result.</summary>
-    public bool CanRemove => Key.Type == TrackType.Subtitles || (Key.Type == TrackType.Audio && AudioCount > 1);
+    /// <summary>
+    /// A subtitle track, a sound of a file with more sounds, or a picture of a file with more pictures (owner, 22. 11. 2026:
+    /// a cover stored as a second video track): it can be left out of the result.
+    /// </summary>
+    public bool CanRemove => Key.Type == TrackType.Subtitles || (Key.Type == TrackType.Audio && AudioCount > 1) || (IsVideo && VideoCount > 1);
 
     private int AudioCount => SlotKey.Of(Group.Representative).Count(x => x.Key.Type == TrackType.Audio);
+
+    private int VideoCount => SlotKey.Videos(Group.Representative).Count();
+
+    private int RemovedVideos => Group.Decisions.Removed.Count(k => k.Type == TrackType.Video && k.Ordinal < VideoCount);
+
+    /// <summary>A video track (owner, 22. 11. 2026: shown first among the tracks; no language, name nor order is decided for it).</summary>
+    public bool IsVideo => Key.Type == TrackType.Video;
+
+    /// <summary>The track can be moved among the tracks of its type (a sound or subtitles).</summary>
+    public bool CanMove => !IsVideo;
+
+    /// <summary>A language is chosen for the track (a sound or subtitles).</summary>
+    public bool HasLanguage => !IsVideo;
+
+    /// <summary>
+    /// A picture of a file that would keep more than one: the file waits for a check until all but one are left out – the
+    /// row is shown in the colour of a warning.
+    /// </summary>
+    public bool IsVideoProblem => IsVideo && !Removed && VideoCount - RemovedVideos > 1;
+
+    // what the picture is: its size, frames a second, a cover; what is to be done when the file keeps more pictures
+    private string VideoNote
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Track.PixelDimensions is { Length: > 0 } size)
+            {
+                parts.Add(size.Replace("x", " × ", StringComparison.Ordinal));
+            }
+
+            if (Track.IsStillPicture)
+            {
+                parts.Add(Removed ? Loc.T("obrázok – asi obal (plagát), vo výsledku nebude") : Loc.T("obrázok – asi obal (plagát)"));
+            }
+            else if (Track.FramesPerSecond is { } fps)
+            {
+                parts.Add(Loc.F("{0} snímok/s", fps.ToString("0.###", System.Globalization.CultureInfo.CurrentCulture)));
+            }
+
+            if (IsVideoProblem)
+            {
+                parts.Add(Loc.F("video stôp vo výsledku: {0} – nechajte len jednu, ostatné odstráňte", VideoCount - RemovedVideos));
+            }
+
+            return string.Join(" · ", parts);
+        }
+    }
 
     /// <summary>The track is not in the result: left out by the user or by its language (the row is shown pale).</summary>
     public bool IsLeftOut => Removed || _removedByLanguage;
@@ -419,7 +471,7 @@ public sealed class SlotRow : ObservableObject
 
     public string Name => Track.Name ?? "";
 
-    public bool NeedsLanguage => Track.Language.IsUndetermined;
+    public bool NeedsLanguage => !IsVideo && Track.Language.IsUndetermined;
 
     public string FileLanguage => Texts.Language(Track.Language);
 
@@ -461,7 +513,8 @@ public sealed class SlotRow : ObservableObject
     /// What decides the language for the group; without a group decision the suggestions heard in the files themselves
     /// are summed up (owner, 29. 10. 2026: "návrhy pri súboroch: angličtina 20×, čeština 2×") – each file has its own.
     /// </summary>
-    public string Evidence => _evidence is null && FileSuggestions is { Length: > 0 } files
+    public string Evidence => IsVideo ? VideoNote
+        : _evidence is null && FileSuggestions is { Length: > 0 } files
         ? Loc.F("návrhy pri súboroch: {0} – potvrďte ich tlačidlom Potvrdiť návrhy (alebo vyberte jazyk pre celú skupinu)", files)
         : !NeedsLanguage && _evidence is { Source: EvidenceSource.GroupDecision }
             ? Loc.F("vaša voľba (v súbore: {0})", Texts.Language(Track.Language))
@@ -538,7 +591,7 @@ public sealed class SlotRow : ObservableObject
 
     public void Refresh()
     {
-        _evidence = BatchPlanner.Evidence(Track, Key, Group);
+        _evidence = IsVideo ? null : BatchPlanner.Evidence(Track, Key, Group);
         OnPropertyChanged(nameof(ChosenLanguage));
         OnPropertyChanged(nameof(Evidence));
         OnPropertyChanged(nameof(HasSuggestion));
@@ -550,6 +603,7 @@ public sealed class SlotRow : ObservableObject
         OnPropertyChanged(nameof(IsLeftOut));
         OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ResultNote));
+        OnPropertyChanged(nameof(IsVideoProblem));
     }
 }
 

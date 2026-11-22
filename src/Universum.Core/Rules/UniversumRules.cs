@@ -24,10 +24,10 @@ public static class UniversumRules
         decisions ??= TrackDecisions.None;
         var issues = new List<RuleIssue>();
         var language = (MediaTrack t) => decisions.Languages.TryGetValue(t.Id, out var chosen) ? chosen : t.Language;
-        // a video track is left out only when its picture is written anew in a track of its own (Úprava videostopy)
-        var replaced = (MediaTrack t) => t.Type == TrackType.Video && decisions.Removed.Contains(t.Id) &&
-                                         file.Tracks.Any(r => r.VideoEncode is { } encode && encode.Source.Id == t.Id && IO.Paths.Same(encode.Path, file.Path));
-        var kept = (MediaTrack t) => t.Type == TrackType.Other || (t.Type == TrackType.Video ? !replaced(t) : !decisions.Removed.Contains(t.Id));
+        // a video track is left out when its picture is written anew in a track of its own (Úprava videostopy), or when the
+        // user leaves it out (owner, 22. 11. 2026: a cover stored as a second video track) – never the file's last picture
+        var videoLeft = file.TracksOf(TrackType.Video).Any(t => !decisions.Removed.Contains(t.Id));
+        var kept = (MediaTrack t) => t.Type == TrackType.Other || (t.Type == TrackType.Video ? !videoLeft || !decisions.Removed.Contains(t.Id) : !decisions.Removed.Contains(t.Id));
 
         var videos = file.TracksOf(TrackType.Video).Where(kept).ToList();
         if (videos.Count > 1)

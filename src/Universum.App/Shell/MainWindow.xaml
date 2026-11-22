@@ -1605,6 +1605,10 @@
                                                 <DataTrigger Binding="{Binding IsLeftOut}" Value="True">
                                                     <Setter Property="Opacity" Value="0.55" />
                                                 </DataTrigger>
+                                                <!-- owner, 22. 11. 2026: more pictures than one stop the file – the rows of the pictures in the colour of a warning -->
+                                                <DataTrigger Binding="{Binding IsVideoProblem}" Value="True">
+                                                    <Setter Property="Background" Value="#47F0A030" />
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </DataGrid.RowStyle>
@@ -1612,7 +1616,7 @@
                                         <DataGridTemplateColumn Header="{loc:T 'Poradie'}" Width="Auto">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding CanMove, Converter={StaticResource BoolToVisibility}}">
                                                         <Border Background="Transparent" Cursor="SizeAll" Padding="3,2" ToolTip="{loc:T 'Chyťte a potiahnite stopu hore alebo dole (v rámci zvukov alebo titulkov)'}"
                                                                 PreviewMouseLeftButtonDown="OnSlotGripDown" MouseMove="OnSlotGripMove">
                                                             <TextBlock Style="{StaticResource Icon}" Text="&#xE76F;" FontSize="14" />
@@ -1658,7 +1662,7 @@
                                                 <DataTemplate>
                                                     <!-- owner, 29. 10. 2026: also a language written in the file can be corrected ("EN" that is Czech) -->
                                                     <ComboBox ItemsPanel="{StaticResource VirtualList}" VirtualizingPanel.IsVirtualizing="True" ItemsSource="{Binding LanguageChoices}" DisplayMemberPath="Name"
-                                                              SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}"
+                                                              SelectedItem="{Binding ChosenLanguage, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding HasLanguage, Converter={StaticResource BoolToVisibility}}"
                                                               ToolTip="{loc:T 'Jazyk stopy pre celú skupinu – aj keď je v súbore zapísaný iný (nesprávny) jazyk'}" />
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -1724,13 +1728,14 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <!-- owner, 21. 11. 2026: any track left out of the result (subtitles, even all of them; never the last sound) -->
+                                        <!-- owner, 21. 11. 2026: any track left out of the result (subtitles, even all of them; never the last sound);
+                                             22. 11. 2026: a picture too (a cover stored as a video track), never the last one -->
                                         <DataGridTemplateColumn Header="{loc:T 'Odstrániť'}" Width="Auto" MinWidth="70">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <CheckBox IsChecked="{Binding Removed, UpdateSourceTrigger=PropertyChanged}" MinWidth="0" HorizontalAlignment="Center"
                                                               Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
-                                                              ToolTip="{loc:T 'Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení.'}" />
+                                                              ToolTip="{loc:T 'Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk ani posledná video stopa súboru sa neodstráni nikdy. Originál sa nemení.'}" />
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>

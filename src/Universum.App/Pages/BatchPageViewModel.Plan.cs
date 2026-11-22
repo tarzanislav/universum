@@ -213,7 +213,8 @@ public sealed partial class BatchPageViewModel
     /// <summary>Puts a dragged track at the place of another track of the same type.</summary>
     public void MoveSlotTo(SlotRow row, SlotRow target)
     {
-        if (row == target || row.Key.Type != target.Key.Type || (!ShowsVariants && row.Group != target.Group) || row.IsRemovedByLanguage || target.IsRemovedByLanguage)
+        // the pictures keep their order (owner, 22. 11. 2026: they are only shown, and one can be left out)
+        if (row == target || row.IsVideo || row.Key.Type != target.Key.Type || (!ShowsVariants && row.Group != target.Group) || row.IsRemovedByLanguage || target.IsRemovedByLanguage)
         {
             return;
         }
@@ -257,11 +258,19 @@ public sealed partial class BatchPageViewModel
             return null;
         }
 
-        var keyOf = SlotKey.Of(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
-        // a sound of the file written anew (Zvuk v štúdiu) stands in its original's slot
+        var keyOf = SlotKey.WithVideos(item.File).ToDictionary(x => x.Track.Id, x => x.Key);
+        // a sound of the file written anew (Zvuk v štúdiu) stands in its original's slot, a picture written anew too
         foreach (var anew in item.File.Tracks.Where(t => t.Encode is { } encode && Paths.Same(encode.Path, item.File.Path)))
         {
             if (keyOf.TryGetValue(anew.Encode!.Source.Id, out var original))
+            {
+                keyOf[anew.Id] = original;
+            }
+        }
+
+        foreach (var anew in item.File.Tracks.Where(t => t.VideoEncode is { } encode && Paths.Same(encode.Path, item.File.Path)))
+        {
+            if (keyOf.TryGetValue(anew.VideoEncode!.Source.Id, out var original))
             {
                 keyOf[anew.Id] = original;
             }
@@ -305,7 +314,8 @@ public sealed partial class BatchPageViewModel
         }
 
         int At(SlotRow s) => results.TryGetValue(s.Group, out var r) && r.Order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue;
-        var wanted = SlotRows.Where(s => s.Group == main).OrderBy(s => first.Order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
+        // the pictures first, in the order of the file (also one left out)
+        var wanted = SlotRows.Where(s => s.Group == main).OrderBy(s => s.IsVideo ? -1 : first.Order.IndexOf(s.Key) is var at and >= 0 ? at : int.MaxValue)
             .ThenBy(s => s.Key.Type).ThenBy(s => s.Key.Ordinal).ToList();
         // the tracks only other variants carry: after the main variant's tracks of their type
         foreach (var extra in SlotRows.Where(s => s.Group != main).OrderBy(s => s.Group.Label, StringComparer.Ordinal).ThenBy(At).ThenBy(s => s.Key.Ordinal))
@@ -362,7 +372,7 @@ public sealed partial class BatchPageViewModel
         }
         else
         {
-            foreach (var (key, track) in SlotKey.Of(group.Representative))
+            foreach (var (key, track) in SlotKey.WithVideos(group.Representative))
             {
                 SlotRows.Add(new SlotRow(group, key, track, ReplanAtTrack, MoveSlot, _services.Profile));
             }

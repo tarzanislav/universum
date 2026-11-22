@@ -332,6 +332,23 @@ internal static partial class SelfTest
                 "batch: Odstrániť taken back");
         }
 
+        // owner, 22. 11. 2026: the picture shown first among the tracks; the file's only one is never left out
+        if (batch.SlotRows.FirstOrDefault(s => s.IsVideo) is { } picture)
+        {
+            Check(batch.SlotRows.IndexOf(picture) == 0 && !picture.CanMove && !picture.HasLanguage && !picture.NeedsLanguage,
+                $"batch: the video track shown first – „{picture.Slot}“, {picture.Evidence}");
+            if (!picture.CanRemove)
+            {
+                picture.Removed = true;
+                Check(!picture.Removed && batch.Items.Where(i => i.Group == picture.Group).All(i => i.Target.Tracks.Any(t => t.Type == TrackType.Video)),
+                    "batch: the only picture of a file is not left out");
+            }
+        }
+        else
+        {
+            Check(false, "batch: no video track among the tracks of the group");
+        }
+
         // owner, 21. 11. 2026: chapters every 5 minutes (the default) for the files without chapters, then taken back
         batch.ChapterMinutes = "5";
         batch.ChaptersForEpisodes = true;

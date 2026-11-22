@@ -3503,7 +3503,7 @@ internal static class Translations
         ["Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať"] = "Zkopírovat do Názvu stopy – potom ho můžete zkrátit nebo do něj dopsat",
         ["ponechať všetky titulky"] = "ponechat všechny titulky",
         ["Titulky v jazykoch mimo zoznamu (Nastavenia) sa neodstránia – všetky naraz; jednotlivo ich ponecháte pri stope"] = "Titulky v jazycích mimo seznamu (Nastavení) se neodstraní – všechny najednou; jednotlivě je ponecháte u stopy",
-        ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení."] = "Stopa nebude ve výsledku (pro celou skupinu, u Všechny pro všechny varianty); poslední zvuk souboru se neodstraní nikdy. Originál se nemění.",
+        ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk ani posledná video stopa súboru sa neodstráni nikdy. Originál sa nemení."] = "Stopa nebude ve výsledku (pro celou skupinu, u Všechny pro všechny varianty); poslední zvuk ani poslední videostopa souboru se neodstraní nikdy. Originál se nemění.",
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete v riadku Kapitoly každých … nižšie alebo na stránke Kapitoly."] = "Počet kapitol v souboru – jen informace, zůstanou ve výsledku. Přidat je můžete v řádku Kapitoly každých … níže nebo na stránce Kapitoly.",
         ["Kapitoly každých"] = "Kapitoly každých",
         ["min:"] = "min:",
@@ -3532,6 +3532,10 @@ internal static class Translations
         ["Originály v Koši miesto na disku neuvoľnia. Superrýchle (Originál) potrebuje pri súboroch s inou len hlavičkou takmer žiadne miesto."] = "Originály v Koši místo na disku neuvolní. Superrychle (Originál) potřebuje u souborů s jinou jen hlavičkou téměř žádné místo.",
         ["Súbor, ktorý sa nezmestí, sa nezapíše (originál ostane) a spracovanie pokračuje ďalším."] = "Soubor, který se nevejde, se nezapíše (originál zůstane) a zpracování pokračuje dalším.",
         ["Spracovanie nespustené – uvoľnite miesto na disku alebo zvoľte iný výstupný priečinok."] = "Zpracování nespuštěno – uvolněte místo na disku nebo zvolte jinou výstupní složku.",
+        ["obrázok – asi obal (plagát), vo výsledku nebude"] = "obrázek – asi obal (plakát), ve výsledku nebude",
+        ["obrázok – asi obal (plagát)"] = "obrázek – asi obal (plakát)",
+        ["{0} snímok/s"] = "{0} snímků/s",
+        ["video stôp vo výsledku: {0} – nechajte len jednu, ostatné odstráňte"] = "videostop ve výsledku: {0} – nechte jen jednu, ostatní odstraňte",
     };
 
     public static readonly IReadOnlyDictionary<string, string> English = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -7031,7 +7035,7 @@ internal static class Translations
         ["Skopírovať do Názvu stopy – potom ho môžete skrátiť alebo doň dopísať"] = "Copy to Track name – then you can shorten it or add to it",
         ["ponechať všetky titulky"] = "keep all subtitles",
         ["Titulky v jazykoch mimo zoznamu (Nastavenia) sa neodstránia – všetky naraz; jednotlivo ich ponecháte pri stope"] = "Subtitles in languages out of the list (Settings) are not removed – all at once; keep single ones at the track",
-        ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk súboru sa neodstráni nikdy. Originál sa nemení."] = "The track will not be in the result (for the whole group, with All for all variants); the last sound of a file is never removed. The original does not change.",
+        ["Stopa nebude vo výsledku (pre celú skupinu, pri Všetky pre všetky varianty); posledný zvuk ani posledná video stopa súboru sa neodstráni nikdy. Originál sa nemení."] = "The track will not be in the result (for the whole group, with All for all variants); neither the last sound nor the last video track of a file is ever removed. The original does not change.",
         ["Počet kapitol v súbore – len informácia, ostanú vo výsledku. Pridať ich môžete v riadku Kapitoly každých … nižšie alebo na stránke Kapitoly."] = "The number of chapters in the file – information only, they stay in the result. Add them in the row Chapters every … below or on the page Chapters.",
         ["Kapitoly každých"] = "Chapters every",
         ["min:"] = "min:",
@@ -7060,5 +7064,9 @@ internal static class Translations
         ["Originály v Koši miesto na disku neuvoľnia. Superrýchle (Originál) potrebuje pri súboroch s inou len hlavičkou takmer žiadne miesto."] = "Originals in the Recycle Bin free no room on the disk. Super fast (Original) needs almost no room for files with another header only.",
         ["Súbor, ktorý sa nezmestí, sa nezapíše (originál ostane) a spracovanie pokračuje ďalším."] = "A file that does not fit is not written (the original stays) and the run goes on with the next.",
         ["Spracovanie nespustené – uvoľnite miesto na disku alebo zvoľte iný výstupný priečinok."] = "Not started – free some room on the disk or choose another output folder.",
+        ["obrázok – asi obal (plagát), vo výsledku nebude"] = "a picture – probably a cover (poster), not in the result",
+        ["obrázok – asi obal (plagát)"] = "a picture – probably a cover (poster)",
+        ["{0} snímok/s"] = "{0} frames/s",
+        ["video stôp vo výsledku: {0} – nechajte len jednu, ostatné odstráňte"] = "video tracks in the result: {0} – keep only one, remove the others",
     };
 }
